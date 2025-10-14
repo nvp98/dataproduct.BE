@@ -1,5 +1,6 @@
 ﻿using dataproduct.api.Business;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -48,6 +49,9 @@ builder.Services.Scan(scan => scan
 // Đăng ký DbContext với Dependency Injection (DI)
 builder.Services.AddDbContext<ProductFormContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DbConnectionString")));
+
+builder.Services.AddDbContext<ProductDataMasterDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MasterDbConnection")));
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

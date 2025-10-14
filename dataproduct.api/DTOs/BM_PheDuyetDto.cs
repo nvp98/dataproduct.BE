@@ -9,6 +9,7 @@
         public int? CapDuyet { get; set; }
 
         public int? NguoiDuyetId { get; set; }
+        public string? TenNguoiDuyet { get; set; }
 
         public DateTime? NgayDuyet { get; set; }
 

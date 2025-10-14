@@ -13,9 +13,9 @@ namespace dataproduct.api.Services
             _repo = repo;
         }
 
-        public async Task<IEnumerable<BK_PhoiThepDto>> GetAllAsync()
+        public async Task<IEnumerable<BK_PhoiThepDto>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip)
         {
-            var data = await _repo.GetAllAsync();
+            var data = await _repo.GetAllAsync(NgaySX,Ca,Kip);
             return data.Select(x => new BK_PhoiThepDto
             {
                 Id = x.Id,

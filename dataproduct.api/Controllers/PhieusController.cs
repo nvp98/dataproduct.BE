@@ -2,6 +2,7 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace dataproduct.api.Controllers
 {
@@ -17,8 +18,8 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll()
-            => Ok(await _service.GetAllAsync());
+        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID,int? NguoiDuyetID)
+            => Ok(await _service.GetAllAsync(MaBM, NguoiTaoID, NguoiDuyetID));
 
         [HttpGet("{id}")]
         public async Task<ActionResult<PhieuDto>> GetById(Guid id)
@@ -28,17 +29,17 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<BmPhieu>> Create([FromBody] BmPhieu model)
+        public async Task<ActionResult<BmPhieu>> Create([FromBody] JsonElement formData)
         {
-            var created = await _service.CreateAsync(model);
+            var created = await _service.CreateAsync(formData);
             return CreatedAtAction(nameof(GetById), new { id = created.Idphieu }, created);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] BmPhieu model)
+        public async Task<IActionResult> Update(Guid id, [FromBody] JsonElement formData)
         {
-            var ok = await _service.UpdateAsync(id, model);
-            return ok ? NoContent() : NotFound();
+            var ok = await _service.UpdateAsync(id, formData);
+            return ok != null ? NoContent() : NotFound();
         }
 
         [HttpDelete("{id}")]

@@ -27,5 +27,6 @@ namespace dataproduct.api.Controllers
             // (Tùy bạn lọc theo shiftCode nếu muốn)
             return Ok(machines);
         }
+
     }
 }

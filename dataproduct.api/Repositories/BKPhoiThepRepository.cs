@@ -1,4 +1,5 @@
 ﻿using dataproduct.api.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Repositories
@@ -12,9 +13,20 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<BkPhoiThep>> GetAllAsync()
+        public async Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX,int? Ca, string? Kip)
         {
-            return await _context.BkPhoiThep.ToListAsync();
+            var query = _context.BkPhoiThep.AsQueryable();
+
+            if (NgaySX.HasValue)
+                query = query.Where(x => x.NgaySx == NgaySX);
+
+            if (Ca.HasValue)
+                query = query.Where(x => x.Ca == Ca.Value);
+
+            if (!string.IsNullOrEmpty(Kip))
+                query = query.Where(x => x.Kip == Kip);
+
+            return await query.ToListAsync();
         }
 
         public async Task<BkPhoiThep?> GetByIdAsync(int id)

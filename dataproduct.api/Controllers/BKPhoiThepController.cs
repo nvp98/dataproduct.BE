@@ -17,7 +17,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+        public async Task<IActionResult> GetAll(DateOnly? NgaySX, int? Ca, string? Kip) => Ok(await _service.GetAllAsync(NgaySX,Ca,Kip));
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)

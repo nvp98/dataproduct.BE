@@ -1,4 +1,7 @@
-﻿namespace dataproduct.api.DTOs
+﻿using dataproduct.api.Models;
+using System.Text.Json;
+
+namespace dataproduct.api.DTOs
 {
     public class PhieuDto
     {
@@ -19,6 +22,7 @@
         public string? Kip { get; set; }
 
         public DateTime? NgayTao { get; set; }
+        public DateOnly? NgaySX { get; set; }
 
         public int? MayDuc { get; set; }
 
@@ -31,5 +35,7 @@
         public int? IsDelete { get; set; }
 
         public int? IsLock { get; set; }
+        public JsonElement? JsonData { get; internal set; }
+        public List<BM_PheDuyetDto>? PheDuyet { get; set; }
     }
 }
