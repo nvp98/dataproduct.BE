@@ -20,11 +20,42 @@ namespace dataproduct.api.Business
             _pheDuyetService = pheDuyetService;
         }
 
-        public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM,int? NguoiTaoID,int? NguoiDuyetID)
+        public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM,int? NguoiTaoID,int? NguoiDuyetID,int? isCheckDuyet)
         {
             var data = (await _repo.GetAllAsync(MaBM, NguoiTaoID)).ToList();
-            var listduyet = (await _pheDuyetRepo.GetAllAsync(NguoiDuyetID)).ToList();
-            if (listduyet.Count() == 0)
+            var listduyet = (await _pheDuyetService.GetAllAsync(NguoiDuyetID, isCheckDuyet)).ToList();
+
+            if(NguoiDuyetID != null) // lọc theo user được duyệt
+            {
+                // Join 2 danh sách theo Id phiếu
+                var result = (from p in data
+                              join d in listduyet on p.Idphieu equals d.PhieuId
+                              //into joined
+                              //from d in joined.DefaultIfEmpty()  // left join
+                              select new PhieuDto
+                              {
+                                  Idphieu = p.Idphieu,
+                                  MaBm = p.MaBm,
+                                  SoPhieu = p.SoPhieu,
+                                  XuongId = p.XuongId,
+                                  IdphongBan = p.IdphongBan,
+                                  Idkip = p.Idkip,
+                                  Ca = p.Ca,
+                                  Kip = p.Kip,
+                                  NgayTao = p.NgayTao,
+                                  NgaySX = p.NgaySX,
+                                  MayDuc = p.MayDuc,
+                                  NguoiTaoId = p.NguoiTaoId,
+                                  TinhTrang = p.TinhTrang,
+                                  DataJson = p.DataJson,
+                                  IsDelete = p.IsDelete,
+                                  IsLock = p.IsLock,
+                                  PheDuyet = new List<BM_PheDuyetDto> { d },
+                              }).ToList();
+
+                return result;
+            }
+            else 
             {
                 return data.Select(p => new PhieuDto
                 {
@@ -47,32 +78,7 @@ namespace dataproduct.api.Business
 
                 });
             }
-            // Join 2 danh sách theo Id phiếu
-            var result = (from p in data
-                          join d in listduyet on p.Idphieu equals d.PhieuId 
-                          //into joined
-                          //from d in joined.DefaultIfEmpty()  // left join
-                          select new PhieuDto
-                          {
-                              Idphieu = p.Idphieu,
-                              MaBm = p.MaBm,
-                              SoPhieu = p.SoPhieu,
-                              XuongId = p.XuongId,
-                              IdphongBan = p.IdphongBan,
-                              Idkip = p.Idkip,
-                              Ca = p.Ca,
-                              Kip = p.Kip,
-                              NgayTao = p.NgayTao,
-                              NgaySX = p.NgaySX,
-                              MayDuc = p.MayDuc,
-                              NguoiTaoId = p.NguoiTaoId,
-                              TinhTrang = p.TinhTrang,
-                              DataJson = p.DataJson,
-                              IsDelete = p.IsDelete,
-                              IsLock = p.IsLock
-                          }).ToList();
-
-            return result;
+            
 
         }
 
@@ -87,7 +93,7 @@ namespace dataproduct.api.Business
                 : new JsonElement();
             // Thông tin phê duyệt
 
-            var duyet = await _pheDuyetService.GetByIdAsync(id);
+            var duyet = await _pheDuyetService.GetByIdPhieuAsync(id);
 
             return new PhieuDto
             {

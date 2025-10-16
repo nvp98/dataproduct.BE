@@ -107,6 +107,7 @@ namespace dataproduct.api.Repositories
 
         public async Task UpdateAsync(BmPhieu entity)
         {
+            // EF tự nhận diện Guid làm khóa chính → Update không lỗi
             _context.BmPhieus.Update(entity);
             await _context.SaveChangesAsync();
         }

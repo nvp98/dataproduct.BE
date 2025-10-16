@@ -20,6 +20,7 @@ public partial class BmPhieu
     public int? Ca { get; set; }
 
     public string? Kip { get; set; }
+
     public DateOnly? NgaySX { get; set; }
 
     public DateTime? NgayTao { get; set; }

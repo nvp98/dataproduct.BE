@@ -31,8 +31,11 @@ public partial class BkPhoiThep
 
     public int? LoaiId { get; set; }
 
+    public string? LoaiPhoi { get; set; }
+
     public string? TenLoai { get; set; }
 
-    public string? LoaiPhoi { get; set; }
     public DateTime? NgayTaoBk { get; set; }
+
+    public string? TenPhanLoai { get; set; }
 }

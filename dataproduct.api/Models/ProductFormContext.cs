@@ -15,6 +15,8 @@ public partial class ProductFormContext : DbContext
     {
     }
 
+    public virtual DbSet<BkNguyenLieu> BkNguyenLieus { get; set; }
+
     public virtual DbSet<BkPhoiThep> BkPhoiThep { get; set; }
 
     public virtual DbSet<BmPheDuyet> BmPheDuyets { get; set; }
@@ -29,12 +31,36 @@ public partial class ProductFormContext : DbContext
 
 //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True");
+//        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<BkNguyenLieu>(entity =>
+        {
+            entity.ToTable("BK_NguyenLieu");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.DoAm).HasColumnType("decimal(8, 2)");
+            entity.Property(e => e.GhiChu).HasMaxLength(50);
+            entity.Property(e => e.GioLayMau).HasMaxLength(10);
+            entity.Property(e => e.GioNhapBk)
+                .HasMaxLength(50)
+                .HasColumnName("GioNhap_BK");
+            entity.Property(e => e.Kip)
+                .HasMaxLength(10)
+                .IsFixedLength();
+            entity.Property(e => e.NgaySx).HasColumnName("NgaySX");
+            entity.Property(e => e.Silo).HasMaxLength(20);
+            entity.Property(e => e.TenNvl)
+                .HasMaxLength(150)
+                .HasColumnName("TenNVL");
+            entity.Property(e => e.TronId).HasColumnName("Tron_ID");
+        });
+
         modelBuilder.Entity<BkPhoiThep>(entity =>
         {
+            entity.HasKey(e => e.Id).HasName("PK_BK_NuocThep");
+
             entity.ToTable("BK_PhoiThep");
 
             entity.Property(e => e.Id).HasColumnName("ID");
@@ -43,6 +69,7 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(10)
                 .IsFixedLength();
             entity.Property(e => e.LoaiId).HasColumnName("LoaiID");
+            entity.Property(e => e.LoaiPhoi).HasMaxLength(50);
             entity.Property(e => e.Mac).HasMaxLength(10);
             entity.Property(e => e.MauThu).HasMaxLength(10);
             entity.Property(e => e.Me).HasMaxLength(20);
@@ -51,6 +78,7 @@ public partial class ProductFormContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("NgayTaoBK");
             entity.Property(e => e.TenLoai).HasMaxLength(10);
+            entity.Property(e => e.TenPhanLoai).HasMaxLength(20);
         });
 
         modelBuilder.Entity<BmPheDuyet>(entity =>
@@ -84,6 +112,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.MaBm)
                 .HasMaxLength(100)
                 .HasColumnName("MaBM");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
             entity.Property(e => e.NgayTao).HasColumnType("datetime");
             entity.Property(e => e.NguoiTaoId).HasColumnName("NguoiTaoID");
             entity.Property(e => e.SoPhieu).HasMaxLength(50);

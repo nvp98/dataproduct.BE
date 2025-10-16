@@ -7,17 +7,17 @@ namespace dataproduct.api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class BmPheDuyetController : ControllerBase
+    public class BKNguyenLieuController : ControllerBase
     {
-        private readonly BmPheDuyetService _service;
+        private readonly BKNguyenLieuService _service;
 
-        public BmPheDuyetController(BmPheDuyetService service)
+        public BKNguyenLieuController(BKNguyenLieuService service)
         {
             _service = service;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(int? NguoiDuyetID, int? isCheckDuyet) => Ok(await _service.GetAllAsync(NguoiDuyetID, isCheckDuyet));
+        public async Task<IActionResult> GetAll(DateOnly? NgaySX, int? Ca, string? Kip) => Ok(await _service.GetAllAsync(NgaySX,Ca,Kip));
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -27,24 +27,24 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] BmPheDuyet model)
+        public async Task<IActionResult> Create([FromBody] BkNguyenLieu model)
         {
             var created = await _service.CreateAsync(model);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] BmPheDuyet model)
+        public async Task<IActionResult> Update(int id, [FromBody] BkNguyenLieu model)
         {
             var ok = await _service.UpdateAsync(id, model);
             return ok ? NoContent() : NotFound();
         }
 
-        //[HttpDelete("{id}")]
-        //public async Task<IActionResult> Delete(int id)
-        //{
-        //    var ok = await _service.DeleteAsync(id);
-        //    return ok ? NoContent() : NotFound();
-        //}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var ok = await _service.DeleteAsync(id);
+            return ok ? NoContent() : NotFound();
+        }
     }
 }

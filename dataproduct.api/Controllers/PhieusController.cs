@@ -18,8 +18,8 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID,int? NguoiDuyetID)
-            => Ok(await _service.GetAllAsync(MaBM, NguoiTaoID, NguoiDuyetID));
+        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID,int? NguoiDuyetID,int? isCheckDuyet)
+            => Ok(await _service.GetAllAsync(MaBM, NguoiTaoID, NguoiDuyetID, isCheckDuyet));
 
         [HttpGet("{id}")]
         public async Task<ActionResult<PhieuDto>> GetById(Guid id)

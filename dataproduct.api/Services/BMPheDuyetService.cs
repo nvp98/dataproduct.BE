@@ -18,9 +18,9 @@ namespace dataproduct.api.Services
             _contextMaster = Mastercontext;
         }
 
-        public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID)
+        public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID,int? isCheckDuyet)
         {
-            var data = await _repo.GetAllAsync(NguoiDuyetID);
+            var data = await _repo.GetAllAsync(NguoiDuyetID,isCheckDuyet);
             return data.Select(x => new BM_PheDuyetDto
             {
                 Id = x.Id,
@@ -33,27 +33,48 @@ namespace dataproduct.api.Services
             });
         }
 
-        public async Task<IEnumerable<BM_PheDuyetDto>?> GetByIdAsync(Guid id)
+        public async Task<BM_PheDuyetDto?> GetByIdAsync(int? id)
         {
             var x = await _repo.GetByIdAsync(id);
             if (x == null) return null;
 
-            var result =(from pd in x
-                                join tk in _contextMaster.Tbl_TaiKhoan
-                                    on pd.NguoiDuyetId equals tk.ID_TaiKhoan into joined
-                                from tk in joined.DefaultIfEmpty()
-                                //where pd.NguoiDuyetId == id
-                                select new BM_PheDuyetDto
-                                {
-                                    Id = pd.Id,
-                                    PhieuId = pd.PhieuId,
-                                    CapDuyet = pd.CapDuyet,
-                                    NguoiDuyetId = pd.NguoiDuyetId,
-                                    TenNguoiDuyet = tk != null ? tk.HoVaTen : "",
-                                    NgayDuyet = pd.NgayDuyet,
-                                    GhiChu = pd.GhiChu,
-                                    TinhTrang = pd.TinhTrang
-                                });
+            var tk = await _contextMaster.Tbl_TaiKhoan
+                            .FirstOrDefaultAsync(u => u.ID_TaiKhoan == x.NguoiDuyetId);
+
+            return new BM_PheDuyetDto
+            {
+                Id = x.Id,
+                PhieuId = x.PhieuId,
+                CapDuyet = x.CapDuyet,
+                NguoiDuyetId = x.NguoiDuyetId,
+                TenNguoiDuyet = tk?.HoVaTen ?? "",
+                NgayDuyet = x.NgayDuyet,
+                GhiChu = x.GhiChu,
+                TinhTrang = x.TinhTrang
+            };
+        }
+
+        public async Task<IEnumerable<BM_PheDuyetDto>?> GetByIdPhieuAsync(Guid id)
+        {
+            var x = await _repo.GetByIdPhieuAsync(id);
+            if (x == null) return null;
+
+            var result = (from pd in x
+                          join tk in _contextMaster.Tbl_TaiKhoan
+                              on pd.NguoiDuyetId equals tk.ID_TaiKhoan into joined
+                          from tk in joined.DefaultIfEmpty()
+                              //where pd.NguoiDuyetId == id
+                          select new BM_PheDuyetDto
+                          {
+                              Id = pd.Id,
+                              PhieuId = pd.PhieuId,
+                              CapDuyet = pd.CapDuyet,
+                              NguoiDuyetId = pd.NguoiDuyetId,
+                              TenNguoiDuyet = tk != null ? tk.HoVaTen : "",
+                              NgayDuyet = pd.NgayDuyet,
+                              GhiChu = pd.GhiChu,
+                              TinhTrang = pd.TinhTrang
+                          });
             return result;
             //return x.Select(x => new BM_PheDuyetDto
             //{
@@ -69,22 +90,23 @@ namespace dataproduct.api.Services
             //});        
         }
 
+
         public async Task<BmPheDuyet> CreateAsync(BmPheDuyet model)
         {
             await _repo.AddAsync(model);
             return model;
         }
 
-        public async Task<bool> UpdateAsync(Guid id, BmPheDuyet model)
+        public async Task<bool> UpdateAsync(int? id, BmPheDuyet model)
         {
             var item = await _repo.GetByIdAsync(id);
             if (item == null) return false;
-            //model.Id = id;
+            model.NgayDuyet = DateTime.Now;
             await _repo.UpdateAsync(model);
             return true;
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(int? id)
         {
             var item = await _repo.GetByIdAsync(id);
             if (item == null) return false;
