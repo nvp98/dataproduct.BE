@@ -40,4 +40,14 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(BkPhoiThep entity);
         Task DeleteAsync(int id);
     }
+    public interface IDLNMHRC2Repository
+    {
+        Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? NgaySX, int? Ca, string? BieuMau, int? Scope);
+        Task<DLNM_HRC2?> GetByIdAsync(int id);
+        Task<IEnumerable<DLNM_HRC2>> GetByReportNoAsync(int reportNo);
+        Task AddAsync(DLNM_HRC2 entity);
+        Task UpdateAsync(DLNM_HRC2 entity);
+        Task DeleteAsync(int id);
+        Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, int page, int pageSize);
+    }
 }

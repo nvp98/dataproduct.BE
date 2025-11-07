@@ -28,6 +28,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<CtdPhoiNguoi> CtdPhoiNguois { get; set; }
 
     public virtual DbSet<CtdPhoiNong> CtdPhoiNongs { get; set; }
+    public virtual DbSet<DLNM_HRC2> DLNM_HRC2s { get; set; }
 
 //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -159,6 +160,30 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.SoThanhLoai2).HasColumnName("SoThanh_Loai2");
             entity.Property(e => e.SoThanhLoai3).HasColumnName("SoThanh_Loai3");
             entity.Property(e => e.TongKl).HasColumnName("TongKL");
+        });
+
+        modelBuilder.Entity<DLNM_HRC2>(entity =>
+        {
+            entity.ToTable("DLNM_HRC2");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.REPORT_NO).HasColumnName("REPORT_NO");
+            entity.Property(e => e.NgaySx).HasColumnName("NgaySX");
+            entity.Property(e => e.Ngay).HasColumnName("Ngay");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.O2).HasColumnName("O2");
+            entity.Property(e => e.AR_RH).HasColumnName("AR_RH");
+            entity.Property(e => e.N2).HasColumnName("N2");
+            entity.Property(e => e.AR_BOF).HasColumnName("AR_BOF");
+            entity.Property(e => e.AR_LF).HasColumnName("AR_LF");
+            entity.Property(e => e.ID_PhuLieu).HasColumnName("ID_PhuLieu");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia");
+            entity.Property(e => e.KLGangLong).HasColumnName("KLGangLong");
+            entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe");
         });
 
         OnModelCreatingPartial(modelBuilder);
