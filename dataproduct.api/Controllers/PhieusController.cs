@@ -48,5 +48,24 @@ namespace dataproduct.api.Controllers
             var ok = await _service.DeleteAsync(id);
             return ok ? NoContent() : NotFound();
         }
+
+        [HttpPost("{id}/clone")]
+        public async Task<ActionResult<BmPhieu>> Clone(Guid id, [FromBody] JsonElement formData)
+        {
+            var cloned = await _service.CloneAsync(id, formData);
+            return cloned != null ? Ok(cloned) : NotFound();
+        }
+
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeStatusRequest request)
+        {
+            var ok = await _service.ChangeStatusAsync(id, request.Status);
+            return ok ? NoContent() : NotFound();
+        }
+    }
+
+    public class ChangeStatusRequest
+    {
+        public int Status { get; set; }
     }
 }

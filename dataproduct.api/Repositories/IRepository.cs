@@ -1,4 +1,6 @@
-﻿using dataproduct.api.Models;
+﻿using dataproduct.api.DTOs;
+using dataproduct.api.Models;
+using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -31,6 +33,7 @@ namespace dataproduct.api.Repositories
         Task DeleteAsync(int id);
         Task<bool> ExistsAsync(int id);
         Task AddListAsync(List<BmPheDuyet> pheDuyetList, Guid idphieu);
+        Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang);
     }
     public interface IBKPhoiThepRepository
     {
@@ -44,10 +47,32 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? NgaySX, int? Ca, string? BieuMau, int? Scope);
         Task<DLNM_HRC2?> GetByIdAsync(int id);
-        Task<IEnumerable<DLNM_HRC2>> GetByReportNoAsync(int reportNo);
+        Task<HRC2DetailByReportNoModel?> GetByReportNoAsync(int reportNo);
+        Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo);
         Task AddAsync(DLNM_HRC2 entity);
         Task UpdateAsync(DLNM_HRC2 entity);
         Task DeleteAsync(int id);
-        Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, int page, int pageSize);
+        Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize);
+        Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
+    }
+    public interface IHeaderKeyRepository
+    {
+        Task<IEnumerable<Header_Key>> GetAllAsync();
+        Task<Header_Key?> GetByIdAsync(int id);
+        Task AddAsync(Header_Key entity);
+        Task UpdateAsync(Header_Key entity);
+        Task DeleteAsync(int id);
+        Task<(IEnumerable<Header_Key> Data, int TotalCount)> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize);
+        Task<bool> ExistsByTenHienThiAsync(string tenHienThi, int? excludeId = null);
+        Task<bool> IsInUseAsync(int id);
+    }
+    public interface IHeaderMappingRepository
+    {
+        Task<Header_Mapping?> GetByIdAsync(int id);
+        Task<Header_Mapping> AddAsync(Header_Mapping entity);
+        Task UpdateAsync(Header_Mapping entity);
+        Task DeleteAsync(int id);
+        Task DeleteByHeaderKeyAsync(int headerKeyId);
+        Task<bool> ExistsAsync(int phuLieuId, int headerKeyId, int? excludeId = null);
     }
 }

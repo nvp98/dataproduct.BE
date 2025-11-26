@@ -1,5 +1,15 @@
 namespace dataproduct.api.DTOs
 {
+    public class DLNM_HRC2SearchDto
+    {
+        public DateTime? NgaySX { get; set; }
+        public int? Ca { get; set; }
+        public string? LoaiBM { get; set; }
+        public int? Scope { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 10;
+    }
+
     public class DLNM_HRC2GroupedDto
     {
         public int Id { get; set; }
@@ -18,6 +28,11 @@ namespace dataproduct.api.DTOs
         public double? AR_LF { get; set; }
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
+    }
+
+    public class ChuyenMeThoiRequest
+    {
+        public string MeThoi { get; set; }
     }
 }
 

@@ -47,9 +47,13 @@ namespace dataproduct.api.Business
                                   MayDuc = p.MayDuc,
                                   NguoiTaoId = p.NguoiTaoId,
                                   TinhTrang = p.TinhTrang,
-                                  DataJson = p.DataJson,
+                                //   DataJson = p.DataJson,
                                   IsDelete = p.IsDelete,
                                   IsLock = p.IsLock,
+                                  LoaiPhieu = p.LoaiPhieu,
+                                  IsClone = p.IsClone,
+                                  VersionClone = p.VersionClone,
+                                  ID_PhieuGoc = p.ID_PhieuGoc,
                                   PheDuyet = new List<BM_PheDuyetDto> { d },
                               }).ToList();
 
@@ -72,10 +76,14 @@ namespace dataproduct.api.Business
                     MayDuc = p.MayDuc,
                     NguoiTaoId = p.NguoiTaoId,
                     TinhTrang = p.TinhTrang,
-                    DataJson = p.DataJson,
+                    // DataJson = p.DataJson,
                     IsDelete = p.IsDelete,
-                    IsLock = p.IsLock
-
+                    IsLock = p.IsLock,
+                    LoaiPhieu = p.LoaiPhieu,
+                    IsClone = p.IsClone,
+                    VersionClone = p.VersionClone,
+                    ID_PhieuGoc = p.ID_PhieuGoc,
+                    // PheDuyet = new List<BM_PheDuyetDto>(),
                 });
             }
             
@@ -113,6 +121,10 @@ namespace dataproduct.api.Business
                 JsonData = jsonObject,
                 IsDelete = item.IsDelete,
                 IsLock = item.IsLock,
+                LoaiPhieu = item.LoaiPhieu,
+                IsClone = item.IsClone,
+                VersionClone = item.VersionClone,
+                ID_PhieuGoc = item.ID_PhieuGoc,
                 PheDuyet = duyet?.ToList() ?? new List<BM_PheDuyetDto>(),
             };
         }
@@ -159,7 +171,8 @@ namespace dataproduct.api.Business
             existing.DataJson = formData.GetRawText();
             existing.NgayTao = existing.NgayTao; // giữ nguyên ngày tạo
             existing.IsLock = 0; // nếu muốn mở khóa khi sửa
-            existing.TinhTrang = 0; // Taọ phiếu
+            // Giữ nguyên TinhTrang hiện tại, không reset về 0
+            // existing.TinhTrang giữ nguyên giá trị hiện tại
 
             // 4. Gọi repository để lưu
             await _repo.UpdateAsync(existing);
@@ -199,6 +212,53 @@ namespace dataproduct.api.Business
             var exists = await _repo.ExistsAsync(id);
             if (!exists) return false;
             await _repo.DeleteAsync(id);
+            return true;
+        }
+
+        public async Task<BmPhieu?> CloneAsync(Guid id, JsonElement formData)
+        {
+            try
+            {
+                // 1. Lấy phiếu gốc để lấy VersionClone hiện tại
+                var phieuGoc = await _repo.GetByIdAsync(id);
+                if (phieuGoc == null) return null;
+
+                // phieuGoc.IsLock = 1;
+                // await _repo.UpdateAsync(phieuGoc);
+                // 2. Tạo mới record từ formData (giống như hàm CreateAsync)
+                var phieu = await _repo.AddAsync(formData);
+                if (phieu == null) return null;
+
+                // 3. Update các trường clone cho record mới tạo
+                phieu.IsClone = true;
+                phieu.VersionClone = (phieuGoc.VersionClone ?? 0) + 1;
+                phieu.ID_PhieuGoc = id;
+                await _repo.UpdateAsync(phieu);
+
+                return phieu;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<bool> ChangeStatusAsync(Guid id, int status){
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return false;
+            // if(status == 4) {
+            //     existing.IsLock = 1;
+            // }
+            existing.TinhTrang = status;
+            await _repo.UpdateAsync(existing);
+
+            // if(existing.ID_PhieuGoc != null) {
+            //     var phieuGoc = await _repo.GetByIdAsync(existing.ID_PhieuGoc.Value);
+            //     if (phieuGoc == null) return false;
+            //     phieuGoc.IsLock = 0;
+            //     await _repo.UpdateAsync(phieuGoc);
+            // }
+
             return true;
         }
     }

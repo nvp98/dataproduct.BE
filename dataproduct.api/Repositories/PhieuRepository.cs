@@ -18,7 +18,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
         {
-            var query = _context.BmPhieus.Where(x => x.IsDelete != 1).AsQueryable();
+            var query = _context.BmPhieus.Where(x => x.IsDelete != 1).OrderByDescending(x => x.NgayTao).AsQueryable();
 
 
             if (!string.IsNullOrEmpty(MaBM))

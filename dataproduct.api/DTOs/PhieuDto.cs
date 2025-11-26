@@ -35,6 +35,10 @@ namespace dataproduct.api.DTOs
         public int? IsDelete { get; set; }
 
         public int? IsLock { get; set; }
+        public int? LoaiPhieu { get; set; }
+        public bool? IsClone { get; set; }
+        public int? VersionClone { get; set; }
+        public Guid? ID_PhieuGoc { get; set; }
         public JsonElement? JsonData { get; internal set; }
         public List<BM_PheDuyetDto>? PheDuyet { get; set; }
     }

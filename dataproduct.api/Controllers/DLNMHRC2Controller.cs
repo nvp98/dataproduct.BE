@@ -11,67 +11,168 @@ namespace dataproduct.api.Controllers
     public class DLNMHRC2Controller : ControllerBase
     {
         private readonly DLNMHRC2Service _service;
-
-        public DLNMHRC2Controller(DLNMHRC2Service service)
+        private readonly HRC2_NMSyncService _hrc2NMSyncService; 
+        public DLNMHRC2Controller(DLNMHRC2Service service, HRC2_NMSyncService hrc2NMSyncService)
         {
             _service = service;
+            _hrc2NMSyncService = hrc2NMSyncService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(DateTime? NgaySX, int? Ca, string? LoaiBM, int? KhuVuc) => Ok(await _service.GetAllAsync(NgaySX,Ca,LoaiBM,KhuVuc));
+        public async Task<IActionResult> GetAll(DateTime? NgaySX, int? Ca, string? LoaiBM, int? KhuVuc)
+        {
+            try
+            {
+                var data = await _service.GetAllAsync(NgaySX, Ca, LoaiBM, KhuVuc);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _service.GetByIdAsync(id);
-            return result == null ? NotFound() : Ok(result);
+            try
+            {
+                var result = await _service.GetByIdAsync(id);
+                return result == null ? NotFound() : Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
 
         [HttpGet("report/{reportNo}")]
         public async Task<IActionResult> GetByReportNo(int reportNo)
         {
-            var result = await _service.GetByReportNoAsync(reportNo);
-            return Ok(result);
+            try
+            {
+                var result = await _service.GetByReportNoAsync(reportNo);
+                return result == null ? NotFound() : Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("filter")]
+        public async Task<IActionResult> Filter([FromBody] SyncFromNM_HRC2_Request request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest("Thiếu dữ liệu bộ lọc.");
+                }
+                var result = await _service.FilterGroupedAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] DLNM_HRC2 model)
         {
-            var created = await _service.CreateAsync(model);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            try
+            {
+                var created = await _service.CreateAsync(model);
+                return CreatedAtAction(nameof(GetById), new { id = created.ID }, created);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] DLNM_HRC2 model)
         {
-            var ok = await _service.UpdateAsync(id, model);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.UpdateAsync(id, model);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var ok = await _service.DeleteAsync(id);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.DeleteAsync(id);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
 
         [HttpGet("search")]
-        public async Task<IActionResult> Search(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Search(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page = 1, int pageSize = 10)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100; // Giới hạn tối đa 100 records mỗi trang
 
-            var result = await _service.SearchWithPagingAsync(
-                NgaySX,
-                Ca,
-                LoaiBM,
-                Scope,
-                page,
-                pageSize
-            );
+            try
+            {
+                var result = await _service.SearchWithPagingAsync(
+                    NgaySX,
+                    Ca,
+                    LoaiBM,
+                    Scope,
+                    searchText,
+                    page,
+                    pageSize
+                );
 
-            return Ok(result);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        // [HttpPost("sync-from-nm")]
+        // public async Task<IActionResult> SyncFromNM([FromBody] SyncFromNM_HRC2_Request request)
+        // {
+        //     try
+        //     {
+        //         await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
+        //         return Ok();
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        //     }
+        // }
+
+        [HttpPost("chuyen-me-thoi")]
+        public async Task<IActionResult> ChuyenMeThoi([FromBody] ChuyenMeThoiRequest request)
+        {
+            try
+            {
+                var result = await _service.ChuyenMeThoiAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
     }
 }

@@ -5,11 +5,11 @@ namespace dataproduct.api.Models;
 
 public partial class DLNM_HRC2
 {
-    public int Id { get; set; }
-    public int REPORT_NO { get; set; }
+    public int ID { get; set; }
+    public int? REPORT_NO { get; set; }
     public DateTime? NgaySx { get; set; }
-    public DateTime? Ngay { get; set; }   // ❗ đổi lại DateTime, vì SQL là datetime
-    public int Ca { get; set; }
+    public DateTime? Ngay { get; set; }  
+    public int? Ca { get; set; }
     public string? BieuMau { get; set; }
     public int? Scope { get; set; }
     public string? MeThoi { get; set; }
@@ -23,10 +23,11 @@ public partial class DLNM_HRC2
 
     public int? ID_PhuLieu { get; set; }
     public string? TenPhuLieu { get; set; }
-
     public double? KLPhuGia { get; set; }
     public double? KLGangLong { get; set; }
     public double? KLThepPhe { get; set; }
+    public bool? IsNM { get; set; }
+    public bool? IsChuyenCa  { get; set; }
 }
 
 
