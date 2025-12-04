@@ -22,6 +22,9 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(BmPhieu entity);
         Task DeleteAsync(Guid id);
         Task<bool> ExistsAsync(Guid id);
+
+        Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc);
+        Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
     }
     public interface IBMPheDuyetRepository
     {
@@ -49,6 +52,7 @@ namespace dataproduct.api.Repositories
         Task<DLNM_HRC2?> GetByIdAsync(int id);
         Task<HRC2DetailByReportNoModel?> GetByReportNoAsync(int reportNo);
         Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo);
+        Task<HRC2GroupedByReportNoModel?> GetByMeThoiGroupedAsync(string meThoi);
         Task AddAsync(DLNM_HRC2 entity);
         Task UpdateAsync(DLNM_HRC2 entity);
         Task DeleteAsync(int id);
@@ -62,7 +66,7 @@ namespace dataproduct.api.Repositories
         Task AddAsync(Header_Key entity);
         Task UpdateAsync(Header_Key entity);
         Task DeleteAsync(int id);
-        Task<(IEnumerable<Header_Key> Data, int TotalCount)> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize);
+        Task<(IEnumerable<HeaderKey_ResponseModel> Data, int TotalCount)> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize);
         Task<bool> ExistsByTenHienThiAsync(string tenHienThi, int? excludeId = null);
         Task<bool> IsInUseAsync(int id);
     }

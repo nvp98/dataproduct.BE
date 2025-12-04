@@ -1,18 +1,22 @@
 using System;
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace dataproduct.api.Repositories
 {
     public class DLNMHRC2Repository   : IDLNMHRC2Repository   
     {
         private readonly ProductFormContext _context;
-        public DLNMHRC2Repository (ProductFormContext context)
+        private readonly ProductDataMasterDbContext _masterDataContext;
+        public DLNMHRC2Repository (ProductFormContext context, ProductDataMasterDbContext masterDataContext)
         {
             _context = context;
+            _masterDataContext = masterDataContext;
         }
         public async Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? Ngay,int? Ca, string? BieuMau, int? Scope)
         {
@@ -35,27 +39,26 @@ namespace dataproduct.api.Repositories
 
         public async Task<DLNM_HRC2?> GetByIdAsync(int id)
         {
-            return await _context.DLNM_HRC2s.FirstOrDefaultAsync(x => x.REPORT_NO == id);
+            return await _context.DLNM_HRC2s.FirstOrDefaultAsync(x => x.ID == id);
         }
 
         public async Task<HRC2DetailByReportNoModel?> GetByReportNoAsync(int reportNo)
         {
             try
-        {
-            var data = await _context.DLNM_HRC2s
-                .Where(x => x.REPORT_NO == reportNo)
-                .OrderBy(x => x.ID)
-                    .ToListAsync();
+            {
+                // Lấy 1 record DLNM_HRC2 per REPORT_NO
+                var baseRecord = await _context.DLNM_HRC2s
+                    .Where(x => x.REPORT_NO == reportNo)
+                    .FirstOrDefaultAsync();
 
-                if (!data.Any())
+                if (baseRecord == null)
                 {
                     return null;
                 }
 
-                var baseRecord = data.First();
-
-                var phuLieuItems = data
-                    .Where(x => x.ID_PhuLieu.HasValue)
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                var phuLieuItems = await _context.PhuLieu_HRC2s
+                    .Where(x => x.REPORT_NO == reportNo && x.ID_PhuLieu.HasValue)
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
@@ -64,7 +67,7 @@ namespace dataproduct.api.Repositories
                     })
                     .GroupBy(x => x.ID_PhuLieu)
                     .Select(g => g.First())
-                    .ToList();
+                    .ToListAsync();
 
                 var phuLieuIds = phuLieuItems
                     .Select(x => x.ID_PhuLieu)
@@ -93,7 +96,9 @@ namespace dataproduct.api.Repositories
                             m.ID_HeaderKey,
                             m.TenNguonDuLieu,
                             KeyGuid = header?.KeyGuid,
-                            TenHienThi = header?.TenHienThi
+                            TenHienThi = header?.TenHienThi,
+                            LoaiPhieu = header?.LoaiPhieu,
+                            ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                         };
                     }).ToList());
 
@@ -114,7 +119,8 @@ namespace dataproduct.api.Repositories
                                 ID_HeaderKey = map.ID_HeaderKey,
                                 KeyGuid = map.KeyGuid,
                                 TenHienThi = map.TenHienThi,
-                                TenNguonDuLieu = map.TenNguonDuLieu
+                                TenNguonDuLieu = map.TenNguonDuLieu,
+                                ThuTu = map.ThuTu
                             });
                         }
                     }
@@ -129,9 +135,9 @@ namespace dataproduct.api.Repositories
                         });
                     }
                 }
-
+                
                 var response = new HRC2DetailByReportNoModel
-            {
+                {
                     data = new DLNM_HRC2_ResponseModels
                     {
                         ID = baseRecord.ID,
@@ -150,7 +156,10 @@ namespace dataproduct.api.Repositories
                         AR_LF = FormatNumber(baseRecord.AR_LF),
                         KLGangLong = FormatNumber(baseRecord.KLGangLong),
                         KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
-                        IsNM = baseRecord.IsNM
+                        IsNM = baseRecord.IsNM,
+                        KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
+                        KLGangLongCR = FormatNumber( baseRecord.KLGangLongCR),
+                        KLThepLong = FormatNumber(baseRecord.KLThepLong)
                     },
                     phulieus = phuLieus
                 };
@@ -168,32 +177,30 @@ namespace dataproduct.api.Repositories
             }
         }
 
-        public async Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo)
+        public async Task<HRC2GroupedByReportNoModel?> GetByMeThoiGroupedAsync(string meThoi)
         {
             try
             {
-                var data = await _context.DLNM_HRC2s
-                    .Where(x => x.REPORT_NO == reportNo)
-                    .OrderBy(x => x.ID)
-                    .ToListAsync();
+                // Lấy 1 record DLNM_HRC2 per REPORT_NO
+                var baseRecord = await _context.DLNM_HRC2s
+                    .Where(x => x.MeThoi == meThoi)
+                    .FirstOrDefaultAsync();
 
-                if (!data.Any())
+                if (baseRecord == null)
                 {
                     return null;
                 }
 
-                var baseRecord = data.First();
-
-                // Lấy tất cả phụ liệu với KLPhuGia
-                var allPhuLieuData = data
-                    .Where(x => x.ID_PhuLieu.HasValue)
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                var allPhuLieuData = await _context.PhuLieu_HRC2s
+                    .Where(x => x.MeThoi == meThoi && x.ID_PhuLieu.HasValue)
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
                         x.TenPhuLieu,
                         x.KLPhuGia,
                     })
-                    .ToList();
+                    .ToListAsync();
 
                 var phuLieuIds = allPhuLieuData
                     .Select(x => x.ID_PhuLieu)
@@ -227,7 +234,8 @@ namespace dataproduct.api.Repositories
                                 KeyGuid = header?.KeyGuid,
                                 TenHienThi = header?.TenHienThi,
                                 LoaiPhieu = header?.LoaiPhieu,
-                                IsActive = header?.IsActive ?? false
+                                IsActive = header?.IsActive ?? false,
+                                ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                             };
                         }).ToList());
 
@@ -264,7 +272,188 @@ namespace dataproduct.api.Repositories
                                         KLPhuGia = formattedValue,
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
-                                        MappingId = map.Id
+                                        MappingId = map.Id,
+                                        ThuTu = map.ThuTu
+                                    };
+                                }
+                                // Sum KLPhuGia
+                                groupedMappedPhuLieus[headerKeyId].KLPhuGiaTotal = (groupedMappedPhuLieus[headerKeyId].KLPhuGiaTotal ?? 0) + (formattedValue ?? 0);
+                            }
+                            continue;
+                        }
+
+                        // Có mapping nhưng toàn bộ Header Key đã bị vô hiệu → bỏ qua hoàn toàn
+                        if (mapEntries.Any())
+                        {
+                            continue;
+                        }
+                    }
+
+                    // Phụ liệu chưa mapped (không có bản ghi mapping nào)
+                    var groupKey = (phuLieuItem.TenPhuLieu ?? $"PL_{phuLieuItem.ID_PhuLieu}")?.Trim() ?? $"PL_{phuLieuItem.ID_PhuLieu}";
+                    if (!groupedUnmappedPhuLieus.ContainsKey(groupKey))
+                    {
+                        groupedUnmappedPhuLieus[groupKey] = new HeaderKeyGroupedByReportNoModel
+                        {
+                            ID_HeaderKey = null,
+                            KeyGuid = null,
+                            TenHienThi = null,
+                            TenNguonDuLieu = phuLieuItem.TenPhuLieu,
+                            ID_PhuLieu = phuLieuItem.ID_PhuLieu,
+                            TenPhuLieu = phuLieuItem.TenPhuLieu,
+                            KLPhuGia = FormatNumber(phuLieuItem.KLPhuGia),
+                            KLPhuGiaTotal = 0,
+                            LoaiPhuLieu = null // Unmapped phụ liệu không có LoaiPhieu từ Header_Key
+                        };
+                    }
+                    // Sum KLPhuGia
+                    groupedUnmappedPhuLieus[groupKey].KLPhuGiaTotal = (groupedUnmappedPhuLieus[groupKey].KLPhuGiaTotal ?? 0) + (FormatNumber(phuLieuItem.KLPhuGia) ?? 0);
+                }
+
+                foreach (var item in groupedMappedPhuLieus.Values)
+                {
+                    item.KLPhuGia = FormatNumber(item.KLPhuGia);
+                    item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
+                }
+
+                foreach (var item in groupedUnmappedPhuLieus.Values)
+                {
+                    item.KLPhuGia = FormatNumber(item.KLPhuGia);
+                    item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
+                }
+
+                return new HRC2GroupedByReportNoModel
+                {
+                    data = new DLNM_HRC2_ResponseModels
+                    {
+                        ID = baseRecord.ID,
+                        REPORT_NO = baseRecord.REPORT_NO,
+                        NgaySx = baseRecord.NgaySx,
+                        Ngay = baseRecord.Ngay,
+                        Ca = baseRecord.Ca,
+                        BieuMau = baseRecord.BieuMau,
+                        Scope = baseRecord.Scope,
+                        MeThoi = baseRecord.MeThoi,
+                        MacThep = baseRecord.MacThep,
+                        IsNM = baseRecord.IsNM,
+                        IsChuyenCa = baseRecord.IsChuyenCa,
+                        O2 = FormatNumber(baseRecord.O2),
+                        AR_RH = FormatNumber(baseRecord.AR_RH),
+                        N2 = FormatNumber(baseRecord.N2),
+                        AR_BOF = FormatNumber(baseRecord.AR_BOF),
+                        AR_LF = FormatNumber(baseRecord.AR_LF),
+                        KLGangLong = FormatNumber(baseRecord.KLGangLong),
+                        KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
+                        KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
+                        KLGangLongCR = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepLong = FormatNumber(baseRecord.KLThepLong)
+                    },
+                    mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
+                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList()
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Error while getting grouped report {meThoi}", ex);
+            }
+        }
+        public async Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo)
+        {
+            try
+            {
+                // Lấy 1 record DLNM_HRC2 per REPORT_NO
+                var baseRecord = await _context.DLNM_HRC2s
+                    .Where(x => x.REPORT_NO == reportNo)
+                    .FirstOrDefaultAsync();
+
+                if (baseRecord == null)
+                {
+                    return null;
+                }
+
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                var allPhuLieuData = await _context.PhuLieu_HRC2s
+                    .Where(x => x.REPORT_NO == reportNo && x.ID_PhuLieu.HasValue)
+                    .Select(x => new
+                    {
+                        ID_PhuLieu = x.ID_PhuLieu!.Value,
+                        x.TenPhuLieu,
+                        x.KLPhuGia,
+                    })
+                    .ToListAsync();
+
+                var phuLieuIds = allPhuLieuData
+                    .Select(x => x.ID_PhuLieu)
+                    .Distinct()
+                    .ToList();
+
+                // Lấy mappings
+                var mappings = await _context.Header_Mappings
+                    .Where(m => phuLieuIds.Contains(m.ID_PhuLieu))
+                    .ToListAsync();
+
+                var headerKeyIds = mappings.Select(m => m.ID_HeaderKey).Distinct().ToList();
+
+                var headerKeys = await _context.Header_Keys
+                    .Where(k => headerKeyIds.Contains(k.Id))
+                    .ToDictionaryAsync(k => k.Id);
+
+                // Tạo lookup mapping theo ID_PhuLieu
+                var mappingLookup = mappings
+                    .GroupBy(m => m.ID_PhuLieu)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(m =>
+                        {
+                            headerKeys.TryGetValue(m.ID_HeaderKey, out var header);
+                            return new
+                            {
+                                m.Id,
+                                m.ID_HeaderKey,
+                                m.TenNguonDuLieu,
+                                KeyGuid = header?.KeyGuid,
+                                TenHienThi = header?.TenHienThi,
+                                LoaiPhieu = header?.LoaiPhieu,
+                                IsActive = header?.IsActive ?? false,
+                                ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
+                            };
+                        }).ToList());
+
+                // Group phụ liệu đã mapped theo idHeaderKey
+                var groupedMappedPhuLieus = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                // Group phụ liệu chưa mapped theo tên
+                var groupedUnmappedPhuLieus = new Dictionary<string, HeaderKeyGroupedByReportNoModel>();
+
+                foreach (var phuLieuItem in allPhuLieuData)
+                {
+                    if (mappingLookup.TryGetValue(phuLieuItem.ID_PhuLieu, out var mapEntries) && mapEntries.Any())
+                    {
+                        var activeMaps = mapEntries
+                            .Where(m => m.IsActive && m.KeyGuid.HasValue)
+                            .ToList();
+
+                        if (activeMaps.Any())
+                        {
+                            // Phụ liệu đã mapped: group theo idHeaderKey
+                            foreach (var map in activeMaps)
+                            {
+                                var headerKeyId = map.ID_HeaderKey;
+                                var formattedValue = FormatNumber(phuLieuItem.KLPhuGia);
+                                if (!groupedMappedPhuLieus.ContainsKey(headerKeyId))
+                                {
+                                    groupedMappedPhuLieus[headerKeyId] = new HeaderKeyGroupedByReportNoModel
+                                    {
+                                        ID_HeaderKey = map.ID_HeaderKey,
+                                        KeyGuid = map.KeyGuid,
+                                        TenHienThi = map.TenHienThi,
+                                        TenNguonDuLieu = map.TenNguonDuLieu,
+                                        ID_PhuLieu = phuLieuItem.ID_PhuLieu,
+                                        TenPhuLieu = phuLieuItem.TenPhuLieu,
+                                        KLPhuGia = formattedValue,
+                                        KLPhuGiaTotal = 0,
+                                        LoaiPhuLieu = map.LoaiPhieu,
+                                        MappingId = map.Id,
+                                        ThuTu = map.ThuTu
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -332,7 +521,10 @@ namespace dataproduct.api.Repositories
                         AR_BOF = FormatNumber(baseRecord.AR_BOF),
                         AR_LF = FormatNumber(baseRecord.AR_LF),
                         KLGangLong = FormatNumber(baseRecord.KLGangLong),
-                        KLThepPhe = FormatNumber(baseRecord.KLThepPhe)
+                        KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
+                        KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
+                        KLGangLongCR = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepLong = FormatNumber(baseRecord.KLThepLong)
                     },
                     mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
                     unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList()
@@ -341,7 +533,7 @@ namespace dataproduct.api.Repositories
             catch (Exception ex)
             {
                 throw new ApplicationException($"Error while getting grouped report {reportNo}", ex);
-        }
+            }
         }
         public async Task AddAsync(DLNM_HRC2 entity)
         {
@@ -436,22 +628,61 @@ namespace dataproduct.api.Repositories
 
         public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
         {
-            var items = await _context.DLNM_HRC2s.Where(x => x.MeThoi == request.MeThoi).ToListAsync();
-            if (items.Count == 0) return false;
-            foreach (var item in items)
-            {
-                var ca = item.Ca;
-                if(ca == 2) {
-                    var NgaySau = item.Ngay.Value.AddDays(1);
-                    item.Ngay = NgaySau;
-                    item.Ca = 1;
-                } else{
-                    item.Ca = 2;
+            int? caKQ = null;
+            DateOnly? ngayKQ = null;
+            if(request.ChuyenToiCa == 1){ // chuyển về ca trước
+                if(request.Ca == 1){
+                    caKQ = 2;
+                    ngayKQ = request.NgaySX.AddDays(-1);
                 }
+                else{
+                    caKQ = 1;
+                }
+            } else { // chuyển đến ca sau
+                if(request.Ca == 2){
+                    caKQ = 1;
+                    ngayKQ = request.NgaySX.AddDays(1);
+                }
+                else{
+                    caKQ = 2;
+                }
+            }
+
+            var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.MaBm == request.MaBM && x.NgaySX == ngayKQ && x.Ca == caKQ && x.Scope == request.Scope && x.IsDelete == 0 && x.IsLock == 0);
+            
+
+            if(phieu == null)
+                throw new ApplicationException("Phiếu chưa được tạo");
+            if(phieu.TinhTrang != 0)
+                throw new ApplicationException("Phiếu đã được gửi đi nên không nhận mẻ chuyển");
+            
+            // Cập nhật DLNM_HRC2 records
+            var dlnmItems = await _context.DLNM_HRC2s
+                .Where(x => x.MeThoi == request.MeThoi)
+                .ToListAsync();
+
+            if (dlnmItems.Count == 0)
+                throw new ApplicationException("Phiếu không có dữ liệu");
+
+            foreach (var item in dlnmItems)
+            {
+                item.Ngay = ngayKQ?.ToDateTime(TimeOnly.MinValue);
+                item.Ca = caKQ;
                 item.IsChuyenCa = true;
             }
+
+            // Cập nhật PhuLieu_HRC2 records (nếu có)
+            var phuLieuItems = await _context.PhuLieu_HRC2s
+                .Where(x => x.MeThoi == request.MeThoi)
+                .ToListAsync();
+
+            // Note: PhuLieu_HRC2 không có field Ngay, Ca, IsChuyenCa
+            // Nếu cần track chuyển ca cho phụ liệu, có thể thêm các field này vào model PhuLieu_HRC2
+            // Hiện tại chỉ cập nhật DLNM_HRC2 là đủ vì phụ liệu được link qua MeThoi
+
             await _context.SaveChangesAsync();
             return true;
         }
+
     }
 }

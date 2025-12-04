@@ -13,6 +13,7 @@ public partial class Header_Key
     public string? LoaiPhieu { get; set; }
     public bool IsActive { get; set; }
     public DateTime? NgayTao { get; set; }
+    public decimal? ThuTu { get; set; }
 }
 
 

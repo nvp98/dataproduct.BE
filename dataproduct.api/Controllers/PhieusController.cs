@@ -59,8 +59,41 @@ namespace dataproduct.api.Controllers
         [HttpPut("{id}/status")]
         public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeStatusRequest request)
         {
-            var ok = await _service.ChangeStatusAsync(id, request.Status);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.ChangeStatusAsync(id, request.Status);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("exist")]
+        public async Task<IActionResult> CheckExistSoPhieu([FromQuery] string maBm,
+        [FromQuery] DateOnly ngaySX,
+        [FromQuery] int ca,
+        [FromQuery] int? scope,
+        [FromQuery] int? mayduc)
+        {
+            var exists = await _service.CheckExistsAsync(maBm, ngaySX,ca,scope,mayduc);
+            return Ok(new { exists });
+        }
+
+        [HttpPost("search")]
+        public async Task<IActionResult> Search([FromBody] SearchPhieuRequest request)
+        {
+            try
+            {
+                var result = await _service.SearchWithPagingAsync(request);
+
+                return Ok(result );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
     }
 

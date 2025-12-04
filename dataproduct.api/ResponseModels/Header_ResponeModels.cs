@@ -11,6 +11,7 @@ namespace dataproduct.api.ResponseModels
         public string? TenPhuLieu { get; set; }
         public double? KLPhuGia { get; set; }
         public int? MappingId { get; set; }
+        public int? ThuTu { get; set; }
     }
     public class HeaderKeyGroupedByReportNoModel
     {
@@ -24,5 +25,25 @@ namespace dataproduct.api.ResponseModels
         public string? LoaiPhuLieu { get; set; }
         public double? KLPhuGiaTotal { get; set; }
         public int? MappingId { get; set; }
+        public int? ThuTu { get; set; }
+    }
+
+    public class HeaderKey_ResponseModel
+    {
+        public int Id { get; set; }
+        public Guid KeyGuid { get; set; }
+        public string TenHienThi { get; set; }
+        public string? Mota { get; set; }
+        public string? LoaiPhieu { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime? NgayTao { get; set; }
+        public int? ThuTu { get; set; }
+        public List<HeaderMapping_ResponseModel> HeaderMappings { get; set; }
+    }
+    public class HeaderMapping_ResponseModel
+    {
+        public int Id { get; set; }
+        public int ID_PhuLieu { get; set; }
+        public string TenNguonDuLieu { get; set; }
     }
 }
