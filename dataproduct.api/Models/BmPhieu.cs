@@ -13,6 +13,8 @@ public partial class BmPhieu
 
     public int? XuongId { get; set; }
 
+    public int? Scope { get; set; }
+
     public int? IdphongBan { get; set; }
 
     public int? Idkip { get; set; }

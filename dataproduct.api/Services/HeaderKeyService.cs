@@ -1,6 +1,7 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
+using dataproduct.api.ResponseModels;
 
 namespace dataproduct.api.Services
 {
@@ -49,6 +50,7 @@ namespace dataproduct.api.Services
             existing.LoaiPhieu = entity.LoaiPhieu;
             existing.Mota = entity.Mota;
             existing.IsActive = entity.IsActive;
+            existing.ThuTu = entity.ThuTu;
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;
@@ -66,10 +68,10 @@ namespace dataproduct.api.Services
             return true;
         }
 
-        public async Task<PagedResult<Header_Key>> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize)
+        public async Task<PagedResult<HeaderKey_ResponseModel>> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize)
         {
             var (data, totalCount) = await _repo.SearchWithPagingAsync(searchKey, LoaiPhieu, page, pageSize);
-            return new PagedResult<Header_Key>
+            return new PagedResult<HeaderKey_ResponseModel>
             {
                 Data = data.ToList(),
                 TotalRecords = totalCount,

@@ -21,6 +21,10 @@ namespace dataproduct.api.ResponseModels
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
         public bool? IsNM { get; set; }
+        public bool? IsChuyenCa { get; set; }
+        public double? KLGangLongCCT { get; set; }
+        public double? KLGangLongCR { get; set; }
+        public double? KLThepLong { get; set; }
     }
     public class HRC2DetailByReportNoModel
     {

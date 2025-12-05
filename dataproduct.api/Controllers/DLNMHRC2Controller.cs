@@ -11,7 +11,7 @@ namespace dataproduct.api.Controllers
     public class DLNMHRC2Controller : ControllerBase
     {
         private readonly DLNMHRC2Service _service;
-        private readonly HRC2_NMSyncService _hrc2NMSyncService; 
+        private readonly HRC2_NMSyncService _hrc2NMSyncService;
         public DLNMHRC2Controller(DLNMHRC2Service service, HRC2_NMSyncService hrc2NMSyncService)
         {
             _service = service;
@@ -147,19 +147,6 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        // [HttpPost("sync-from-nm")]
-        // public async Task<IActionResult> SyncFromNM([FromBody] SyncFromNM_HRC2_Request request)
-        // {
-        //     try
-        //     {
-        //         await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
-        //         return Ok();
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
-        //     }
-        // }
 
         [HttpPost("chuyen-me-thoi")]
         public async Task<IActionResult> ChuyenMeThoi([FromBody] ChuyenMeThoiRequest request)
@@ -167,12 +154,15 @@ namespace dataproduct.api.Controllers
             try
             {
                 var result = await _service.ChuyenMeThoiAsync(request);
-                return Ok(result);
+                return Ok(new { data = new { message = "Chuyển mẻ thành công" } });
+
             }
-            catch (Exception ex)
+            catch (ApplicationException ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+                // Trả về đúng message nghiệp vụ được throw từ Repository
+                return BadRequest(new { data = new { message = ex.Message } });
             }
+
         }
     }
 }

@@ -21,6 +21,8 @@ namespace dataproduct.api.DTOs
 
         public string? Kip { get; set; }
 
+        public int? Scope { get; set; }
+
         public DateTime? NgayTao { get; set; }
         public DateOnly? NgaySX { get; set; }
 
@@ -41,5 +43,18 @@ namespace dataproduct.api.DTOs
         public Guid? ID_PhieuGoc { get; set; }
         public JsonElement? JsonData { get; internal set; }
         public List<BM_PheDuyetDto>? PheDuyet { get; set; }
+    }
+
+    public class SearchPhieuRequest
+    {
+        public DateTime? TuNgay { get; set; }
+        public DateTime? DenNgay { get; set; }
+        public int? Ca { get; set; }
+        public int? Scope { get; set; }
+        public int? MayDuc { get; set; }
+        public string? MaBm { get; set; }
+        public string? searchText { get; set; }
+        public int page { get; set; } = 1;
+        public int pageSize { get; set; } = 10;
     }
 }

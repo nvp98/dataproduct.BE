@@ -20,14 +20,13 @@ public partial class DLNM_HRC2
     public double? N2 { get; set; }
     public double? AR_BOF { get; set; }
     public double? AR_LF { get; set; }
-
-    public int? ID_PhuLieu { get; set; }
-    public string? TenPhuLieu { get; set; }
-    public double? KLPhuGia { get; set; }
     public double? KLGangLong { get; set; }
     public double? KLThepPhe { get; set; }
+    public double? KLThepLong { get; set; }
     public bool? IsNM { get; set; }
     public bool? IsChuyenCa  { get; set; }
+    public double? KLGangLongCCT { get; set; }
+    public double? KLGangLongCR { get; set; }
 }
 
 
