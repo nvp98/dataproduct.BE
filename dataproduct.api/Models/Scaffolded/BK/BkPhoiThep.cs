@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace dataproduct.api.Models;
+namespace dataproduct.api.Models.Scaffolded.BK;
 
 public partial class BkPhoiThep
 {

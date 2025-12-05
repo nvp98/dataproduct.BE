@@ -2,6 +2,7 @@
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using dataproduct.api.DTOs;
 
 namespace dataproduct.api.Controllers
 {
@@ -17,7 +18,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(DateOnly? NgaySX, int? Ca, string? Kip) => Ok(await _service.GetAllAsync(NgaySX,Ca,Kip));
+        public async Task<IActionResult> GetAll(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc) => Ok(await _service.GetAllAsync(NgaySX, Ca, Kip, LoaiPhoi, MayDuc));
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -46,5 +47,47 @@ namespace dataproduct.api.Controllers
             var ok = await _service.DeleteAsync(id);
             return ok ? NoContent() : NotFound();
         }
+
+        [HttpPut("{id}/st-dachuyen")]
+        public async Task<IActionResult> UpdateStDaChuyen(int id, [FromBody] UpdateStDaChuyenRequest request)
+        {
+            if (request == null) return BadRequest();
+            var ok = await _service.UpdateStDaChuyenAsync(id, request.ST_DaChuyen);
+            return ok ? NoContent() : NotFound();
+        }
+
+        [HttpPut("st-dachuyen-bulk")]
+        public async Task<IActionResult> UpdateStDaChuyenBulk([FromBody] List<BKPhoiThepStUpdate> items)
+        {
+            if (items == null || items.Count == 0) return BadRequest();
+            var count = await _service.UpdateStDaChuyenRangeAsync(items);
+            return Ok(new { updated = count });
+        }
+
+        [HttpPut("{id}/st-thuhoi")]
+        public async Task<IActionResult> RevokeStDaChuyen(int id, [FromBody] RevokeStRequest request)
+        {
+            if (request == null) return BadRequest();
+            var newVal = await _service.RevokeStDaChuyenAsync(id, request.SoThuHoi);
+            return newVal.HasValue ? Ok(new { newStDaChuyen = newVal.Value }) : NotFound();
+        }
+
+        [HttpPut("st-thuhoi-bulk")]
+        public async Task<IActionResult> RevokeStDaChuyenBulk([FromBody] List<BKPhoiThepStRevoke> items)
+        {
+            if (items == null || items.Count == 0) return BadRequest();
+            var count = await _service.RevokeStDaChuyenRangeAsync(items);
+            return Ok(new { updated = count });
+        }
+    }
+
+    public class UpdateStDaChuyenRequest
+    {
+        public int ST_DaChuyen { get; set; }
+    }
+
+    public class RevokeStRequest
+    {
+        public int SoThuHoi { get; set; }
     }
 }

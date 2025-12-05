@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using dataproduct.api.Services;
@@ -118,7 +118,7 @@ namespace dataproduct.api.Business
                 NguoiTaoId = item.NguoiTaoId,
                 TinhTrang = item.TinhTrang,
                 //DataJson = item.DataJson,
-                JsonData = jsonObject,
+                JsonData = item.DataJson != null ? jsonObject : null,
                 IsDelete = item.IsDelete,
                 IsLock = item.IsLock,
                 LoaiPhieu = item.LoaiPhieu,
@@ -259,6 +259,17 @@ namespace dataproduct.api.Business
             //     await _repo.UpdateAsync(phieuGoc);
             // }
 
+            return true;
+        }
+
+        public async Task<bool> UpdateStatusExtendedAsync(Guid id, int? status, int? isLock, int? isDelete)
+        {
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return false;
+            if (status.HasValue) existing.TinhTrang = status.Value;
+            if (isLock.HasValue) existing.IsLock = isLock.Value;
+            if (isDelete.HasValue) existing.IsDelete = isDelete.Value;
+            await _repo.UpdateAsync(existing);
             return true;
         }
     }

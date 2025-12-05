@@ -69,6 +69,7 @@ public partial class ProductFormContext : DbContext
             entity.ToTable("BK_PhoiThep");
 
             entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.GhiChu).HasMaxLength(50);
             entity.Property(e => e.KichThuoc).HasMaxLength(20);
             entity.Property(e => e.Kip)
                 .HasMaxLength(10)
@@ -82,8 +83,11 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayTaoBk)
                 .HasColumnType("datetime")
                 .HasColumnName("NgayTaoBK");
+            entity.Property(e => e.StDaChuyen).HasColumnName("ST_DaChuyen");
             entity.Property(e => e.TenLoai).HasMaxLength(10);
             entity.Property(e => e.TenPhanLoai).HasMaxLength(20);
+            entity.Property(e => e.VanChuyen).HasMaxLength(50);
+            entity.Property(e => e.IsNm).HasColumnName("IsNM");
         });
 
         modelBuilder.Entity<BmPheDuyet>(entity =>
@@ -153,17 +157,31 @@ public partial class ProductFormContext : DbContext
             entity.ToTable("CTD_PhoiNong");
 
             entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.CaKip)
+                .HasMaxLength(10)
+                .IsFixedLength();
+            entity.Property(e => e.GhiChu).HasMaxLength(200);
+            entity.Property(e => e.IdBkPhoiThep).HasColumnName("ID_BK_PhoiThep");
             entity.Property(e => e.Idphieu).HasColumnName("IDPhieu");
             entity.Property(e => e.KhoiLuongLoai1).HasColumnName("KhoiLuong_Loai1");
             entity.Property(e => e.KhoiLuongLoai2).HasColumnName("KhoiLuong_Loai2");
             entity.Property(e => e.KhoiLuongLoai3).HasColumnName("KhoiLuong_Loai3");
             entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.Kip)
+                .HasMaxLength(10)
+                .IsFixedLength();
             entity.Property(e => e.Mac).HasMaxLength(10);
             entity.Property(e => e.Me).HasMaxLength(10);
+            entity.Property(e => e.NgaySx).HasColumnName("NgaySX");
+            entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.NmCan).HasColumnName("NMCan");
             entity.Property(e => e.SoThanhLoai1).HasColumnName("SoThanh_Loai1");
             entity.Property(e => e.SoThanhLoai2).HasColumnName("SoThanh_Loai2");
             entity.Property(e => e.SoThanhLoai3).HasColumnName("SoThanh_Loai3");
+            entity.Property(e => e.TinhTrangCTD).HasColumnName("TinhTrangCTD");
+            entity.Property(e => e.TinhTrangQLCL).HasColumnName("TinhTrangQLCL");
             entity.Property(e => e.TongKl).HasColumnName("TongKL");
+            entity.Property(e => e.TongSt).HasColumnName("TongST");
         });
 
         modelBuilder.Entity<DLNM_HRC2>(entity =>
