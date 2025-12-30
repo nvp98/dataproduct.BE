@@ -103,6 +103,7 @@ namespace dataproduct.api.Repositories
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
+    }
     public interface ICtdPhoiNongRepository
     {
         Task<IEnumerable<CtdPhoiNong>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
