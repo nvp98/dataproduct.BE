@@ -126,11 +126,24 @@ namespace dataproduct.api.Controllers
         }
 
 
+        [HttpPut("{id}/status-extended")]
+        public async Task<IActionResult> UpdateStatusExtended(Guid id, [FromBody] UpdatePhieuStatusRequest request)
+        {
+            var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
+            return ok ? NoContent() : NotFound();
+        }
     }
     
 
     public class ChangeStatusRequest
     {
         public int Status { get; set; }
+    }
+
+    public class UpdatePhieuStatusRequest
+    {
+        public int? Status { get; set; }
+        public int? IsLock { get; set; }
+        public int? IsDelete { get; set; }
     }
 }

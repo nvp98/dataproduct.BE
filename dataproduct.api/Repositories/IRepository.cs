@@ -40,10 +40,14 @@ namespace dataproduct.api.Repositories
     }
     public interface IBKPhoiThepRepository
     {
-        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
+        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
         Task<BkPhoiThep?> GetByIdAsync(int id);
         Task AddAsync(BkPhoiThep entity);
         Task UpdateAsync(BkPhoiThep entity);
+        Task<bool> UpdateStDaChuyenAsync(int id, int stDaChuyen);
+        Task<int> UpdateStDaChuyenRangeAsync(List<BKPhoiThepStUpdate> items);
+        Task<int?> RevokeStDaChuyenAsync(int id, int soThuHoi);
+        Task<int> RevokeStDaChuyenRangeAsync(List<BKPhoiThepStRevoke> items);
         Task DeleteAsync(int id);
     }
     public interface IDLNMHRC2Repository
@@ -99,5 +103,16 @@ namespace dataproduct.api.Repositories
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
+    public interface ICtdPhoiNongRepository
+    {
+        Task<IEnumerable<CtdPhoiNong>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
+        Task<CtdPhoiNong?> GetByIdAsync(int id);
+        Task<IEnumerable<CtdPhoiNong>> GetByPhieuIdAsync(Guid phieuId);
+        Task AddAsync(CtdPhoiNong entity);
+        Task AddListAsync(List<CtdPhoiNong> entities);
+        Task UpdateAsync(CtdPhoiNong entity);
+        Task<int> UpdateStatusRangeAsync(List<CtdPhoiNongStatusUpdate> items);
+        Task DeleteAsync(int id);
+        Task<(int Created, int Updated)> UpsertListAsync(List<CtdPhoiNong> entities);
     }
 }

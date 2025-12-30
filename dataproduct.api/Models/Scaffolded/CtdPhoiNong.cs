@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace dataproduct.api.Models;
+namespace dataproduct.api.Models.Scaffolded;
 
 public partial class CtdPhoiNong
 {
@@ -21,7 +21,7 @@ public partial class CtdPhoiNong
 
     public string? KichThuoc { get; set; }
 
-    public int? NmCan { get; set; }
+    public int? Nmcan { get; set; }
 
     public int? SoThanhLoai1 { get; set; }
 
@@ -49,7 +49,7 @@ public partial class CtdPhoiNong
 
     public DateTime? NgayTao { get; set; }
 
-    public int? TinhTrangCTD { get; set; }
+    public int? TinhTrangCtd { get; set; }
 
-    public int? TinhTrangQLCL { get; set; }
+    public int? TinhTrangQlcl { get; set; }
 }
