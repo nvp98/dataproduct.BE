@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.Models;
 
@@ -23,6 +24,8 @@ public partial class HRC2_NM
     public double? KLPhuGia { get; set; }
     public double? KLGangLong { get; set; }
     public double? KLThepPhe { get; set; }
+    [NotMapped]
+    public Guid? TempKey { get; set; }
 }
 
 

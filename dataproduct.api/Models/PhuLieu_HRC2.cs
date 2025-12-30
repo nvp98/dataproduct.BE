@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.Models;
 
@@ -14,7 +15,7 @@ public partial class PhuLieu_HRC2
     public double? KLPhuGia { get; set; }
     public int? ID_HeaderKey { get; set; }
     public string? TenHienThi { get; set; }
-
+    public long ID_MeThoi { get; set; }
+    [NotMapped]
+    public Guid TempKey { get; set; }
 }
-
-

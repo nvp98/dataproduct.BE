@@ -51,6 +51,7 @@ namespace dataproduct.api.Services
             existing.Mota = entity.Mota;
             existing.IsActive = entity.IsActive;
             existing.ThuTu = entity.ThuTu;
+            existing.IsUsedNXT = entity.IsUsedNXT;
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;
@@ -72,6 +73,39 @@ namespace dataproduct.api.Services
         {
             var (data, totalCount) = await _repo.SearchWithPagingAsync(searchKey, LoaiPhieu, page, pageSize);
             return new PagedResult<HeaderKey_ResponseModel>
+            {
+                Data = data.ToList(),
+                TotalRecords = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+
+        // Search theo Header_Mappings: mỗi ID_PhuLieu trả về 1 dòng với 1 HeaderKey
+        public async Task<PagedResult<HeaderKeyMapping_ResponseModel>> SearchMappingsWithPagingAsync(
+            string? searchKey,
+            string? LoaiPhieu,
+            string? TrangThai,
+            bool? IsUsedNXT,
+            DateTime? FromDate,
+            DateTime? ToDate,
+            string? SortThuTu,
+            int page,
+            int pageSize
+        )
+        {
+            var (data, totalCount) = await _repo.SearchMappingsWithPagingAsync(
+                searchKey,
+                LoaiPhieu,
+                TrangThai,
+                IsUsedNXT,
+                FromDate,
+                ToDate,
+                SortThuTu,
+                page,
+                pageSize
+            );
+            return new PagedResult<HeaderKeyMapping_ResponseModel>
             {
                 Data = data.ToList(),
                 TotalRecords = totalCount,

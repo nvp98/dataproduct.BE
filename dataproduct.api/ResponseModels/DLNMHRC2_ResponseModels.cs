@@ -4,7 +4,7 @@ namespace dataproduct.api.ResponseModels
 {
     public class DLNM_HRC2_ResponseModels
     {
-        public int ID { get; set; }
+        public long ID { get; set; }
         public decimal? REPORT_NO { get; set; }
         public DateTime? NgaySx { get; set; }
         public DateTime? Ngay { get; set; }  
@@ -25,6 +25,7 @@ namespace dataproduct.api.ResponseModels
         public double? KLGangLongCCT { get; set; }
         public double? KLGangLongCR { get; set; }
         public double? KLThepLong { get; set; }
+        public bool? IsTrungMeThoi { get; set; }
     }
     public class HRC2DetailByReportNoModel
     {
@@ -37,5 +38,21 @@ namespace dataproduct.api.ResponseModels
         public DLNM_HRC2_ResponseModels? data { get; set; }
         public List<HeaderKeyGroupedByReportNoModel> mappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> unmappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
+    }
+
+    public class FilterSTD_NXTResponse
+    {
+        public string? BieuMau { get; set; }
+        public int Scope { get; set; }
+        public List<PhuLieuNM>? PhuLieus { get; set; }
+        public double? TotalKLPhuGia { get; set; }
+        public int? HeaderKeyId { get; set; }
+        public string? HeaderKeyName { get; set; }
+    }
+
+    public class PhuLieuNM
+    {
+        public int? ID_PhuLieu { get; set; }
+        public string? TenPhuLieu { get; set; }
     }
 }
