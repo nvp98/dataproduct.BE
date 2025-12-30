@@ -32,7 +32,26 @@ namespace dataproduct.api.Controllers
         public async Task<ActionResult<BmPhieu>> Create([FromBody] JsonElement formData)
         {
             var created = await _service.CreateAsync(formData);
+            if (created == null)
+            {
+                return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+            }
             return CreatedAtAction(nameof(GetById), new { id = created.Idphieu }, created);
+        }
+
+        [HttpPost("auto-create-phieu")]
+        public async Task<ActionResult<BmPhieu>> AutoCreatePhieu([FromBody] JsonElement formData)
+        {
+            var created = await _service.CreateAsync(formData);
+            if (created == null)
+            {
+                return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+            }
+             return Ok(new 
+                    { 
+                        success = true, 
+                        id = created.Idphieu
+                    });
         }
 
         [HttpPut("{id}")]
@@ -95,7 +114,20 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+
+        [HttpPost("{id:guid}/initialize")]
+        public async Task<IActionResult> Initialize(Guid id)
+        {
+            var ok = await _service.InitializeAsync(id);
+            if (!ok)
+                return BadRequest(new { success = false, message = "Initialize thất bại" });
+
+            return Ok(new { success = true });
+        }
+
+
     }
+    
 
     public class ChangeStatusRequest
     {

@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.Models;
 
 public partial class DLNM_HRC2
 {
-    public int ID { get; set; }
+    public long ID { get; set; }
     public int? REPORT_NO { get; set; }
     public DateTime? NgaySx { get; set; }
     public DateTime? Ngay { get; set; }  
@@ -27,6 +28,10 @@ public partial class DLNM_HRC2
     public bool? IsChuyenCa  { get; set; }
     public double? KLGangLongCCT { get; set; }
     public double? KLGangLongCR { get; set; }
+    public bool? IsTrungMeThoi { get; set; } = false;
+
+    [NotMapped]
+    public Guid TempKey { get; set; }
 }
 
 

@@ -46,7 +46,7 @@ namespace dataproduct.api.Repositories
 
         public async Task DeleteAsync(int id)
         {
-                var item = await _context.Header_Keys.FindAsync(id);
+            var item = await _context.Header_Keys.FindAsync(id);
             if (item != null)
             {
                 _context.Header_Keys.Remove(item);
@@ -100,6 +100,7 @@ namespace dataproduct.api.Repositories
                 LoaiPhieu = h.LoaiPhieu,
                 IsActive = h.IsActive,
                 NgayTao = h.NgayTao,
+                IsUsedNXT = h.IsUsedNXT,
                 ThuTu = h.ThuTu.HasValue ? (int?)h.ThuTu.Value : null,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
@@ -123,6 +124,214 @@ namespace dataproduct.api.Repositories
         public async Task<bool> IsInUseAsync(int id)
         {
             return await _context.Header_Mappings.AnyAsync(x => x.ID_HeaderKey == id);
+        }
+
+        // Search theo 3 bảng Header_Key, Header_Mapping, PhuLieu_NM:
+        // - Trả về 1 dòng / record
+        // - Có móc nối: trả về dòng mapping
+        // - Có HeaderKey nhưng chưa móc nối: vẫn trả về
+        // - Có PhuLieu_NM nhưng chưa móc nối: vẫn trả về
+        public async Task<(IEnumerable<HeaderKeyMapping_ResponseModel> Data, int TotalCount)> SearchMappingsWithPagingAsync(
+            string? searchKey,
+            string? LoaiPhieu,
+            string? TrangThai,
+            bool? IsUsedNXT,
+            DateTime? FromDate,
+            DateTime? ToDate,
+            string? SortThuTu,
+            int page,
+            int pageSize
+        )
+        {
+            // (1) Các dòng có móc nối (Header_Mapping)
+            var mappedQuery =
+                from m in _context.Header_Mappings
+                join hk in _context.Header_Keys on m.ID_HeaderKey equals hk.Id into hkGroup
+                from hk in hkGroup.DefaultIfEmpty()
+                join pl in _context.PhuLieu_NMs on m.ID_PhuLieu equals pl.ID_PhuLieu into plGroup
+                from pl in plGroup.DefaultIfEmpty()
+                select new HeaderKeyMapping_ResponseModel
+                {
+                    MappingId = m.Id,
+                    ID_HeaderKey = hk != null ? hk.Id : (int?)null,
+                    KeyGuid = hk != null ? hk.KeyGuid : (Guid?)null,
+                    TenHienThi = hk != null ? hk.TenHienThi : null,
+                    Mota = hk != null ? hk.Mota : null,
+                    LoaiPhieu = hk != null ? hk.LoaiPhieu : null,
+                    IsActive = hk != null ? hk.IsActive : (bool?)null,
+                    NgayTao = hk != null ? hk.NgayTao : null,
+                    NgayTaoPhuLieu = pl != null ? pl.NgayTao : null,
+                    IsUsedNXT = hk != null ? hk.IsUsedNXT : null,
+                    ThuTu = hk != null && hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    ID_PhuLieu = m.ID_PhuLieu,
+                    TenNguonDuLieu = m.TenNguonDuLieu,
+                    TenPhuLieu = pl != null ? pl.TenPhuLieu : null
+                };
+
+            // (2) HeaderKey chưa được móc nối
+            var unmappedHeaderKeysQuery =
+                from hk in _context.Header_Keys
+                where !_context.Header_Mappings.Any(m => m.ID_HeaderKey == hk.Id)
+                select new HeaderKeyMapping_ResponseModel
+                {
+                    MappingId = null,
+                    ID_HeaderKey = hk.Id,
+                    KeyGuid = hk.KeyGuid,
+                    TenHienThi = hk.TenHienThi,
+                    Mota = hk.Mota,
+                    LoaiPhieu = hk.LoaiPhieu,
+                    IsActive = hk.IsActive,
+                    NgayTao = hk.NgayTao,
+                    NgayTaoPhuLieu = null,
+                    IsUsedNXT = hk.IsUsedNXT,
+                    ThuTu = hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    ID_PhuLieu = null,
+                    TenNguonDuLieu = null,
+                    TenPhuLieu = null
+                };
+
+            // (3) PhuLieu_NM chưa được móc nối
+            var unmappedPhuLieuQuery =
+                from pl in _context.PhuLieu_NMs
+                where !_context.Header_Mappings.Any(m => m.ID_PhuLieu == pl.ID_PhuLieu)
+                select new HeaderKeyMapping_ResponseModel
+                {
+                    MappingId = null,
+                    ID_HeaderKey = null,
+                    KeyGuid = null,
+                    TenHienThi = null,
+                    Mota = null,
+                    LoaiPhieu = null,
+                    IsActive = null,
+                    NgayTao = null,
+                    NgayTaoPhuLieu = pl.NgayTao,
+                    IsUsedNXT = null,
+                    ThuTu = null,
+                    ID_PhuLieu = pl.ID_PhuLieu,
+                    TenNguonDuLieu = null,
+                    TenPhuLieu = pl.TenPhuLieu
+                };
+
+            // Union 3 tập dữ liệu thành 1 query
+            var query = mappedQuery
+                .Concat(unmappedHeaderKeysQuery)
+                .Concat(unmappedPhuLieuQuery);
+
+            // Filter theo searchKey (tìm trong TenPhuLieu/TenHienThi/TenNguonDuLieu)
+            if (!string.IsNullOrEmpty(searchKey))
+            {
+                query = query.Where(x =>
+                    (x.TenPhuLieu != null && x.TenPhuLieu.Contains(searchKey)) ||
+                    (x.TenHienThi != null && x.TenHienThi.Contains(searchKey)) ||
+                    (x.TenNguonDuLieu != null && x.TenNguonDuLieu.Contains(searchKey))
+                );
+            }
+
+            // Filter theo LoaiPhieu
+            if (!string.IsNullOrEmpty(LoaiPhieu))
+            {
+                // nếu chưa móc nối (LoaiPhieu null) thì vẫn cho hiện ra
+                query = query.Where(x => x.LoaiPhieu == null || x.LoaiPhieu == LoaiPhieu);
+            }
+
+            // Filter theo Trạng thái: DangDung | ChuaMocNoi | Ngung
+            if (!string.IsNullOrEmpty(TrangThai))
+            {
+                var st = TrangThai.Trim().ToLowerInvariant();
+
+                // Ngưng: ưu tiên theo isActive == false
+                if (st == "ngung" || st == "inactive" || st == "0")
+                {
+                    query = query.Where(x => x.IsActive == false);
+                }
+                else if (st == "dangdung" || st == "active" || st == "1")
+                {
+                    // Đang dùng: isActive == true AND đã móc nối (có cả phụ liệu & header key)
+                    query = query.Where(x =>
+                        x.IsActive == true &&
+                        x.ID_PhuLieu != null &&
+                        x.ID_HeaderKey != null
+                    );
+                }
+                else if (st == "chuamocnoi" || st == "unmapped")
+                {
+                    // Chưa móc nối: isActive != false AND thiếu 1 trong 2 (phụ liệu/header key)
+                    query = query.Where(x =>
+                        x.IsActive != false &&
+                        (
+                            (x.ID_PhuLieu != null && x.ID_HeaderKey == null) ||
+                            (x.ID_PhuLieu == null && x.ID_HeaderKey != null)
+                        )
+                    );
+                }
+            }
+
+            // Filter theo IsUsedNXT: true = Có dùng, false = Không dùng (false hoặc null)
+            if (IsUsedNXT.HasValue)
+            {
+                if (IsUsedNXT.Value)
+                {
+                    query = query.Where(x => x.IsUsedNXT == true);
+                }
+                else
+                {
+                    query = query.Where(x => x.IsUsedNXT != true);
+                }
+            }
+
+            // Filter theo khoảng ngày (áp dụng trên "Ngày tạo hiệu lực": ưu tiên NgayTaoPhuLieu, fallback NgayTao)
+            if (FromDate.HasValue)
+            {
+                var from = FromDate.Value.Date;
+                query = query.Where(x => (x.NgayTaoPhuLieu ?? x.NgayTao) != null && (x.NgayTaoPhuLieu ?? x.NgayTao) >= from);
+            }
+            if (ToDate.HasValue)
+            {
+                // inclusive end-of-day
+                var to = ToDate.Value.Date.AddDays(1).AddTicks(-1);
+                query = query.Where(x => (x.NgayTaoPhuLieu ?? x.NgayTao) != null && (x.NgayTaoPhuLieu ?? x.NgayTao) <= to);
+            }
+
+            // Đếm tổng số records
+            var totalCount = await query.CountAsync();
+
+            // Lấy dữ liệu với pagination:
+            // - mặc định: phụ liệu mới trước (NgayTaoPhuLieu DESC) rồi header key mới (NgayTao DESC)
+            // - nếu SortThuTu được truyền: sort theo ThuTu (asc/desc) làm tiêu chí chính
+            IOrderedQueryable<HeaderKeyMapping_ResponseModel> ordered;
+            var sortThuTu = SortThuTu?.Trim().ToLowerInvariant();
+            if (sortThuTu == "asc" || sortThuTu == "1" || sortThuTu == "tang")
+            {
+                ordered = query
+                    .OrderBy(x => x.ThuTu.HasValue ? 0 : 1)
+                    .ThenBy(x => x.ThuTu)
+                    .ThenByDescending(x => x.NgayTaoPhuLieu)
+                    .ThenByDescending(x => x.NgayTao);
+            }
+            else if (sortThuTu == "desc" || sortThuTu == "-1" || sortThuTu == "giam")
+            {
+                ordered = query
+                    .OrderBy(x => x.ThuTu.HasValue ? 0 : 1)
+                    .ThenByDescending(x => x.ThuTu)
+                    .ThenByDescending(x => x.NgayTaoPhuLieu)
+                    .ThenByDescending(x => x.NgayTao);
+            }
+            else
+            {
+                ordered = query
+                    .OrderByDescending(x => x.NgayTaoPhuLieu)
+                    .ThenByDescending(x => x.NgayTao);
+            }
+
+            var data = await ordered
+                .ThenBy(x => x.MappingId == null ? 1 : 0)
+                .ThenBy(x => x.ID_PhuLieu)
+                .ThenBy(x => x.ID_HeaderKey)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (data, totalCount);
         }
     }
 }

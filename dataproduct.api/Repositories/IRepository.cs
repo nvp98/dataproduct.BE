@@ -49,15 +49,17 @@ namespace dataproduct.api.Repositories
     public interface IDLNMHRC2Repository
     {
         Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? NgaySX, int? Ca, string? BieuMau, int? Scope);
-        Task<DLNM_HRC2?> GetByIdAsync(int id);
+        Task<DLNM_HRC2?> GetByIdAsync(long id);
         Task<HRC2DetailByReportNoModel?> GetByReportNoAsync(int reportNo);
         Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo);
         Task<HRC2GroupedByReportNoModel?> GetByMeThoiGroupedAsync(string meThoi);
+        Task<HRC2GroupedByReportNoModel?> GetByIdGroupedAsync(int id);
         Task AddAsync(DLNM_HRC2 entity);
         Task UpdateAsync(DLNM_HRC2 entity);
-        Task DeleteAsync(int id);
+        Task DeleteAsync(long id);
         Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize);
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
+        Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca);
     }
     public interface IHeaderKeyRepository
     {
@@ -67,6 +69,17 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(Header_Key entity);
         Task DeleteAsync(int id);
         Task<(IEnumerable<HeaderKey_ResponseModel> Data, int TotalCount)> SearchWithPagingAsync(string? searchKey, string? LoaiPhieu, int page, int pageSize);
+        Task<(IEnumerable<HeaderKeyMapping_ResponseModel> Data, int TotalCount)> SearchMappingsWithPagingAsync(
+            string? searchKey,
+            string? LoaiPhieu,
+            string? TrangThai,
+            bool? IsUsedNXT,
+            DateTime? FromDate,
+            DateTime? ToDate,
+            string? SortThuTu,
+            int page,
+            int pageSize
+        );
         Task<bool> ExistsByTenHienThiAsync(string tenHienThi, int? excludeId = null);
         Task<bool> IsInUseAsync(int id);
     }
@@ -78,5 +91,13 @@ namespace dataproduct.api.Repositories
         Task DeleteAsync(int id);
         Task DeleteByHeaderKeyAsync(int headerKeyId);
         Task<bool> ExistsAsync(int phuLieuId, int headerKeyId, int? excludeId = null);
+    }
+    public interface ISTD_NXT_HRC2Repository{
+        Task<STD_NXT_HRC2_UpsertResponse> UpsertAsync(STD_NXT_HRC2_UpsertDto entity);
+        Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
+        Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
+        Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
+        // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
     }
 }
