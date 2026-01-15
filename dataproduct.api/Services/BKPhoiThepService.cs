@@ -41,7 +41,8 @@ namespace dataproduct.api.Services
                 IsNm = x.IsNm,
                 StDaChuyen = x.StDaChuyen,
                 PhanLoaiPhoi = x.PhanLoaiPhoi,
-                LoaiChatLuong = x.LoaiChatLuong
+                LoaiChatLuong = x.LoaiChatLuong,
+                DonTrongPhoi = x.DonTrongPhoi
             });
         }
 
@@ -75,7 +76,8 @@ namespace dataproduct.api.Services
                 IsNm = x.IsNm,
                 StDaChuyen = x.StDaChuyen,
                 PhanLoaiPhoi = x.PhanLoaiPhoi,
-                LoaiChatLuong = x.LoaiChatLuong
+                LoaiChatLuong = x.LoaiChatLuong,
+                DonTrongPhoi = x.DonTrongPhoi
             };
         }
 

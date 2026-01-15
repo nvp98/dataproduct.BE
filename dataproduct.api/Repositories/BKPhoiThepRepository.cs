@@ -73,9 +73,13 @@ namespace dataproduct.api.Repositories
             var total = 0;
             foreach (var item in items)
             {
+                var bkphoi = await _context.BkPhoiThep.FirstOrDefaultAsync(x => x.Id == item.Id);
+                if (bkphoi == null) continue;
+                int stDaChuyen = bkphoi.StDaChuyen != null?(int)bkphoi.StDaChuyen:0;
+                stDaChuyen = stDaChuyen + item.ST_DaChuyen;
                 var affected = await _context.BkPhoiThep
                     .Where(x => x.Id == item.Id)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.StDaChuyen, item.ST_DaChuyen));
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.StDaChuyen, stDaChuyen));
                 total += affected;
             }
             await tx.CommitAsync();

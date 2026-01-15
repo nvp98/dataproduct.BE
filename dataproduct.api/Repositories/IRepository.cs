@@ -85,14 +85,26 @@ namespace dataproduct.api.Repositories
     }
     public interface ICtdPhoiNongRepository
     {
-        Task<IEnumerable<CtdPhoiNong>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
+        Task<IEnumerable<CtdPhoiNong>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me);
         Task<CtdPhoiNong?> GetByIdAsync(int id);
         Task<IEnumerable<CtdPhoiNong>> GetByPhieuIdAsync(Guid phieuId);
         Task AddAsync(CtdPhoiNong entity);
         Task AddListAsync(List<CtdPhoiNong> entities);
         Task UpdateAsync(CtdPhoiNong entity);
         Task<int> UpdateStatusRangeAsync(List<CtdPhoiNongStatusUpdate> items);
+        Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me);
         Task DeleteAsync(int id);
         Task<(int Created, int Updated)> UpsertListAsync(List<CtdPhoiNong> entities);
+    }
+    public interface IBmQuyenXlRepository
+    {
+        Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
+        Task<BmQuyenXl?> GetByIdAsync(int id);
+        Task AddAsync(BmQuyenXl entity);
+        Task UpdateAsync(BmQuyenXl entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsAsync(int id);
+        Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
+        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, int? excludeId = null);
     }
 }

@@ -1,4 +1,5 @@
-﻿using dataproduct.api.Models.MasterData;
+﻿using Azure.Core;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
@@ -93,11 +94,78 @@ namespace dataproduct.api.Controllers
                 user.ID_PhanXuong,
                 user.ID_PhongBan,
                 user.Xuong_API,
-                TenPhongBan = user.PhongBan?.TenPhongBan
+                TenPhongBan = user.PhongBan?.TenPhongBan,
+                user.ID_Quyen
             };
 
             return Ok(result);
         }
+        [HttpGet("me")]
+        public async Task<IActionResult> Me()
+        {
+            if (User?.Identity?.IsAuthenticated == true)
+            {
+                var user = await _context.Tbl_TaiKhoan
+                .FirstOrDefaultAsync(x =>
+                    x.TenTaiKhoan == User.Identity.Name);
+                var result = new
+                {
+                    user.ID_TaiKhoan,
+                    user.TenTaiKhoan,
+                    user.HoVaTen,
+                    user.ChuKy,
+                    user.PhongBan_API,
+                    user.PhongBan.TenNgan,
+                    user.ID_PhanXuong,
+                    user.ID_PhongBan,
+                    user.Xuong_API,
+                    TenPhongBan = user.PhongBan?.TenPhongBan
+                };
+                return Ok(result);
+            }
+
+            return Unauthorized(new
+            {
+                isAuthenticated = false
+            });
+        }
+
+        /// <summary>
+        /// Lấy thông tin tài khoản theo tên đăng nhập
+        /// </summary>
+        /// <param name="tenTaiKhoan">Tên tài khoản cần lấy thông tin</param>
+        /// <returns>Thông tin tài khoản giống như khi login</returns>
+        [HttpGet("info/{tenTaiKhoan}")]
+        public async Task<IActionResult> GetUserInfo(string tenTaiKhoan)
+        {
+            if (string.IsNullOrEmpty(tenTaiKhoan))
+                return BadRequest(new { message = "Tên tài khoản không được để trống" });
+
+            var user = await _context.Tbl_TaiKhoan
+                .Include(x => x.PhongBan)
+                .FirstOrDefaultAsync(x => x.TenTaiKhoan == tenTaiKhoan);
+
+            if (user == null)
+                return NotFound(new { message = $"Không tìm thấy tài khoản: {tenTaiKhoan}" });
+
+            var result = new
+            {
+                user.ID_TaiKhoan,
+                user.TenTaiKhoan,
+                user.HoVaTen,
+                user.ChuKy,
+                user.PhongBan_API,
+                user.PhongBan?.TenNgan,
+                user.ID_PhanXuong,
+                user.ID_PhongBan,
+                user.Xuong_API,
+                TenPhongBan = user.PhongBan?.TenPhongBan,
+                user.ID_Quyen
+            };
+
+            return Ok(result);
+        }
+
     }
 
 }

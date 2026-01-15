@@ -17,8 +17,8 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip)
-            => Ok(await _service.GetAllAsync(NgaySX, Ca, Kip));
+        public async Task<IActionResult> GetAll([FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+            => Ok(await _service.GetAllAsync(NgaySX, Ca, Kip, Xuong, Me));
 
         [HttpGet("by-phieu/{phieuId}")]
         public async Task<IActionResult> GetByPhieu(Guid phieuId)
@@ -67,5 +67,50 @@ namespace dataproduct.api.Controllers
             var count = await _service.UpdateStatusesAsync(items);
             return Ok(new { updated = count });
         }
+
+        [HttpPut("update-chot")]
+        public async Task<IActionResult> UpdateStatusDone([FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+        {
+            return Ok(await _service.UpdateStatusDone(NgaySX, Ca, Kip, Xuong, Me));
+        }
+
+        [HttpGet("export-excel")]
+        public async Task<IActionResult> ExportExcel(
+      [FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+        {
+            var result = await _service.ExportExcelAsync(
+                NgaySX, Ca, Kip, Xuong, Me
+            );
+
+            return File(
+                result.Content,
+                result.ContentType,
+                result.FileName
+            );
+        }
+
+        [HttpGet("export-pdf")]
+        public async Task<IActionResult> ExportPdf(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me)
+        {
+            var file = await _service.ExportPdfAsync(NgaySX, Ca, Kip, Xuong, Me);
+
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpGet("export-excel-tonghop")]
+        public async Task<IActionResult> ExportExcelPKH(
+     [FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+        {
+            var result = await _service.PKH_ExportExcelAsync(
+                NgaySX, Ca, Kip, Xuong, Me
+            );
+
+            return File(
+                result.Content,
+                result.ContentType,
+                result.FileName
+            );
+        }
+
     }
 }

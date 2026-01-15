@@ -49,5 +49,6 @@ namespace dataproduct.api.DTOs
         public int? PhanLoaiPhoi { get; set; }
 
         public int? LoaiChatLuong { get; set; }
+        public int? DonTrongPhoi { get; set; }
     }
 }

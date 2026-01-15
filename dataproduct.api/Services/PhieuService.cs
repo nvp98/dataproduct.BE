@@ -122,6 +122,7 @@ namespace dataproduct.api.Business
                 Kip = item.Kip,
                 Scope = item.Scope,
                 NgayTao = item.NgayTao,
+                NgaySX = item.NgaySX,
                 MayDuc = item.MayDuc,
                 NguoiTaoId = item.NguoiTaoId,
                 TinhTrang = item.TinhTrang,
@@ -154,11 +155,11 @@ namespace dataproduct.api.Business
         {
             // 1. Lấy phiếu hiện tại
             var existing = await _repo.GetByIdAsync(id);
-            if (existing == null || existing.TinhTrang != 0) return null;
+            if (existing == null) return null;
 
             // save data khi them cho hrc2
-            var data = await BuildModelToInsert(formData);
-            await SaveHRC2ManualDataAsync(data);
+            //var data = await BuildModelToInsert(formData);
+            //await SaveHRC2ManualDataAsync(data);
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
             if (formData.TryGetProperty("NgaySX", out var ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null)
