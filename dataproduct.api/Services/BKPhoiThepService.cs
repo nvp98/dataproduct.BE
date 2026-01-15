@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 
@@ -13,9 +13,9 @@ namespace dataproduct.api.Services
             _repo = repo;
         }
 
-        public async Task<IEnumerable<BK_PhoiThepDto>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip)
+        public async Task<IEnumerable<BK_PhoiThepDto>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc)
         {
-            var data = await _repo.GetAllAsync(NgaySX,Ca,Kip);
+            var data = await _repo.GetAllAsync(NgaySX, Ca, Kip, LoaiPhoi, MayDuc);
             return data.Select(x => new BK_PhoiThepDto
             {
                 Id = x.Id,
@@ -33,7 +33,16 @@ namespace dataproduct.api.Services
                 LoaiId = x.LoaiId,
                 LoaiPhoi = x.LoaiPhoi,
                 TenLoai = x.TenLoai,
-                NgayTaoBk = x.NgayTaoBk
+                NgayTaoBk = x.NgayTaoBk,
+                TenPhanLoai = x.TenPhanLoai,
+                VanChuyen = x.VanChuyen,
+                GhiChu = x.GhiChu,
+                IsChuyen = x.IsChuyen,
+                IsNm = x.IsNm,
+                StDaChuyen = x.StDaChuyen,
+                PhanLoaiPhoi = x.PhanLoaiPhoi,
+                LoaiChatLuong = x.LoaiChatLuong,
+                DonTrongPhoi = x.DonTrongPhoi
             });
         }
 
@@ -59,7 +68,16 @@ namespace dataproduct.api.Services
                 LoaiId = x.LoaiId,
                 LoaiPhoi = x.LoaiPhoi,
                 TenLoai = x.TenLoai,
-                NgayTaoBk = x.NgayTaoBk
+                NgayTaoBk = x.NgayTaoBk,
+                TenPhanLoai = x.TenPhanLoai,
+                VanChuyen = x.VanChuyen,
+                GhiChu = x.GhiChu,
+                IsChuyen = x.IsChuyen,
+                IsNm = x.IsNm,
+                StDaChuyen = x.StDaChuyen,
+                PhanLoaiPhoi = x.PhanLoaiPhoi,
+                LoaiChatLuong = x.LoaiChatLuong,
+                DonTrongPhoi = x.DonTrongPhoi
             };
         }
 
@@ -84,6 +102,26 @@ namespace dataproduct.api.Services
             if (existing == null) return false;
             await _repo.DeleteAsync(id);
             return true;
+        }
+
+        public Task<bool> UpdateStDaChuyenAsync(int id, int stDaChuyen)
+        {
+            return _repo.UpdateStDaChuyenAsync(id, stDaChuyen);
+        }
+
+        public Task<int> UpdateStDaChuyenRangeAsync(List<BKPhoiThepStUpdate> items)
+        {
+            return _repo.UpdateStDaChuyenRangeAsync(items);
+        }
+
+        public Task<int?> RevokeStDaChuyenAsync(int id, int soThuHoi)
+        {
+            return _repo.RevokeStDaChuyenAsync(id, soThuHoi);
+        }
+
+        public Task<int> RevokeStDaChuyenRangeAsync(List<BKPhoiThepStRevoke> items)
+        {
+            return _repo.RevokeStDaChuyenRangeAsync(items);
         }
     }
 }

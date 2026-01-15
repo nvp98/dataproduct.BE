@@ -2,6 +2,7 @@
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
+using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -11,11 +12,13 @@ namespace dataproduct.api.Services
     {
         private readonly IBMPheDuyetRepository _repo;
         private readonly ProductDataMasterDbContext _contextMaster;
+        private readonly IPhieuRepository _phieuRepo;
 
-        public BmPheDuyetService(IBMPheDuyetRepository repo, ProductDataMasterDbContext Mastercontext)
+        public BmPheDuyetService(IBMPheDuyetRepository repo, ProductDataMasterDbContext Mastercontext, IPhieuRepository phieuRepo)
         {
             _repo = repo;
             _contextMaster = Mastercontext;
+            _phieuRepo = phieuRepo;
         }
 
         public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID,int? isCheckDuyet)
@@ -111,6 +114,105 @@ namespace dataproduct.api.Services
             var item = await _repo.GetByIdAsync(id);
             if (item == null) return false;
             //await _repo.DeleteAsync(id);
+            return true;
+        }
+       
+        public async Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang)
+        {
+            const int PendingStatus = 0;
+            const int ApprovedStatus = 1;
+            const int RejectedStatus = 2;
+
+            // 1. Lấy phiếu và danh sách phê duyệt hiện tại (trước khi update)
+            var phieu = await _phieuRepo.GetByIdAsync(phieuId);
+            var allPheDuyet = await _repo.GetByIdPhieuAsync(phieuId);
+
+            if (phieu == null)
+            {
+                // Nếu không tìm thấy phiếu thì chỉ update BM_PheDuyet và return
+                return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
+            }
+
+            // Trường hợp người duyệt chọn Reject: nếu phiếu là bản clone thì mở khóa phiếu gốc
+            // và set trạng thái phiếu hiện tại sang "Không xác nhận" (4)
+            if (tinhTrang == RejectedStatus)
+            {
+                if (phieu.ID_PhieuGoc != null)
+                {
+                    var phieuGoc = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
+                    if (phieuGoc == null) return false;
+                    phieuGoc.IsLock = 0;
+                    phieuGoc.TinhTrang = 2;
+                    await _phieuRepo.UpdateAsync(phieuGoc);
+                }
+
+                phieu.IsDelete = 1;
+                phieu.TinhTrang = 4;
+                await _phieuRepo.UpdateAsync(phieu);
+            }
+
+            if (allPheDuyet == null || !allPheDuyet.Any())
+            {
+                // Nếu không có records thì chỉ update và return
+                return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
+            }
+
+            // Loại bỏ các cấp duyệt = 0 (người lập phiếu, không tham gia phê duyệt)
+            var approverPheDuyet = allPheDuyet
+                .Where(x => (x.CapDuyet ?? 0) != 0)
+                .ToList();
+
+            if (!approverPheDuyet.Any())
+            {
+                // Không có ai cần phê duyệt → chỉ update và return
+                return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
+            }
+
+            // 2. Tính toán trạng thái mới sau khi update (giả lập update)
+
+            // Tạo danh sách giả lập sau khi update - tính toán TinhTrang sau khi update
+            var simulatedTinhTrangList = approverPheDuyet.Select(x =>
+                x.NguoiDuyetId == nguoiDuyetId ? tinhTrang : (x.TinhTrang ?? PendingStatus)
+            ).ToList();
+
+            var allApproved = simulatedTinhTrangList.All(x => x == ApprovedStatus);
+            var allRejected = simulatedTinhTrangList.All(x => x == RejectedStatus);
+            var anyApproved = simulatedTinhTrangList.Any(x => x == ApprovedStatus);
+            var allPending = simulatedTinhTrangList.All(x => x == PendingStatus);
+
+            // 4. Check trước khi update BmPheDuyet
+            int? newPhieuStatus = null;
+            if (allApproved)
+            {
+                // Tất cả đều xác nhận → chuyển sang Hoàn thành (2)
+                PhieuStatusHelper.CheckAllowStatusChange(phieu.TinhTrang ?? 0, 2);
+                newPhieuStatus = 2;
+            }
+            else if (allRejected)
+            {
+                // Tất cả đều không xác nhận → chuyển sang Không xác nhận (4)
+                PhieuStatusHelper.CheckAllowStatusChange(phieu.TinhTrang ?? 0, 4);
+                newPhieuStatus = 4;
+            }
+            else if (anyApproved && !allPending)
+            {
+                // Có người xác nhận nhưng chưa hoàn tất → Đang phê duyệt (6)
+                PhieuStatusHelper.CheckAllowStatusChange(phieu.TinhTrang ?? 0, 6);
+                newPhieuStatus = 6;
+            }
+            // Nếu tất cả vẫn đang chờ xử lý thì giữ nguyên trạng thái hiện tại (không cần check)
+
+            // 5. Nếu check pass thì mới update BmPheDuyet
+            var updateResult = await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
+            if (!updateResult) return false;
+
+            // 6. Cập nhật trạng thái phiếu nếu cần
+            if (newPhieuStatus.HasValue)
+            {
+                phieu.TinhTrang = newPhieuStatus.Value;
+                await _phieuRepo.UpdateAsync(phieu);
+            }
+
             return true;
         }
     }

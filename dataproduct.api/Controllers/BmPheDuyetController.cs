@@ -40,11 +40,30 @@ namespace dataproduct.api.Controllers
             return ok ? NoContent() : NotFound();
         }
 
+        [HttpPut("update-tinhtrang")]
+        public async Task<IActionResult> UpdateTinhTrang([FromBody] UpdateTinhTrangRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var ok = await _service.UpdateTinhTrangAsync(request.PhieuId, request.NguoiDuyetId, request.TinhTrang);
+            return ok ? NoContent() : NotFound();
+        }
+
         //[HttpDelete("{id}")]
         //public async Task<IActionResult> Delete(int id)
         //{
         //    var ok = await _service.DeleteAsync(id);
         //    return ok ? NoContent() : NotFound();
         //}
+    }
+
+    public class UpdateTinhTrangRequest
+    {
+        public Guid PhieuId { get; set; }
+        public int NguoiDuyetId { get; set; }
+        public int TinhTrang { get; set; } // 1 = xác nhận, 0 = không xác nhận
     }
 }

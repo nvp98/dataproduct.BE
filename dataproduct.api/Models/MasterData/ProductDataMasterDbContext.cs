@@ -38,6 +38,15 @@ public partial class ProductDataMasterDbContext : DbContext
             .WithMany(p => p.TaiKhoans)
             .HasForeignKey(t => t.ID_PhongBan);
 
+        // Cấu hình entity keyless cho stored procedure results
+        modelBuilder.Entity<StoredProcedureScalarResult>(entity =>
+        {
+            entity.HasNoKey();
+            entity.ToView(null); // Không map đến view/table nào
+            // Map property Result với bất kỳ tên cột nào từ stored procedure
+            entity.Property(e => e.Result)
+                .HasColumnName("Result"); // Có thể là "Result", "TotalKL", hoặc tên cột khác
+        });
 
         base.OnModelCreating(modelBuilder);
     }

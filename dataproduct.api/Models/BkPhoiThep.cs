@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace dataproduct.api.Models;
@@ -38,4 +38,19 @@ public partial class BkPhoiThep
     public DateTime? NgayTaoBk { get; set; }
 
     public string? TenPhanLoai { get; set; }
+
+    public string? VanChuyen { get; set; }
+
+    public string? GhiChu { get; set; }
+
+    public int? IsChuyen { get; set; }
+
+    public int? IsNm { get; set; }
+
+    public int? StDaChuyen { get; set; }
+
+    public int? PhanLoaiPhoi { get; set; }
+
+    public int? LoaiChatLuong { get; set; }
+    public int? DonTrongPhoi { get; set; }
 }

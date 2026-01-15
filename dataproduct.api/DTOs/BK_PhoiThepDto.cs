@@ -1,4 +1,4 @@
-﻿namespace dataproduct.api.DTOs
+namespace dataproduct.api.DTOs
 {
     public class BK_PhoiThepDto
     {
@@ -33,5 +33,22 @@
         public string? LoaiPhoi { get; set; }
 
         public DateTime? NgayTaoBk { get; set; }
+
+        public string? TenPhanLoai { get; set; }
+
+        public string? VanChuyen { get; set; }
+
+        public string? GhiChu { get; set; }
+
+        public int? IsChuyen { get; set; }
+
+        public int? IsNm { get; set; }
+
+        public int? StDaChuyen { get; set; }
+
+        public int? PhanLoaiPhoi { get; set; }
+
+        public int? LoaiChatLuong { get; set; }
+        public int? DonTrongPhoi { get; set; }
     }
 }

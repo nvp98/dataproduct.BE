@@ -1,4 +1,6 @@
-﻿using dataproduct.api.Models;
+﻿using dataproduct.api.DTOs;
+using dataproduct.api.Models;
+using dataproduct.api.ResponseModels;
 using dataproduct.api.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +20,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
         {
-            var query = _context.BmPhieus.Where(x => x.IsDelete != 1).AsQueryable();
+            var query = _context.BmPhieus.Where(x => x.IsDelete != 1 && x.IsLock != 1).OrderByDescending(x => x.NgayTao).AsQueryable();
 
 
             if (!string.IsNullOrEmpty(MaBM))
@@ -39,22 +41,27 @@ namespace dataproduct.api.Repositories
             try
             {
                 string maBM = formData.GetProperty("maBm").GetString() ?? "UNKNOWN";
+                string prefix = formData.TryGetProperty("prefix", out var p)? p.GetString() ?? "UNKNOWN" : "UNKNOWN";
+                int Ca = formData.TryGetProperty("ca", out var ca) ? ca.GetInt32() : 0;
+                int Scope = formData.TryGetProperty("scope", out var scope) ? scope.GetInt32() : 0;
+                DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp)
+                                ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
+                                : null;
+                string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix, Scope, Ca, NgaySX);
 
-                string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix: "BBGN");
 
                 var phieu = new BmPhieu
                 {
                     Idphieu = Guid.NewGuid(),
                     MaBm = maBM,
                     SoPhieu = soPhieu,
-                    NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp)
-                                ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
-                                : null,
-                    Ca = formData.TryGetProperty("ca", out var caProp) ? caProp.GetInt32() : null,
+                    NgaySX = NgaySX,
+                    Ca = Ca,
                     MayDuc = formData.TryGetProperty("mayduc", out var mdProp) ? mdProp.GetInt32() : null,
-                    NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
-                    XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
-                    IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
+                    //NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
+                    Scope = Scope ,
+                    //XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
+                    //IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
                     DataJson = formData.GetRawText(),
                     NgayTao = DateTime.Now,
                     TinhTrang = 0,
@@ -126,5 +133,65 @@ namespace dataproduct.api.Repositories
         {
             return await _context.BmPhieus.AnyAsync(e => e.Idphieu == id);
         }
+
+        public async Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc)
+        {
+            return await _context.BmPhieus.AnyAsync(x =>
+                x.MaBm == maBm &&
+                x.NgaySX == ngaySX &&
+                x.Ca == ca &&
+                (x.Scope == scope || x.MayDuc == mayduc)
+            );
+        }
+
+        public async Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request)
+        {
+            var query = _context.BmPhieus.Where(x => x.IsDelete != 1 && x.IsLock != 1).OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).AsQueryable();
+            if (request.TuNgay.HasValue)
+            {
+                query = query.Where(x => x.NgaySX >= DateOnly.FromDateTime(request.TuNgay.Value));
+            }
+            if (request.DenNgay.HasValue)
+            {
+                query = query.Where(x => x.NgaySX <= DateOnly.FromDateTime(request.DenNgay.Value));
+            }
+            if (request.Ca.HasValue)
+            {
+                query = query.Where(x => x.Ca == request.Ca.Value);
+            }
+            if (request.Scope.HasValue)
+            {
+                query = query.Where(x => x.Scope == request.Scope.Value);
+            }
+            if (request.MayDuc.HasValue)
+            {
+                query = query.Where(x => x.MayDuc == request.MayDuc.Value);
+            }
+            if (!string.IsNullOrEmpty(request.MaBm))
+            {
+                query = query.Where(x => x.MaBm == request.MaBm);
+            }
+            if (!string.IsNullOrEmpty(request.searchText))
+            {
+                query = query.Where(x => x.SoPhieu.Contains(request.searchText));
+            }
+            var totalCount = await query.CountAsync();
+            var data = await query.Skip((request.page - 1) * request.pageSize).Take(request.pageSize).ToListAsync();
+            var result = data.Select(x => new SearchPhieuResponseModel
+            {
+                Idphieu = x.Idphieu,
+                SoPhieu = x.SoPhieu,
+                MaBm = x.MaBm,
+                NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
+                Ca = x.Ca,
+                Scope = x.Scope,
+                MayDuc = x.MayDuc,
+                TinhTrang = x.TinhTrang,
+                NguoiTao = x.NguoiTaoId
+            }).ToList();
+            
+            return (result, totalCount);
+        }
+
     }
 }

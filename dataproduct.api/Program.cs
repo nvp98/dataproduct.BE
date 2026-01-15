@@ -2,6 +2,8 @@
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
+using DinkToPdf;
+using DinkToPdf.Contracts;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Reflection;
@@ -31,6 +33,10 @@ builder.Services.AddCors(options =>
 //builder.Services.AddScoped<IPhieuRepository, PhieuRepository>();
 //builder.Services.AddScoped<PhieuService>();
 
+builder.Services.AddSingleton<IConverter>(
+    new SynchronizedConverter(new PdfTools())
+);
+
 builder.Services.Scan(scan => scan
     .FromAssemblies(Assembly.GetExecutingAssembly())
     .AddClasses(c => c.Where(t => t.Name.EndsWith("Helper")))
@@ -59,21 +65,26 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
-//app.UseCors("AllowReactApp"); // Áp dụng CORS
-app.UseCors("AllowAllOrigins");
 
-// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
-app.UseSwagger();
-app.UseSwaggerUI();
-app.UseHttpsRedirection();
+// 🔑 1. STATIC FILES (React build)
+app.UseStaticFiles();
 
-app.UseAuthorization();
-
+// 🔑 2. API
 app.MapControllers();
 
+// 🔑 3. SWAGGER (OK)
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// 🔑 4. SPA FALLBACK – QUAN TRỌNG NHẤT
+app.MapFallbackToFile("index.html");
+
+// 🔑 5. CORS (nếu cần)
+app.UseCors("AllowAllOrigins");
+
+// ❌ KHÔNG HTTPS REDIRECTION
+// ❌ KHÔNG UseDefaultFiles
+// ❌ KHÔNG MapControllers lần 2
+
 app.Run();
+

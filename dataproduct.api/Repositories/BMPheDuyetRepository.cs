@@ -27,12 +27,12 @@ namespace dataproduct.api.Repositories
             return await query.ToListAsync();
         }
 
-        public async Task<BmPheDuyet> GetByIdAsync(int? id)
+        public async Task<BmPheDuyet?> GetByIdAsync(int? id)
         {
             return await _context.BmPheDuyets.Where(x => x.Id == id).FirstOrDefaultAsync();
         }
 
-        public async Task<IEnumerable<BmPheDuyet>> GetByIdPhieuAsync(Guid id)
+        public async Task<IEnumerable<BmPheDuyet>?> GetByIdPhieuAsync(Guid id)
         {
             return await _context.BmPheDuyets.Where(x => x.PhieuId == id).ToListAsync();
         }
@@ -84,6 +84,23 @@ namespace dataproduct.api.Repositories
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.BmPheDuyets.AnyAsync(e => e.Id == id);
+        }
+
+        public async Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang)
+        {
+            var item = await _context.BmPheDuyets
+                .FirstOrDefaultAsync(x => x.PhieuId == phieuId && x.NguoiDuyetId == nguoiDuyetId);
+            
+            if (item == null) return false;
+            
+            item.TinhTrang = tinhTrang;
+            if (tinhTrang == 1) // Nếu xác nhận thì set NgayDuyet
+            {
+                item.NgayDuyet = DateTime.Now;
+            }
+            
+            await _context.SaveChangesAsync();
+            return true;
         }
 
     }

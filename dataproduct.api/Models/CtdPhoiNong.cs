@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace dataproduct.api.Models;
@@ -9,11 +9,19 @@ public partial class CtdPhoiNong
 
     public Guid? Idphieu { get; set; }
 
+    public DateOnly? NgaySx { get; set; }
+
+    public int? Ca { get; set; }
+
+    public string? Kip { get; set; }
+
     public string? Me { get; set; }
 
     public string? Mac { get; set; }
 
     public string? KichThuoc { get; set; }
+
+    public int? NmCan { get; set; }
 
     public int? SoThanhLoai1 { get; set; }
 
@@ -27,5 +35,21 @@ public partial class CtdPhoiNong
 
     public double? KhoiLuongLoai3 { get; set; }
 
+    public int? TongSt { get; set; }
+
     public double? TongKl { get; set; }
+
+    public string? CaKip { get; set; }
+
+    public int? IdBkPhoiThep { get; set; }
+
+    public int? TinhTrang { get; set; }
+
+    public string? GhiChu { get; set; }
+
+    public DateTime? NgayTao { get; set; }
+
+    public int? TinhTrangCTD { get; set; }
+
+    public int? TinhTrangQLCL { get; set; }
 }
