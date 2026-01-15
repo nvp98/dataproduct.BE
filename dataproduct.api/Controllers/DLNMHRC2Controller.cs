@@ -164,5 +164,19 @@ namespace dataproduct.api.Controllers
             }
 
         }
+
+        [HttpPost("filterSTD_NXT")]
+        public async Task<IActionResult> FilterSTD_NXT([FromBody] FilterSTD_NXTRequest request)
+        {
+            try
+            {
+                var result = await _service.FilterSTD_NXTAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }   
+        }
     }
 }

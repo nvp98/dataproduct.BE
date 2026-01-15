@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using dataproduct.api.ResponseModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Models;
@@ -38,12 +39,15 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<Header_Mapping> Header_Mappings { get; set; }
 
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
-
+    public virtual DbSet<PhuLieu_NM> PhuLieu_NMs { get; set; }
     public virtual DbSet<PhuLieu_HRC2> PhuLieu_HRC2s { get; set; }
-
-//    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
+    public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
+    public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
+    public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
+    public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
+    //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+    //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -235,6 +239,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
             entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
+            entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
         });
 
         modelBuilder.Entity<Header_Mapping>(entity =>
@@ -271,10 +276,9 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLGangLong).HasColumnName("KLGangLong");
             entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe");
         });
-
         modelBuilder.Entity<PhuLieu_HRC2>(entity =>
         {
-            entity.ToTable("PhuLieu_HRC2");
+            entity.ToTable("PhuLieu_HRC2", tb => tb.HasTrigger("TR_PhuLieu_HRC2_Upsert_PhuLieu_NM"));
             entity.Property(e => e.ID).HasColumnName("Id");
             entity.Property(e => e.REPORT_NO).HasColumnName("REPORT_NO");
             entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
@@ -285,7 +289,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
             entity.Property(e => e.TenHienThi).HasColumnName("TenHienThi");
         });
-
         OnModelCreatingPartial(modelBuilder);
     }
 

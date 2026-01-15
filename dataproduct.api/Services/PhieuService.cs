@@ -13,13 +13,15 @@ namespace dataproduct.api.Business
     public class PhieuService
     {
         private readonly IPhieuRepository _repo;
+        private readonly ISTD_NXT_HRC2Repository _std_nxt_hrc2Repo;
         private readonly IBMPheDuyetRepository _pheDuyetRepo;
         private readonly BmPheDuyetService _pheDuyetService;
         private readonly ProductFormContext _context;
 
-        public PhieuService(IPhieuRepository repo, IBMPheDuyetRepository pheDuyetRepo, BmPheDuyetService pheDuyetService, ProductFormContext context)
+        public PhieuService(IPhieuRepository repo, ISTD_NXT_HRC2Repository std_nxt_hrc2Repo, IBMPheDuyetRepository pheDuyetRepo, BmPheDuyetService pheDuyetService, ProductFormContext context)
         {
             _repo = repo;
+            _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
             _pheDuyetRepo = pheDuyetRepo;
             _pheDuyetService = pheDuyetService;
             _context = context;
@@ -158,8 +160,12 @@ namespace dataproduct.api.Business
             if (existing == null) return null;
 
             // save data khi them cho hrc2
-            //var data = await BuildModelToInsert(formData);
-            //await SaveHRC2ManualDataAsync(data);
+            string bm = formData.GetProperty("maBm").GetString();
+            if (bm == "HRC2_BB_NauLuyen_BOF" || bm == "HRC2_BB_NauLuyen_LF" || bm == "HRC2_BB_NauLuyen_RH")
+            {
+                var data = await BuildModelToInsert(formData);
+                await SaveHRC2ManualDataAsync(data);
+            }
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
             if (formData.TryGetProperty("NgaySX", out var ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null)
@@ -273,18 +279,16 @@ namespace dataproduct.api.Business
                 isCreatorZero.TinhTrang = 1;
                 await _pheDuyetRepo.UpdateAsync(isCreatorZero);
             }
-            if (status == 2)
-            {
-                var allPheDuyet = await _pheDuyetRepo.GetByIdPhieuAsync(id);
-                if (allPheDuyet == null || !allPheDuyet.Any()) return false;
-                var isCreatorZero = allPheDuyet.Any(x => x.CapDuyet == 0);
-                if (isCreatorZero) return false;
-                foreach (var item in allPheDuyet)
-                {
-                    item.TinhTrang = 1;
-                    await _pheDuyetRepo.UpdateAsync(item);
-                }
-            }
+            //if(status == 2) {
+            //var allPheDuyet = await _pheDuyetRepo.GetByIdPhieuAsync(id);
+            //if(allPheDuyet == null || !allPheDuyet.Any()) return false;
+            //var isCreatorZero = allPheDuyet.Any(x => x.CapDuyet == 0);
+            //if(isCreatorZero) return false;
+            //foreach(var item in allPheDuyet) {
+            // item.TinhTrang = 1;
+            // await _pheDuyetRepo.UpdateAsync(item);
+            //}
+            //}
 
             existing.TinhTrang = status;
             await _repo.UpdateAsync(existing);
@@ -324,6 +328,46 @@ namespace dataproduct.api.Business
                 Page = request.page,
                 PageSize = request.pageSize
             };
+        }
+
+        public async Task<bool> InitializeAsync(Guid phieuId)
+        {
+            using var tran = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == phieuId);
+
+                if (phieu == null)
+                {
+                    return false;
+                }
+
+                // Xác định loại biểu mẫu để chạy logic riêng
+                switch (phieu.MaBm)
+                {
+                    case "HRC2_STD_NXT":
+                        await InitializeHRC2_STD_NXTAsync(phieu);
+                        break;
+                    // them các biểu mẫu khác nếu cần khởi tạo default
+                    default:
+                        break;
+                }
+                await _context.SaveChangesAsync();
+                await tran.CommitAsync();
+
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await tran.RollbackAsync();
+                return false;
+            }
+        }
+        public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
+        {
+            await _std_nxt_hrc2Repo.InitializeHRC2_STD_NXTAsync(phieu);
         }
 
         public async Task<List<HRC2InsertModel>> BuildModelToInsert(JsonElement formData)
@@ -476,25 +520,198 @@ namespace dataproduct.api.Business
             return result;
         }
 
-        /// <summary>
-        /// Lưu dữ liệu nhập tay vào 2 bảng: DLNM_HRC2 và PhuLieu_HRC2
-        /// Nếu đã tồn tại (theo MeThoi, Ngay, Ca, Scope, BieuMau, IsNM=false) thì update, nếu chưa thì insert
-        /// </summary>
+        // public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models)
+        // {
+        //     if (models == null || !models.Any())
+        //         return;
+
+        //     var dlnmMap = new Dictionary<Guid, DLNM_HRC2>(); // Key = RowKey
+
+        //     foreach (var model in models)
+        //     {
+        //         // Tìm DLNM cha cũ (nếu có)
+        //         DLNM_HRC2 existing = null;
+        //         if (model.Id != null && model.Id > 0)
+        //         {
+        //             existing = await _context.DLNM_HRC2s
+        //                 .FirstOrDefaultAsync(x => x.ID == model.Id && x.IsNM == false);
+        //         }
+
+        //         // Kiểm tra trùng mẻ
+        //         var existingMeThoi = await _context.DLNM_HRC2s
+        //             .Where(x => x.MeThoi == model.MeThoi &&
+        //                         x.BieuMau == model.BieuMau &&
+        //                         x.IsNM == false)
+        //             .ToListAsync();
+
+        //         bool isTrung = existingMeThoi.Any();
+
+        //         if (isTrung)
+        //         {
+        //             foreach (var item in existingMeThoi)
+        //             {
+        //                 item.IsTrungMeThoi = true;
+        //             }
+        //             _context.DLNM_HRC2s.UpdateRange(existingMeThoi);
+        //         }
+
+        //         DLNM_HRC2 dlnm;
+
+        //         if (existing == null)
+        //         {
+        //             // Tạo mới DLNM
+        //             dlnm = new DLNM_HRC2
+        //             {
+        //                 REPORT_NO = null,
+        //                 NgaySx = model.Ngay,
+        //                 Ngay = model.Ngay,
+        //                 Ca = model.Ca,
+        //                 BieuMau = model.BieuMau,
+        //                 Scope = model.Scope,
+        //                 MeThoi = model.MeThoi,
+        //                 MacThep = model.MacThep,
+        //                 O2 = model.O2,
+        //                 N2 = model.N2,
+        //                 AR_RH = model.AR_RH,
+        //                 AR_LF = model.AR_LF,
+        //                 AR_BOF = model.AR_BOF,
+        //                 KLGangLong = model.KLGangLong,
+        //                 KLThepPhe = model.KLThepPhe,
+        //                 KLThepLong = model.KlThepLong,
+        //                 IsNM = false,
+        //                 IsChuyenCa = model.IsChuyenCa,
+        //                 IsTrungMeThoi = isTrung,
+
+        //                 TempKey = Guid.NewGuid()  // ⭐ Quan trọng để map phụ liệu
+        //             };
+
+        //             await _context.DLNM_HRC2s.AddAsync(dlnm);
+        //         }
+        //         else
+        //         {
+        //             // Update DLNM
+        //             dlnm = existing;
+
+        //             dlnm.MeThoi = model.MeThoi;
+        //             dlnm.MacThep = model.MacThep;
+        //             dlnm.O2 = model.O2;
+        //             dlnm.N2 = model.N2;
+        //             dlnm.AR_RH = model.AR_RH;
+        //             dlnm.AR_LF = model.AR_LF;
+        //             dlnm.AR_BOF = model.AR_BOF;
+        //             dlnm.KLGangLong = model.KLGangLong;
+        //             dlnm.KLThepPhe = model.KLThepPhe;
+        //             dlnm.KLThepLong = model.KlThepLong;
+        //             dlnm.IsChuyenCa = model.IsChuyenCa;
+        //             dlnm.NgaySx = model.Ngay;
+        //             dlnm.IsTrungMeThoi = isTrung;
+
+        //             if (dlnm.TempKey == Guid.Empty)
+        //                 dlnm.TempKey = Guid.NewGuid();
+
+        //             _context.DLNM_HRC2s.Update(dlnm);
+        //         }
+
+        //         // Lưu vào Map bằng RowKey (DUY NHẤT)
+        //         dlnmMap[model.RowKey] = dlnm;
+        //     }
+
+        //     await _context.SaveChangesAsync();
+
+        //     foreach (var model in models)
+        //     {
+        //         var dlnm = dlnmMap[model.RowKey];
+
+        //         // XÓA phụ liệu cũ theo ID cha (an toàn tuyệt đối)
+        //         var oldPL = await _context.PhuLieu_HRC2s
+        //             .Where(x => x.ID_MeThoi == dlnm.ID)
+        //             .ToListAsync();
+
+        //         _context.PhuLieu_HRC2s.RemoveRange(oldPL);
+
+        //         // THÊM phụ liệu mới
+        //         foreach (var pl in model.hRC2_PhuLieus)
+        //         {
+        //             _context.PhuLieu_HRC2s.Add(new PhuLieu_HRC2
+        //             {
+        //                 BieuMau = model.BieuMau,
+        //                 MeThoi = model.MeThoi,
+        //                 ID_PhuLieu = pl.ID_PhuLieu,
+        //                 TenPhuLieu = pl.TenPhuLieu,
+        //                 KLPhuGia = pl.KLPhuGia,
+        //                 ID_HeaderKey = pl.ID_HeaderKey,
+        //                 TenHienThi = pl.TenHienThi,
+        //                 ID_MeThoi = dlnm.ID  
+        //             });
+        //         }
+        //     }
+
+        //     // SAVE 2 — lưu phụ liệu
+        //     await _context.SaveChangesAsync();
+        // }
         public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models)
         {
             if (models == null || !models.Any())
                 return;
 
+            var dlnmMap = new Dictionary<Guid, DLNM_HRC2>(); // Key = RowKey
+
             foreach (var model in models)
             {
-                // Tìm bản ghi DLNM_HRC2 hiện hữu
-                var existingDLNM = await _context.DLNM_HRC2s.FirstOrDefaultAsync(x => x.ID == model.Id &&
-                    x.IsNM == false);
-
-                if (existingDLNM == null)
+                // Tìm DLNM cha cũ (nếu có)
+                DLNM_HRC2 existing = null;
+                if (model.Id != null && model.Id > 0)
                 {
-                    // INSERT
-                    existingDLNM = new DLNM_HRC2
+                    existing = await _context.DLNM_HRC2s
+                        .FirstOrDefaultAsync(x => x.ID == model.Id && x.IsNM == false);
+                }
+
+                // ====== KIỂM TRA TRÙNG MẺ THỎI (IsNM = false) ======
+                var sameMeThoi = await _context.DLNM_HRC2s
+                    .Where(x =>
+                        x.MeThoi == model.MeThoi &&
+                        x.BieuMau == model.BieuMau)
+                    .ToListAsync();
+
+                bool isTrung = false;
+
+                if (existing == null)
+                {
+                    // INSERT → nếu có record khác trùng → trùng
+                    if (sameMeThoi.Any())
+                        isTrung = true;
+                }
+                else
+                {
+                    // UPDATE → loại bỏ chính nó khỏi danh sách kiểm tra
+                    var others = sameMeThoi.Where(x => x.ID != existing.ID).ToList();
+                    if (others.Any())
+                        isTrung = true;
+                }
+
+                // ====== UPDATE IsTrungMeThoi CHO TẤT CẢ BẢN GHI TRÙNG ======
+                if (isTrung)
+                {
+                    foreach (var item in sameMeThoi)
+                        item.IsTrungMeThoi = true;
+
+                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
+                }
+                else
+                {
+                    // Nếu không trùng → reset toàn bộ về false
+                    foreach (var item in sameMeThoi)
+                        item.IsTrungMeThoi = false;
+
+                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
+                }
+
+                // ====== TẠO HOẶC UPDATE DLNM ======
+                DLNM_HRC2 dlnm;
+
+                if (existing == null)
+                {
+                    dlnm = new DLNM_HRC2
                     {
                         REPORT_NO = null,
                         NgaySx = model.Ngay,
@@ -514,61 +731,76 @@ namespace dataproduct.api.Business
                         KLThepLong = model.KlThepLong,
                         IsNM = false,
                         IsChuyenCa = model.IsChuyenCa,
-                        KLGangLongCCT = null,
-                        KLGangLongCR = null
+                        IsTrungMeThoi = isTrung,
+
+                        TempKey = Guid.NewGuid()
                     };
 
-                    _context.DLNM_HRC2s.Add(existingDLNM);
+                    await _context.DLNM_HRC2s.AddAsync(dlnm);
                 }
                 else
                 {
-                    // UPDATE
-                    existingDLNM.MeThoi = model.MeThoi;
-                    existingDLNM.MacThep = model.MacThep;
-                    existingDLNM.O2 = model.O2;
-                    existingDLNM.N2 = model.N2;
-                    existingDLNM.AR_RH = model.AR_RH;
-                    existingDLNM.AR_LF = model.AR_LF;
-                    existingDLNM.AR_BOF = model.AR_BOF;
-                    existingDLNM.KLGangLong = model.KLGangLong;
-                    existingDLNM.KLThepPhe = model.KLThepPhe;
-                    existingDLNM.KLThepLong = model.KlThepLong;
-                    existingDLNM.IsChuyenCa = model.IsChuyenCa;
-                    existingDLNM.NgaySx = model.Ngay;
+                    dlnm = existing;
 
-                    _context.DLNM_HRC2s.Update(existingDLNM);
+                    dlnm.MeThoi = model.MeThoi;
+                    dlnm.MacThep = model.MacThep;
+                    dlnm.O2 = model.O2;
+                    dlnm.N2 = model.N2;
+                    dlnm.AR_RH = model.AR_RH;
+                    dlnm.AR_LF = model.AR_LF;
+                    dlnm.AR_BOF = model.AR_BOF;
+                    dlnm.KLGangLong = model.KLGangLong;
+                    dlnm.KLThepPhe = model.KLThepPhe;
+                    dlnm.KLThepLong = model.KlThepLong;
+                    dlnm.IsChuyenCa = model.IsChuyenCa;
+                    dlnm.NgaySx = model.Ngay;
+                    dlnm.IsTrungMeThoi = isTrung;
+
+                    if (dlnm.TempKey == Guid.Empty)
+                        dlnm.TempKey = Guid.NewGuid();
+
+                    _context.DLNM_HRC2s.Update(dlnm);
                 }
 
-                // XÓA PHỤ LIỆU CŨ ĐÚNG SCOPE
-                var oldPhuLieus = await _context.PhuLieu_HRC2s
-                    .Where(x =>
-                        x.MeThoi == model.MeThoi &&
-                        x.BieuMau == model.BieuMau)
+                // Lưu map
+                dlnmMap[model.RowKey] = dlnm;
+            }
+
+            // ====== SAVE 1 (lưu DLNM + IsTrung) ======
+            await _context.SaveChangesAsync();
+
+            // ====== XỬ LÝ PHỤ LIỆU ======
+            foreach (var model in models)
+            {
+                var dlnm = dlnmMap[model.RowKey];
+
+                // Xóa phụ liệu cũ
+                var oldPL = await _context.PhuLieu_HRC2s
+                    .Where(x => x.ID_MeThoi == dlnm.ID)
                     .ToListAsync();
 
-                if (oldPhuLieus.Any())
-                    _context.PhuLieu_HRC2s.RemoveRange(oldPhuLieus);
+                _context.PhuLieu_HRC2s.RemoveRange(oldPL);
 
-                // THÊM PHỤ LIỆU MỚI
+                // Thêm mới
                 foreach (var pl in model.hRC2_PhuLieus)
                 {
                     _context.PhuLieu_HRC2s.Add(new PhuLieu_HRC2
                     {
-
                         BieuMau = model.BieuMau,
                         MeThoi = model.MeThoi,
                         ID_PhuLieu = pl.ID_PhuLieu,
                         TenPhuLieu = pl.TenPhuLieu,
                         KLPhuGia = pl.KLPhuGia,
                         ID_HeaderKey = pl.ID_HeaderKey,
-                        TenHienThi = pl.TenHienThi
+                        TenHienThi = pl.TenHienThi,
+                        ID_MeThoi = dlnm.ID
                     });
                 }
             }
 
+            // SAVE 2 — lưu phụ liệu
             await _context.SaveChangesAsync();
         }
-
 
 
         // Helper

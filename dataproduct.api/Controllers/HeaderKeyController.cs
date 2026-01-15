@@ -70,12 +70,46 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet("search")]
-        public async Task<IActionResult> Search(string? searchKey, string? LoaiPhieu, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Search(
+            string? searchKey,
+            string? LoaiPhieu,
+            string? TrangThai,
+            bool? IsUsedNXT,
+            DateTime? FromDate,
+            DateTime? ToDate,
+            string? SortThuTu,
+            int page = 1,
+            int pageSize = 10
+        )
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100; // Giới hạn tối đa 100 records mỗi trang
 
+            // Trả về theo Header_Mappings (1-1), mỗi dòng là 1 mapping (mỗi ID_PhuLieu trả về 1 dòng với 1 HeaderKey)
+            var result = await _service.SearchMappingsWithPagingAsync(
+                searchKey,
+                LoaiPhieu,
+                TrangThai,
+                IsUsedNXT,
+                FromDate,
+                ToDate,
+                SortThuTu,
+                page,
+                pageSize
+            );
+
+            return Ok(result);
+        }
+
+        [HttpGet("search-autocomplete")]
+        public async Task<IActionResult> SearchMappingsWithPagingAutocomplete(string? searchKey, string? LoaiPhieu, int page = 1, int pageSize = 10)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100; 
+
+            // Trả về theo Header_Mappings (1-1), mỗi dòng là 1 mapping (mỗi ID_PhuLieu trả về 1 dòng với 1 HeaderKey)
             var result = await _service.SearchWithPagingAsync(
                 searchKey,
                 LoaiPhieu,

@@ -68,17 +68,16 @@ namespace dataproduct.api.Services
 
             await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
             var allData = await _repo.GetAllAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
-            var meThois = allData
-                .Select(x => (string?)x.MeThoi)
-                .Where(x => x != null)
-                .Select(x => x!)
-                .Distinct()
+            var ids = allData
+                .Select(x => (int?)x.ID)
+                .Where(x => x.HasValue && x.Value != 0)
+                .Select(x => x!.Value)
                 .ToList();
 
             var result = new List<HRC2GroupedByReportNoModel>();
-            foreach (var meThoi in meThois)
+            foreach (var id in ids)
             {
-                var detail = await _repo.GetByMeThoiGroupedAsync(meThoi);
+                var detail = await _repo.GetByIdGroupedAsync(id);
                 if (detail != null)
                 {
                     result.Add(detail);
@@ -103,7 +102,7 @@ namespace dataproduct.api.Services
             return true;
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(long id)
         {
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return false;
@@ -127,6 +126,11 @@ namespace dataproduct.api.Services
         public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
         {
             return await _repo.ChuyenMeThoiAsync(request);
+        }
+
+        public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
+        {
+            return await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca);
         }
 
     }

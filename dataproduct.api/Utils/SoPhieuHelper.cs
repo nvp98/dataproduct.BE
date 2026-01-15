@@ -9,7 +9,11 @@ namespace dataproduct.api.Utils
         {
             string today = ngaySX.Value.ToString("yyyyMMdd");
             string caStr = ca == 1 ? "N" : "D";
-            return $"{prefix}-{today}-{caStr}-{scope}";
+            if(scope > 0){
+                return $"{prefix}-{today}-{caStr}-{scope}";
+            }else{
+                return $"{prefix}-{today}-{caStr}";
+            }
         }
     }
 }
