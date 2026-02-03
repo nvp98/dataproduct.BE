@@ -12,7 +12,7 @@ namespace dataproduct.api.Repositories
         {
             _context = context;
         }
-        public async Task<List<TaiKhoan>> GetByIdsAsync(List<int> ids)
+        public async Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids)
         {
             return await _dbcontext.Tbl_TaiKhoan
                 .Where(x => ids.Contains(x.ID_TaiKhoan))
@@ -28,7 +28,7 @@ namespace dataproduct.api.Repositories
         {
             return await _dbcontext.Tbl_ViTri.ToListAsync();
         }
-        public async Task<List<BmPheDuyet>> GetByPhieuIdAsync(Guid phieuId)
+        public async Task<List<BmPheDuyet>> GetBmPheDuyetByPhieuIdAsync(Guid phieuId)
         {
             return await _context.BmPheDuyets
                 .Where(x => x.PhieuId == phieuId)
