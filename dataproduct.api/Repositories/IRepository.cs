@@ -146,8 +146,8 @@ namespace dataproduct.api.Repositories
 
     public interface IPheDuyetRepository
     {
-        Task<List<BmPheDuyet>> GetByPhieuIdAsync(Guid phieuId);
-        Task<List<TaiKhoan>> GetByIdsAsync(List<int> ids);
+        Task<List<BmPheDuyet>> GetBmPheDuyetByPhieuIdAsync(Guid phieuId);
+        Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids);
         Task<List<PhongBan>> GetAllPhongBanAsync();
         Task<List<ViTri>> GetAllViTriAsync();
     }
