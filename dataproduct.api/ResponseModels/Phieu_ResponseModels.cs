@@ -9,6 +9,7 @@ namespace dataproduct.api.ResponseModels
         public string MaBm { get; set; } = string.Empty;
         public DateOnly NgaySX { get; set; }
         public int? Ca { get; set; }
+        public string? Kip { get; set; }
         public int? Scope { get; set; }
         public int? MayDuc { get; set; }
         public int? TinhTrang { get; set; }

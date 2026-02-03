@@ -229,6 +229,84 @@ namespace dataproduct.api.Business
             return existing;
         }
 
+        public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
+        {
+            // 1. Lấy phiếu hiện tại
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return null;
+
+
+
+            int nguoiTaoId = NguoiTaoID ?? 0;
+
+            // 3. Lấy NgaySX, Ca, MaBm từ phiếu hiện tại
+            var ngaySX = existing.NgaySX;
+            var ca = existing.Ca;
+            var maBm = existing.MaBm;
+
+            if (!ngaySX.HasValue || !ca.HasValue || string.IsNullOrEmpty(maBm))
+            {
+                return null; // Thiếu thông tin cần thiết
+            }
+
+            // 4. Tìm tất cả các phiếu cùng NgaySX, Ca và MaBm
+            var phieusToUpdate = await _context.BmPhieus
+                .Where(x => x.NgaySX == ngaySX.Value
+                         && x.Ca == ca.Value
+                         && x.MaBm == maBm
+                         && x.IsDelete != 1) // Không cập nhật phiếu đã xóa
+                .ToListAsync();
+
+            if (!phieusToUpdate.Any())
+            {
+                return null;
+            }
+
+            // 5. Cập nhật NguoiTaoId cho tất cả phiếu
+            foreach (var phieu in phieusToUpdate)
+            {
+                phieu.NguoiTaoId = nguoiTaoId;
+            }
+
+            // 6. Lưu thay đổi
+            _context.BmPhieus.UpdateRange(phieusToUpdate);
+            await _context.SaveChangesAsync();
+
+            // 7. Cập nhật hoặc tạo mới BM_PheDuyet cho người tạo (CapDuyet = 0)
+            foreach (var phieu in phieusToUpdate)
+            {
+                // Tìm bản ghi phê duyệt với CapDuyet = 0
+                var pheDuyetCapDuyet0 = await _context.BmPheDuyets
+                    .FirstOrDefaultAsync(x => x.PhieuId == phieu.Idphieu && x.CapDuyet == 0);
+
+                if (pheDuyetCapDuyet0 != null)
+                {
+                    // Nếu đã tồn tại, cập nhật NguoiDuyetId
+                    pheDuyetCapDuyet0.NguoiDuyetId = nguoiTaoId;
+                    _context.BmPheDuyets.Update(pheDuyetCapDuyet0);
+                }
+                else
+                {
+                    // Nếu chưa tồn tại, tạo mới
+                    var newPheDuyet = new BmPheDuyet
+                    {
+                        PhieuId = phieu.Idphieu,
+                        CapDuyet = 0,
+                        NguoiDuyetId = nguoiTaoId,
+                        TinhTrang = 0,
+                        GhiChu = null
+                    };
+                    await _context.BmPheDuyets.AddAsync(newPheDuyet);
+                }
+            }
+
+            // 8. Lưu thay đổi BM_PheDuyet
+            await _context.SaveChangesAsync();
+
+            // 9. Trả về phiếu hiện tại đã được cập nhật
+            return existing;
+        }
+
         public async Task<bool> DeleteAsync(Guid id)
         {
             var exists = await _repo.ExistsAsync(id);

@@ -8,9 +8,10 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly ProductDataMasterDbContext _dbcontext;
-        public PheDuyetRepository(ProductFormContext context)
+        public PheDuyetRepository(ProductFormContext context, ProductDataMasterDbContext dbcontext)
         {
             _context = context;
+            _dbcontext = dbcontext;
         }
         public async Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids)
         {

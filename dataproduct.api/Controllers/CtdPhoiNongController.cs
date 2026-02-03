@@ -69,9 +69,9 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPut("update-chot")]
-        public async Task<IActionResult> UpdateStatusDone([FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+        public async Task<IActionResult> UpdateStatusDone([FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me, [FromQuery] int? status)
         {
-            return Ok(await _service.UpdateStatusDone(NgaySX, Ca, Kip, Xuong, Me));
+            return Ok(await _service.UpdateStatusDone(NgaySX, Ca, Kip, Xuong, Me, status));
         }
 
         [HttpGet("export-excel")]
@@ -90,9 +90,9 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet("export-pdf")]
-        public async Task<IActionResult> ExportPdf(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me)
+        public async Task<IActionResult> ExportPdf(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me, Guid id)
         {
-            var file = await _service.ExportPdfAsync(NgaySX, Ca, Kip, Xuong, Me);
+            var file = await _service.ExportPdfAsync(NgaySX, Ca, Kip, Xuong, Me, id);
 
             return File(file.Content, file.ContentType, file.FileName);
         }

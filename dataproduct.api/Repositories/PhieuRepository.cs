@@ -41,7 +41,7 @@ namespace dataproduct.api.Repositories
             try
             {
                 string maBM = formData.GetProperty("maBm").GetString() ?? "UNKNOWN";
-                string prefix = formData.TryGetProperty("prefix", out var p)? p.GetString() ?? "UNKNOWN" : "UNKNOWN";
+                string prefix = formData.TryGetProperty("prefix", out var p) ? p.GetString() ?? "UNKNOWN" : "UNKNOWN";
                 int Ca = formData.TryGetProperty("ca", out var ca) ? ca.GetInt32() : 0;
                 int Scope = formData.TryGetProperty("scope", out var scope) ? scope.GetInt32() : 0;
                 DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp)
@@ -59,7 +59,7 @@ namespace dataproduct.api.Repositories
                     Ca = Ca,
                     MayDuc = formData.TryGetProperty("mayduc", out var mdProp) ? mdProp.GetInt32() : null,
                     //NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
-                    Scope = Scope ,
+                    Scope = Scope,
                     //XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
                     //IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
                     DataJson = formData.GetRawText(),
@@ -90,7 +90,8 @@ namespace dataproduct.api.Repositories
                         pheDuyetList.Add(phe);
                     }
                 }
-                if (pheDuyetList.Count > 0) {
+                if (pheDuyetList.Count > 0)
+                {
                     // xóa dữ liệu phê duyệt cũ
                     var listDuyet = _context.BmPheDuyets.Where(p => p.PhieuId == phieu.Idphieu).ToList();
                     _context.BmPheDuyets.RemoveRange(listDuyet);
@@ -184,12 +185,13 @@ namespace dataproduct.api.Repositories
                 MaBm = x.MaBm,
                 NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
                 Ca = x.Ca,
+                Kip = x.Kip,
                 Scope = x.Scope,
                 MayDuc = x.MayDuc,
                 TinhTrang = x.TinhTrang,
                 NguoiTao = x.NguoiTaoId
             }).ToList();
-            
+
             return (result, totalCount);
         }
 

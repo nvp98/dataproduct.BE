@@ -18,7 +18,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID,int? NguoiDuyetID,int? isCheckDuyet)
+        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
             => Ok(await _service.GetAllAsync(MaBM, NguoiTaoID, NguoiDuyetID, isCheckDuyet));
 
         [HttpGet("{id}")]
@@ -47,11 +47,11 @@ namespace dataproduct.api.Controllers
             {
                 return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
             }
-             return Ok(new 
-                    { 
-                        success = true, 
-                        id = created.Idphieu
-                    });
+            return Ok(new
+            {
+                success = true,
+                id = created.Idphieu
+            });
         }
 
         [HttpPut("{id}")]
@@ -96,7 +96,7 @@ namespace dataproduct.api.Controllers
         [FromQuery] int? scope,
         [FromQuery] int? mayduc)
         {
-            var exists = await _service.CheckExistsAsync(maBm, ngaySX,ca,scope,mayduc);
+            var exists = await _service.CheckExistsAsync(maBm, ngaySX, ca, scope, mayduc);
             return Ok(new { exists });
         }
 
@@ -107,7 +107,7 @@ namespace dataproduct.api.Controllers
             {
                 var result = await _service.SearchWithPagingAsync(request);
 
-                return Ok(result );
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -132,8 +132,26 @@ namespace dataproduct.api.Controllers
             var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
             return ok ? NoContent() : NotFound();
         }
+
+        [HttpPut("{id}/sync-nguoi-tao")]
+        public async Task<IActionResult> SyncNguoiTao(Guid id, [FromBody] int? NguoiTaoID)
+        {
+            try
+            {
+                var result = await _service.UpdateNguoiTaoAsync(id, NguoiTaoID);
+                if (result == null)
+                {
+                    return BadRequest(new { success = false, message = "Đồng bộ người tạo thất bại. Kiểm tra dữ liệu đầu vào." });
+                }
+                return Ok(new { success = true, message = "Đồng bộ người tạo thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
+            }
+        }
     }
-    
+
 
     public class ChangeStatusRequest
     {

@@ -1,109 +1,125 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
+  <head>
     <meta charset="utf-8" />
     <title>BM.06/QT.05.11 – Biên bản giao nhận phôi nóng</title>
 
     <style>
-        @page {
-            size: A4;
-            margin: 20mm;
-        }
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
 
-        body {
-            font-family: "Times New Roman", serif;
-            font-size: 12pt;
-            color: #000;
-        }
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 12pt;
+        color: #000;
+      }
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
+      .header {
+        display: table;
+        width: 100%;
+        margin-bottom: 10px;
+      }
 
-        .header-left {
-            font-weight: bold;
-            text-transform: uppercase;
-        }
+      .header-left {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 11pt;
+      }
 
-        .header-right {
-            text-align: right;
-            font-size: 11pt;
-        }
+      .header-left img {
+        max-width: 250px;
+        max-height: 100px;
+        vertical-align: middle;
+        margin-right: 10px;
+      }
 
-        .title {
-            text-align: center;
-            font-size: 16pt;
-            font-weight: bold;
-            margin: 10px 0;
-        }
+      .header-right {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        text-align: right;
+        font-size: 10pt;
+        line-height: 1.4;
+      }
 
-        .sub-title {
-            text-align: center;
-            font-style: italic;
-            margin-bottom: 10px;
-        }
+      .title {
+        text-align: center;
+        font-size: 16pt;
+        font-weight: bold;
+        margin: 10px 0;
+      }
 
-        .info-line {
-            margin: 4px 0;
-        }
+      .sub-title {
+        text-align: center;
+        font-style: italic;
+        margin-bottom: 10px;
+      }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-        }
+      .info-line {
+        margin: 4px 0;
+      }
 
-        th, td {
-            border: 1px solid #000;
-            padding: 4px;
-            text-align: center;
-            vertical-align: middle;
-        }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
 
-        th {
-            font-weight: bold;
-        }
+      th,
+      td {
+        border: 1px solid #000;
+        padding: 4px;
+        text-align: center;
+        vertical-align: middle;
+      }
 
-        .text-left {
-            text-align: left;
-        }
+      th {
+        font-weight: bold;
+      }
 
-        .note {
-            font-size: 11pt;
-            margin-top: 8px;
-        }
+      .text-left {
+        text-align: left;
+      }
 
-       .sign {
-			margin-top: 40px;
-			display: flex;
-			justify-content: space-between;
-			text-align: center;
-		}
+      .note {
+        font-size: 11pt;
+        margin-top: 8px;
+      }
 
-		.sign-col {
-			width: 30%;
-		}
+      .sign {
+        margin-top: 40px;
+        display: flex;
+        justify-content: space-between;
+        text-align: center;
+      }
 
-        .sign div {
-            width: 30%;
-        }
+      .sign-col {
+        width: 30%;
+      }
+
+      .sign div {
+        width: 30%;
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <!-- HEADER -->
     <div class="header">
-        <div class="header-left">
-            CÔNG TY CỔ PHẦN THÉP<br />
-            HÒA PHÁT DUNG QUẤT
-        </div>
-        <div class="header-right">
-            BM.06/QT.05.11<br />
-            Ngày hiệu lực: 10/05/2025<br />
-            Lần sửa đổi: 01
-        </div>
+      <div class="header-left">
+        <img src="{{LogoUrl}}" alt="Logo" /><br />
+        CÔNG TY CỔ PHẦN THÉP<br />
+        HÒA PHÁT DUNG QUẤT
+      </div>
+      <div class="header-right">
+        BM.06/QT.05.11<br />
+        Ngày hiệu lực: 10/05/2025<br />
+        Lần sửa đổi: 01
+      </div>
     </div>
 
     <!-- TITLE -->
@@ -112,83 +128,97 @@
 
     <!-- INFO -->
     <div class="sub-title">
-        Kíp: {{Kip}} &nbsp;&nbsp; từ {{TuGio}}h {{TuNgay}} đến {{DenGio}}h {{DenNgay}}
+      Kíp: {{Kip}} &nbsp;&nbsp; từ {{TuGio}}h {{TuNgay}} đến {{DenGio}}h
+      {{DenNgay}}
     </div>
 
     <div class="info-line"><b>Máy đúc:</b> {{MayDuc}}</div>
 
+    <div class="info-line">Chúng tôi gồm:</div>
     <div class="info-line">
-        Chúng tôi gồm:
+      1. Ông/bà: {{NguoiLapPhieu}} &nbsp;&nbsp; Chức vụ: {{ChucVuNguoiLap}}
+      &nbsp;&nbsp; BP: {{BPNguoiLap}}
     </div>
-    <div class="info-line">1. Ông/bà: {{Nguoi1}} &nbsp;&nbsp; Chức vụ: {{ChucVu1}} &nbsp;&nbsp; BP: {{BP1}}</div>
-    <div class="info-line">2. Ông/bà: {{Nguoi2}} &nbsp;&nbsp; Chức vụ: {{ChucVu2}} &nbsp;&nbsp; BP: {{BP2}}</div>
-    <div class="info-line">3. Ông/bà: {{Nguoi3}} &nbsp;&nbsp; Chức vụ: {{ChucVu3}} &nbsp;&nbsp; BP: {{BP3}}</div>
+    <div class="info-line">
+      2. Ông/bà: {{NguoiNhanCTD}} &nbsp;&nbsp; Chức vụ: {{ChucVuCTD}}
+      &nbsp;&nbsp; BP: {{BPCTD}}
+    </div>
+    <div class="info-line">
+      3. Ông/bà: {{NguoiNhanQLCL}} &nbsp;&nbsp; Chức vụ: {{ChucVuQLCL}}
+      &nbsp;&nbsp; BP: {{BPQLCL}}
+    </div>
 
     <div class="info-line">
-        Cùng nhau thống nhất lập "Biên bản giao nhận phôi nóng" chi tiết như sau:
+      Cùng nhau thống nhất lập "Biên bản giao nhận phôi nóng" chi tiết như sau:
     </div>
 
     <!-- TABLE -->
     <table>
-        <thead>
-            <tr>
-                <th rowspan="2">STT</th>
-                <th rowspan="2">Mẻ</th>
-                <th rowspan="2">Mác</th>
-                <th rowspan="2">Kích thước</th>
-                <th colspan="2">Loại I</th>
-                <th colspan="2">Loại II TPHH</th>
-                <th colspan="2">Loại II BM</th>
-                <th colspan="2">Loại III</th>
-                <th rowspan="2">Tổng<br />khối lượng<br />(tấn)</th>
-            </tr>
-            <tr>
-                <th>Số thanh</th>
-                <th>Khối lượng<br />(tấn)</th>
-                <th>Số thanh</th>
-                <th>Khối lượng<br />(tấn)</th>
-                <th>Số thanh</th>
-                <th>Khối lượng<br />(tấn)</th>
-                <th>Số thanh</th>
-                <th>Khối lượng<br />(tấn)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{Rows}}
-        </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="12"><b>Tổng</b></td>
-                <td><b>{{TongKhoiLuong}}</b></td>
-            </tr>
-        </tfoot>
+      <thead>
+        <tr>
+          <th rowspan="2">STT</th>
+          <th rowspan="2">Mẻ</th>
+          <th rowspan="2">Mác</th>
+          <th rowspan="2">Kích thước</th>
+          <th colspan="2">Loại I</th>
+          <th colspan="2">Loại II TPHH</th>
+          <th colspan="2">Loại II BM</th>
+          <th colspan="2">Loại III</th>
+          <th rowspan="2">Tổng<br />khối lượng<br />(tấn)</th>
+        </tr>
+        <tr>
+          <th>Số thanh</th>
+          <th>Khối lượng<br />(tấn)</th>
+          <th>Số thanh</th>
+          <th>Khối lượng<br />(tấn)</th>
+          <th>Số thanh</th>
+          <th>Khối lượng<br />(tấn)</th>
+          <th>Số thanh</th>
+          <th>Khối lượng<br />(tấn)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{Rows}}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="12"><b>Tổng</b></td>
+          <td><b>{{TongKhoiLuong}}</b></td>
+        </tr>
+      </tfoot>
     </table>
 
     <!-- NOTE -->
     <div class="note">
-        <b>Lưu ý:</b><br />
-        - Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn nằm trên bàn con lăn đều bàn giao ngay trong kíp, không để lẫn sang kíp sau.<br />
-        - Thời điểm xác nhận biên bản giao nhận phôi nóng ở hai thời điểm 8h00 và 20h00.<br />
-        - Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực tế.
+      <b>Lưu ý:</b><br />
+      - Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn nằm trên bàn con lăn
+      đều bàn giao ngay trong kíp, không để lẫn sang kíp sau.<br />
+      - Thời điểm xác nhận biên bản giao nhận phôi nóng ở hai thời điểm 8h00 và
+      20h00.<br />
+      - Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực tế.
     </div>
 
     <!-- SIGN -->
-	<table style="width:100%; margin-top:40px; text-align:center; border:none;">
-		<tr>
-			<td style="width:33%; border:none;">
-				<b>NM.CT DAI</b><br /><br /><br />
-				(Ký, ghi rõ họ tên)
-			</td>
-			<td style="width:33%; border:none;">
-				<b>P.QLCL</b><br /><br /><br />
-				(Ký, ghi rõ họ tên)
-			</td>
-			<td style="width:33%; border:none;">
-				<b>NM.HRC1</b><br /><br /><br />
-				(Ký, ghi rõ họ tên)
-			</td>
-		</tr>
-	</table>
-
-</body>
+    <table
+      style="width: 100%; margin-top: 40px; text-align: center; border: none"
+    >
+      <tr>
+        <td style="width: 33%; border: none">
+          <b>NM.CT DAI</b><br /><br /><br />
+          {{ChuKyNguoiNhanCTD}} <br />
+          {{NguoiNhanCTD}}
+        </td>
+        <td style="width: 33%; border: none">
+          <b>P.QLCL</b><br /><br /><br />
+          {{ChuKyNguoiNhanQLCL}} <br />
+          {{NguoiNhanQLCL}}
+        </td>
+        <td style="width: 33%; border: none">
+          <b>NM.HRC1</b><br /><br /><br />
+          {{ChuKyNguoiLap}} <br />
+          {{NguoiLapPhieu}}
+        </td>
+      </tr>
+    </table>
+  </body>
 </html>

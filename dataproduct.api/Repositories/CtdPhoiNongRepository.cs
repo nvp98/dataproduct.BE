@@ -80,9 +80,9 @@ namespace dataproduct.api.Repositories
             return entities.Count;
         }
 
-        public async Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me)
+        public async Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me, int? status)
         {
-            var query = _context.CtdPhoiNongs.Where(x=>x.NgaySx == NgaySX && x.Ca == Ca && x.NmCan == Xuong).AsQueryable();
+            var query = _context.CtdPhoiNongs.Where(x => x.NgaySx == NgaySX && x.Ca == Ca && x.NmCan == Xuong).AsQueryable();
 
             //if (NgaySX.HasValue)
             //    query = query.Where(x => x.NgaySx == NgaySX);
@@ -97,10 +97,13 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrEmpty(Me))
                 query = query.Where(x => x.Me == Me);
 
+            // Xác định trạng thái: 0 = hủy chốt, 1 = chốt
+            var statusValue = status ?? 1;
+
             // 🔥 UPDATE ALL MATCHED ROWS
             var affectedRows = await query.ExecuteUpdateAsync(setters =>
-                setters.SetProperty(x => x.TinhTrang, 1)
-                        //.SetProperty(x => x.NgayCapNhat, DateTime.Now) // nếu có
+                setters.SetProperty(x => x.TinhTrang, statusValue)
+            //.SetProperty(x => x.NgayCapNhat, DateTime.Now) // nếu có
             );
 
             return affectedRows;
@@ -133,7 +136,7 @@ namespace dataproduct.api.Repositories
                     _context.CtdPhoiNongs.Add(model);
                     created++;
                 }
-                else if(existing.TinhTrangCTD !=1 && existing.TinhTrangCTD !=1) // khi mẻ chưa được xử lý thì được chuyển vào thêm 
+                else if (existing.TinhTrangCTD != 1 && existing.TinhTrangCTD != 1) // khi mẻ chưa được xử lý thì được chuyển vào thêm 
                 {
                     existing.NgaySx = model.NgaySx;
                     existing.Ca = model.Ca;

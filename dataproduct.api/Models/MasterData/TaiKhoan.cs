@@ -27,6 +27,9 @@ namespace dataproduct.api.Models.MasterData
 
         public int? ID_ChucVu { get; set; }
 
+        [ForeignKey(nameof(ID_ChucVu))]
+        public virtual ViTri? ViTri { get; set; }
+
         [MaxLength(250)]
         public string? Email { get; set; }
 

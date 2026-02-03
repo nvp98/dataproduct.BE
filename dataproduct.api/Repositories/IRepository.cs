@@ -98,7 +98,8 @@ namespace dataproduct.api.Repositories
         Task DeleteByHeaderKeyAsync(int headerKeyId);
         Task<bool> ExistsAsync(int phuLieuId, int headerKeyId, int? excludeId = null);
     }
-    public interface ISTD_NXT_HRC2Repository{
+    public interface ISTD_NXT_HRC2Repository
+    {
         Task<STD_NXT_HRC2_UpsertResponse> UpsertAsync(STD_NXT_HRC2_UpsertDto entity);
         Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
         Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
@@ -115,16 +116,16 @@ namespace dataproduct.api.Repositories
         Task AddListAsync(List<CtdPhoiNong> entities);
         Task UpdateAsync(CtdPhoiNong entity);
         Task<int> UpdateStatusRangeAsync(List<CtdPhoiNongStatusUpdate> items);
-        Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me);
+        Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me, int? status);
         Task DeleteAsync(int id);
         Task<(int Created, int Updated)> UpsertListAsync(List<CtdPhoiNong> entities);
     }
     //  Begin NM CTD 
     public interface ICtdBMDucCTDRepository
     {
-        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca ,string kip, DateTime ngaySX);
+        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
         Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
-        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca,string kip,DateTime ngaySX,int? mayDuc = null,Guid? idPhieu = null);
+        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
         Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity);
         Task DeleteByPhieuAsync(Guid idPhieu);
 
