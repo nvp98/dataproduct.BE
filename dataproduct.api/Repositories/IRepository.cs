@@ -1,5 +1,7 @@
 ﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -117,6 +119,17 @@ namespace dataproduct.api.Repositories
         Task DeleteAsync(int id);
         Task<(int Created, int Updated)> UpsertListAsync(List<CtdPhoiNong> entities);
     }
+    //  Begin NM CTD 
+    public interface ICtdBMDucCTDRepository
+    {
+        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca ,string kip, DateTime ngaySX);
+        Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
+        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca,string kip,DateTime ngaySX,int? mayDuc = null,Guid? idPhieu = null);
+        Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity);
+        Task DeleteByPhieuAsync(Guid idPhieu);
+
+    }
+    //  End NM CTD 
     public interface IBmQuyenXlRepository
     {
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
@@ -128,4 +141,16 @@ namespace dataproduct.api.Repositories
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
         Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, int? excludeId = null);
     }
+
+    //  Begin láy thông tin người và chữ ký 
+
+    public interface IPheDuyetRepository
+    {
+        Task<List<BmPheDuyet>> GetByPhieuIdAsync(Guid phieuId);
+        Task<List<TaiKhoan>> GetByIdsAsync(List<int> ids);
+        Task<List<PhongBan>> GetAllPhongBanAsync();
+        Task<List<ViTri>> GetAllViTriAsync();
+    }
+
+    // End
 }
