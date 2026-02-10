@@ -59,6 +59,20 @@ namespace dataproduct.api.Controllers
             await _service.InsertSanLuongPhoiAsync(dto);
             return Ok();
         }
+        [HttpDelete("DeleteSanLuongPhoi/{idPhieu}")]
 
+        public async Task<IActionResult> DeleteByPhieu(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                return BadRequest("IdPhieu không hợp lệ");
+
+            await _service.DeleteByPhieuAsync(idPhieu);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Xóa dữ liệu theo phiếu thành công"
+            });
+        }
     }
 }

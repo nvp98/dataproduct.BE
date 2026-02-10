@@ -39,24 +39,24 @@ namespace dataproduct.api.DTOs.CTD_Dto
     }
     public class InsertSanLuongPhoiDto
     {
-        public string KipNgay { get; set; }
+        public string? KipNgay { get; set; }
 
-        public string MacThep { get; set; }
-        public string KichThuoc { get; set; }
+        public string? MacThep { get; set; }
+        public string? KichThuoc { get; set; }
 
-        public int StLoai1 { get; set; }
-        public decimal KlLoai1 { get; set; }
+        public int? StLoai1 { get; set; }
+        public decimal? KlLoai1 { get; set; }
 
-        public int StPhoiNgan { get; set; }
-        public decimal KlPhoiNgan { get; set; }
+        public int? StPhoiNgan { get; set; }
+        public decimal? KlPhoiNgan { get; set; }
 
-        public int StLoai2 { get; set; }
-        public decimal KlLoai2 { get; set; }
+        public int? StLoai2 { get; set; }
+        public decimal? KlLoai2 { get; set; }
 
-        public int StLoai3 { get; set; }
-        public decimal KlLoai3 { get; set; }
+        public int? StLoai3 { get; set; }
+        public decimal? KlLoai3 { get; set; }
 
-        public int TongSoThanh { get; set; }
-        public decimal TongKhoiLuong { get; set; }
+        public int? TongSoThanh { get; set; }
+        public decimal? TongKhoiLuong { get; set; }
     }
 }

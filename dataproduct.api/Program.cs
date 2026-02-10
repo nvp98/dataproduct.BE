@@ -37,6 +37,8 @@ builder.Services.AddSingleton<IConverter>(
     new SynchronizedConverter(new PdfTools())
 );
 
+builder.Services.AddHttpClient();
+
 builder.Services.Scan(scan => scan
     .FromAssemblies(Assembly.GetExecutingAssembly())
     .AddClasses(c => c.Where(t => t.Name.EndsWith("Helper")))

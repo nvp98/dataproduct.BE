@@ -127,7 +127,11 @@
             margin-top: 5px;
             font-weight: normal;
         }
-
+        table.sign-table,
+        table.sign-table td {
+            border: none !important;
+            border-collapse: collapse;
+        }
     </style>
 </head>
 
@@ -137,7 +141,7 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-left">
-                <img src="https://report.hoaphatdungquat.vn/img/logoHP.png" alt="Hòa Phát">
+                <img src="{{LogoUrl}}" alt="Logo" /><br />
                 <div>CÔNG TY CỔ PHẦN THÉP</div>
                 <div>HÒA PHÁT DUNG QUẤT</div>
             </div>
@@ -161,9 +165,8 @@
         <!-- CONTENT -->
         <div class="content">
             <p>Chúng tôi gồm:</p>
-            <p>1. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>2. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>3. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
+
+            {{NguoiThamGia}}
 
             <p>
                 Cùng nhau thống nhất lập “Biên bản xác nhận sản lượng phôi thép” chi tiết như sau:
@@ -226,42 +229,44 @@
         <div class="note">
             Biên bản này được lập thành 03 (ba) bản có giá trị như nhau, mỗi bên giữ 01 (một) bản để làm căn cứ.
         </div>
+        <table  class="sign-table" style="width:100%; margin-top:20px; text-align:center;">
+            <tr>
+                <td style="width:33%;">
+                    Kho phôi NM.HRC1
+                </td>
+                <td style="width:33%;">
+                    P.QLCL
+                </td>
+                <td style="width:33%;">
+                    Xưởng Đúc phôi vuông NM.HRC1
+                </td>
+            </tr>
 
-        <!-- SIGNATURE -->
-        <div class="signatures">
-            <!-- KHO PHÔI -->
-            <div class="sign-box">
-                Kho phôi NM.HRC1
-                <div class="sign-name">
+            <tr>
+                <td style="height:70px;">
                     {{Sign_KhoPhoi}}
-                </div>
-                <div class="sign-fullname">
-                    {{Name_KhoPhoi}}
-                </div>
-            </div>
-
-            <!-- QLCL -->
-            <div class="sign-box">
-                P.QLCL
-                <div class="sign-name">
+                </td>
+                <td>
                     {{Sign_QLCL}}
-                </div>
-                <div class="sign-fullname">
-                    {{Name_QLCL}}
-                </div>
-            </div>
-
-            <!-- XƯỞNG ĐÚC -->
-            <div class="sign-box">
-                Xưởng Đúc phôi vuông NM.HRC1
-                <div class="sign-name">
+                </td>
+                <td>
                     {{Sign_XuongDuc}}
-                </div>
-                <div class="sign-fullname">
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_KhoPhoi}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_QLCL}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
                     {{Name_XuongDuc}}
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
+        </table>
+
 
 
     </div>
