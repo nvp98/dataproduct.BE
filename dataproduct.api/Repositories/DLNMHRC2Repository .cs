@@ -57,9 +57,12 @@ namespace dataproduct.api.Repositories
                     return null;
                 }
 
-                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2 (CHỈ lấy phụ liệu thực tế, không lấy phân bổ)
                 var phuLieuItems = await _context.PhuLieu_HRC2s
-                    .Where(x => x.REPORT_NO == reportNo && x.ID_PhuLieu.HasValue)
+                    .Where(x => 
+                        x.REPORT_NO == reportNo && 
+                        x.ID_PhuLieu.HasValue &&
+                        (x.IsPhanBo != true)) // ⭐ CHỈ lấy phụ liệu thực tế, không lấy phân bổ
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
@@ -192,9 +195,12 @@ namespace dataproduct.api.Repositories
                     return null;
                 }
 
-                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2 (CHỈ lấy phụ liệu thực tế, không lấy phân bổ)
                 var allPhuLieuData = await _context.PhuLieu_HRC2s
-                    .Where(x => x.MeThoi == meThoi && x.ID_PhuLieu.HasValue)
+                    .Where(x => 
+                        x.MeThoi == meThoi && 
+                        x.ID_PhuLieu.HasValue &&
+                        (x.IsPhanBo != true)) // ⭐ CHỈ lấy phụ liệu thực tế, không lấy phân bổ
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
@@ -318,6 +324,48 @@ namespace dataproduct.api.Repositories
                 }
 
                 foreach (var item in groupedUnmappedPhuLieus.Values)
+                {
+                    item.KLPhuGia = FormatNumber(item.KLPhuGia);
+                    item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
+                }
+
+                // ========== Lấy dữ liệu phân bổ (IsPhanBo = true) và nhóm theo HeaderKey ==========
+                var phanBoData = await _context.PhuLieu_HRC2s
+                    .Where(x => 
+                        x.MeThoi == meThoi && 
+                        x.IsPhanBo == true &&
+                        x.ID_HeaderKey.HasValue)
+                    .Select(x => new
+                    {
+                        x.ID_HeaderKey,
+                        x.KLPhuGia,
+                        x.TenHienThi,
+                    })
+                    .ToListAsync();
+
+                // Nhóm phân bổ theo ID_HeaderKey
+                var groupedPhanBoPhuLieus = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                foreach (var phanBoItem in phanBoData)
+                {
+                    if (!phanBoItem.ID_HeaderKey.HasValue) continue;
+                    var headerKeyId = phanBoItem.ID_HeaderKey.Value;
+                    var formattedValue = FormatNumber(phanBoItem.KLPhuGia);
+                    
+                    if (!groupedPhanBoPhuLieus.ContainsKey(headerKeyId))
+                    {
+                        groupedPhanBoPhuLieus[headerKeyId] = new HeaderKeyGroupedByReportNoModel
+                        {
+                            ID_HeaderKey = headerKeyId,
+                            TenHienThi = phanBoItem.TenHienThi,
+                            KLPhuGia = formattedValue,
+                            KLPhuGiaTotal = 0,
+                        };
+                    }
+                    // Sum KLPhuGia
+                    groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal = (groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal ?? 0) + (formattedValue ?? 0);
+                }
+
+                foreach (var item in groupedPhanBoPhuLieus.Values)
                 {
                     item.KLPhuGia = FormatNumber(item.KLPhuGia);
                     item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
@@ -350,7 +398,8 @@ namespace dataproduct.api.Repositories
                         KLThepLong = FormatNumber(baseRecord.KLThepLong)
                     },
                     mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
-                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList()
+                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList(),
+                    phanBoPhulieus = groupedPhanBoPhuLieus.Values.ToList()
                 };
             }
             catch (Exception ex)
@@ -372,9 +421,12 @@ namespace dataproduct.api.Repositories
                     return null;
                 }
 
-                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2 (CHỈ lấy phụ liệu thực tế, không lấy phân bổ)
                 var allPhuLieuData = await _context.PhuLieu_HRC2s
-                    .Where(x => x.REPORT_NO == reportNo && x.ID_PhuLieu.HasValue)
+                    .Where(x => 
+                        x.REPORT_NO == reportNo && 
+                        x.ID_PhuLieu.HasValue &&
+                        (x.IsPhanBo != true)) // ⭐ CHỈ lấy phụ liệu thực tế, không lấy phân bổ
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
@@ -498,6 +550,48 @@ namespace dataproduct.api.Repositories
                 }
 
                 foreach (var item in groupedUnmappedPhuLieus.Values)
+                {
+                    item.KLPhuGia = FormatNumber(item.KLPhuGia);
+                    item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
+                }
+
+                // ========== Lấy dữ liệu phân bổ (IsPhanBo = true) và nhóm theo HeaderKey ==========
+                var phanBoData = await _context.PhuLieu_HRC2s
+                    .Where(x => 
+                        x.REPORT_NO == reportNo && 
+                        x.IsPhanBo == true &&
+                        x.ID_HeaderKey.HasValue)
+                    .Select(x => new
+                    {
+                        x.ID_HeaderKey,
+                        x.KLPhuGia,
+                        x.TenHienThi,
+                    })
+                    .ToListAsync();
+
+                // Nhóm phân bổ theo ID_HeaderKey
+                var groupedPhanBoPhuLieus = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                foreach (var phanBoItem in phanBoData)
+                {
+                    if (!phanBoItem.ID_HeaderKey.HasValue) continue;
+                    var headerKeyId = phanBoItem.ID_HeaderKey.Value;
+                    var formattedValue = FormatNumber(phanBoItem.KLPhuGia);
+                    
+                    if (!groupedPhanBoPhuLieus.ContainsKey(headerKeyId))
+                    {
+                        groupedPhanBoPhuLieus[headerKeyId] = new HeaderKeyGroupedByReportNoModel
+                        {
+                            ID_HeaderKey = headerKeyId,
+                            TenHienThi = phanBoItem.TenHienThi,
+                            KLPhuGia = formattedValue,
+                            KLPhuGiaTotal = 0,
+                        };
+                    }
+                    // Sum KLPhuGia
+                    groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal = (groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal ?? 0) + (formattedValue ?? 0);
+                }
+
+                foreach (var item in groupedPhanBoPhuLieus.Values)
                 {
                     item.KLPhuGia = FormatNumber(item.KLPhuGia);
                     item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
@@ -528,7 +622,8 @@ namespace dataproduct.api.Repositories
                         KLThepLong = FormatNumber(baseRecord.KLThepLong)
                     },
                     mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
-                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList()
+                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList(),
+                    phanBoPhulieus = groupedPhanBoPhuLieus.Values.ToList()
                 };
             }
             catch (Exception ex)
@@ -551,9 +646,12 @@ namespace dataproduct.api.Repositories
                     return null;
                 }
 
-                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2
+                // Lấy tất cả phụ liệu từ bảng PhuLieu_HRC2 (CHỈ lấy phụ liệu thực tế, không lấy phân bổ)
                 var allPhuLieuData = await _context.PhuLieu_HRC2s
-                    .Where(x => x.ID_MeThoi == id && x.ID_PhuLieu.HasValue )
+                    .Where(x => 
+                        x.ID_MeThoi == id && 
+                        x.ID_PhuLieu.HasValue &&
+                        (x.IsPhanBo != true)) // ⭐ CHỈ lấy phụ liệu thực tế, không lấy phân bổ
                     .Select(x => new
                     {
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
@@ -677,6 +775,48 @@ namespace dataproduct.api.Repositories
                 }
 
                 foreach (var item in groupedUnmappedPhuLieus.Values)
+                {
+                    item.KLPhuGia = FormatNumber(item.KLPhuGia);
+                    item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
+                }
+
+                // ========== Lấy dữ liệu phân bổ (IsPhanBo = true) và nhóm theo HeaderKey ==========
+                var phanBoData = await _context.PhuLieu_HRC2s
+                    .Where(x => 
+                        x.ID_MeThoi == id && 
+                        x.IsPhanBo == true &&
+                        x.ID_HeaderKey.HasValue)
+                    .Select(x => new
+                    {
+                        x.ID_HeaderKey,
+                        x.KLPhuGia,
+                        x.TenHienThi,
+                    })
+                    .ToListAsync();
+
+                // Nhóm phân bổ theo ID_HeaderKey
+                var groupedPhanBoPhuLieus = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                foreach (var phanBoItem in phanBoData)
+                {
+                    if (!phanBoItem.ID_HeaderKey.HasValue) continue;
+                    var headerKeyId = phanBoItem.ID_HeaderKey.Value;
+                    var formattedValue = FormatNumber(phanBoItem.KLPhuGia);
+                    
+                    if (!groupedPhanBoPhuLieus.ContainsKey(headerKeyId))
+                    {
+                        groupedPhanBoPhuLieus[headerKeyId] = new HeaderKeyGroupedByReportNoModel
+                        {
+                            ID_HeaderKey = headerKeyId,
+                            TenHienThi = phanBoItem.TenHienThi,
+                            KLPhuGia = formattedValue,
+                            KLPhuGiaTotal = 0,
+                        };
+                    }
+                    // Sum KLPhuGia
+                    groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal = (groupedPhanBoPhuLieus[headerKeyId].KLPhuGiaTotal ?? 0) + (formattedValue ?? 0);
+                }
+
+                foreach (var item in groupedPhanBoPhuLieus.Values)
                 {
                     item.KLPhuGia = FormatNumber(item.KLPhuGia);
                     item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal);
@@ -710,7 +850,8 @@ namespace dataproduct.api.Repositories
                         IsTrungMeThoi = baseRecord.IsTrungMeThoi
                     },
                     mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
-                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList()
+                    unmappedPhulieus = groupedUnmappedPhuLieus.Values.ToList(),
+                    phanBoPhulieus = groupedPhanBoPhuLieus.Values.ToList()
                 };
             }
             catch (Exception ex)
@@ -878,7 +1019,7 @@ namespace dataproduct.api.Repositories
             return true;
         }
 
-     
+
 
         /// <summary>
         /// Gọi stored procedure sp_GetHRC2GroupedByMaterial_Test để lấy dữ liệu phụ liệu theo ngày/ca.
@@ -886,73 +1027,70 @@ namespace dataproduct.api.Repositories
         /// </summary>
         public async Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca)
         {
-            var ngayParam = new SqlParameter("@NgaySX", ngaySX);
-            var caParam = new SqlParameter("@Ca", ca);
-
-            // 1) Lấy dữ liệu raw từ stored
             var raw = await _context.STD_NXT_Filters
-                .FromSqlRaw("EXEC sp_GetHRC2GroupedByMaterial_Test @NgaySX, @Ca", ngayParam, caParam)
+                .FromSqlRaw(
+                    "EXEC sp_GetHRC2GroupedByMaterial_Test @WorkDate, @Shift",
+                    new SqlParameter("@WorkDate", ngaySX.Date),
+                    new SqlParameter("@Shift", ca)
+                )
                 .ToListAsync();
 
-            if (raw == null || raw.Count == 0) return Enumerable.Empty<FilterSTD_NXTResponse>();
+            if (!raw.Any())
+                return Enumerable.Empty<FilterSTD_NXTResponse>();
 
-            // 2) Lấy danh sách ID_PhuLieu
+            // Mapping
             var phuLieuIds = raw.Select(x => (int)x.ID_PhuLieu).Distinct().ToList();
 
-            // 3) Lấy mapping Header_Mapping và Header_Key
             var mappings = await _context.Header_Mappings
                 .Where(m => phuLieuIds.Contains(m.ID_PhuLieu))
                 .ToListAsync();
 
-            var headerKeyIds = mappings.Select(m => m.ID_HeaderKey).Distinct().ToList();
             var headerKeys = await _context.Header_Keys
-                .Where(h => headerKeyIds.Contains(h.Id))
+                .Where(h => mappings.Select(m => m.ID_HeaderKey).Contains(h.Id))
                 .ToListAsync();
 
-            // 4) Map và group
             var mapped = raw.Select(r =>
             {
                 var map = mappings.FirstOrDefault(m => m.ID_PhuLieu == (int)r.ID_PhuLieu);
-                var headerKeyId = map?.ID_HeaderKey;
-                var headerKeyName = headerKeys.FirstOrDefault(h => h.Id == headerKeyId)?.TenHienThi;
+                var hk = headerKeys.FirstOrDefault(h => h.Id == map?.ID_HeaderKey);
+
                 return new
                 {
                     Raw = r,
-                    HeaderKeyId = headerKeyId,
-                    HeaderKeyName = headerKeyName
+                    HeaderKeyId = map?.ID_HeaderKey,
+                    HeaderKeyName = hk?.TenHienThi
                 };
             });
 
-            // Group: nếu có HeaderKeyId thì group theo HeaderKeyId, nếu không thì group theo ID_PhuLieu riêng
-            var grouped = mapped.GroupBy(x =>
-                x.HeaderKeyId.HasValue
+            // 🔥 GROUP ĐÚNG THEO TỔ HỢP
+            var grouped = mapped.GroupBy(x => new
+            {
+                x.Raw.BieuMau,
+                x.Raw.Scope,
+                Key = x.HeaderKeyId.HasValue
                     ? $"HK_{x.HeaderKeyId}"
-                    : $"PL_{(int)x.Raw.ID_PhuLieu}");
+                    : $"PL_{x.Raw.ID_PhuLieu}"
+            });
 
             var result = grouped.Select(g =>
             {
-                var first = g.First().Raw;
-                var headerKeyId = g.First().HeaderKeyId;
-                var headerKeyName = g.First().HeaderKeyName;
-                var total = g.Sum(x => x.Raw.TotalKLPhuGia);
-
-                var phuLieus = g
-                    .GroupBy(x => (int)x.Raw.ID_PhuLieu)
-                    .Select(plGroup => new PhuLieuNM
-                    {
-                        ID_PhuLieu = plGroup.Key,
-                        TenPhuLieu = plGroup.First().Raw.TenPhuLieu,
-                    })
-                    .ToList();
+                var first = g.First();
 
                 return new FilterSTD_NXTResponse
                 {
-                    BieuMau = first.BieuMau,
-                    Scope = (int)first.Scope,
-                    PhuLieus = phuLieus,
-                    TotalKLPhuGia = (double?)total,
-                    HeaderKeyId = headerKeyId,
-                    HeaderKeyName = headerKeyName
+                    BieuMau = first.Raw.BieuMau,
+                    Scope = (int)first.Raw.Scope,
+                    HeaderKeyId = first.HeaderKeyId,
+                    HeaderKeyName = first.HeaderKeyName,
+                    TotalKLPhuGia = g.Sum(x => x.Raw.TotalKLPhuGia),
+                    PhuLieus = g
+                        .GroupBy(x => (int)x.Raw.ID_PhuLieu)
+                        .Select(pl => new PhuLieuNM
+                        {
+                            ID_PhuLieu = pl.Key,
+                            TenPhuLieu = pl.First().Raw.TenPhuLieu
+                        })
+                        .ToList()
                 };
             }).ToList();
 

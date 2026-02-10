@@ -154,4 +154,53 @@ namespace dataproduct.api.Repositories
     }
 
     // End
+    public interface ISiloRepository
+    {
+        Task<IEnumerable<Silo>> GetAllAsync();
+        Task<Silo?> GetByIdAsync(int id);
+        Task AddAsync(Silo entity);
+        Task UpdateAsync(Silo entity);
+        Task DeleteAsync(int id);
+        Task<(IEnumerable<Silo> Data, int TotalCount)> SearchMappingsWithPagingAsync(
+            string? searchKey,
+            int? scope,
+            bool? tinhTrang,
+            string? BieuMau,
+            int? nhaMay,
+            int page,
+            int pageSize
+        );
+        Task<bool> ExistsByTenSiloAsync(string tenSilo, int nhaMay, string bieuMau, int? scope, int? excludeId = null);
+        Task<List<SiloWithPhuLieuNmDto>> GetValidSilosAsync(
+                List<int> phuLieuNMIds,
+                DateTime ngaySX
+            );
+        Task<List<int>> GetPhuLieuNMInSiloAsync(
+            int siloId,
+            DateTime ngaySX
+        );
+        Task<bool> IsSiloContainPhuLieuNMAsync(
+            int siloId,
+            int phuLieuNMId,
+            DateTime ngaySX
+        );
+        // MapSiloPhuLieuNM methods
+        Task<List<MapSiloPhuLieuNMResponse>> GetMappingsBySiloIdAsync(int siloId);
+        Task<MapSiloPhuLieuNM?> GetMappingByIdAsync(int id);
+        Task<MapSiloPhuLieuNM> AddMappingAsync(MapSiloPhuLieuNM entity);
+        Task UpdateMappingAsync(MapSiloPhuLieuNM entity);
+        Task DeleteMappingAsync(int id);
+        Task<List<PhuLieu_NM>> GetAllPhuLieuNMAsync();
+        Task<(IEnumerable<PhuLieu_NM> Data, int TotalCount)> SearchPhuLieuNMWithPagingAsync(
+            string? searchKey,
+            int page,
+            int pageSize
+        );
+        Task<List<DTOs.SiloByHeaderKeyDto>> GetSilosByHeaderKeyAsync(
+            int headerKeyId,
+            DateTime ngaySX,
+            int nhaMay,
+            string? bieuMau
+        );
+    }
 }

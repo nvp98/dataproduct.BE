@@ -16,6 +16,7 @@ public partial class PhuLieu_HRC2
     public int? ID_HeaderKey { get; set; }
     public string? TenHienThi { get; set; }
     public long ID_MeThoi { get; set; }
+    public bool? IsPhanBo { get; set; } = false;
     [NotMapped]
     public Guid TempKey { get; set; }
 }

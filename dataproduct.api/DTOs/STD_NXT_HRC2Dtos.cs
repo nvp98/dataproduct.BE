@@ -12,6 +12,8 @@ namespace dataproduct.api.DTOs
         public List<NXTDetailDto> Details { get; set; } = new();
         // Danh sách tổng hợp
         public List<NXTSummaryDto> Summary { get; set; } = new();
+        // Danh sách kiểm kê (snapshot)
+        public List<SaveKiemKeRequest>? KiemKe { get; set; }
     }
 
     public class NXTDetailDto
@@ -78,6 +80,18 @@ namespace dataproduct.api.DTOs
         public int Ca { get; set; }
         public int Id_HeaderKey { get; set; }
         public decimal ChenhLech { get; set; }
+    }
+
+    public class SaveKiemKeRequest
+    {
+        public DateTime NgaySX { get; set; }
+        public string Ca { get; set; } = null!;
+        public int HeaderKeyId { get; set; }
+        public int SiloId { get; set; }
+        public int PhuLieuNMId { get; set; }
+        public decimal? TheTich { get; set; }
+        public decimal? TyTrong { get; set; }
+        public int? Scope { get; set; }
     }
 }
 

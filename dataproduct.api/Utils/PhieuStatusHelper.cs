@@ -23,6 +23,9 @@ namespace dataproduct.api.Utils
                 throw new Exception("Phiếu bị thu hồi, không thể không xác nhận");
             else if (newStatus == 5 && currentStatus != 2) 
                 throw new Exception("Phiếu chưa được duyệt, không thể chốt");
+            // Cho phép chuyển từ DaGui (1) hoặc DangPheDuyet (6) sang HieuChinh (7)
+            // Cho phép chuyển từ HieuChinh (7) về DaGui (1)
+            // Các trường hợp khác sẽ được cho phép mặc định
         }
     }
 }

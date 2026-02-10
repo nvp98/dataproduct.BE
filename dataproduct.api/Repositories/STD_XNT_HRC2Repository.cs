@@ -5,6 +5,7 @@ using System.Linq;
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.ResponseModels;
+using dataproduct.api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -175,6 +176,58 @@ namespace dataproduct.api.Repositories
                    _context.STD_NXT_TOTAL_HRC2s.RemoveRange(summaryToDelete);
                }
 
+               // ========== XỬ LÝ BmKiemKePhuLieu (Kiểm kê - Snapshot) ==========
+               if (entity.KiemKe != null && entity.KiemKe.Any())
+               {
+                   var siloRepo = new SiloRepository(_context);
+                   var siloService = new SiloService(siloRepo);
+
+                   foreach (var kiemKeDto in entity.KiemKe)
+                   {
+                       // ValidateBeforeSaveAsync - kiểm tra silo có chứa phụ liệu NM và mapping còn hiệu lực
+                       await siloService.ValidateBeforeSaveAsync(
+                           kiemKeDto.SiloId, 
+                           kiemKeDto.PhuLieuNMId, 
+                           kiemKeDto.NgaySX
+                       );
+
+                       // Check trùng (Key: NgaySX, Ca, HeaderKeyId, SiloId, PhuLieuNMId, Scope)
+                       var exists = await _context.BmKiemKePhuLieus
+                           .AnyAsync(k => 
+                               k.NgaySX.Date == kiemKeDto.NgaySX.Date &&
+                               k.Ca == kiemKeDto.Ca &&
+                               k.ID_HeaderKey == kiemKeDto.HeaderKeyId &&
+                               k.ID_Silo == kiemKeDto.SiloId &&
+                               k.ID_PhuLieuNM == kiemKeDto.PhuLieuNMId &&
+                               k.Scope == kiemKeDto.Scope
+                           );
+
+                       if (exists)
+                       {
+                           throw new InvalidOperationException(
+                               $"Đã tồn tại bản ghi kiểm kê với cùng Ngày SX, Ca, HeaderKey, Silo, Phụ liệu NM và Scope."
+                           );
+                       }
+
+                       // Tạo entity BmKiemKePhuLieu
+                       var kiemKe = new BmKiemKePhuLieu
+                       {
+                           NgaySX = kiemKeDto.NgaySX,
+                           Ca = kiemKeDto.Ca,
+                           Scope = kiemKeDto.Scope,
+                           ID_HeaderKey = kiemKeDto.HeaderKeyId,
+                           ID_Silo = kiemKeDto.SiloId,
+                           ID_PhuLieuNM = kiemKeDto.PhuLieuNMId,
+                           TheTich = kiemKeDto.TheTich,
+                           TyTrong = kiemKeDto.TyTrong,
+                           NgayTao = DateTime.Now
+                       };
+
+                       // Lưu snapshot
+                       await _context.BmKiemKePhuLieus.AddAsync(kiemKe);
+                   }
+               }
+
                // Lưu thay đổi
                await _context.SaveChangesAsync();
 
@@ -192,8 +245,9 @@ namespace dataproduct.api.Repositories
 
         public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
         {
-
-            var listUsedNXT  = await _context.Header_Keys.Where(x => x.IsUsedNXT == true).ToListAsync();
+            var listUsedNXT = await _context.Header_Keys
+                .Where(x => x.IsUsedNXT == true)
+                .ToListAsync();
 
             var ngaySx = phieu.NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now;
             var ca = phieu.Ca.Value;
@@ -214,6 +268,7 @@ namespace dataproduct.api.Repositories
                             BieuMau = bieuMau,
                             Id_HeaderKey = item.Id,
                             TenNguyenLieu = item.TenHienThi,
+                            TyTrong = item.TyTrong, 
                             ViTri = 1
                         };
                         await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(detail);
@@ -330,20 +385,202 @@ namespace dataproduct.api.Repositories
         {
             try
             {
-                // var details = await _context.STD_NXT_TOTAL_HRC2s
-                //     .Where(x => x.Id_HeaderKey == entity.Id_HeaderKey && x.NgaySX == entity.NgaySX && x.Ca == entity.Ca)
-                //     .FirstOrDefaultAsync();
-                // if (details == null || details.ChenhLech != entity.ChenhLech)
-                // {
-                //     throw new Exception("Vui lòng lưu trước khi phân bổ");
-                // }
-                // var listMeThoi = await _context.DLNM_HRC2s.Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca).ToListAsync();
-                // if (listMeThoi.Any())
-                // {
-                //     // tìm 
-                // }
+                // ========== BƯỚC 1: Kiểm tra dữ liệu đã được lưu chưa ==========
+                var details = await _context.STD_NXT_TOTAL_HRC2s
+                    .Where(x => 
+                        x.Id_HeaderKey == entity.Id_HeaderKey && 
+                        x.NgaySX == entity.NgaySX && 
+                        x.Ca == entity.Ca)
+                    .FirstOrDefaultAsync();
+
+                if (details == null)
+                {
+                    throw new Exception("Không tìm thấy dữ liệu tổng hợp. Vui lòng lưu trước khi phân bổ.");
+                }
+
+                // So sánh ChenhLech (cho phép sai số nhỏ do decimal)
+                var chenhLechDiff = Math.Abs((details.ChenhLech ?? 0) - entity.ChenhLech);
+                if (chenhLechDiff > 0.001m) // Cho phép sai số 0.001
+                {
+                    throw new Exception("Chênh lệch không khớp với dữ liệu đã lưu. Vui lòng lưu lại trước khi phân bổ.");
+                }
+
+                // ========== BƯỚC 2: Lấy danh sách ID_PhuLieu từ Header_Mapping ==========
+                var phuLieuIds = await _context.Header_Mappings
+                    .Where(m => m.ID_HeaderKey == entity.Id_HeaderKey)
+                    .Select(m => m.ID_PhuLieu)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (!phuLieuIds.Any())
+                {
+                    throw new Exception($"HeaderKey {entity.Id_HeaderKey} chưa được móc nối với phụ liệu nào.");
+                }
+
+                // ========== BƯỚC 3 & 4: Kết hợp query - Lấy các PhuLieu_HRC2 có sử dụng HeaderKey này ==========
+                // Tìm các PhuLieu_HRC2 có:
+                // - ID_PhuLieu trong danh sách phuLieuIds (từ Header_Mapping)
+                // - ID_HeaderKey = entity.Id_HeaderKey (đảm bảo đúng mapping)
+                // - ID_MeThoi thuộc các mẻ trong ngày/ca (join với DLNM_HRC2s)
+                // - IsPhanBo != true (CHỈ lấy phụ liệu thực tế, không lấy phân bổ cũ)
+                var phuLieuRecords = await (
+                    from pl in _context.PhuLieu_HRC2s
+                    join dlnm in _context.DLNM_HRC2s on pl.ID_MeThoi equals dlnm.ID
+                    where phuLieuIds.Contains(pl.ID_PhuLieu ?? -1) &&
+                          dlnm.Ngay == entity.NgaySX &&
+                          dlnm.Ca == entity.Ca &&
+                          (pl.IsPhanBo != true)
+                    select pl
+                ).ToListAsync();
+
+                if (!phuLieuRecords.Any())
+                {
+                    throw new Exception($"Không tìm thấy mẻ nào sử dụng HeaderKey {entity.Id_HeaderKey} trong ngày {entity.NgaySX:dd/MM/yyyy} ca {entity.Ca}.");
+                }
+
+                // Lấy danh sách ID_MeThoi duy nhất (mỗi mẻ chỉ phân bổ 1 lần)
+                var meThoiIds = phuLieuRecords
+                    .Select(x => x.ID_MeThoi)
+                    .Distinct()
+                    .ToList();
+
+                // ========== BƯỚC 5: Tính khối lượng phân bổ cho mỗi mẻ ==========
+                var soMe = meThoiIds.Count;
+                var klPhanBo = entity.ChenhLech / soMe; // Chia đều
+
+                // ========== BƯỚC 6: Lấy thông tin Header_Key để lấy TenHienThi ==========
+                var headerKey = await _context.Header_Keys
+                    .Where(k => k.Id == entity.Id_HeaderKey)
+                    .Select(k => new { k.TenHienThi })
+                    .FirstOrDefaultAsync();
+
+                var tenHienThi = headerKey?.TenHienThi ?? "Phân bổ";
+
+                // ========== BƯỚC 7: Lấy các record phân bổ cũ để upsert ==========
+                // Lấy tất cả record phân bổ cũ cho HeaderKey này trong ngày/ca
+                var oldPhanBoRecords = await (
+                    from pl in _context.PhuLieu_HRC2s
+                    join dlnm in _context.DLNM_HRC2s on pl.ID_MeThoi equals dlnm.ID
+                    where pl.ID_HeaderKey == entity.Id_HeaderKey &&
+                          pl.IsPhanBo == true &&
+                          dlnm.Ngay == entity.NgaySX &&
+                          dlnm.Ca == entity.Ca
+                    select new { PhuLieu = pl, MeThoiId = dlnm.ID }
+                ).ToListAsync();
+
+                // Tạo dictionary để lookup nhanh: key = ID_MeThoi
+                var oldPhanBoLookup = oldPhanBoRecords
+                    .ToDictionary(x => x.MeThoiId, x => x.PhuLieu);
+
+                // ========== BƯỚC 8: Upsert record phân bổ cho mỗi mẻ ==========
+                foreach (var meThoiId in meThoiIds)
+                {
+                    // Lấy DLNM_HRC2 để lấy thông tin mẻ
+                    var dlnm = await _context.DLNM_HRC2s
+                        .Where(x => x.ID == meThoiId)
+                        .FirstOrDefaultAsync();
+
+                    if (dlnm == null) continue;
+
+                    // Kiểm tra xem đã có record phân bổ cho mẻ này chưa
+                    if (oldPhanBoLookup.TryGetValue(meThoiId, out var existingPhanBo))
+                    {
+                        // UPDATE: Cập nhật khối lượng phân bổ (chênh lệch mới)
+                        existingPhanBo.KLPhuGia = (double)klPhanBo;
+                        existingPhanBo.TenHienThi = tenHienThi;
+                        // Cập nhật các trường khác từ DLNM nếu cần
+                        existingPhanBo.REPORT_NO = dlnm.REPORT_NO;
+                        existingPhanBo.BieuMau = dlnm.BieuMau;
+                        existingPhanBo.MeThoi = dlnm.MeThoi;
+                        _context.PhuLieu_HRC2s.Update(existingPhanBo);
+                    }
+                    else
+                    {
+                        // INSERT: Tạo record phân bổ mới
+                        var phuLieuPhanBo = new PhuLieu_HRC2
+                        {
+                            REPORT_NO = dlnm.REPORT_NO,
+                            BieuMau = dlnm.BieuMau,
+                            MeThoi = dlnm.MeThoi,
+                            ID_PhuLieu = null, // Phân bổ không có ID_PhuLieu cụ thể
+                            TenPhuLieu = null,
+                            KLPhuGia = (double)klPhanBo,
+                            ID_HeaderKey = entity.Id_HeaderKey,
+                            TenHienThi = tenHienThi,
+                            ID_MeThoi = meThoiId,
+                            IsPhanBo = true // ⭐ Đánh dấu là phân bổ
+                        };
+                        _context.PhuLieu_HRC2s.Add(phuLieuPhanBo);
+                    }
+                }
+
+                // ========== BƯỚC 9: Xóa các record phân bổ cũ không còn trong danh sách mới ==========
+                // (Các mẻ đã bị xóa hoặc không còn sử dụng HeaderKey này)
+                var meThoiIdsSet = meThoiIds.ToHashSet();
+                var phanBoToDelete = oldPhanBoRecords
+                    .Where(x => !meThoiIdsSet.Contains(x.MeThoiId))
+                    .Select(x => x.PhuLieu)
+                    .ToList();
+
+                if (phanBoToDelete.Any())
+                {
+                    _context.PhuLieu_HRC2s.RemoveRange(phanBoToDelete);
+                }
+
                 await _context.SaveChangesAsync();
                 return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task SaveKiemKeAsync(SaveKiemKeRequest request)
+        {
+            try
+            {
+                // ValidateBeforeSaveAsync - sử dụng SiloService
+                var siloRepo = new SiloRepository(_context);
+                var siloService = new SiloService(siloRepo);
+                await siloService.ValidateBeforeSaveAsync(request.SiloId, request.PhuLieuNMId, request.NgaySX);
+
+                // Check trùng (BmKiemKePhuLieuRepository.Exists)
+                // Key: (NgaySX, Ca, HeaderKeyId, SiloId, PhuLieuNMId, Scope)
+                var exists = await _context.BmKiemKePhuLieus
+                    .AnyAsync(k => 
+                        k.NgaySX.Date == request.NgaySX.Date &&
+                        k.Ca == request.Ca &&
+                        k.ID_HeaderKey == request.HeaderKeyId &&
+                        k.ID_Silo == request.SiloId &&
+                        k.ID_PhuLieuNM == request.PhuLieuNMId &&
+                        k.Scope == request.Scope
+                    );
+
+                if (exists)
+                {
+                    throw new InvalidOperationException(
+                        $"Đã tồn tại bản ghi kiểm kê với cùng Ngày SX, Ca, HeaderKey, Silo, Phụ liệu NM và Scope."
+                    );
+                }
+
+                // Tạo entity BmKiemKePhuLieu
+                var kiemKe = new BmKiemKePhuLieu
+                {
+                    NgaySX = request.NgaySX,
+                    Ca = request.Ca,
+                    Scope = request.Scope,
+                    ID_HeaderKey = request.HeaderKeyId,
+                    ID_Silo = request.SiloId,
+                    ID_PhuLieuNM = request.PhuLieuNMId,
+                    TheTich = request.TheTich,
+                    TyTrong = request.TyTrong,
+                    NgayTao = DateTime.Now
+                };
+
+                // Lưu snapshot
+                await _context.BmKiemKePhuLieus.AddAsync(kiemKe);
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {

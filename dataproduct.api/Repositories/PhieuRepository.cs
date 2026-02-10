@@ -137,12 +137,19 @@ namespace dataproduct.api.Repositories
 
         public async Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc)
         {
-            return await _context.BmPhieus.AnyAsync(x =>
+            var query = _context.BmPhieus.Where(x =>
                 x.MaBm == maBm &&
                 x.NgaySX == ngaySX &&
-                x.Ca == ca &&
-                (x.Scope == scope || x.MayDuc == mayduc)
+                x.Ca == ca
             );
+
+            if (scope.HasValue)
+                query = query.Where(x => x.Scope == scope.Value);
+
+            if (mayduc.HasValue)
+                query = query.Where(x => x.MayDuc == mayduc.Value);
+
+            return await query.AnyAsync();
         }
 
         public async Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request)

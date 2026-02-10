@@ -2,7 +2,6 @@ using System;
 
 namespace dataproduct.api.Models;
 
-// Bảng master lưu danh sách Phụ liệu NM (được sync tự động từ PhuLieu_HRC2)
 public partial class PhuLieu_NM
 {
     public int Id { get; set; }

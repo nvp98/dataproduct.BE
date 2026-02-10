@@ -160,11 +160,13 @@ namespace dataproduct.api.Services
                         .ToList();
 
                     // Lấy các PhuLieu_HRC2 records cũ (filter theo cả REPORT_NO và MeThoi)
+                    // CHỈ lấy phụ liệu thực tế, KHÔNG lấy record phân bổ (IsPhanBo = true)
                     var existingPhuLieuRecords = await _context.PhuLieu_HRC2s
                         .Where(x =>
                             x.MeThoi == key.MeThoi &&
                             x.REPORT_NO == (int)key.ReportNo &&
-                            x.BieuMau == request.LoaiBM)
+                            x.BieuMau == request.LoaiBM &&
+                            (x.IsPhanBo != true)) // ⭐ CHỈ lấy phụ liệu thực tế, không lấy phân bổ
                         .ToListAsync();
 
                     // Kiểm tra xem mẻ này có đã chuyển đến ca/ngày hiện tại không
@@ -250,6 +252,7 @@ namespace dataproduct.api.Services
                             g => g.First());
 
                     // Tạo lookup từ DB: key = (REPORT_NO, MeThoi, ID_PhuLieu)
+                    // existingPhuLieuRecords đã được filter IsPhanBo != true ở trên, nên không cần filter lại
                     var existingPhuLieuLookup = existingPhuLieuRecords
                         .Where(x => x.ID_PhuLieu.HasValue && x.REPORT_NO.HasValue)
                         .GroupBy(x => new { 
@@ -291,10 +294,12 @@ namespace dataproduct.api.Services
                     }
 
                     // Xóa các PhuLieu_HRC2 dư thừa (có trong DB nhưng không có trong nmData)
+                    // existingPhuLieuRecords đã được filter IsPhanBo != true ở trên, nên chỉ xóa phụ liệu thực tế
                     var phuLieuToDelete = existingPhuLieuRecords
                         .Where(existing => 
                             existing.ID_PhuLieu.HasValue &&
                             existing.REPORT_NO.HasValue &&
+                            (existing.IsPhanBo != true) && // ⭐ CHỈ xóa phụ liệu thực tế, không xóa phân bổ
                             !nmPhuLieuLookup.ContainsKey(new { 
                                 ReportNo = existing.REPORT_NO!.Value, 
                                 MeThoi = existing.MeThoi, 
@@ -330,10 +335,12 @@ namespace dataproduct.api.Services
 
                 if (dlnmToDelete.Any())
                 {
-                    // Xóa các PhuLieu_HRC2 liên quan trước
+                    // Xóa các PhuLieu_HRC2 liên quan trước (bao gồm cả phân bổ)
+                    // Khi mẻ bị xóa → phải xóa luôn tất cả phụ liệu và phân bổ liên quan
                     var dlnmIdsToDelete = dlnmToDelete.Select(x => x.ID).ToList();
                     var phuLieuToDeleteByDlnm = await _context.PhuLieu_HRC2s
                         .Where(x => dlnmIdsToDelete.Contains(x.ID_MeThoi))
+                        // ⭐ KHÔNG filter IsPhanBo vì muốn xóa cả phân bổ khi mẻ bị xóa
                         .ToListAsync();
                     if (phuLieuToDeleteByDlnm.Any())
                     {
@@ -372,7 +379,8 @@ namespace dataproduct.api.Services
                 KLPhuGia = nm.KLPhuGia,
                 ID_HeaderKey = null, // Sẽ được map sau nếu có
                 TenHienThi = null,
-                ID_MeThoi = idMeThoi
+                ID_MeThoi = idMeThoi,
+                IsPhanBo = false // ⭐ Đảm bảo phụ liệu từ NM sync không phải phân bổ
             };
         }
 
@@ -462,9 +470,17 @@ namespace dataproduct.api.Services
 
         /// <summary>
         /// Cập nhật PhuLieu_HRC2 entity từ HRC2_NM (giữ nguyên ID và ID_HeaderKey, TenHienThi nếu đã có)
+        /// Lưu ý: Hàm này chỉ được gọi với entity từ existingPhuLieuLookup (đã filter IsPhanBo != true)
         /// </summary>
         private void UpdatePhuLieuEntityFromNm(PhuLieu_HRC2 entity, HRC2_NM nm, long idMeThoi)
         {
+            // ⚠️ Đảm bảo không update record phân bổ (IsPhanBo = true)
+            // existingPhuLieuLookup đã được filter IsPhanBo != true ở trên, nên an toàn
+            if (entity.IsPhanBo == true)
+            {
+                return; // Không update record phân bổ
+            }
+
             // Cập nhật các trường từ NM data
             entity.REPORT_NO = (int)nm.REPORT_NO;
             entity.MeThoi = nm.PRODUCT_ID;
@@ -472,6 +488,7 @@ namespace dataproduct.api.Services
             entity.TenPhuLieu = nm.DESCRIPTION_EN;
             entity.KLPhuGia = nm.KLPhuGia;
             entity.ID_MeThoi = idMeThoi;
+            entity.IsPhanBo = false; // ⭐ Đảm bảo vẫn là phụ liệu thực tế
             
             // Giữ nguyên ID_HeaderKey và TenHienThi nếu đã có (không ghi đè mapping)
             // entity.ID_HeaderKey và entity.TenHienThi giữ nguyên giá trị hiện có

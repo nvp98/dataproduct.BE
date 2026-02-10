@@ -28,6 +28,6 @@ namespace dataproduct.api.Services
         {
             return await _repo.PhanBoAsync(entity);
         }
-
+       
     }
 }

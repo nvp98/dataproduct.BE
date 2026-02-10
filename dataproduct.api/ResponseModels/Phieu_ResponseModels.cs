@@ -15,4 +15,5 @@ namespace dataproduct.api.ResponseModels
         public int? TinhTrang { get; set; }
         public int? NguoiTao { get; set; }
     }
+
 }

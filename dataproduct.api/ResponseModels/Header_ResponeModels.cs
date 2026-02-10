@@ -39,6 +39,7 @@ namespace dataproduct.api.ResponseModels
         public DateTime? NgayTao { get; set; }
         public bool? IsUsedNXT { get; set; }
         public int? ThuTu { get; set; }
+        public decimal? TyTrong { get; set; }
         public List<HeaderMapping_ResponseModel> HeaderMappings { get; set; } = new List<HeaderMapping_ResponseModel>();
     }
     public class HeaderMapping_ResponseModel
@@ -62,6 +63,7 @@ namespace dataproduct.api.ResponseModels
         public DateTime? NgayTaoPhuLieu { get; set; } // Ngày tạo phụ liệu NM (PhuLieu_NM.NgayTao)
         public bool? IsUsedNXT { get; set; }
         public int? ThuTu { get; set; }
+        public decimal? TyTrong { get; set; } // Tỷ trọng từ Header_Key
         public int? ID_PhuLieu { get; set; } // null nếu chưa móc nối
         public string? TenNguonDuLieu { get; set; } // null nếu chưa móc nối
         public string? TenPhuLieu { get; set; } // tên phụ liệu NM (từ bảng PhuLieu_NM)
