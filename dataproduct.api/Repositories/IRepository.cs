@@ -5,6 +5,7 @@ using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
@@ -125,9 +126,12 @@ namespace dataproduct.api.Repositories
     {
         Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
         Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
-        Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
         Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity);
-        Task DeleteByPhieuAsync(Guid idPhieu);
+        Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task<List<InsertPhoiNhapKhoDto>> GetPhoiNhapKhoChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity);
+        Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu);
 
     }
     //  End NM CTD 

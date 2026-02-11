@@ -1,14 +1,15 @@
-﻿using dataproduct.api.Models;
+﻿using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.DTOs.Export;
+using dataproduct.api.Models;
 using dataproduct.api.Repositories;
-using System;
 using DinkToPdf;
 using DinkToPdf.Contracts;
-using dataproduct.api.DTOs.Export;
 using DocumentFormat.OpenXml.Spreadsheet;
-using System.Text;
-using dataproduct.api.DTOs.CTD_Dto;
-using System.Configuration;
 using Microsoft.Extensions.Configuration;
+using System;
+using System.Configuration;
+using System.Text;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Services
 {
@@ -119,7 +120,7 @@ namespace dataproduct.api.Services
             if (!idPhieu.HasValue)
                 throw new ArgumentException("Thiếu IdPhiếu");
 
-            var items = await _repo.GetSanLuongPhoiAsync(
+            var items = await _repo.GetSanLuongPhoiChiTietAsync(
                 ca: Ca.Value,
                 kip: Kip,
                 ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
@@ -266,7 +267,6 @@ namespace dataproduct.api.Services
             };
         }
 
-
         public async Task InsertSanLuongPhoiAsync(SaveSanLuongPhoiDto dto)
         {
             try
@@ -300,13 +300,216 @@ namespace dataproduct.api.Services
                 throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
             }
         }
-        public async Task DeleteByPhieuAsync(Guid idPhieu)
+        public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
             if (idPhieu == Guid.Empty)
                 throw new ArgumentException("IdPhieu không hợp lệ");
 
-            await _repo.DeleteByPhieuAsync(idPhieu);
+            await _repo.DeleteSanLuongPhoiByPhieuAsync(idPhieu);
+        }
+        //=== PHÔI NHẬP KHO
+        public async Task InsertPhoiNhapKhoAsync(SavePhoiNhapKhoDto dto)
+        {
+            try
+            {
+                var entities = dto.Table1.Select(r => new BM_PhoiNhapKho
+                {
+                    IdPhieu = dto.IdPhieu,
+                    SoPhieu = dto.SoPhieu,
+                    NgaySX = dto.NgaySX.Date,
+                    Kip = dto.Kip,
+                    Ca = dto.Ca,
+                    MayDuc = dto.MayDuc,
+                    Me = r.Me,
+                    Mac = r.Mac,
+                    KichThuoc = r.KichThuoc,
+                    StLoai1 = r.StLoai1,
+                    KlLoai1 = r.KlLoai1,
+                    StPhoiNgan = r.StPhoiNgan,
+                    KlPhoiNgan = r.KlPhoiNgan,
+                    StLoai2 = r.StLoai2,
+                    KlLoai2 = r.KlLoai2,
+                    StLoai2TP = r.StLoai2TP,
+                    KlLoai2TP = r.KlLoai2TP,
+                    StLoai3 = r.StLoai3,
+                    KlLoai3 = r.KlLoai3,
+                    TongSoThanh = r.TongSoThanh,
+                    TongKhoiLuong = r.TongKhoiLuong,
+                    NguoiTaoId = null
+                }).ToList();
+                await _repo.InsertPhoiNhapKhoAsync(entities);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
+            }
+        }
+        public async Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                throw new ArgumentException("IdPhieu không hợp lệ");
+
+            await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
         }
 
+        public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(DateOnly? NgaySX, int? Ca, string? Kip, Guid? idPhieu, List<PheDuyetDto> pheDuyets)
+        {
+            if (!NgaySX.HasValue || !Ca.HasValue || string.IsNullOrEmpty(Kip))
+                throw new ArgumentException("Thiếu tham số Ngày / Ca / Kíp");
+
+            if (!idPhieu.HasValue)
+                throw new ArgumentException("Thiếu IdPhiếu");
+
+            var items = await _repo.GetPhoiNhapKhoChiTietAsync(
+                ca: Ca.Value,
+                kip: Kip,
+                ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
+                idPhieu: idPhieu
+            );
+
+            var data = items.ToList();
+
+            if (!data.Any())
+                throw new Exception("Không có dữ liệu sản lượng để xuất PDF");
+
+            var templatePath = Path.Combine(
+                _env.WebRootPath,
+                "template_html",
+                "BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho.html"
+            );
+
+            var html = await File.ReadAllTextAsync(templatePath);
+            var nguoiThamGia = new StringBuilder();
+            int indexNguoi = 1;
+
+            foreach (var pd in pheDuyets
+                .Where(x => x.TinhTrang == 1)     // chỉ người đã duyệt
+                .OrderBy(x => x.CapDuyet))
+            {
+                nguoiThamGia.Append($@"
+            <p>
+                {indexNguoi++}. Ông/bà: <b>{pd.HoVaTen}</b>
+                &nbsp;–&nbsp; Chức vụ: {pd.TenViTri ?? ""}
+                &nbsp;BP: {pd.TenPhongBan ?? ""}
+            </p>");
+            }
+
+
+            var rows = new StringBuilder();
+            int tongSoThanh = 0;
+            int stt = 0;
+            decimal tongKhoiLuong = 0;
+
+            foreach (var t in data)
+            {
+                tongSoThanh += t.TongSoThanh ?? 0;
+                tongKhoiLuong += t.TongKhoiLuong ?? 0;
+                stt += 1;  
+                rows.Append($@"
+                <tr>
+                     <td>{stt}</td>
+                    <td>{t.Me}</td>
+                    <td>{t.Mac}</td>
+                    <td>{t.KichThuoc}</td>
+
+                    <td>{t.StLoai1}</td>
+                    <td>{t.KlLoai1:N0}</td>
+
+                    <td>{t.StLoai2}</td>
+                    <td>{t.KlLoai2:N0}</td>
+
+                    <td>{t.StLoai2TP}</td>
+                    <td>{t.KlLoai2TP:N0}</td>
+
+                    <td>{t.StPhoiNgan}</td>
+                    <td>{t.KlPhoiNgan:N0}</td>
+
+                    <td>{t.StLoai3}</td>
+                    <td>{t.KlLoai3:N0}</td>
+
+                    <td>{t.TongSoThanh}</td>
+                    <td>{t.TongKhoiLuong:N0}</td>
+                </tr>");
+            }
+
+            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
+
+            // Convert logo và chữ ký sang base64
+            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+
+            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy);
+            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy);
+            var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy);
+
+            html = html
+                // Header
+                .Replace("{{LogoUrl}}", logoBase64)
+                .Replace("{{NgaySX}}", NgaySX.Value.ToString("dd/MM/yyyy"))
+                .Replace("{{Ca}}", Ca.Value.ToString())
+                .Replace("{{Kip}}", Kip)
+
+                // Content
+                .Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
+
+                // Table
+                .Replace("{{Rows}}", rows.ToString())
+                .Replace("{{TongSoThanh}}", tongSoThanh.ToString("N0"))
+                .Replace("{{TongKhoiLuong}}", tongKhoiLuong.ToString("N0"))
+
+                // ===== XƯỞNG ĐÚC =====
+                .Replace("{{Sign_XuongDuc}}", signXuongDuc)
+                .Replace("{{Name_XuongDuc}}", xuongDuc?.HoVaTen ?? "")
+
+                // ===== QLCL =====
+                .Replace("{{Sign_QLCL}}", signQLCL)
+                .Replace("{{Name_QLCL}}", qlcl?.HoVaTen ?? "")
+
+                // ===== KHO PHÔI =====
+                .Replace("{{Sign_KhoPhoi}}", signKhoPhoi)
+                .Replace("{{Name_KhoPhoi}}", khoPhoi?.HoVaTen ?? "");
+
+
+            var doc = new HtmlToPdfDocument
+            {
+                GlobalSettings =
+                {
+                    PaperSize = PaperKind.A4,
+                    Orientation = Orientation.Landscape
+                },
+                Objects =
+                {
+                new ObjectSettings
+                    {
+                        HtmlContent = html,
+                        WebSettings =
+                        {
+                            DefaultEncoding = "utf-8",
+                            LoadImages = true,
+                            EnableJavascript = false,
+                            PrintMediaType = true,
+                            UserStyleSheet = ""
+                        },
+                        LoadSettings =
+                        {
+                            BlockLocalFileAccess = false,
+                            DebugJavascript = false,
+                            LoadErrorHandling = ContentErrorHandling.Ignore
+                        }
+                    }
+                }
+            };
+
+            var pdfBytes = _pdfConverter.Convert(doc);
+
+            return new ExportFileResult
+            {
+                Content = pdfBytes,
+                FileName = $"BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
+                ContentType = "application/pdf"
+            };
+        }
     }
 }

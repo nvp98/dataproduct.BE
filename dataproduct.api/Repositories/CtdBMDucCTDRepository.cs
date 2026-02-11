@@ -1,8 +1,9 @@
-﻿using dataproduct.api.Models;
+﻿using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System;
-using Microsoft.Data.SqlClient;
-using dataproduct.api.DTOs.CTD_Dto;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
@@ -14,9 +15,7 @@ namespace dataproduct.api.Repositories
         {
             _context = context;
         }
-        public async Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync( string ca,
-        string kip,
-        DateTime ngaySX)
+        public async Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync( string ca,string kip,DateTime ngaySX)
         {
             return await _context.Database
              .SqlQueryRaw<SanLuongPhoiDto>(
@@ -40,13 +39,7 @@ namespace dataproduct.api.Repositories
          .ToListAsync();
         }
 
-        public async Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiAsync(
-                 int ca,
-                 string kip,
-                 DateTime ngaySX,
-                 int? mayDuc = null,
-                 Guid? idPhieu = null
-             )
+        public async Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca,string kip,DateTime ngaySX, int? mayDuc = null,Guid? idPhieu = null)
         {
             var query = _context.BM_SanLuongPhoi
                 .AsNoTracking()
@@ -106,14 +99,7 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
             return entity;
         }
-        public async Task DeleteByPhieu(Guid idPhieu)
-        {
-            await _context.BM_SanLuongPhoi
-                .Where(x => x.IdPhieu == idPhieu)
-                .ExecuteDeleteAsync();
-        }
-
-        public async Task DeleteByPhieuAsync(Guid idPhieu)
+        public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
             var entities = await _context.BM_SanLuongPhoi
             .Where(x => x.IdPhieu == idPhieu)
@@ -126,17 +112,77 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
-        //public async Task<List<SanLuongPhoiDto>> GetSanLuongPhoiPDFAsync(int? ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null)
-        //{
-        //    var query =  _context.BM_SanLuongPhoi.AsNoTracking()
-        //            .Where(x => x.NgaySX == ngaySX
-        //                    && x.Ca == ca
-        //                    && x.Kip == kip);
-        //}
+        public async Task<List<InsertPhoiNhapKhoDto>> GetPhoiNhapKhoChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null)
+        {
+            var query = _context.BM_PhoiNhapKho
+                .AsNoTracking()
+                .AsQueryable();
 
-        //public Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null)
-        //{
-        //    throw new NotImplementedException();
-        //}
+            // 1️⃣ Ưu tiên theo IdPhieu (đã chốt)
+            if (idPhieu.HasValue)
+            {
+                query = query.Where(x => x.IdPhieu == idPhieu.Value);
+            }
+            else
+            {
+                // 2️⃣ Fallback theo Ngày + Ca + Kíp
+                query = query.Where(x =>
+                    x.NgaySX.Date == ngaySX.Date &&
+                    x.Ca == ca &&
+                    x.Kip == kip
+                );
+            }
+
+            if (mayDuc.HasValue)
+            {
+                query = query.Where(x => x.MayDuc == mayDuc.Value);
+            }
+
+            return await query
+                .Select(x => new InsertPhoiNhapKhoDto
+                {
+                    Me = x.Me,
+                    Mac = x.Mac,
+                    KichThuoc = x.KichThuoc,
+
+                    StLoai1 = x.StLoai1,
+                    KlLoai1 = x.KlLoai1,
+
+                    StPhoiNgan = x.StPhoiNgan,
+                    KlPhoiNgan = x.KlPhoiNgan,
+
+                    StLoai2 = x.StLoai2,
+                    KlLoai2 = x.KlLoai2,
+
+                    StLoai2TP = x.StLoai2TP,
+                    KlLoai2TP = x.KlLoai2TP,
+
+                    StLoai3 = x.StLoai3,
+                    KlLoai3 = x.KlLoai3,
+
+                    TongSoThanh = x.TongSoThanh,
+                    TongKhoiLuong = x.TongKhoiLuong
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity)
+        {
+            await _context.BM_PhoiNhapKho.AddRangeAsync(entity);
+            await _context.SaveChangesAsync();
+            return entity;
+        }
+        public async Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            var entities = await _context.BM_PhoiNhapKho
+            .Where(x => x.IdPhieu == idPhieu)
+            .ToListAsync();
+
+            if (!entities.Any())
+                return;
+
+            _context.BM_PhoiNhapKho.RemoveRange(entities);
+            await _context.SaveChangesAsync();
+        }
     }
 }

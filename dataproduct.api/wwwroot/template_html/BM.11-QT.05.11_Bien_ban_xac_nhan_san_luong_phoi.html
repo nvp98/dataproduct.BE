@@ -10,40 +10,46 @@
             font-size: 13px;
             margin: 0;
             padding: 0;
+            color: #000;
         }
 
         .page {
             padding: 20px 30px 0px 50px;
         }
 
-        /* ===== HEADER ===== */
+        /* ================= HEADER ================= */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .header-left,
+        .header-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
         }
 
         .header-left {
             font-weight: bold;
         }
 
-            .header-left img {
-                height: 45px;
-            }
+        .header-left img {
+            height: 45px;
+            margin-bottom: 4px;
+        }
 
-            .header-left div {
-                margin-top: 2px;
-                text-transform: uppercase;
-            }
+        .header-left div {
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
 
         .header-right {
             text-align: right;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.5;
         }
-
-            .header-right div {
-                margin-bottom: 2px;
-            }
 
         /* ===== TITLE ===== */
         .title {
@@ -62,10 +68,12 @@
         /* ===== CONTENT TEXT ===== */
         .content {
             margin: 10px 0;
+            font-size :13px;
         }
 
             .content p {
                 margin: 4px 0;
+                font-size: 13px;
             }
 
         /* ===== TABLE ===== */
@@ -117,6 +125,7 @@
         .sign-name {
             height: 65px;
             margin-top: 10px;
+            font-size: 13px;
         }
 
         .sign-name img {
@@ -126,6 +135,7 @@
         .sign-fullname {
             margin-top: 5px;
             font-weight: normal;
+            font-size: 13px;
         }
         table.sign-table,
         table.sign-table td {

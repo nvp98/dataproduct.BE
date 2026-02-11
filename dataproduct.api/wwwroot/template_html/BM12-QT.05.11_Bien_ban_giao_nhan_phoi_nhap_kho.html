@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Biên bản giao nhận phôi nhập kho</title>
+    <title>Biên bản xác nhận sản lượng phôi thép</title>
 
     <style>
         body {
@@ -10,17 +10,25 @@
             font-size: 13px;
             margin: 0;
             padding: 0;
+            color: #000;
         }
 
         .page {
             padding: 20px 30px 0px 50px;
         }
 
-        /* ===== HEADER ===== */
+        /* ================= HEADER ================= */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .header-left,
+        .header-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
         }
 
         .header-left {
@@ -29,21 +37,19 @@
 
             .header-left img {
                 height: 45px;
+                margin-bottom: 4px;
             }
 
             .header-left div {
-                margin-top: 2px;
                 text-transform: uppercase;
+                margin-top: 2px;
             }
 
         .header-right {
             text-align: right;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.5;
         }
-
-            .header-right div {
-                margin-bottom: 2px;
-            }
 
         /* ===== TITLE ===== */
         .title {
@@ -62,10 +68,12 @@
         /* ===== CONTENT TEXT ===== */
         .content {
             margin: 10px 0;
+            font-size: 13px;
         }
 
             .content p {
                 margin: 4px 0;
+                font-size: 13px;
             }
 
         /* ===== TABLE ===== */
@@ -115,20 +123,27 @@
             margin-top: 60px;
         }
 
-        .note-ghichu {
-            margin-top: 6px;
+        .sign-name {
+            height: 65px;
+            margin-top: 10px;
             font-size: 13px;
         }
 
-            .note-ghichu p {
-                margin: 2px 0;
-                text-align: left;
-                padding-left: 10px;
+            .sign-name img {
+                max-height: 60px;
             }
 
-            .note-ghichu .ghichu-title {
-                padding-left: 0;
-            }
+        .sign-fullname {
+            margin-top: 5px;
+            font-weight: normal;
+            font-size: 13px;
+        }
+
+        table.sign-table,
+        table.sign-table td {
+            border: none !important;
+            border-collapse: collapse;
+        }
     </style>
 </head>
 
@@ -138,7 +153,7 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-left">
-                <img src="https://report.hoaphatdungquat.vn/img/logoHP.png" alt="Hòa Phát">
+                <img src="{{LogoUrl}}" alt="Logo" /><br />
                 <div>CÔNG TY CỔ PHẦN THÉP</div>
                 <div>HÒA PHÁT DUNG QUẤT</div>
             </div>
@@ -165,20 +180,16 @@
             </div>
         </div>
 
-
         <!-- CONTENT -->
         <div class="content">
             <p>Chúng tôi gồm:</p>
-            <p>1. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>2. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>3. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
+
+            {{NguoiThamGia}}
 
             <p>
-                Cùng nhau thống nhất lập “Biên bản giao nhận phôi nhập kho” chi tiết như sau:
+                Cùng nhau thống nhất lập “Biên bản xác nhận sản lượng phôi thép” chi tiết như sau:
             </p>
         </div>
-
-        <!-- TABLE -->
         <table>
             <thead>
                 <tr>
@@ -233,7 +244,7 @@
                     <td></td>
                     <td></td>
                     <td></td>
-                    <td></td>
+                    <td><b>{{TongSoThanh}}</b></td>
                     <td><b>{{TongKhoiLuong}}</b></td>
                 </tr>
             </tbody>
@@ -251,24 +262,45 @@
             <p>- Kích thước chỉ bao gồm các loại: Chiều dài chuẩn theo lệnh sản xuất, 6m, từ 9 - 12m.</p>
         </div>
 
+        <table class="sign-table" style="width:100%; margin-top:20px; text-align:center;">
+            <tr>
+                <td style="width:33%;">
+                    Kho phôi NM.HRC1
+                </td>
+                <td style="width:33%;">
+                    P.QLCL
+                </td>
+                <td style="width:33%;">
+                    Xưởng Đúc phôi vuông NM.HRC1
+                </td>
+            </tr>
 
-        <!-- SIGNATURE -->
-        <div class="signatures">
-            <div class="sign-box">
-                Kho phôi NM.HRC1
-                <div class="sign-name"></div>
-            </div>
+            <tr>
+                <td style="height:70px;">
+                    {{Sign_KhoPhoi}}
+                </td>
+                <td>
+                    {{Sign_QLCL}}
+                </td>
+                <td>
+                    {{Sign_XuongDuc}}
+                </td>
+            </tr>
 
-            <div class="sign-box">
-                P.QLCL
-                <div class="sign-name"></div>
-            </div>
+            <tr>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_KhoPhoi}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_QLCL}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_XuongDuc}}
+                </td>
+            </tr>
+        </table>
 
-            <div class="sign-box">
-                Xưởng Đúc phôi vuông NM.HRC1
-                <div class="sign-name"></div>
-            </div>
-        </div>
+
 
     </div>
 </body>
