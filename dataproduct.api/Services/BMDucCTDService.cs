@@ -21,8 +21,10 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IPhieuRepository _repoPhieu;
+        
 
-        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory)
+        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu)
         {
             _repo = repo;
             _pdfConverter = pdfConverter;
@@ -30,6 +32,7 @@ namespace dataproduct.api.Services
             _configuration = configuration;
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
+            _repoPhieu = repoPhieu;
         }
 
         private async Task<string> ConvertImageUrlToBase64Async(string imageUrl)
@@ -132,6 +135,34 @@ namespace dataproduct.api.Services
             if (!data.Any())
                 throw new Exception("Không có dữ liệu sản lượng để xuất PDF");
 
+            // Tính toán thời gian ca kíp
+            string tuGio = "", denGio = "", tuNgay = "", denNgay = "";
+
+            if (NgaySX.HasValue && Ca.HasValue)
+            {
+                DateOnly ngayBatDau = NgaySX.Value;
+                DateOnly ngayKetThuc = NgaySX.Value;
+
+                switch (Ca.Value)
+                {
+                    case 1: // Ca 1: 08h - 20h
+                        tuGio = "08";
+                        denGio = "20";
+                        break;
+                    case 2: // Ca 2: 20h - 08h
+                        tuGio = "20";
+                        denGio = "08";
+                        ngayKetThuc = NgaySX.Value.AddDays(1);
+                        break;
+                    default:
+                        tuGio = "";
+                        denGio = "";
+                        break;
+                }
+
+                tuNgay = ngayBatDau.ToString("dd/MM/yyyy");
+                denNgay = ngayKetThuc.ToString("dd/MM/yyyy");
+            }
             var templatePath = Path.Combine(
                 _env.WebRootPath,
                 "template_html",
@@ -139,20 +170,7 @@ namespace dataproduct.api.Services
             );
 
             var html = await File.ReadAllTextAsync(templatePath);
-            var nguoiThamGia = new StringBuilder();
-            int indexNguoi = 1;
-
-            foreach (var pd in pheDuyets
-                .Where(x => x.TinhTrang == 1)     // chỉ người đã duyệt
-                .OrderBy(x => x.CapDuyet))
-            {
-                nguoiThamGia.Append($@"
-            <p>
-                {indexNguoi++}. Ông/bà: <b>{pd.HoVaTen}</b>
-                &nbsp;–&nbsp; Chức vụ: {pd.TenViTri ?? ""}
-                &nbsp;BP: {pd.TenPhongBan ?? ""}
-            </p>");
-                        }
+            
 
            
             var rows = new StringBuilder();
@@ -195,6 +213,21 @@ namespace dataproduct.api.Services
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
 
+
+            var nguoiGiao = xuongDuc.HoVaTen;
+            var chucVuGiao = xuongDuc.TenViTri;
+            var bPhanGiao = xuongDuc.TenPhongBan;
+
+
+            var nguoiqlclo = qlcl.HoVaTen;
+            var chucVuqlcl = qlcl.TenViTri;
+            var bPhanqlcl = qlcl.TenPhongBan;
+
+            var nguoiNhan = khoPhoi.HoVaTen;
+            var chucVuNhan = khoPhoi.TenViTri;
+            var bPhanNhan = khoPhoi.TenPhongBan;
+
+
             var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy);
             var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy);
             var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy);
@@ -207,7 +240,22 @@ namespace dataproduct.api.Services
                 .Replace("{{Kip}}", Kip)
 
                 // Content
-                .Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
+                //.Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
+
+                // ===== XƯỞNG ĐÚC =====
+                .Replace("{{NguoiGiao}}", nguoiGiao)
+                .Replace("{{ChucVuGiao}}", chucVuGiao)
+                .Replace("{{BoPhanGiao}}", bPhanGiao)
+
+                // ===== QLCL =====
+                .Replace("{{NguoiQLCL}}", nguoiqlclo)
+                .Replace("{{ChucVuQLCL}}", chucVuqlcl)
+                .Replace("{{BoPhanQLCL}}", bPhanqlcl)
+
+                // ===== KHO PHÔI =====
+                .Replace("{{NguoiNhan}}", nguoiNhan)
+                .Replace("{{ChucVuNhan}}", chucVuNhan)
+                .Replace("{{BoPhanNhan}}", bPhanNhan)
 
                 // Table
                 .Replace("{{Rows}}", rows.ToString())
@@ -352,26 +400,58 @@ namespace dataproduct.api.Services
             await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
         }
 
-        public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(DateOnly? NgaySX, int? Ca, string? Kip, Guid? idPhieu, List<PheDuyetDto> pheDuyets)
+        public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(PhoiNhapKhoPdfDTOReq request)
         {
-            if (!NgaySX.HasValue || !Ca.HasValue || string.IsNullOrEmpty(Kip))
+            if (request.NgaySX == default || request.Ca == 0 || string.IsNullOrEmpty(request.Kip))
                 throw new ArgumentException("Thiếu tham số Ngày / Ca / Kíp");
 
-            if (!idPhieu.HasValue)
+            if (request.IdPhieu == Guid.Empty)
                 throw new ArgumentException("Thiếu IdPhiếu");
 
-            var items = await _repo.GetPhoiNhapKhoChiTietAsync(
-                ca: Ca.Value,
-                kip: Kip,
-                ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
-                idPhieu: idPhieu
-            );
+            var phieu = await _repoPhieu.GetByIdAsync(request.IdPhieu);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
 
+            var items = await _repo.GetPhoiNhapKhoChiTietAsync(
+                ca: request.Ca,
+                kip: request.Kip,
+                ngaySX: request.NgaySX,
+                idPhieu: request.IdPhieu
+            );
             var data = items.ToList();
 
             if (!data.Any())
                 throw new Exception("Không có dữ liệu sản lượng để xuất PDF");
 
+            int mayDuc = (int)phieu.MayDuc;
+            // Tính toán thời gian ca kíp
+            string tuGio = "", denGio = "", tuNgay = "", denNgay = "";
+          
+            if (request.NgaySX != default && request.Ca > 0)
+            {
+                var ngayBatDau = DateOnly.FromDateTime(request.NgaySX);
+                var ngayKetThuc = DateOnly.FromDateTime(request.NgaySX);
+
+                switch (request.Ca)
+                {
+                    case 1: // Ca 1: 08h - 20h
+                        tuGio = "08h00";
+                        denGio = "20h00";
+                        break;
+                    case 2: // Ca 2: 20h - 08h
+                        tuGio = "20h00";
+                        denGio = "08h00";
+                        ngayKetThuc = DateOnly.FromDateTime(request.NgaySX).AddDays(1);
+                        break;
+                    default:
+                        tuGio = "";
+                        denGio = "";
+                        break;
+                }
+
+                tuNgay = ngayBatDau.ToString("dd/MM/yyyy");
+                denNgay = ngayKetThuc.ToString("dd/MM/yyyy");
+            }
             var templatePath = Path.Combine(
                 _env.WebRootPath,
                 "template_html",
@@ -382,17 +462,8 @@ namespace dataproduct.api.Services
             var nguoiThamGia = new StringBuilder();
             int indexNguoi = 1;
 
-            foreach (var pd in pheDuyets
-                .Where(x => x.TinhTrang == 1)     // chỉ người đã duyệt
-                .OrderBy(x => x.CapDuyet))
-            {
-                nguoiThamGia.Append($@"
-            <p>
-                {indexNguoi++}. Ông/bà: <b>{pd.HoVaTen}</b>
-                &nbsp;–&nbsp; Chức vụ: {pd.TenViTri ?? ""}
-                &nbsp;BP: {pd.TenPhongBan ?? ""}
-            </p>");
-            }
+            var pheDuyets = request.listNguoiPheDuyet ?? new List<PheDuyetDto>();
+
 
 
             var rows = new StringBuilder();
@@ -435,10 +506,24 @@ namespace dataproduct.api.Services
             var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
+       
 
             // Convert logo và chữ ký sang base64
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+
+            var nguoiGiao = xuongDuc.HoVaTen;
+            var chucVuGiao = xuongDuc.TenViTri;
+            var bPhanGiao = xuongDuc.TenPhongBan;
+
+
+            var nguoiqlclo = qlcl.HoVaTen;
+            var chucVuqlcl = qlcl.TenViTri;
+            var bPhanqlcl = qlcl.TenPhongBan;
+
+            var nguoiNhan = khoPhoi.HoVaTen;
+            var chucVuNhan = khoPhoi.TenViTri;
+            var bPhanNhan = khoPhoi.TenPhongBan;
 
             var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy);
             var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy);
@@ -447,12 +532,33 @@ namespace dataproduct.api.Services
             html = html
                 // Header
                 .Replace("{{LogoUrl}}", logoBase64)
-                .Replace("{{NgaySX}}", NgaySX.Value.ToString("dd/MM/yyyy"))
-                .Replace("{{Ca}}", Ca.Value.ToString())
-                .Replace("{{Kip}}", Kip)
+                .Replace("{{NgaySX}}", request.NgaySX.ToString("dd/MM/yyyy"))
+                .Replace("{{Ca}}", request.Ca.ToString())
+                .Replace("{{Kip}}", request.Kip)
+                .Replace("{{MayDuc}}", mayDuc.ToString())
+
+                // ===== Thời gian ca =====
+                .Replace("{{TuGio}}", tuGio)
+                .Replace("{{DenGio}}", denGio)
+                .Replace("{{TuNgay}}", tuNgay)
+                .Replace("{{DenNgay}}", denNgay)
+
 
                 // Content
-                .Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
+                // ===== XƯỞNG ĐÚC =====
+                .Replace("{{NguoiGiao}}", nguoiGiao)
+                .Replace("{{ChucVuGiao}}", chucVuGiao)
+                .Replace("{{BoPhanGiao}}", bPhanGiao)
+
+                // ===== QLCL =====
+                .Replace("{{NguoiQLCL}}", nguoiqlclo)
+                .Replace("{{ChucVuQLCL}}", chucVuqlcl)
+                .Replace("{{BoPhanQLCL}}", bPhanqlcl)
+
+                // ===== KHO PHÔI =====
+                .Replace("{{NguoiNhan}}", nguoiNhan)
+                .Replace("{{ChucVuNhan}}", chucVuNhan)
+                .Replace("{{BoPhanNhan}}", bPhanNhan)
 
                 // Table
                 .Replace("{{Rows}}", rows.ToString())

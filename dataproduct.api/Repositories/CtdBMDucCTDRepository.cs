@@ -70,7 +70,7 @@ namespace dataproduct.api.Repositories
                 .ThenBy(x => x.KichThuoc)
                 .Select(x => new InsertSanLuongPhoiDto
                 {
-                    KipNgay = $"{x.Ca}{x.Kip}-{x.NgaySX.Date}",
+                    KipNgay = $"{x.Ca}{x.Kip}-{x.NgaySX:dd/MM/yyyy}",
                     MacThep = x.MacThep,
                     KichThuoc = x.KichThuoc,
 
@@ -148,14 +148,15 @@ namespace dataproduct.api.Repositories
                     StLoai1 = x.StLoai1,
                     KlLoai1 = x.KlLoai1,
 
-                    StPhoiNgan = x.StPhoiNgan,
-                    KlPhoiNgan = x.KlPhoiNgan,
-
                     StLoai2 = x.StLoai2,
                     KlLoai2 = x.KlLoai2,
 
+
                     StLoai2TP = x.StLoai2TP,
                     KlLoai2TP = x.KlLoai2TP,
+
+                    StPhoiNgan = x.StPhoiNgan,
+                    KlPhoiNgan = x.KlPhoiNgan,
 
                     StLoai3 = x.StLoai3,
                     KlLoai3 = x.KlLoai3,

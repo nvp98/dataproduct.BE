@@ -76,6 +76,46 @@
                 font-size: 13px;
             }
 
+        /* ===== NGƯỜI THAM GIA ===== */
+
+        .ds-nguoi {
+            margin-top: 5px;
+        }
+
+        .row-nguoi {
+            width: 100%;
+            margin-bottom: 4px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+            .row-nguoi span {
+                display: inline-block;
+                vertical-align: bottom;
+            }
+
+        /* Chia đúng theo khổ A4 lề trái 50px */
+
+        .col-1 {
+            width: 25%;
+        }
+
+        .col-2 {
+            width: 25%;
+        }
+
+        .col-3 {
+            width: 23%;
+        }
+
+        /* Dòng chấm */
+
+        .line {
+            display: inline-block;
+            width: 160px;
+            border-bottom: 1px #000;
+        }
+
         /* ===== TABLE ===== */
         table {
             width: 100%;
@@ -175,8 +215,52 @@
         <!-- CONTENT -->
         <div class="content">
             <p>Chúng tôi gồm:</p>
+            <div class="ds-nguoi">
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        1. Ông/bà:
+                        <span class="line">{{NguoiGiao}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuGiao}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanGiao}}</span>
+                    </span>
+                </div>
 
-            {{NguoiThamGia}}
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        2. Ông/bà:
+                        <span class="line">{{NguoiQLCL}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuQLCL}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanQLCL}}</span>
+                    </span>
+                </div>
+
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        3. Ông/bà:
+                        <span class="line">{{NguoiNhan}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuNhan}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanNhan}}</span>
+                    </span>
+                </div>
+            </div>
 
             <p>
                 Cùng nhau thống nhất lập “Biên bản xác nhận sản lượng phôi thép” chi tiết như sau:

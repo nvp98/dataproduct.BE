@@ -105,14 +105,18 @@ namespace dataproduct.api.Controllers
             // 1. Lấy danh sách phê duyệt + chữ ký
             var pheDuyets = await _pdservice.GetPheDuyetPhieuAsync(idPhieu.Value);
 
-            // 2. Export PDF (truyền luôn chữ ký vào)
-            var file = await _service.ExportPdfPhoiNhapKhoAsync(
-                NgaySX,
-                Ca,
-                Kip,
-                idPhieu.Value,
-                pheDuyets
-            );
+            // 2. Build request DTO
+            var request = new PhoiNhapKhoPdfDTOReq
+            {
+                IdPhieu = idPhieu.Value,
+                NgaySX = NgaySX?.ToDateTime(TimeOnly.MinValue) ?? default,
+                Ca = Ca ?? 0,
+                Kip = Kip ?? "",
+                listNguoiPheDuyet = pheDuyets
+            };
+
+            // 3. Export PDF
+            var file = await _service.ExportPdfPhoiNhapKhoAsync(request);
 
             return File(file.Content, file.ContentType, file.FileName);
         }
