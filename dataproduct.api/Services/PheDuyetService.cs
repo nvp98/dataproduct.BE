@@ -29,23 +29,21 @@ namespace dataproduct.api.Services
             var ds = pheDuyet.Select(p =>
             {
                 var tk = taiKhoans.FirstOrDefault(x => x.ID_TaiKhoan == p.NguoiDuyetId);
-                var pb = phongBans.FirstOrDefault(x => x.ID_PhongBan == tk.ID_PhongBan);
-                var vt = viTris.FirstOrDefault(x => x.ID_ViTri == tk.ID_ChucVu);
+
+                var pb = phongBans.FirstOrDefault(x => x.ID_PhongBan == tk?.ID_PhongBan);
+                var vt = viTris.FirstOrDefault(x => x.ID_ViTri == tk?.ID_ChucVu);
+
                 return new PheDuyetDto
                 {
                     CapDuyet = p.CapDuyet,
                     NguoiDuyetID = p.NguoiDuyetId,
-                    HoVaTen = tk.HoVaTen,
-                    ChuKy =  tk.ChuKy,
-
+                    HoVaTen = tk?.HoVaTen,
+                    ChuKy = tk?.ChuKy,
                     TenPhongBan = pb?.TenPhongBan,
                     TenViTri = vt?.TenViTri,
-
                     NgayDuyet = p.NgayDuyet,
                     TinhTrang = p.TinhTrang,
                     GhiChu = p.GhiChu
-
-
                 };
             }).ToList();
             return ds;

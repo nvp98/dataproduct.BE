@@ -1,3 +1,5 @@
+using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 
 namespace dataproduct.api.ResponseModels
@@ -14,5 +16,6 @@ namespace dataproduct.api.ResponseModels
         public int? MayDuc { get; set; }
         public int? TinhTrang { get; set; }
         public int? NguoiTao { get; set; }
+        public List<PheDuyetDto>? PheDuyet { get; set; }
     }
 }
