@@ -42,7 +42,7 @@ namespace dataproduct.api.Repositories
     }
     public interface IBKPhoiThepRepository
     {
-        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
+        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, DateOnly? TuNgay, DateOnly? DenNgay, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
         Task<BkPhoiThep?> GetByIdAsync(int id);
         Task AddAsync(BkPhoiThep entity);
         Task UpdateAsync(BkPhoiThep entity);

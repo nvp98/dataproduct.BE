@@ -14,12 +14,18 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX,int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc)
+        public async Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, DateOnly? TuNgay, DateOnly? DenNgay, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc)
         {
             var query = _context.BkPhoiThep.AsQueryable();
 
             if (NgaySX.HasValue)
                 query = query.Where(x => x.NgaySx == NgaySX);
+
+            if (TuNgay.HasValue)
+                query = query.Where(x => x.NgaySx >= TuNgay);
+
+            if (DenNgay.HasValue)
+                query = query.Where(x => x.NgaySx <= DenNgay);
 
             if (Ca.HasValue)
                 query = query.Where(x => x.Ca == Ca.Value);
@@ -75,7 +81,7 @@ namespace dataproduct.api.Repositories
             {
                 var bkphoi = await _context.BkPhoiThep.FirstOrDefaultAsync(x => x.Id == item.Id);
                 if (bkphoi == null) continue;
-                int stDaChuyen = bkphoi.StDaChuyen != null?(int)bkphoi.StDaChuyen:0;
+                int stDaChuyen = bkphoi.StDaChuyen != null ? (int)bkphoi.StDaChuyen : 0;
                 stDaChuyen = stDaChuyen + item.ST_DaChuyen;
                 var affected = await _context.BkPhoiThep
                     .Where(x => x.Id == item.Id)

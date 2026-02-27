@@ -99,10 +99,10 @@ namespace dataproduct.api.Controllers
 
         [HttpGet("export-excel-tonghop")]
         public async Task<IActionResult> ExportExcelPKH(
-     [FromQuery] DateOnly? NgaySX, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
+     [FromQuery] DateOnly? NgaySX, [FromQuery] DateOnly? TuNgay, [FromQuery] DateOnly? DenNgay, [FromQuery] int? Ca, [FromQuery] string? Kip, [FromQuery] int? Xuong, [FromQuery] string? Me)
         {
             var result = await _service.PKH_ExportExcelAsync(
-                NgaySX, Ca, Kip, Xuong, Me
+                NgaySX, TuNgay, DenNgay, Ca, Kip, Xuong, Me
             );
 
             return File(
