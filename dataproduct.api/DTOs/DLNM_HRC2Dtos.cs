@@ -82,6 +82,7 @@ namespace dataproduct.api.DTOs
 
         public int? ID_HeaderKey { get; set; }
         public string TenHienThi { get; set; }
+        public bool? IsPhanBo { get; set; } = false; // ⭐ Đánh dấu là phân bổ
     }
 
     public class FilterSTD_NXTRequest

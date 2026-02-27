@@ -102,6 +102,7 @@ namespace dataproduct.api.Repositories
                 NgayTao = h.NgayTao,
                 IsUsedNXT = h.IsUsedNXT,
                 ThuTu = h.ThuTu.HasValue ? (int?)h.ThuTu.Value : null,
+                TyTrong = h.TyTrong.HasValue ? (decimal?)h.TyTrong.Value : null,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
                     : new List<HeaderMapping_ResponseModel>()
@@ -163,6 +164,7 @@ namespace dataproduct.api.Repositories
                     NgayTaoPhuLieu = pl != null ? pl.NgayTao : null,
                     IsUsedNXT = hk != null ? hk.IsUsedNXT : null,
                     ThuTu = hk != null && hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    TyTrong = hk != null && hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = m.ID_PhuLieu,
                     TenNguonDuLieu = m.TenNguonDuLieu,
                     TenPhuLieu = pl != null ? pl.TenPhuLieu : null
@@ -185,6 +187,7 @@ namespace dataproduct.api.Repositories
                     NgayTaoPhuLieu = null,
                     IsUsedNXT = hk.IsUsedNXT,
                     ThuTu = hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    TyTrong = hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = null,
                     TenNguonDuLieu = null,
                     TenPhuLieu = null
@@ -207,6 +210,7 @@ namespace dataproduct.api.Repositories
                     NgayTaoPhuLieu = pl.NgayTao,
                     IsUsedNXT = null,
                     ThuTu = null,
+                    TyTrong = null, // ⭐ Thêm field TyTrong để khớp với các query khác
                     ID_PhuLieu = pl.ID_PhuLieu,
                     TenNguonDuLieu = null,
                     TenPhuLieu = pl.TenPhuLieu

@@ -15,6 +15,7 @@ public partial class Header_Key
     public DateTime? NgayTao { get; set; }
     public decimal? ThuTu { get; set; }
     public bool? IsUsedNXT { get; set; }
+    public decimal? TyTrong { get; set; }
 }
 
 

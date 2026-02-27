@@ -38,6 +38,7 @@ namespace dataproduct.api.ResponseModels
         public DLNM_HRC2_ResponseModels? data { get; set; }
         public List<HeaderKeyGroupedByReportNoModel> mappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> unmappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
+        public List<HeaderKeyGroupedByReportNoModel> phanBoPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>(); // Dữ liệu phân bổ (IsPhanBo = true)
     }
 
     public class FilterSTD_NXTResponse

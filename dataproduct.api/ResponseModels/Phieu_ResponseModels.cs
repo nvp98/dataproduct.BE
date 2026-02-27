@@ -18,4 +18,5 @@ namespace dataproduct.api.ResponseModels
         public int? NguoiTao { get; set; }
         public List<PheDuyetDto>? PheDuyet { get; set; }
     }
+
 }
