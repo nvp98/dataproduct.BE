@@ -26,15 +26,17 @@ namespace dataproduct.api.Models
         public int? StPhoiNgan { get; set; }
         [Column(TypeName = "decimal(10,3)")]
         public decimal? KlPhoiNgan { get; set; }
+        [Column(TypeName = "decimal(6,2)")]
+        public decimal? CdPhoiNgan { get; set; }
 
         public int? StLoai2 { get; set; }
         [Column(TypeName = "decimal(10,3)")]
         public decimal? KlLoai2 { get; set; }
 
-        public int StLoai2TP { get; set; }
+        public int? StLoai2TP { get; set; }
 
         [Column(TypeName = "decimal(10,3)")]
-        public decimal KlLoai2TP { get; set; }
+        public decimal? KlLoai2TP { get; set; }
 
         public int? StLoai3 { get; set; }
         [Column(TypeName = "decimal(10,3)")]

@@ -177,10 +177,34 @@ namespace dataproduct.api.Services
             int tongSoThanh = 0;
             decimal tongKhoiLuong = 0;
 
+            int tongStLoai1 = 0;
+            decimal tongKlLoai1 = 0;
+
+            int tongStPhoiNgan = 0;
+            decimal tongKlPhoiNgan = 0;
+
+            int tongStLoai2 = 0;
+            decimal tongKlLoai2 = 0;
+
+            int tongStLoai3 = 0;
+            decimal tongKlLoai3 = 0;
+
             foreach (var t in data)
             {
                 tongSoThanh += t.TongSoThanh ?? 0;
                 tongKhoiLuong += t.TongKhoiLuong ?? 0;
+
+                tongStLoai1 += t.StLoai1 ?? 0;
+                tongKlLoai1 += t.KlLoai1 ?? 0;
+
+                tongStLoai2 += t.StLoai2 ?? 0;
+                tongKlLoai2 += t.KlLoai2 ?? 0;
+
+                tongStLoai3 += t.StLoai3 ?? 0;
+                tongKlLoai3 += t.KlLoai3 ?? 0;
+
+                tongStPhoiNgan += t.StPhoiNgan ?? 0;
+                tongKlPhoiNgan += t.KlPhoiNgan ?? 0;
 
                 rows.Append($@"
                 <tr>
@@ -241,6 +265,21 @@ namespace dataproduct.api.Services
 
                 // Content
                 //.Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
+
+                .Replace("{{TongStLoai1}}", tongStLoai1.ToString("N0"))
+                .Replace("{{TongKlLoai1}}", tongKlLoai1.ToString("N0"))
+
+                .Replace("{{TongStPhoiNgan}}", tongStPhoiNgan.ToString("N0"))
+                .Replace("{{TongKlPhoiNgan}}", tongKlPhoiNgan.ToString("N0"))
+
+                .Replace("{{TongStLoai2}}", tongStLoai2.ToString("N0"))
+                .Replace("{{TongKlLoai2}}", tongKlLoai2.ToString("N0"))
+
+                .Replace("{{TongStLoai3}}", tongStLoai3.ToString("N0"))
+                .Replace("{{TongKlLoai3}}", tongKlLoai3.ToString("N0"))
+
+                .Replace("{{TongSoThanh}}", tongSoThanh.ToString("N0"))
+                .Replace("{{TongKhoiLuong}}", tongKhoiLuong.ToString("N0"))
 
                 // ===== XƯỞNG ĐÚC =====
                 .Replace("{{NguoiGiao}}", nguoiGiao)
@@ -375,6 +414,7 @@ namespace dataproduct.api.Services
                     KlLoai1 = r.KlLoai1,
                     StPhoiNgan = r.StPhoiNgan,
                     KlPhoiNgan = r.KlPhoiNgan,
+                    CdPhoiNgan = r.CdPhoiNgan,
                     StLoai2 = r.StLoai2,
                     KlLoai2 = r.KlLoai2,
                     StLoai2TP = r.StLoai2TP,
@@ -467,18 +507,50 @@ namespace dataproduct.api.Services
 
 
             var rows = new StringBuilder();
+
             int tongSoThanh = 0;
             int stt = 0;
             decimal tongKhoiLuong = 0;
+            int tongStLoai1 = 0;
+            decimal tongKlLoai1 = 0;
+
+            int tongStLoai2 = 0;
+            decimal tongKlLoai2 = 0;
+
+            int tongStLoai2TP = 0;
+            decimal tongKlLoai2TP = 0;
+
+            int tongStPhoiNgan = 0;
+            decimal tongKlPhoiNgan = 0;
+            decimal tongCdPhoiNgan = 0;
+
+            int tongStLoai3 = 0;
+            decimal tongKlLoai3 = 0;
 
             foreach (var t in data)
             {
                 tongSoThanh += t.TongSoThanh ?? 0;
                 tongKhoiLuong += t.TongKhoiLuong ?? 0;
+
+                tongStLoai1 += t.StLoai1 ?? 0;
+                tongKlLoai1 += t.KlLoai1 ?? 0;
+
+                tongStLoai2 += t.StLoai2 ?? 0;
+                tongKlLoai2 += t.KlLoai2 ?? 0;
+
+                tongStLoai2TP += t.StLoai2TP ?? 0;
+                tongKlLoai2TP += t.KlLoai2TP ?? 0;
+
+                tongStPhoiNgan += t.StPhoiNgan ?? 0;
+                tongKlPhoiNgan += t.KlPhoiNgan ?? 0;
+                tongCdPhoiNgan += t.CdPhoiNgan ?? 0;
+
+                tongStLoai3 += t.StLoai3 ?? 0;
+                tongKlLoai3 += t.KlLoai3 ?? 0;
                 stt += 1;  
                 rows.Append($@"
                 <tr>
-                     <td>{stt}</td>
+                    <td>{stt}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>
@@ -493,12 +565,12 @@ namespace dataproduct.api.Services
                     <td>{t.KlLoai2TP:N0}</td>
 
                     <td>{t.StPhoiNgan}</td>
+                    <td>{t.CdPhoiNgan:N2}</td>
                     <td>{t.KlPhoiNgan:N0}</td>
 
                     <td>{t.StLoai3}</td>
                     <td>{t.KlLoai3:N0}</td>
 
-                    <td>{t.TongSoThanh}</td>
                     <td>{t.TongKhoiLuong:N0}</td>
                 </tr>");
             }
@@ -543,7 +615,21 @@ namespace dataproduct.api.Services
                 .Replace("{{TuNgay}}", tuNgay)
                 .Replace("{{DenNgay}}", denNgay)
 
+                .Replace("{{TongStLoai1}}", tongStLoai1.ToString("N0"))
+                .Replace("{{TongKlLoai1}}", tongKlLoai1.ToString("N0"))
 
+                .Replace("{{TongStLoai2}}", tongStLoai2.ToString("N0"))
+                .Replace("{{TongKlLoai2}}", tongKlLoai2.ToString("N0"))
+
+                .Replace("{{TongStLoai2TP}}", tongStLoai2TP.ToString("N0"))
+                .Replace("{{TongKlLoai2TP}}", tongKlLoai2TP.ToString("N0"))
+
+                .Replace("{{TongStPhoiNgan}}", tongStPhoiNgan.ToString("N0"))
+                .Replace("{{TongCdPhoiNgan}}", tongCdPhoiNgan.ToString("N2"))
+                .Replace("{{TongKlPhoiNgan}}", tongKlPhoiNgan.ToString("N0"))
+
+                .Replace("{{TongStLoai3}}", tongStLoai3.ToString("N0"))
+                .Replace("{{TongKlLoai3}}", tongKlLoai3.ToString("N0"))
                 // Content
                 // ===== XƯỞNG ĐÚC =====
                 .Replace("{{NguoiGiao}}", nguoiGiao)

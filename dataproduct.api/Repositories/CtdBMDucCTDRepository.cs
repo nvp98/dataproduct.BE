@@ -157,6 +157,7 @@ namespace dataproduct.api.Repositories
 
                     StPhoiNgan = x.StPhoiNgan,
                     KlPhoiNgan = x.KlPhoiNgan,
+                    CdPhoiNgan =x.CdPhoiNgan,
 
                     StLoai3 = x.StLoai3,
                     KlLoai3 = x.KlLoai3,

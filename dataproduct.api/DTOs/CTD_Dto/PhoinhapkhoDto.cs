@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.DTOs.CTD_Dto
 {
@@ -15,6 +16,7 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public int StPhoiNgan { get; set; }
         public double KlPhoiNgan { get; set; }
+        public double CdPhoiNgan { get; set; }
 
         public int StLoai2 { get; set; }
         public double KlLoai2 { get; set; }
@@ -52,12 +54,13 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public int? StPhoiNgan { get; set; }
         public decimal? KlPhoiNgan { get; set; }
+        public decimal? CdPhoiNgan { get; set; }
 
         public int? StLoai2 { get; set; }
         public decimal? KlLoai2 { get; set; }
 
-        public int StLoai2TP { get; set; }
-        public decimal KlLoai2TP { get; set; }
+        public int? StLoai2TP { get; set; }
+        public decimal? KlLoai2TP { get; set; }
 
         public int? StLoai3 { get; set; }
         public decimal? KlLoai3 { get; set; }
