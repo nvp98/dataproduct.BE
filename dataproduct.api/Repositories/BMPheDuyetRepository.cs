@@ -1,4 +1,4 @@
-﻿using dataproduct.api.Models;
+using dataproduct.api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.ConstrainedExecution;
 
@@ -77,6 +77,16 @@ namespace dataproduct.api.Repositories
             if (item != null)
             {
                 _context.BmPheDuyets.Remove(item);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task DeleteByPhieuIdAsync(Guid phieuId)
+        {
+            var list = await _context.BmPheDuyets.Where(x => x.PhieuId == phieuId).ToListAsync();
+            if (list.Count > 0)
+            {
+                _context.BmPheDuyets.RemoveRange(list);
                 await _context.SaveChangesAsync();
             }
         }

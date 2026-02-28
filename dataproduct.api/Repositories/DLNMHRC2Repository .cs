@@ -1029,7 +1029,7 @@ namespace dataproduct.api.Repositories
         {
             var raw = await _context.STD_NXT_Filters
                 .FromSqlRaw(
-                    "EXEC sp_GetHRC2GroupedByMaterial_Test @WorkDate, @Shift",
+                    "EXEC sp_GetHRC2GroupedByMaterial @WorkDate, @Shift",
                     new SqlParameter("@WorkDate", ngaySX.Date),
                     new SqlParameter("@Shift", ca)
                 )

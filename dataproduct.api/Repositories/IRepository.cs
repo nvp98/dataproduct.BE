@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
@@ -36,6 +36,7 @@ namespace dataproduct.api.Repositories
         Task AddAsync(BmPheDuyet entity);
         Task UpdateAsync(BmPheDuyet entity);
         Task DeleteAsync(int id);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
         Task<bool> ExistsAsync(int id);
         Task AddListAsync(List<BmPheDuyet> pheDuyetList, Guid idphieu);
         Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang);

@@ -34,7 +34,7 @@ namespace dataproduct.api.Services
                 new SqlParameter("@Shift", shift)
             };
             return await _context.Set<HRC2_NM>()
-                .FromSqlRaw("EXEC sp_GetHRC2FromNM_Test @Plant, @PlantNo, @WorkDate, @Shift", parameters)
+                .FromSqlRaw("EXEC sp_GetHRC2FromNM @Plant, @PlantNo, @WorkDate, @Shift", parameters)
                 .ToListAsync();
         }
 
@@ -47,7 +47,7 @@ namespace dataproduct.api.Services
                 new SqlParameter("@MeThoi", meThoi),
             };
             return await _context.Set<HRC2_NM>()
-                .FromSqlRaw("EXEC sp_GetHRC2ByMeThoiFromNM_Test @Plant, @PlantNo, @MeThoi", parameters)
+                .FromSqlRaw("EXEC sp_GetHRC2ByMeThoiFromNM @Plant, @PlantNo, @MeThoi", parameters)
                 .ToListAsync();
         }
 

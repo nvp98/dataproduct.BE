@@ -158,8 +158,8 @@ namespace dataproduct.api.Business
             // 1. Lấy phiếu hiện tại
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return null;
-            // Cho phép update khi ở trạng thái ĐangLuu (0) hoặc Đã thu hồi (3)
-            if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3)) return null;
+            // Cho phép update khi ĐangLuu (0), Đã thu hồi (3) hoặc Hiệu chỉnh (7 = phiếu clone đang chỉnh sửa). Lưu ở trạng thái 7 không đổi TinhTrang.
+            if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return null;
 
             // save data khi them cho hrc2
             string bm = formData.GetProperty("maBm").GetString();
@@ -321,26 +321,42 @@ namespace dataproduct.api.Business
         {
             try
             {
-                // 1. Lấy phiếu gốc để lấy VersionClone hiện tại
+                // 1. Lấy phiếu gốc, chỉ cho clone khi đang Hoàn thành (2) hoặc Đang phê duyệt (6)
                 var phieuGoc = await _repo.GetByIdAsync(id);
                 if (phieuGoc == null) return null;
+                if (phieuGoc.IsLock == 1)
+                    throw new InvalidOperationException("Đã tồn tại phiếu hiệu chỉnh. Vui lòng từ chối hoặc hoàn tất phiếu hiệu chỉnh hiện tại trước khi tạo mới.");
+                PhieuStatusHelper.CheckAllowStatusChange(phieuGoc.TinhTrang ?? 0, 7);
 
+                // 2. Phiếu gốc chỉ IsLock = 1 để ẩn khỏi trang, không đổi TinhTrang
                 phieuGoc.IsLock = 1;
                 await _repo.UpdateAsync(phieuGoc);
-                // 2. Tạo mới record từ formData (giống như hàm CreateAsync)
+
+                // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
                 var phieu = await _repo.AddAsync(formData);
                 if (phieu == null) return null;
 
-                // 3. Update các trường clone cho record mới tạo
+                // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh (max 50 ký tự)
+                const string suffix = "_HieuChinh";
+                var soPhieuBase = (phieuGoc.SoPhieu ?? "").Trim();
+                if (soPhieuBase.Length + suffix.Length > 50)
+                    soPhieuBase = soPhieuBase.Substring(0, 50 - suffix.Length);
+                phieu.SoPhieu = soPhieuBase + suffix;
+
+                // 5. Clone mang trạng thái Hiệu chỉnh (7), hiện nút Lưu / Lưu và Gửi như Đang lưu
                 phieu.IsClone = true;
                 phieu.VersionClone = (phieuGoc.VersionClone ?? 0) + 1;
                 phieu.ID_PhieuGoc = id;
-                phieu.TinhTrang = 0;
+                phieu.TinhTrang = 7;
                 await _repo.UpdateAsync(phieu);
 
                 return phieu;
             }
-            catch (Exception ex)
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception)
             {
                 return null;
             }
