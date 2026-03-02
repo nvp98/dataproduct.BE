@@ -1,6 +1,7 @@
 ﻿using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.ResponseModels;
+using dataproduct.api.Services;
 using dataproduct.api.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,12 @@ namespace dataproduct.api.Repositories
     public class PhieuRepository : IPhieuRepository
     {
         private readonly ProductFormContext _context;
+        private readonly PheDuyetService _pdservice;
 
-        public PhieuRepository(ProductFormContext context)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice)
         {
             _context = context;
+            _pdservice = pdservice;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -232,6 +235,7 @@ namespace dataproduct.api.Repositories
             }
             var totalCount = await query.CountAsync();
             var data = await query.Skip((request.page - 1) * request.pageSize).Take(request.pageSize).ToListAsync();
+            var ids = data.Select(x => x.Idphieu).ToList();
             var result = data.Select(x => new SearchPhieuResponseModel
             {
                 Idphieu = x.Idphieu,
@@ -243,8 +247,13 @@ namespace dataproduct.api.Repositories
                 Scope = x.Scope,
                 MayDuc = x.MayDuc,
                 TinhTrang = x.TinhTrang,
-                NguoiTao = x.NguoiTaoId
+                NguoiTao = x.NguoiTaoId,
             }).ToList();
+            foreach (var item in result)
+            {
+                var pheDuyet = await _pdservice.GetPheDuyetPhieuAsync(item.Idphieu);
+                item.PheDuyet = pheDuyet.ToList();
+            }
 
             return (result, totalCount);
         }

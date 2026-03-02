@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using dataproduct.api.ResponseModels;
 using Microsoft.EntityFrameworkCore;
@@ -417,6 +417,15 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.NgayBatDau).HasColumnName("NgayBatDau");
             entity.Property(e => e.NgayKetThuc).HasColumnName("NgayKetThuc");
+        });
+        modelBuilder.Entity<PhuLieu_NM>(entity =>
+        {
+            entity.ToTable("PhuLieu_NM");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.ID_PhuLieu).HasColumnName("ID_PhuLieu");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.IsActive).HasColumnName("IsActive");
         });
         OnModelCreatingPartial(modelBuilder);
     }

@@ -372,11 +372,11 @@ namespace dataproduct.api.Services
         }
 
 
-        public async Task<ExportFileResult> PKH_ExportExcelAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me)
+        public async Task<ExportFileResult> PKH_ExportExcelAsync(DateOnly? NgaySX, DateOnly? TuNgay, DateOnly? DenNgay, int? Ca, string? Kip, int? Xuong, string? Me)
         {
 
             // Lấy dữ liệu từ BK PhoiThep
-            var dataBkPhoi = await _repoBkPhoi.GetAllAsync(NgaySX, Ca, Kip, 1, Xuong);
+            var dataBkPhoi = await _repoBkPhoi.GetAllAsync(NgaySX, TuNgay, DenNgay, Ca, Kip, 1, Xuong);
 
             // 1️⃣ Query dữ liệu
             var query = await _repo.GetAllAsync(null, null, null, Xuong, null);

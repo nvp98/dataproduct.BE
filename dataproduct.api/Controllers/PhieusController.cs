@@ -1,4 +1,4 @@
-﻿using dataproduct.api.Business;
+using dataproduct.api.Business;
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -71,8 +71,15 @@ namespace dataproduct.api.Controllers
         [HttpPost("{id}/clone")]
         public async Task<ActionResult<BmPhieu>> Clone(Guid id, [FromBody] JsonElement formData)
         {
-            var cloned = await _service.CloneAsync(id, formData);
-            return cloned != null ? Ok(cloned) : NotFound();
+            try
+            {
+                var cloned = await _service.CloneAsync(id, formData);
+                return cloned != null ? Ok(cloned) : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}/status")]

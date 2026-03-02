@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
@@ -133,19 +133,24 @@ namespace dataproduct.api.Services
                 return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
             }
 
-            // Trường hợp người duyệt chọn Reject: nếu phiếu là bản clone thì mở khóa phiếu gốc
-            // và set trạng thái phiếu hiện tại sang "Không xác nhận" (4)
+            // Trường hợp người duyệt chọn Reject (Không xác nhận)
             if (tinhTrang == RejectedStatus)
             {
                 if (phieu.ID_PhieuGoc != null)
                 {
+                    // Phiếu này là bản clone: xóa hẳn khỏi table, mở khóa phiếu gốc (IsLock = 0) để hiển thị lại
                     var phieuGoc = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
-                    if (phieuGoc == null) return false;
-                    phieuGoc.IsLock = 0;
-                    phieuGoc.TinhTrang = 2;
-                    await _phieuRepo.UpdateAsync(phieuGoc);
+                    if (phieuGoc != null)
+                    {
+                        phieuGoc.IsLock = 0;
+                        await _phieuRepo.UpdateAsync(phieuGoc);
+                    }
+                    await _repo.DeleteByPhieuIdAsync(phieuId);
+                    await _phieuRepo.DeleteAsync(phieuId);
+                    return true;
                 }
 
+                // Phiếu không phải clone: đánh dấu Không xác nhận như cũ
                 phieu.IsDelete = 1;
                 phieu.TinhTrang = 4;
                 await _phieuRepo.UpdateAsync(phieu);

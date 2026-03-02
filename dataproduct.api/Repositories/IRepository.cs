@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
@@ -37,13 +37,14 @@ namespace dataproduct.api.Repositories
         Task AddAsync(BmPheDuyet entity);
         Task UpdateAsync(BmPheDuyet entity);
         Task DeleteAsync(int id);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
         Task<bool> ExistsAsync(int id);
         Task AddListAsync(List<BmPheDuyet> pheDuyetList, Guid idphieu);
         Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang);
     }
     public interface IBKPhoiThepRepository
     {
-        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
+        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, DateOnly? TuNgay, DateOnly? DenNgay, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
         Task<BkPhoiThep?> GetByIdAsync(int id);
         Task AddAsync(BkPhoiThep entity);
         Task UpdateAsync(BkPhoiThep entity);
