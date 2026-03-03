@@ -76,6 +76,23 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
+        /// Lấy quyền menu theo tài khoản: Việc tôi bắt đầu (processingForms) và Việc đến tôi (approvingForms).
+        /// </summary>
+        [HttpGet("menu-permissions")]
+        public async Task<IActionResult> GetMenuPermissions([FromQuery] int idTaiKhoan)
+        {
+            try
+            {
+                var data = await _service.GetMenuPermissionsAsync(idTaiKhoan);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Tạo mới quyền xử lý
         /// </summary>
         /// <param name="dto">Dữ liệu tạo mới</param>

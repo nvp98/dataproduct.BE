@@ -138,12 +138,13 @@ namespace dataproduct.api.Services
             {
                 if (phieu.ID_PhieuGoc != null)
                 {
-                    // Phiếu này là bản clone: xóa hẳn khỏi table, mở khóa phiếu gốc (IsLock = 0) để hiển thị lại
-                    var phieuGoc = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
-                    if (phieuGoc != null)
+                    // Phiếu này là bản clone: xóa hẳn khỏi table, mở khóa phiếu cha (ID_PhieuGoc) để hiển thị lại.
+                    // Hỗ trợ chuỗi clone nhiều tầng: nếu reject A2 thì mở A1; reject A1 thì mở A...
+                    var phieuCha = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
+                    if (phieuCha != null)
                     {
-                        phieuGoc.IsLock = 0;
-                        await _phieuRepo.UpdateAsync(phieuGoc);
+                        phieuCha.IsLock = 0;
+                        await _phieuRepo.UpdateAsync(phieuCha);
                     }
                     await _repo.DeleteByPhieuIdAsync(phieuId);
                     await _phieuRepo.DeleteAsync(phieuId);

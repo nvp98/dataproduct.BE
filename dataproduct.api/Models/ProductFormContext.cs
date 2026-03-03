@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using dataproduct.api.ResponseModels;
 using Microsoft.EntityFrameworkCore;
@@ -168,6 +168,7 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("MaBM");
             entity.Property(e => e.MaKhuVuc).HasMaxLength(20);
+            entity.Property(e => e.QuyenChucNang).HasColumnName("QuyenChucNang");
         });
 
         modelBuilder.Entity<CtdPhoiNguoi>(entity =>
