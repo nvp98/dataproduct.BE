@@ -321,14 +321,15 @@ namespace dataproduct.api.Business
         {
             try
             {
-                // 1. Lấy phiếu gốc, chỉ cho clone khi đang Hoàn thành (2) hoặc Đang phê duyệt (6)
+                // 1. Lấy phiếu được bấm "Đề nghị hiệu chỉnh" (có thể là phiếu gốc hoặc phiếu clone),
+                // chỉ cho clone khi đang Hoàn thành (2) hoặc Đang phê duyệt (6)
                 var phieuGoc = await _repo.GetByIdAsync(id);
                 if (phieuGoc == null) return null;
                 if (phieuGoc.IsLock == 1)
-                    throw new InvalidOperationException("Đã tồn tại phiếu hiệu chỉnh. Vui lòng từ chối hoặc hoàn tất phiếu hiệu chỉnh hiện tại trước khi tạo mới.");
+                    throw new InvalidOperationException("Đã tồn tại phiếu hiệu chỉnh cho phiếu này. Vui lòng từ chối hoặc hoàn tất phiếu hiệu chỉnh hiện tại trước khi tạo mới.");
                 PhieuStatusHelper.CheckAllowStatusChange(phieuGoc.TinhTrang ?? 0, 7);
 
-                // 2. Phiếu gốc chỉ IsLock = 1 để ẩn khỏi trang, không đổi TinhTrang
+                // 2. Phiếu cha chỉ IsLock = 1 để ẩn khỏi trang, không đổi TinhTrang
                 phieuGoc.IsLock = 1;
                 await _repo.UpdateAsync(phieuGoc);
 
@@ -336,8 +337,9 @@ namespace dataproduct.api.Business
                 var phieu = await _repo.AddAsync(formData);
                 if (phieu == null) return null;
 
-                // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh (max 50 ký tự)
-                const string suffix = "_HieuChinh";
+                // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
+                var nextVersion = (phieuGoc.VersionClone ?? 0) + 1;
+                var suffix = $"_HieuChinh_{nextVersion}";
                 var soPhieuBase = (phieuGoc.SoPhieu ?? "").Trim();
                 if (soPhieuBase.Length + suffix.Length > 50)
                     soPhieuBase = soPhieuBase.Substring(0, 50 - suffix.Length);
@@ -345,8 +347,9 @@ namespace dataproduct.api.Business
 
                 // 5. Clone mang trạng thái Hiệu chỉnh (7), hiện nút Lưu / Lưu và Gửi như Đang lưu
                 phieu.IsClone = true;
-                phieu.VersionClone = (phieuGoc.VersionClone ?? 0) + 1;
-                phieu.ID_PhieuGoc = id;
+                phieu.VersionClone = nextVersion;
+                // ID_PhieuGoc luôn trỏ về phiếu cha (phiếu bị bấm clone), hỗ trợ clone nhiều tầng: A -> A1 -> A2...
+                phieu.ID_PhieuGoc = phieuGoc.Idphieu;
                 phieu.TinhTrang = 7;
                 await _repo.UpdateAsync(phieu);
 
