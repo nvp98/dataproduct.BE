@@ -48,5 +48,6 @@ namespace dataproduct.api.Models
 
         public int? NguoiTaoId { get; set; }
         public DateTime ThoiGianTao { get; set; }
+        public bool? TTHD { get; set; }
     }
 }

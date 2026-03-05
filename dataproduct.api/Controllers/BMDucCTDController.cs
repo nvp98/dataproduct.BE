@@ -74,6 +74,23 @@ namespace dataproduct.api.Controllers
                 message = "Xóa dữ liệu theo phiếu thành công"
             });
         }
+
+        [HttpPatch("HideSanLuongPhoi/{idPhieu}")]
+        public async Task<IActionResult> HideSanLuongPhoiByPhieu(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
+            await _service.HideSanLuongPhoiByPhieuAsync(idPhieu);
+            return Ok(new { success = true, message = "Đã ẩn dữ liệu sản lượng phôi" });
+        }
+
+        [HttpPatch("RestoreSanLuongPhoi/{idPhieu}")]
+        public async Task<IActionResult> RestoreSanLuongPhoiByPhieu(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
+            await _service.RestoreSanLuongPhoiByPhieuAsync(idPhieu);
+            return Ok(new { success = true, message = "Đã khôi phục dữ liệu sản lượng phôi" });
+        }
+
         [HttpPost("InsertPhoiNhapKho")]
         public async Task<IActionResult> InsertPhoiNhapKho([FromBody] SavePhoiNhapKhoDto dto)
         {
@@ -81,7 +98,6 @@ namespace dataproduct.api.Controllers
             return Ok();
         }
         [HttpDelete("DeletePhoiNhapKho/{idPhieu}")]
-
         public async Task<IActionResult> DeletePhoiNhapKhoByPhieu(Guid idPhieu)
         {
             if (idPhieu == Guid.Empty)
@@ -119,6 +135,22 @@ namespace dataproduct.api.Controllers
             var file = await _service.ExportPdfPhoiNhapKhoAsync(request);
 
             return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpPatch("HidePhoiNhapKho/{idPhieu}")]
+        public async Task<IActionResult> HidePhoiNhapKhoByPhieu(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
+            await _service.HidePhoiNhapKhoByPhieuAsync(idPhieu);
+            return Ok(new { success = true, message = "Đã ẩn dữ liệu sản lượng phôi" });
+        }
+
+        [HttpPatch("RestorePhoiNhapKho/{idPhieu}")]
+        public async Task<IActionResult> RestorePhoiNhapKhoByPhieu(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
+            await _service.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
+            return Ok(new { success = true, message = "Đã khôi phục dữ liệu sản lượng phôi" });
         }
     }
 }

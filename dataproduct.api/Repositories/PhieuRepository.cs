@@ -53,53 +53,53 @@ namespace dataproduct.api.Repositories
                                 : null;
                 string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix, Scope, Ca, NgaySX);
 
-                if (maBM == "CTD_BB_GiaoNhanPhoiNhapKho")
-                {
-                    if (NgaySX == null)
-                        throw new Exception("Thiếu ngày sản xuất");
+                //if (maBM == "CTD_BB_GiaoNhanPhoiNhapKho")
+                //{
+                //    if (NgaySX == null)
+                //        throw new Exception("Thiếu ngày sản xuất");
 
-                    if (Ca == 0)
-                        throw new Exception("Thiếu ca sản xuất");
+                //    if (Ca == 0)
+                //        throw new Exception("Thiếu ca sản xuất");
 
-                    if (!formData.TryGetProperty("mayduc", out var mDProp))
-                        throw new Exception("Thiếu máy đúc");
+                //    if (!formData.TryGetProperty("mayduc", out var mDProp))
+                //        throw new Exception("Thiếu máy đúc");
 
-                    int mayDuc = mDProp.GetInt32();
+                //    int mayDuc = mDProp.GetInt32();
 
-                    // check đã tồn tại phiếu theo ngày + ca + máy chưa
-                    var daTonTai = await _context.BmPhieus.AnyAsync(x =>
-                        x.MaBm == maBM &&
-                        x.NgaySX == NgaySX &&
-                        x.Ca == Ca &&
-                        x.MayDuc == mayDuc &&
-                        x.IsDelete == 0);
+                //    // check đã tồn tại phiếu theo ngày + ca + máy chưa
+                //    var daTonTai = await _context.BmPhieus.AnyAsync(x =>
+                //        x.MaBm == maBM &&
+                //        x.NgaySX == NgaySX &&
+                //        x.Ca == Ca &&
+                //        x.MayDuc == mayDuc &&
+                //        x.IsDelete == 0);
 
-                    if (daTonTai)
-                    {
-                        throw new Exception($"Đã tồn tại phiếu cho máy {mayDuc}, ca {Ca}, ngày {NgaySX}");
-                    }
-                }
-                if (maBM == "CTD_BB_Sanluongphoi")
-                {
-                    if (NgaySX == null)
-                        throw new Exception("Thiếu ngày sản xuất");
+                //    if (daTonTai)
+                //    {
+                //        throw new Exception($"Đã tồn tại phiếu cho máy {mayDuc}, ca {Ca}, ngày {NgaySX}");
+                //    }
+                //}
+                //if (maBM == "CTD_BB_Sanluongphoi")
+                //{
+                //    if (NgaySX == null)
+                //        throw new Exception("Thiếu ngày sản xuất");
 
 
-                    if (Ca != 1 && Ca != 2)
-                        throw new Exception("Ca không hợp lệ (chỉ 1 hoặc 2)");
+                //    if (Ca != 1 && Ca != 2)
+                //        throw new Exception("Ca không hợp lệ (chỉ 1 hoặc 2)");
 
-                    // check đã tồn tại phiếu theo ngày + ca + máy chưa
-                    var daTonTai = await _context.BmPhieus.AnyAsync(x =>
-                        x.MaBm == maBM &&
-                        x.NgaySX == NgaySX &&
-                        x.Ca == Ca &&
-                        x.IsDelete == 0);
+                //    // check đã tồn tại phiếu theo ngày + ca + máy chưa
+                //    var daTonTai = await _context.BmPhieus.AnyAsync(x =>
+                //        x.MaBm == maBM &&
+                //        x.NgaySX == NgaySX &&
+                //        x.Ca == Ca &&
+                //        x.IsDelete == 0);
 
-                    if (daTonTai)
-                    {
-                        throw new Exception($"Đã tồn tại phiếu cho ca {Ca}, ngày {NgaySX}");
-                    }
-                }
+                //    if (daTonTai)
+                //    {
+                //        throw new Exception($"Đã tồn tại phiếu cho ca {Ca}, ngày {NgaySX}");
+                //    }
+                //}
                 var phieu = new BmPhieu
                 {
                     Idphieu = Guid.NewGuid(),

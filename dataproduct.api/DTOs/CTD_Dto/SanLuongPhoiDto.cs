@@ -58,5 +58,6 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public int? TongSoThanh { get; set; }
         public decimal? TongKhoiLuong { get; set; }
+        public bool? TTHD { get; set; }
     }
 }

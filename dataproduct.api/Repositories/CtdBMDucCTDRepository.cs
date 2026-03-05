@@ -87,7 +87,8 @@ namespace dataproduct.api.Repositories
                     KlLoai3 = x.KlLoai3,
 
                     TongSoThanh = x.TongSoThanh,
-                    TongKhoiLuong = x.TongKhoiLuong
+                    TongKhoiLuong = x.TongKhoiLuong,
+                    TTHD =true
                 })
                 .ToListAsync();
         }
@@ -184,6 +185,58 @@ namespace dataproduct.api.Repositories
                 return;
 
             _context.BM_PhoiNhapKho.RemoveRange(entities);
+            await _context.SaveChangesAsync();
+        }
+        public async Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BM_SanLuongPhoi
+                                     .Where(x => x.IdPhieu == idPhieu)
+                                     .ToListAsync();
+
+            if (!rows.Any()) return;
+
+            rows.ForEach(r => r.TTHD = false);
+            await _context.SaveChangesAsync();
+        }
+
+        /// Khôi phục dữ liệu (TTHD = 1).
+        /// Gọi khi: Assigned bấm "Không xác nhận" trên phiếu clone
+        ///          → clone bị xóa, dữ liệu phiếu cha hiện lại.
+        public async Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BM_SanLuongPhoi
+                                     .Where(x => x.IdPhieu == idPhieu)
+                                     .ToListAsync();
+
+            if (!rows.Any()) return;
+
+            rows.ForEach(r => r.TTHD = true);
+            await _context.SaveChangesAsync();
+        }
+        public async Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BM_PhoiNhapKho
+                                     .Where(x => x.IdPhieu == idPhieu)
+                                     .ToListAsync();
+
+            if (!rows.Any()) return;
+
+            rows.ForEach(r => r.TTHD = false);
+            await _context.SaveChangesAsync();
+        }
+
+        /// Khôi phục dữ liệu (TTHD = 1).
+        /// Gọi khi: Assigned bấm "Không xác nhận" trên phiếu clone
+        ///          → clone bị xóa, dữ liệu phiếu cha hiện lại.
+        public async Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BM_PhoiNhapKho
+                                     .Where(x => x.IdPhieu == idPhieu)
+                                     .ToListAsync();
+
+            if (!rows.Any()) return;
+
+            rows.ForEach(r => r.TTHD = true);
             await _context.SaveChangesAsync();
         }
     }

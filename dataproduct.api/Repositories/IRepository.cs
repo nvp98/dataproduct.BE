@@ -134,6 +134,14 @@ namespace dataproduct.api.Repositories
         Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity);
         Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu);
 
+        /// <summary>Ẩn (TTHD = 0) – dùng khi tạo phiếu Hiệu chỉnh (clone)</summary>
+        Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        /// <summary>Khôi phục (TTHD = 1) – dùng khi phiếu Hiệu chỉnh bị từ chối</summary>
+        Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
     }
     //  End NM CTD 
     public interface IBmQuyenXlRepository

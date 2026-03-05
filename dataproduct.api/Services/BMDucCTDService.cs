@@ -378,7 +378,8 @@ namespace dataproduct.api.Services
                     KlLoai3 = r.KlLoai3,
                     TongSoThanh = r.TongSoThanh,
                     TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null
+                    NguoiTaoId = null,
+                    TTHD = true
                 }).ToList();
                 await _repo.InsertSanLuongPhoiAsync(entities);
             }
@@ -386,6 +387,18 @@ namespace dataproduct.api.Services
             {
                 throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
             }
+        }
+        public async Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                throw new ArgumentException("IdPhieu không hợp lệ");
+            await _repo.HideSanLuongPhoiByPhieuAsync(idPhieu);
+        }
+        public async Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                throw new ArgumentException("IdPhieu không hợp lệ");
+            await _repo.RestoreSanLuongPhoiByPhieuAsync(idPhieu);
         }
         public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
@@ -423,7 +436,8 @@ namespace dataproduct.api.Services
                     KlLoai3 = r.KlLoai3,
                     TongSoThanh = r.TongSoThanh,
                     TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null
+                    NguoiTaoId = null,
+                    TTHD = true
                 }).ToList();
                 await _repo.InsertPhoiNhapKhoAsync(entities);
             }
@@ -439,7 +453,18 @@ namespace dataproduct.api.Services
 
             await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
         }
-
+        public async Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                throw new ArgumentException("IdPhieu không hợp lệ");
+            await _repo.HidePhoiNhapKhoByPhieuAsync(idPhieu);
+        }
+        public async Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+        {
+            if (idPhieu == Guid.Empty)
+                throw new ArgumentException("IdPhieu không hợp lệ");
+            await _repo.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
+        }
         public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(PhoiNhapKhoPdfDTOReq request)
         {
             if (request.NgaySX == default || request.Ca == 0 || string.IsNullOrEmpty(request.Kip))
