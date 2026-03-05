@@ -1,4 +1,4 @@
-﻿using dataproduct.api.Models;
+using dataproduct.api.Models;
 using System.Text.Json;
 
 namespace dataproduct.api.DTOs
@@ -54,6 +54,9 @@ namespace dataproduct.api.DTOs
         public int? MayDuc { get; set; }
         public string? MaBm { get; set; }
         public string? searchText { get; set; }
+        // Nếu có NguoiDuyetId thì trả về danh sách phiếu "việc đến tôi"
+        // (phiếu có gắn user này trong BmPheDuyet, CapDuyet != 0)
+        public int? NguoiDuyetId { get; set; }
         public int page { get; set; } = 1;
         public int pageSize { get; set; } = 10;
     }

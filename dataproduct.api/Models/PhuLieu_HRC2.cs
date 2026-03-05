@@ -17,6 +17,10 @@ public partial class PhuLieu_HRC2
     public string? TenHienThi { get; set; }
     public long ID_MeThoi { get; set; }
     public bool? IsPhanBo { get; set; } = false;
+    /// <summary>Không map ra DB (bảng PhuLieu_HRC2 không có cột Id_Phieu). Dùng [NotMapped] để tránh lỗi Invalid column name.</summary>
+    [NotMapped]
+    public Guid? Id_Phieu { get; set; }
     [NotMapped]
     public Guid TempKey { get; set; }
 }
+

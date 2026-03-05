@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
@@ -9,11 +9,13 @@ namespace dataproduct.api.Services
     {
         private readonly IDLNMHRC2Repository _repo;
         private readonly HRC2_NMSyncService _hrc2NMSyncService;
+        private readonly ISTD_NXT_HRC2Repository _stdNxtRepo;
 
-        public DLNMHRC2Service(IDLNMHRC2Repository repo, HRC2_NMSyncService hrc2NMSyncService)
+        public DLNMHRC2Service(IDLNMHRC2Repository repo, HRC2_NMSyncService hrc2NMSyncService, ISTD_NXT_HRC2Repository stdNxtRepo)
         {
             _repo = repo;
             _hrc2NMSyncService = hrc2NMSyncService;
+            _stdNxtRepo = stdNxtRepo;
         }
 
         public async Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? Ngay, int? Ca, string? BieuMau, int? Scope)
@@ -123,6 +125,66 @@ namespace dataproduct.api.Services
             };
         }
 
+        public async Task<PagedResult<HRC2GroupedByReportNoModel>> SearchGroupedWithPagingAsync(
+            DateTime? NgaySX,
+            int? Ca,
+            string? LoaiBM,
+            int? Scope,
+            string? searchText,
+            int page,
+            int pageSize
+        )
+        {
+            // Sync dữ liệu từ NM nếu đủ điều kiện bộ lọc giống API filter
+            if (NgaySX.HasValue && Ca.HasValue && Scope.HasValue && !string.IsNullOrWhiteSpace(LoaiBM))
+            {
+                await _hrc2NMSyncService.SyncHRC2FromNMAsync(new SyncFromNM_HRC2_Request
+                {
+                    NgaySX = NgaySX.Value,
+                    Ca = Ca.Value,
+                    LoaiBM = LoaiBM!,
+                    Scope = Scope.Value
+                });
+            }
+
+            var (data, totalCount) = await _repo.SearchWithPagingAsync(
+                NgaySX,
+                Ca,
+                LoaiBM,
+                Scope,
+                searchText,
+                page,
+                pageSize
+            );
+
+            var result = new List<HRC2GroupedByReportNoModel>();
+            foreach (var item in data)
+            {
+                HRC2GroupedByReportNoModel? grouped = null;
+                if (item.ID <= int.MaxValue && item.ID >= int.MinValue)
+                {
+                    grouped = await _repo.GetByIdGroupedAsync((int)item.ID);
+                }
+                else if (item.REPORT_NO.HasValue)
+                {
+                    grouped = await _repo.GetByReportNoGroupedAsync(item.REPORT_NO.Value);
+                }
+
+                if (grouped != null)
+                {
+                    result.Add(grouped);
+                }
+            }
+
+            return new PagedResult<HRC2GroupedByReportNoModel>
+            {
+                Data = result,
+                TotalRecords = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+
         public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
         {
             return await _repo.ChuyenMeThoiAsync(request);
@@ -130,7 +192,33 @@ namespace dataproduct.api.Services
 
         public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
         {
-            return await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca);
+            var result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
+            if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
+            {
+                // Ưu tiên dùng danh sách HeaderKeyIds từ FE (phản ánh đúng bảng đang hiển thị, kể cả dòng mới chưa lưu)
+                var headerKeys = (request.HeaderKeyIds != null && request.HeaderKeyIds.Count > 0)
+                    ? request.HeaderKeyIds
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .Select(id => new IdHeaderKeyModel { Id_HeaderKey = id })
+                        .ToList()
+                    : result
+                        .Where(x => x.HeaderKeyId.HasValue && x.HeaderKeyId.Value > 0)
+                        .Select(x => new IdHeaderKeyModel { Id_HeaderKey = x.HeaderKeyId!.Value })
+                        .DistinctBy(x => x.Id_HeaderKey)
+                        .ToList();
+                if (headerKeys.Count > 0)
+                {
+                    await _stdNxtRepo.GetHRC2FilterInitAsync(new InitXuatNhapTonHRC2Request
+                    {
+                        NgaySX = request.NgaySX,
+                        Ca = request.Ca,
+                        IdPhieu = request.IdPhieu.Value,
+                        HeaderKeys = headerKeys
+                    });
+                }
+            }
+            return result;
         }
 
     }

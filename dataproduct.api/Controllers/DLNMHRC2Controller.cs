@@ -147,6 +147,33 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("search-grouped")]
+        public async Task<IActionResult> SearchGrouped(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page = 1, int pageSize = 10)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100; // Giới hạn tối đa 100 records mỗi trang
+
+            try
+            {
+                var result = await _service.SearchGroupedWithPagingAsync(
+                    NgaySX,
+                    Ca,
+                    LoaiBM,
+                    Scope,
+                    searchText,
+                    page,
+                    pageSize
+                );
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
 
         [HttpPost("chuyen-me-thoi")]
         public async Task<IActionResult> ChuyenMeThoi([FromBody] ChuyenMeThoiRequest request)

@@ -80,6 +80,7 @@ namespace dataproduct.api.DTOs
         public int Ca { get; set; }
         public int Id_HeaderKey { get; set; }
         public decimal ChenhLech { get; set; }
+        public Guid IdPhieu { get; set; }
     }
 
     public class SaveKiemKeRequest

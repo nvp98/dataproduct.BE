@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using dataproduct.api.ResponseModels;
 using Microsoft.EntityFrameworkCore;
@@ -254,6 +254,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TyTrong)
                 .HasColumnName("TyTrong")
                 .HasPrecision(18, 3); // ⭐ decimal(18, 3) - 3 chữ số thập phân
+            entity.Property(e => e.IsUsedThongKe).HasColumnName("IsUsedThongKe");
         });
 
         modelBuilder.Entity<Header_Mapping>(entity =>
@@ -345,6 +346,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TongSDTrenSoSach).HasColumnName("TongSDTrenSoSach");
             entity.Property(e => e.ChenhLech).HasColumnName("ChenhLech");
             entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.HasPhanBo).HasColumnName("HasPhanBo");
         });
         modelBuilder.Entity<STD_NXT_Filter>(entity =>
         {

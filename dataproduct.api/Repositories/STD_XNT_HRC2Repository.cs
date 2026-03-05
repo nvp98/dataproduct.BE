@@ -376,7 +376,8 @@ namespace dataproduct.api.Repositories
                     TongTonCuoiCa = x.TongTonCuoiCa,
                     TongSuDung = x.TongSuDung,
                     TongSDTrenSoSach = x.TongSDTrenSoSach,
-                    ChenhLech = x.ChenhLech
+                    ChenhLech = x.ChenhLech,
+                    HasPhanBo = x.HasPhanBo
                 }).ToList()
             };
         }
@@ -387,10 +388,11 @@ namespace dataproduct.api.Repositories
             {
                 // ========== BƯỚC 1: Kiểm tra dữ liệu đã được lưu chưa ==========
                 var details = await _context.STD_NXT_TOTAL_HRC2s
-                    .Where(x => 
-                        x.Id_HeaderKey == entity.Id_HeaderKey && 
-                        x.NgaySX == entity.NgaySX && 
-                        x.Ca == entity.Ca)
+                    .Where(x =>
+                        x.Id_HeaderKey == entity.Id_HeaderKey &&
+                        x.NgaySX == entity.NgaySX &&
+                        x.Ca == entity.Ca &&
+                        x.Id_Phieu == entity.IdPhieu)
                     .FirstOrDefaultAsync();
 
                 if (details == null)
@@ -456,8 +458,7 @@ namespace dataproduct.api.Repositories
 
                 var tenHienThi = headerKey?.TenHienThi ?? "Phân bổ";
 
-                // ========== BƯỚC 7: Lấy các record phân bổ cũ để upsert ==========
-                // Lấy tất cả record phân bổ cũ cho HeaderKey này trong ngày/ca
+                // ========== BƯỚC 7: Lấy các record phân bổ cũ để upsert (theo HeaderKey + ngày + ca) ==========
                 var oldPhanBoRecords = await (
                     from pl in _context.PhuLieu_HRC2s
                     join dlnm in _context.DLNM_HRC2s on pl.ID_MeThoi equals dlnm.ID
@@ -485,10 +486,8 @@ namespace dataproduct.api.Repositories
                     // Kiểm tra xem đã có record phân bổ cho mẻ này chưa
                     if (oldPhanBoLookup.TryGetValue(meThoiId, out var existingPhanBo))
                     {
-                        // UPDATE: Cập nhật khối lượng phân bổ (chênh lệch mới)
                         existingPhanBo.KLPhuGia = (double)klPhanBo;
                         existingPhanBo.TenHienThi = tenHienThi;
-                        // Cập nhật các trường khác từ DLNM nếu cần
                         existingPhanBo.REPORT_NO = dlnm.REPORT_NO;
                         existingPhanBo.BieuMau = dlnm.BieuMau;
                         existingPhanBo.MeThoi = dlnm.MeThoi;
@@ -502,13 +501,13 @@ namespace dataproduct.api.Repositories
                             REPORT_NO = dlnm.REPORT_NO,
                             BieuMau = dlnm.BieuMau,
                             MeThoi = dlnm.MeThoi,
-                            ID_PhuLieu = null, // Phân bổ không có ID_PhuLieu cụ thể
+                            ID_PhuLieu = null,
                             TenPhuLieu = null,
                             KLPhuGia = (double)klPhanBo,
                             ID_HeaderKey = entity.Id_HeaderKey,
                             TenHienThi = tenHienThi,
                             ID_MeThoi = meThoiId,
-                            IsPhanBo = true // ⭐ Đánh dấu là phân bổ
+                            IsPhanBo = true
                         };
                         _context.PhuLieu_HRC2s.Add(phuLieuPhanBo);
                     }
@@ -526,6 +525,57 @@ namespace dataproduct.api.Repositories
                 {
                     _context.PhuLieu_HRC2s.RemoveRange(phanBoToDelete);
                 }
+
+                details.HasPhanBo = true;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity)
+        {
+            try
+            {
+                // B1: Kiểm tra row tổng hợp tồn tại (đúng phiếu đang thao tác)
+                var summary = await _context.STD_NXT_TOTAL_HRC2s
+                    .FirstOrDefaultAsync(x =>
+                        x.Id_HeaderKey == entity.Id_HeaderKey &&
+                        x.NgaySX == entity.NgaySX &&
+                        x.Ca == entity.Ca &&
+                        x.Id_Phieu == entity.IdPhieu);
+
+                if (summary == null)
+                {
+                    throw new Exception("Không tìm thấy dữ liệu tổng hợp để thu hồi phân bổ. Vui lòng lưu trước.");
+                }
+
+                if (summary.HasPhanBo != true)
+                {
+                    throw new Exception("Dòng này chưa được phân bổ hoặc đã thu hồi trước đó.");
+                }
+
+                // B2: Xóa record PhuLieu_HRC2 phân bổ (IsPhanBo = true) cho HeaderKey + ngày + ca (join DLNM để lọc đúng ngày/ca)
+                var phanBoRecords = await (
+                    from pl in _context.PhuLieu_HRC2s
+                    join dlnm in _context.DLNM_HRC2s on pl.ID_MeThoi equals dlnm.ID
+                    where pl.ID_HeaderKey == entity.Id_HeaderKey &&
+                          pl.IsPhanBo == true &&
+                          dlnm.Ngay == entity.NgaySX &&
+                          dlnm.Ca == entity.Ca
+                    select pl
+                ).ToListAsync();
+
+                if (phanBoRecords.Any())
+                {
+                    _context.PhuLieu_HRC2s.RemoveRange(phanBoRecords);
+                }
+
+                // B3: Reset cờ HasPhanBo
+                summary.HasPhanBo = false;
 
                 await _context.SaveChangesAsync();
                 return true;

@@ -43,6 +43,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? TongSuDung { get; set; }
         public decimal? TongSDTrenSoSach { get; set; }
         public decimal? ChenhLech { get; set; }
+        public bool? HasPhanBo { get; set; }
     }
 }
 

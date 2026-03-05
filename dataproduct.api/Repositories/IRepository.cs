@@ -103,8 +103,10 @@ namespace dataproduct.api.Repositories
     {
         Task<STD_NXT_HRC2_UpsertResponse> UpsertAsync(STD_NXT_HRC2_UpsertDto entity);
         Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
+        Task GetHRC2FilterInitAsync(InitXuatNhapTonHRC2Request request);
         Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
     }

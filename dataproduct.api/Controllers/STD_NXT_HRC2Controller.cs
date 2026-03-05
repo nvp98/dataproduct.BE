@@ -59,5 +59,19 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+
+        [HttpPost("thu-hoi-phan-bo")]
+        public async Task<IActionResult> ThuHoiPhanBo([FromBody] STD_NXT_HRC2_PhanBoDto entity)
+        {
+            try
+            {
+                var result = await _service.ThuHoiPhanBoAsync(entity);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
     }
 }

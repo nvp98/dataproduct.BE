@@ -89,6 +89,10 @@ namespace dataproduct.api.DTOs
     {
         public DateTime NgaySX { get; set; }
         public int Ca { get; set; }
+        /// <summary>Nếu có: sau khi filter sẽ gọi sp_Init_XuatNhapTon_HRC2 để cập nhật dữ liệu phiếu hiện tại.</summary>
+        public Guid? IdPhieu { get; set; }
+        /// <summary>Danh sách Id_HeaderKey đang hiển thị trên FE (kể cả dòng mới chưa lưu). Dùng cho Init khi có IdPhieu.</summary>
+        public List<int>? HeaderKeyIds { get; set; }
     }
 }
 
