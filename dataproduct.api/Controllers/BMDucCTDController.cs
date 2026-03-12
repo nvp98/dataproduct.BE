@@ -152,5 +152,30 @@ namespace dataproduct.api.Controllers
             await _service.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
             return Ok(new { success = true, message = "Đã khôi phục dữ liệu sản lượng phôi" });
         }
+
+        [HttpGet("export-excelPhoiNhapKho")]
+        public async Task<IActionResult> ExportExcel(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var fileBytes = await _service.ExportExcelByBmPhieuAsync(fromDate, toDate);
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"TongHopPhoiNhapKho_{DateTime.Now:yyyyMMddHHmmss}.xlsx"
+            );
+        }
+
+
+        [HttpGet("export-excelSanLuongPhoi")]
+        public async Task<IActionResult> ExportExcelSLP(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var fileBytes = await _service.ExportExcelSanLuongPhoiAsync(fromDate, toDate);
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"TongHopSanLuongPhoi_{DateTime.Now:yyyyMMddHHmmss}.xlsx"
+            );
+        }
     }
 }

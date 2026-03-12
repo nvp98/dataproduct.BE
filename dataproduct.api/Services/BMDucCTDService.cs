@@ -1,4 +1,5 @@
-﻿using dataproduct.api.DTOs.CTD_Dto;
+﻿using ClosedXML.Excel;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
@@ -6,9 +7,11 @@ using DinkToPdf;
 using DinkToPdf.Contracts;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.Configuration;
+using NuGet.Protocol.Core.Types;
 using System;
 using System.Configuration;
 using System.Text;
+using System.Text.Json;
 using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Services
@@ -727,6 +730,383 @@ namespace dataproduct.api.Services
                 FileName = $"BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
                 ContentType = "application/pdf"
             };
+        }
+        public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var phieuList = await _repo.GetDataAsync(fromDate, toDate);
+
+            var result = new List<BmPhieuExportRow>();
+
+            foreach (var item in phieuList)
+            {
+                if (string.IsNullOrEmpty(item.DataJson))
+                    continue;
+
+                var json = JsonSerializer.Deserialize<BmPhieuJson>(
+                    item.DataJson,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                if (json?.table1 == null)
+                    continue;
+
+                foreach (var row in json.table1)
+                {
+                    result.Add(new BmPhieuExportRow
+                    {
+                        SoPhieu = item.SoPhieu,
+                        NgaySX = json.NgaySX,
+                        MayDuc = json.mayduc,
+                        Kip = json.kip,
+                        Ca = json.ca,
+
+                        Me = row.me,
+                        Mac = row.mac,
+                        KichThuoc = row.kichThuoc,
+
+                        StLoai1 = row.stLoai1,
+                        KlLoai1 = row.klLoai1,
+
+                        StLoai2 = row.stLoai2,
+                        KlLoai2 = row.klLoai2,
+
+                        StLoai2tp = row.stLoai2tp,
+                        KlLoai2tp = row.klLoai2tp,
+
+                        StPhoiNgan = row.stPhoiNgan,
+                        CdPhoiNgan = row.cdPhoiNgan,
+                        KlPhoiNgan = row.klPhoiNgan,
+
+                        StLoai3 = row.stLoai3,
+                        KlLoai3 = row.klLoai3,
+
+                        TongSoThanh = row.tongSoThanh,
+                        TongKhoiLuong = row.tongKhoiLuong,
+                        TinhTrang = item.TinhTrang,
+                    });
+                }
+            }
+
+            return result;
+        }
+
+
+        public async Task<byte[]> ExportExcelByBmPhieuAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var data = await GetDataExportExcelByBmPhieuAsync(fromDate, toDate);
+
+
+            var templatePath = Path.Combine(
+                _env.WebRootPath,
+                "templates",
+                "BM_TongHopGiaoNhanPhoiNhapKho.xlsx"
+            );
+
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var workbook = new XLWorkbook(templatePath);
+            var ws = workbook.Worksheet(1);
+
+            ws.Cell("A4").Value = $"Từ ngày: {fromDate:dd/MM/yyyy} đến ngày: {toDate:dd/MM/yyyy}";
+
+            int row = 9;
+            int stt = 1;
+            foreach (var item in data)
+            {
+                // copy format của dòng mẫu
+                if (row > 9)
+                {
+                    ws.Row(9).CopyTo(ws.Row(row));
+                }
+
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.NgaySX?.ToString("dd/MM/yyyy");
+
+                ws.Cell(row, 3).Value = item.Kip;
+                ws.Cell(row, 4).Value = item.Ca;
+                ws.Cell(row, 5).Value = item.MayDuc;
+
+                ws.Cell(row, 6).Value = item.Me;
+                ws.Cell(row, 7).Value = item.Mac;
+                ws.Cell(row, 8).Value = item.KichThuoc;
+
+                ws.Cell(row, 9).Value = item.StLoai1;
+                ws.Cell(row, 10).Value = item.KlLoai1;
+
+                ws.Cell(row, 11).Value = item.StLoai2;
+                ws.Cell(row, 12).Value = item.KlLoai2;
+
+                ws.Cell(row, 13).Value = item.StLoai2tp;
+                ws.Cell(row, 14).Value = item.KlLoai2tp;
+
+                ws.Cell(row, 15).Value = item.StPhoiNgan;
+                ws.Cell(row, 16).Value = item.CdPhoiNgan;
+                ws.Cell(row, 17).Value = item.KlPhoiNgan;
+
+                ws.Cell(row, 18).Value = item.StLoai3;
+                ws.Cell(row, 19).Value = item.KlLoai3;
+
+                ws.Cell(row, 20).Value = item.TongKhoiLuong;
+
+                ws.Cell(row, 21).Value = "";
+                ws.Cell(row, 22).Value = item.SoPhieu;
+                var cell = ws.Cell(row, 23);
+                switch (item.TinhTrang)
+                {
+                    case 0:
+                        cell.Value = "Đang lưu";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGray;
+                        break;
+
+                    case 1:
+                        cell.Value = "Đã gửi";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
+                        break;
+
+                    case 2:
+                        cell.Value = "Hoàn thành";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGreen;
+                        break;
+
+                    case 3:
+                        cell.Value = "Đã thu hồi";
+                        cell.Style.Fill.BackgroundColor = XLColor.Orange;
+                        break;
+
+                    case 4:
+                        cell.Value = "Không xác nhận";
+                        cell.Style.Fill.BackgroundColor = XLColor.Red;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 5:
+                        cell.Value = "Đã chốt";
+                        cell.Style.Fill.BackgroundColor = XLColor.DarkGreen;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 6:
+                        cell.Value = "Đang phê duyệt";
+                        cell.Style.Fill.BackgroundColor = XLColor.Yellow;
+                        break;
+
+                    case 7:
+                        cell.Value = "Hiệu chỉnh";
+                        cell.Style.Fill.BackgroundColor = XLColor.MediumPurple;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    default:
+                        cell.Value = "Không xác định";
+                        break;
+                }
+                row++;
+            }
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+           
+            return stream.ToArray();
+        }
+
+        public async Task<List<BmSanLuongPhoiRow>> GetDataExportExcelSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var phieuList = await _repo.GetDataSanLuongPhoiAsync(fromDate, toDate);
+
+            var result = new List<BmSanLuongPhoiRow>();
+
+            foreach (var item in phieuList)
+            {
+                if (string.IsNullOrEmpty(item.DataJson))
+                    continue;
+
+                var json = JsonSerializer.Deserialize<BmPhieuSLPJson>(
+                    item.DataJson,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                if (json?.table1 == null)
+                    continue;
+
+                foreach (var row in json.table1)
+                {
+                    result.Add(new BmSanLuongPhoiRow
+                    {
+                        SoPhieu = item.SoPhieu,
+                        NgaySX = json.NgaySX,
+                        Kip = json.kip,
+                        Ca = json.ca,
+
+                        MacThep = row.macThep,
+                        KichThuoc = row.kichThuoc,
+
+                        StLoai1 = row.stLoai1,
+                        KlLoai1 = row.klLoai1,
+
+                        StPhoiNgan = row.stPhoiNgan,
+                        KlPhoiNgan = row.klPhoiNgan,
+
+                        StLoai2 = row.stLoai2,
+                        KlLoai2 = row.klLoai2,
+
+                        StLoai3 = row.stLoai3,
+                        KlLoai3 = row.klLoai3,
+
+                        TongSoThanh = row.tongSoThanh,
+                        TongKhoiLuong = row.tongKhoiLuong,
+
+                        TinhTrang = item.TinhTrang
+                    });
+                }
+            }
+
+            return result;
+        }
+        public async Task<byte[]> ExportExcelSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var data = await GetDataExportExcelSanLuongPhoiAsync(fromDate, toDate);
+
+            var templatePath = Path.Combine(
+                _env.WebRootPath,
+                "templates",
+                "BM_TongHopSanLuongPhoi.xlsx"
+            );
+
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var workbook = new XLWorkbook(templatePath);
+            var ws = workbook.Worksheet(1);
+
+            ws.Cell("A4").Value = $"Từ ngày: {fromDate:dd/MM/yyyy} đến ngày: {toDate:dd/MM/yyyy}";
+
+            int startRow = 9;
+
+            if (data.Count > 1)
+                ws.Row(startRow).InsertRowsBelow(data.Count - 1);
+
+            int row = startRow;
+            int stt = 1;
+
+            foreach (var item in data)
+            {
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.NgaySX?.ToDateTime(TimeOnly.MinValue);
+                ws.Cell(row, 3).Value = item.Kip;
+                ws.Cell(row, 4).Value = item.Ca;
+
+                ws.Cell(row, 5).Value = item.MacThep;
+                ws.Cell(row, 6).Value = item.KichThuoc;
+
+                ws.Cell(row, 7).Value = item.StLoai1;
+                ws.Cell(row, 8).Value = item.KlLoai1;
+
+                ws.Cell(row, 9).Value = item.StPhoiNgan;
+                ws.Cell(row, 10).Value = item.KlPhoiNgan;
+
+                ws.Cell(row, 11).Value = item.StLoai2;
+                ws.Cell(row, 12).Value = item.KlLoai2;
+
+                ws.Cell(row, 13).Value = item.StLoai3;
+                ws.Cell(row, 14).Value = item.KlLoai3;
+
+                ws.Cell(row, 15).Value = item.TongSoThanh;
+                ws.Cell(row, 16).Value = item.TongKhoiLuong;
+
+                ws.Cell(row, 17).Value = "";
+                ws.Cell(row, 18).Value = item.SoPhieu;
+
+                var cell = ws.Cell(row, 19);
+
+                switch (item.TinhTrang)
+                {
+                    case 0:
+                        cell.Value = "Đang lưu";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGray;
+                        break;
+
+                    case 1:
+                        cell.Value = "Đã gửi";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
+                        break;
+
+                    case 2:
+                        cell.Value = "Hoàn thành";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGreen;
+                        break;
+
+                    case 3:
+                        cell.Value = "Đã thu hồi";
+                        cell.Style.Fill.BackgroundColor = XLColor.Orange;
+                        break;
+
+                    case 4:
+                        cell.Value = "Không xác nhận";
+                        cell.Style.Fill.BackgroundColor = XLColor.Red;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 5:
+                        cell.Value = "Đã chốt";
+                        cell.Style.Fill.BackgroundColor = XLColor.DarkGreen;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 6:
+                        cell.Value = "Đang phê duyệt";
+                        cell.Style.Fill.BackgroundColor = XLColor.Yellow;
+                        break;
+
+                    case 7:
+                        cell.Value = "Hiệu chỉnh";
+                        cell.Style.Fill.BackgroundColor = XLColor.MediumPurple;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    default:
+                        cell.Value = "Không xác định";
+                        break;
+                }
+
+                row++;
+            }
+            int lastRow = row - 1;
+
+            // format ngày
+            ws.Range(9, 2, lastRow, 2).Style.DateFormat.Format = "dd/MM/yyyy";
+
+            // format số
+            ws.Range(9, 7, lastRow, 16).Style.NumberFormat.Format = "#,##0";
+
+            // căn giữa
+            ws.Range(9, 1, lastRow, 4)
+                .Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // căn phải số
+            ws.Range(9, 7, lastRow, 16)
+                .Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+
+            // border bảng
+            var range = ws.Range(9, 1, lastRow, 19);
+
+            range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+            // chiều cao dòng
+            ws.Rows(9, lastRow).Height = 35;
+
+            // freeze header
+            ws.SheetView.FreezeRows(8);
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+
+            return stream.ToArray();
         }
     }
 }

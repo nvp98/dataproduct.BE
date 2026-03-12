@@ -239,5 +239,43 @@ namespace dataproduct.api.Repositories
             rows.ForEach(r => r.TTHD = true);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var query = _context.BmPhieus
+                .Where(x => x.IsDelete == 0 &&
+                            x.MaBm == "CTD_BB_GiaoNhanPhoiNhapKho")
+                .AsQueryable();
+
+            if (fromDate.HasValue)
+                query = query.Where(x => x.NgaySX >= fromDate);
+
+            if (toDate.HasValue)
+                query = query.Where(x => x.NgaySX <= toDate);
+
+            query = query.Where(p => !_context.BmPhieus.Any(c => c.ID_PhieuGoc == p.Idphieu));
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<List<BmPhieu>> GetDataSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var query = _context.BmPhieus
+                .AsNoTracking()
+                .Where(x => x.IsDelete == 0 &&
+                            x.MaBm == "CTD_BB_Sanluongphoi")
+                .AsQueryable();
+
+            if (fromDate.HasValue)
+                query = query.Where(x => x.NgaySX >= fromDate);
+
+            if (toDate.HasValue)
+                query = query.Where(x => x.NgaySX <= toDate);
+
+             query = query.Where(p => !_context.BmPhieus.Any(c => c.ID_PhieuGoc == p.Idphieu));
+                
+
+            return await query.ToListAsync();
+        }
     }
 }

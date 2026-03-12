@@ -142,6 +142,9 @@ namespace dataproduct.api.Repositories
         Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu);
         Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu);
 
+        Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<List<BmPhieu>> GetDataSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate);
+
     }
     //  End NM CTD 
     public interface IBmQuyenXlRepository
