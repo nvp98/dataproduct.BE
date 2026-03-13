@@ -47,6 +47,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
 
     public virtual DbSet<BM_SanLuongPhoi> BM_SanLuongPhoi { get; set; }
+    public virtual DbSet<BM_PhoiNhapKho> BM_PhoiNhapKho { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -168,6 +169,7 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("MaBM");
             entity.Property(e => e.MaKhuVuc).HasMaxLength(20);
+            entity.Property(e => e.QuyenChucNang).HasColumnName("QuyenChucNang");
         });
 
         modelBuilder.Entity<CtdPhoiNguoi>(entity =>
@@ -416,6 +418,15 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.NgayBatDau).HasColumnName("NgayBatDau");
             entity.Property(e => e.NgayKetThuc).HasColumnName("NgayKetThuc");
+        });
+        modelBuilder.Entity<PhuLieu_NM>(entity =>
+        {
+            entity.ToTable("PhuLieu_NM");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.ID_PhuLieu).HasColumnName("ID_PhuLieu");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.IsActive).HasColumnName("IsActive");
         });
         OnModelCreatingPartial(modelBuilder);
     }

@@ -1,10 +1,11 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
@@ -36,6 +37,7 @@ namespace dataproduct.api.Repositories
         Task AddAsync(BmPheDuyet entity);
         Task UpdateAsync(BmPheDuyet entity);
         Task DeleteAsync(int id);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
         Task<bool> ExistsAsync(int id);
         Task AddListAsync(List<BmPheDuyet> pheDuyetList, Guid idphieu);
         Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang);
@@ -125,9 +127,23 @@ namespace dataproduct.api.Repositories
     {
         Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
         Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
-        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
         Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity);
-        Task DeleteByPhieuAsync(Guid idPhieu);
+        Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task<List<InsertPhoiNhapKhoDto>> GetPhoiNhapKhoChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity);
+        Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        /// <summary>Ẩn (TTHD = 0) – dùng khi tạo phiếu Hiệu chỉnh (clone)</summary>
+        Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        /// <summary>Khôi phục (TTHD = 1) – dùng khi phiếu Hiệu chỉnh bị từ chối</summary>
+        Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<List<BmPhieu>> GetDataSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate);
 
     }
     //  End NM CTD 
@@ -140,7 +156,10 @@ namespace dataproduct.api.Repositories
         Task DeleteAsync(int id);
         Task<bool> ExistsAsync(int id);
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
-        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, int? excludeId = null);
+        /// <summary>
+        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang.
+        /// </summary>
+        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, int? excludeId = null);
     }
 
     //  Begin láy thông tin người và chữ ký 

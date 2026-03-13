@@ -43,6 +43,7 @@ namespace dataproduct.api.Repositories
         {
             try
             {
+
                 string maBM = formData.GetProperty("maBm").GetString() ?? "UNKNOWN";
                 string prefix = formData.TryGetProperty("prefix", out var p) ? p.GetString() ?? "UNKNOWN" : "UNKNOWN";
                 int Ca = formData.TryGetProperty("ca", out var ca) ? ca.GetInt32() : 0;
@@ -51,7 +52,6 @@ namespace dataproduct.api.Repositories
                                 ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
                                 : null;
                 string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix, Scope, Ca, NgaySX);
-
 
                 var phieu = new BmPhieu
                 {
@@ -143,7 +143,8 @@ namespace dataproduct.api.Repositories
             var query = _context.BmPhieus.Where(x =>
                 x.MaBm == maBm &&
                 x.NgaySX == ngaySX &&
-                x.Ca == ca
+                x.Ca == ca &&
+                x.IsDelete != 1
             );
 
             if (scope.HasValue)

@@ -10,40 +10,46 @@
             font-size: 13px;
             margin: 0;
             padding: 0;
+            color: #000;
         }
 
         .page {
             padding: 20px 30px 0px 50px;
         }
 
-        /* ===== HEADER ===== */
+        /* ================= HEADER ================= */
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: table;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .header-left,
+        .header-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
         }
 
         .header-left {
             font-weight: bold;
         }
 
-            .header-left img {
-                height: 45px;
-            }
+        .header-left img {
+            height: 45px;
+            margin-bottom: 4px;
+        }
 
-            .header-left div {
-                margin-top: 2px;
-                text-transform: uppercase;
-            }
+        .header-left div {
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
 
         .header-right {
             text-align: right;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.5;
         }
-
-            .header-right div {
-                margin-bottom: 2px;
-            }
 
         /* ===== TITLE ===== */
         .title {
@@ -62,11 +68,53 @@
         /* ===== CONTENT TEXT ===== */
         .content {
             margin: 10px 0;
+            font-size :13px;
         }
 
             .content p {
                 margin: 4px 0;
+                font-size: 13px;
             }
+
+        /* ===== NGƯỜI THAM GIA ===== */
+
+        .ds-nguoi {
+            margin-top: 5px;
+        }
+
+        .row-nguoi {
+            width: 100%;
+            margin-bottom: 4px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+            .row-nguoi span {
+                display: inline-block;
+                vertical-align: bottom;
+            }
+
+        /* Chia đúng theo khổ A4 lề trái 50px */
+
+        .col-1 {
+            width: 25%;
+        }
+
+        .col-2 {
+            width: 25%;
+        }
+
+        .col-3 {
+            width: 23%;
+        }
+
+        /* Dòng chấm */
+
+        .line {
+            display: inline-block;
+            width: 160px;
+            border-bottom: 1px #000;
+        }
 
         /* ===== TABLE ===== */
         table {
@@ -117,6 +165,7 @@
         .sign-name {
             height: 65px;
             margin-top: 10px;
+            font-size: 13px;
         }
 
         .sign-name img {
@@ -126,8 +175,13 @@
         .sign-fullname {
             margin-top: 5px;
             font-weight: normal;
+            font-size: 13px;
         }
-
+        table.sign-table,
+        table.sign-table td {
+            border: none !important;
+            border-collapse: collapse;
+        }
     </style>
 </head>
 
@@ -137,7 +191,7 @@
         <!-- HEADER -->
         <div class="header">
             <div class="header-left">
-                <img src="https://report.hoaphatdungquat.vn/img/logoHP.png" alt="Hòa Phát">
+                <img src="{{LogoUrl}}" alt="Logo" /><br />
                 <div>CÔNG TY CỔ PHẦN THÉP</div>
                 <div>HÒA PHÁT DUNG QUẤT</div>
             </div>
@@ -155,15 +209,58 @@
         </div>
 
         <div class="sub-title">
-            Máy đúc: …… &nbsp;&nbsp; Kíp: …… &nbsp;&nbsp; Ngày: ………………
+            Máy đúc: …… &nbsp;&nbsp; Kíp: {{Ca}}{{Kip}} &nbsp;&nbsp; Ngày: {{NgaySX}}
         </div>
 
         <!-- CONTENT -->
         <div class="content">
             <p>Chúng tôi gồm:</p>
-            <p>1. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>2. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
-            <p>3. Ông/bà: ............................................. Chức vụ: ........................ BP: ........................</p>
+            <div class="ds-nguoi">
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        1. Ông/bà:
+                        <span class="line">{{NguoiGiao}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuGiao}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanGiao}}</span>
+                    </span>
+                </div>
+
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        2. Ông/bà:
+                        <span class="line">{{NguoiQLCL}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuQLCL}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanQLCL}}</span>
+                    </span>
+                </div>
+
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        3. Ông/bà:
+                        <span class="line">{{NguoiNhan}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuNhan}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanNhan}}</span>
+                    </span>
+                </div>
+            </div>
 
             <p>
                 Cùng nhau thống nhất lập “Biên bản xác nhận sản lượng phôi thép” chi tiết như sau:
@@ -208,14 +305,14 @@
                 <!-- TỔNG -->
                 <tr>
                     <td colspan="3"><b>Tổng</b></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td><b>{{TongStLoai1}}</b></td>
+                    <td><b>{{TongKlLoai1}}</b></td>
+                    <td><b>{{TongStPhoiNgan}}</b></td>
+                    <td><b>{{TongKlPhoiNgan}}</b></td>
+                    <td><b>{{TongStLoai2}}</b></td>
+                    <td><b>{{TongKlLoai2}}</b></td>
+                    <td><b>{{TongStLoai3}}</b></td>
+                    <td><b>{{TongKlLoai3}}</b></td>
                     <td><b>{{TongSoThanh}}</b></td>
                     <td><b>{{TongKhoiLuong}}</b></td>
                 </tr>
@@ -226,42 +323,44 @@
         <div class="note">
             Biên bản này được lập thành 03 (ba) bản có giá trị như nhau, mỗi bên giữ 01 (một) bản để làm căn cứ.
         </div>
+        <table  class="sign-table" style="width:100%; margin-top:20px; text-align:center;">
+            <tr>
+                <td style="width: 33%; font-weight: bold;">
+                    Kho phôi NM.HRC1
+                </td>
+                <td style="width: 33%; font-weight: bold;">
+                    P.QLCL
+                </td>
+                <td style="width: 33%; font-weight: bold;">
+                    Xưởng Đúc phôi vuông NM.HRC1
+                </td>
+            </tr>
 
-        <!-- SIGNATURE -->
-        <div class="signatures">
-            <!-- KHO PHÔI -->
-            <div class="sign-box">
-                Kho phôi NM.HRC1
-                <div class="sign-name">
+            <tr>
+                <td style="height:70px;" >
                     {{Sign_KhoPhoi}}
-                </div>
-                <div class="sign-fullname">
-                    {{Name_KhoPhoi}}
-                </div>
-            </div>
-
-            <!-- QLCL -->
-            <div class="sign-box">
-                P.QLCL
-                <div class="sign-name">
+                </td>
+                <td>
                     {{Sign_QLCL}}
-                </div>
-                <div class="sign-fullname">
-                    {{Name_QLCL}}
-                </div>
-            </div>
-
-            <!-- XƯỞNG ĐÚC -->
-            <div class="sign-box">
-                Xưởng Đúc phôi vuông NM.HRC1
-                <div class="sign-name">
+                </td>
+                <td>
                     {{Sign_XuongDuc}}
-                </div>
-                <div class="sign-fullname">
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_KhoPhoi}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_QLCL}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
                     {{Name_XuongDuc}}
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
+        </table>
+
 
 
     </div>
