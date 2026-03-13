@@ -6,9 +6,11 @@ namespace dataproduct.api.Services
     public class PheDuyetService
     {
         private readonly IPheDuyetRepository _pheDuyetRepo;
-        public PheDuyetService(IPheDuyetRepository pheDuyetRepo)
+        private readonly IConfiguration _configuration;
+        public PheDuyetService(IPheDuyetRepository pheDuyetRepo, IConfiguration configuration)
         {
             _pheDuyetRepo = pheDuyetRepo;
+            _configuration = configuration;
         }
         public async Task<List<PheDuyetDto>> GetPheDuyetPhieuAsync(Guid phieuId)
         {
@@ -47,6 +49,39 @@ namespace dataproduct.api.Services
                 };
             }).ToList();
             return ds;
+        }
+
+        public string FormatChuKy(string? chuKy)
+        {
+            if (string.IsNullOrWhiteSpace(chuKy))
+                return "";
+
+            // Nếu là base64 image (bắt đầu bằng data:image)
+            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"<img src=\"{chuKy}\" style=\"max-width: 150px; max-height: 80px;\" />";
+            }
+
+            // Nếu là URL (http/https)
+            if (chuKy.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"<img src=\"{chuKy}\" style=\"max-width: 150px; max-height: 80px;\" />";
+            }
+
+            // Nếu là đường dẫn relative (ví dụ: /uploads/chuky/xxx.png)
+            if (chuKy.StartsWith("/"))
+            {
+                // Lấy domain từ config
+                var domain = _configuration.GetValue<string>("AppSettings:Domain") ?? "https://report.hoaphatdungquat.vn";
+
+                // Ghép domain với relative path
+                var fullUrl = domain.TrimEnd('/') + chuKy;
+
+                return $"<img src=\"{fullUrl}\" style=\"max-width: 150px; max-height: 80px;\" />";
+            }
+
+            // Nếu không phải là link/base64, trả về text gốc
+            return chuKy;
         }
     }
 }

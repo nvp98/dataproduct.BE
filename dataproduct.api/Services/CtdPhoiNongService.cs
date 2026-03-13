@@ -398,7 +398,7 @@ namespace dataproduct.api.Services
             {
                 ws.Cell(currentRow, 1).Value = currentRow - 5;
                 ws.Cell(currentRow, 2).Value = t.NgaySx.ToString("dd/MM/yyyy");
-                ws.Cell(currentRow, 3).Value = t.Ca;
+                ws.Cell(currentRow, 3).Value = t.Ca + t.Kip;
                 ws.Cell(currentRow, 4).Value = t.Me;
                 ws.Cell(currentRow, 5).Value = t.Mac;
                 ws.Cell(currentRow, 6).Value = t.KichThuoc;
@@ -417,9 +417,17 @@ namespace dataproduct.api.Services
                 ws.Cell(currentRow, 19).Value = t.GhiChu;
                 // Tìm dữ liệu tương ứng từ CtdPhoiNong
                 var ctdPhoi = query.Where(x => x.IdBkPhoiThep == t.Id);
-                int sttCtd = 1;
+                int sttCtd = 0;
                 foreach (var item in ctdPhoi)
                 {
+                    if (item.Ca == t.Ca && item.NgaySx == t.NgaySx)
+                    {
+                        sttCtd = 1;
+                    }
+                    else
+                    {
+                        sttCtd = 2;
+                    }
                     if (sttCtd == 1)
                     {
                         ws.Cell(currentRow, 20).Value = item.TinhTrang == 1 ? "Đã chốt" : "Chưa chốt";
@@ -446,7 +454,7 @@ namespace dataproduct.api.Services
                         ws.Cell(currentRow, 32).Value = item.TongSt;
                         ws.Cell(currentRow, 33).Value = item.TongKl;
                     }
-                    sttCtd++;
+                    // sttCtd++;
                 }
                 currentRow++;
             }

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.Models
 {
-    public class BM_SanLuongPhoi
+    public class BM_PhoiNhapKho
     {
         [Key]
         public int Id { get; set; }
@@ -15,8 +15,8 @@ namespace dataproduct.api.Models
         public string Kip { get; set; }
         public int Ca { get; set; }
         public int MayDuc { get; set; }
-
-        public string MacThep { get; set; }
+        public string Me { get; set; }
+        public string Mac{ get; set; }
         public string KichThuoc { get; set; }
 
         public int? StLoai1 { get; set; }
@@ -26,10 +26,17 @@ namespace dataproduct.api.Models
         public int? StPhoiNgan { get; set; }
         [Column(TypeName = "decimal(10,3)")]
         public decimal? KlPhoiNgan { get; set; }
+        [Column(TypeName = "decimal(6,2)")]
+        public decimal? CdPhoiNgan { get; set; }
 
         public int? StLoai2 { get; set; }
         [Column(TypeName = "decimal(10,3)")]
         public decimal? KlLoai2 { get; set; }
+
+        public int? StLoai2TP { get; set; }
+
+        [Column(TypeName = "decimal(10,3)")]
+        public decimal? KlLoai2TP { get; set; }
 
         public int? StLoai3 { get; set; }
         [Column(TypeName = "decimal(10,3)")]

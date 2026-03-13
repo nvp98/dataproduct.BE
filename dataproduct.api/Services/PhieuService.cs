@@ -150,6 +150,8 @@ namespace dataproduct.api.Business
 
         public async Task<BmPhieu> CreateAsync(JsonElement formData)
         {
+            await CheckDuplicateAsync(formData);
+
             try
             {
                 var phieu = await _repo.AddAsync(formData);
@@ -495,7 +497,43 @@ namespace dataproduct.api.Business
 
             return null;
         }
+        private async Task CheckDuplicateAsync(JsonElement formData)
+        {
+            string maBM = formData.TryGetProperty("maBm", out var mBm)
+                ? mBm.GetString()
+                : null;
 
+            if (string.IsNullOrEmpty(maBM))
+                return;
+
+            int Ca = formData.TryGetProperty("ca", out var ca)
+                ? ca.GetInt32()
+                : 0;
+
+            int? Scope = formData.TryGetProperty("scope", out var scope) && scope.ValueKind != JsonValueKind.Null
+                ? scope.GetInt32()
+                : null;
+
+            int? MayDuc = formData.TryGetProperty("mayduc", out var md) && md.ValueKind != JsonValueKind.Null
+                ? md.GetInt32()
+                : null;
+
+            DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var nsx) && nsx.ValueKind != JsonValueKind.Null
+                ? DateOnly.FromDateTime(nsx.GetDateTime())
+                : null;
+
+            if (!NgaySX.HasValue)
+                return;
+
+            bool exists = await _repo.CheckExistsAsync(maBM, NgaySX.Value, Ca, Scope, MayDuc);
+
+            if (exists)
+            {
+                throw new InvalidOperationException(
+                    $"Đã tồn tại phiếu {maBM} cho ngày {NgaySX:dd/MM/yyyy} ca {Ca}"
+                );
+            }
+        }
     }
 }
 

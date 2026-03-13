@@ -5,6 +5,7 @@ using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
@@ -130,9 +131,23 @@ namespace dataproduct.api.Repositories
     {
         Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
         Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
-        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
         Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity);
-        Task DeleteByPhieuAsync(Guid idPhieu);
+        Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task<List<InsertPhoiNhapKhoDto>> GetPhoiNhapKhoChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity);
+        Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        /// <summary>Ẩn (TTHD = 0) – dùng khi tạo phiếu Hiệu chỉnh (clone)</summary>
+        Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        /// <summary>Khôi phục (TTHD = 1) – dùng khi phiếu Hiệu chỉnh bị từ chối</summary>
+        Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<List<BmPhieu>> GetDataSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate);
 
     }
     //  End NM CTD 
