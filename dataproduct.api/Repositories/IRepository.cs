@@ -67,6 +67,7 @@ namespace dataproduct.api.Repositories
         Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize);
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
         Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca);
+        Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto);
     }
     public interface IHeaderKeyRepository
     {
@@ -81,6 +82,7 @@ namespace dataproduct.api.Repositories
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,

@@ -17,14 +17,22 @@ namespace dataproduct.api.Business
         private readonly IBMPheDuyetRepository _pheDuyetRepo;
         private readonly BmPheDuyetService _pheDuyetService;
         private readonly ProductFormContext _context;
+        private readonly DLNMHRC2Service _dlnmHrc2Service;
 
-        public PhieuService(IPhieuRepository repo, ISTD_NXT_HRC2Repository std_nxt_hrc2Repo, IBMPheDuyetRepository pheDuyetRepo, BmPheDuyetService pheDuyetService, ProductFormContext context)
+        public PhieuService(
+            IPhieuRepository repo,
+            ISTD_NXT_HRC2Repository std_nxt_hrc2Repo,
+            IBMPheDuyetRepository pheDuyetRepo,
+            BmPheDuyetService pheDuyetService,
+            ProductFormContext context,
+            DLNMHRC2Service dlnmHrc2Service)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
             _pheDuyetRepo = pheDuyetRepo;
             _pheDuyetService = pheDuyetService;
             _context = context;
+            _dlnmHrc2Service = dlnmHrc2Service;
         }
 
         public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
@@ -165,8 +173,7 @@ namespace dataproduct.api.Business
             string bm = formData.GetProperty("maBm").GetString();
             if (bm == "HRC2_BB_NauLuyen_BOF" || bm == "HRC2_BB_NauLuyen_LF" || bm == "HRC2_BB_NauLuyen_RH")
             {
-                var data = await BuildModelToInsert(formData);
-                await SaveHRC2ManualDataAsync(data);
+                await _dlnmHrc2Service.SaveHRC2ManualFromPhieuFormAsync(formData);
             }
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
@@ -339,7 +346,7 @@ namespace dataproduct.api.Business
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
                 var nextVersion = (phieuGoc.VersionClone ?? 0) + 1;
-                var suffix = $"_HieuChinh_{nextVersion}";
+                var suffix = $"_HC_{nextVersion}";
                 var soPhieuBase = (phieuGoc.SoPhieu ?? "").Trim();
                 if (soPhieuBase.Length + suffix.Length > 50)
                     soPhieuBase = soPhieuBase.Substring(0, 50 - suffix.Length);
@@ -469,344 +476,6 @@ namespace dataproduct.api.Business
         {
             await _std_nxt_hrc2Repo.InitializeHRC2_STD_NXTAsync(phieu);
         }
-
-        public async Task<List<HRC2InsertModel>> BuildModelToInsert(JsonElement formData)
-        {
-            var result = new List<HRC2InsertModel>();
-
-            string bm = formData.GetProperty("maBm").GetString();
-            int scope = formData.GetProperty("scope").GetInt32();
-            int ca = formData.GetProperty("ca").GetInt32();
-
-            string ngaySXstr = formData.TryGetProperty("NgaySX", out var nsxProp)
-                ? nsxProp.GetString()
-                : null;
-
-            DateTime ngaySX = !string.IsNullOrEmpty(ngaySXstr)
-                ? DateTime.Parse(ngaySXstr)
-                : DateTime.Now;
-
-            var table1 = formData.GetProperty("table1").EnumerateArray().ToList();
-            var dynamicRoot = formData.GetProperty("table1DynamicColumns");
-
-            // BM → nhóm cột dynamic
-            var bmColumnMap = new Dictionary<string, List<string>>
-            {
-                { "HRC2_BB_NauLuyen_BOF", new List<string> { "BOF_PhuGia", "others", "adjust" } },
-                { "HRC2_BB_NauLuyen_LF", new List<string> { "PG", "KL", "others", "adjust" } },
-                { "HRC2_BB_NauLuyen_RH", new List<string> { "PG", "KL", "others", "adjust" } }
-            };
-
-            if (!bmColumnMap.TryGetValue(bm, out var colGroups))
-                return result;
-            string LoaiBM = "";
-            if (bm == "HRC2_BB_NauLuyen_BOF") LoaiBM = "BOF";
-            else if (bm == "HRC2_BB_NauLuyen_LF") LoaiBM = "LF";
-            else LoaiBM = "RH";
-            // Gom tất cả dynamic columns
-            var dynamicCols = new List<JsonElement>();
-            foreach (var g in colGroups)
-                if (dynamicRoot.TryGetProperty(g, out var grp))
-                    dynamicCols.AddRange(grp.EnumerateArray());
-
-            // Lấy các row nhập tay
-            var rowsNhapTay = table1
-                .Where(r => r.TryGetProperty("IsNM", out var flag)
-                            && flag.ValueKind == JsonValueKind.False)
-                .ToList();
-
-            foreach (var row in rowsNhapTay)
-            {
-                string meThoi = row.GetProperty("meThoi").GetString();
-                string macThep = row.TryGetProperty("macThep", out var mt) ? mt.GetString() : null;
-
-                double? o2 = TryGetDouble(row, "o2");
-                double? n2 = TryGetDouble(row, "n2");
-                double? ar_RH = TryGetDouble(row, "ar_RH");
-                double? ar_LF = TryGetDouble(row, "ar_LF");
-                double? ar_BOF = TryGetDouble(row, "ar_BOF");
-
-                double? gang = TryGetDouble(row, "klGangLong");
-                double? phe = TryGetDouble(row, "klThepPhe");
-                double? klThepLong = TryGetDouble(row, "klThepLong");
-                int? id = row.TryGetProperty("id", out var idRow) ? idRow.GetInt32() : null;
-
-                // ==========================
-                // TẠO 1 DÒNG MODEL CHÍNH
-                // ==========================
-                var model = new HRC2InsertModel
-                {
-                    Id = id,
-                    Ngay = ngaySX,
-                    Ca = ca,
-                    BieuMau = LoaiBM,
-                    Scope = scope,
-
-                    MeThoi = meThoi,
-                    MacThep = macThep,
-
-                    O2 = o2,
-                    N2 = n2,
-                    AR_BOF = ar_BOF,
-                    AR_LF = ar_LF,
-                    AR_RH = ar_RH,
-
-                    KLGangLong = gang,
-                    KLThepPhe = phe,
-                    KlThepLong = klThepLong,
-
-                    IsNM = false,
-                    IsChuyenCa = false
-                };
-
-                // ==========================
-                // XỬ LÝ PHỤ LIỆU
-                // ==========================
-                foreach (var col in dynamicCols)
-                {
-                    string dataIndex = col.GetProperty("dataIndex").GetString();
-
-                    if (!row.TryGetProperty(dataIndex, out var valProp))
-                        continue;
-
-                    double? klPhuGia = TryConvertNumeric(valProp);
-                    if (klPhuGia == null || klPhuGia == 0)
-                        continue;
-
-                    // Kiểm tra xem có phải adjust column không (dataIndex dạng "adjust_{headerKeyId}_adjust")
-                    bool isAdjustColumn = dataIndex.StartsWith("adjust_") && dataIndex.EndsWith("_adjust");
-                    
-                    // ⚠️ LƯU Ý: Bỏ qua các cột phân bổ khi nhập thủ công
-                    // Phân bổ chỉ được thực hiện tự động từ nút "Phân bổ" ở SummaryTableSTD
-                    if (isAdjustColumn)
-                        continue; // ⭐ Bỏ qua adjust columns, không xử lý khi nhập thủ công
-
-                    // label & headerKeyId
-                    string label = col.TryGetProperty("label", out var lblProp)
-                        ? lblProp.GetString()
-                        : null;
-
-                    int? headerKeyId = null;
-                    if (col.TryGetProperty("headerKeyId", out var hkProp)
-                        && hkProp.ValueKind == JsonValueKind.Number)
-                    {
-                        headerKeyId = hkProp.GetInt32();
-                    }
-
-                    // mappingPayload → lấy ID_PhuLieu & TenPhuLieu
-                    int? idPhuLieu = null;
-                    string tenPhuLieu = null;
-
-                    if (col.TryGetProperty("mappingPayload", out var mp)
-                        && mp.ValueKind != JsonValueKind.Null)
-                    {
-                        if (mp.TryGetProperty("idPhuLieu", out var idp)
-                            && idp.ValueKind == JsonValueKind.Number)
-                        {
-                            idPhuLieu = idp.GetInt32();
-                        }
-
-                        tenPhuLieu = mp.TryGetProperty("tenPhuLieu", out var tnp)
-                            ? tnp.GetString()
-                            : null;
-                    }
-
-                    model.hRC2_PhuLieus.Add(new HRC2_PhuLieuInSertModel
-                    {
-                        MeThoi = meThoi,
-                        BieuMau = LoaiBM,
-                        ID_PhuLieu = idPhuLieu,
-                        TenPhuLieu = tenPhuLieu,
-                        KLPhuGia = klPhuGia,
-                        ID_HeaderKey = headerKeyId,
-                        TenHienThi = label,
-                        IsPhanBo = false // ⭐ Chỉ phụ liệu thực tế, không phải phân bổ
-                    });
-                }
-
-                result.Add(model);
-            }
-            return result;
-        }
-
-        
-        public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models)
-        {
-            if (models == null || !models.Any())
-                return;
-
-            var dlnmMap = new Dictionary<Guid, DLNM_HRC2>(); // Key = RowKey
-
-            foreach (var model in models)
-            {
-                // Tìm DLNM cha cũ (nếu có)
-                DLNM_HRC2 existing = null;
-                if (model.Id != null && model.Id > 0)
-                {
-                    existing = await _context.DLNM_HRC2s
-                        .FirstOrDefaultAsync(x => x.ID == model.Id && x.IsNM == false);
-                }
-
-                // ====== KIỂM TRA TRÙNG MẺ THỎI (IsNM = false) ======
-                var sameMeThoi = await _context.DLNM_HRC2s
-                    .Where(x =>
-                        x.MeThoi == model.MeThoi &&
-                        x.BieuMau == model.BieuMau)
-                    .ToListAsync();
-
-                bool isTrung = false;
-
-                if (existing == null)
-                {
-                    // INSERT → nếu có record khác trùng → trùng
-                    if (sameMeThoi.Any())
-                        isTrung = true;
-                }
-                else
-                {
-                    // UPDATE → loại bỏ chính nó khỏi danh sách kiểm tra
-                    var others = sameMeThoi.Where(x => x.ID != existing.ID).ToList();
-                    if (others.Any())
-                        isTrung = true;
-                }
-
-                // ====== UPDATE IsTrungMeThoi CHO TẤT CẢ BẢN GHI TRÙNG ======
-                if (isTrung)
-                {
-                    foreach (var item in sameMeThoi)
-                        item.IsTrungMeThoi = true;
-
-                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
-                }
-                else
-                {
-                    // Nếu không trùng → reset toàn bộ về false
-                    foreach (var item in sameMeThoi)
-                        item.IsTrungMeThoi = false;
-
-                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
-                }
-
-                // ====== TẠO HOẶC UPDATE DLNM ======
-                DLNM_HRC2 dlnm;
-
-                if (existing == null)
-                {
-                    dlnm = new DLNM_HRC2
-                    {
-                        REPORT_NO = null,
-                        NgaySx = model.Ngay,
-                        Ngay = model.Ngay,
-                        Ca = model.Ca,
-                        BieuMau = model.BieuMau,
-                        Scope = model.Scope,
-                        MeThoi = model.MeThoi,
-                        MacThep = model.MacThep,
-                        O2 = model.O2,
-                        N2 = model.N2,
-                        AR_RH = model.AR_RH,
-                        AR_LF = model.AR_LF,
-                        AR_BOF = model.AR_BOF,
-                        KLGangLong = model.KLGangLong,
-                        KLThepPhe = model.KLThepPhe,
-                        KLThepLong = model.KlThepLong,
-                        IsNM = false,
-                        IsChuyenCa = model.IsChuyenCa,
-                        IsTrungMeThoi = isTrung,
-
-                        TempKey = Guid.NewGuid()
-                    };
-
-                    await _context.DLNM_HRC2s.AddAsync(dlnm);
-                }
-                else
-                {
-                    dlnm = existing;
-
-                    dlnm.MeThoi = model.MeThoi;
-                    dlnm.MacThep = model.MacThep;
-                    dlnm.O2 = model.O2;
-                    dlnm.N2 = model.N2;
-                    dlnm.AR_RH = model.AR_RH;
-                    dlnm.AR_LF = model.AR_LF;
-                    dlnm.AR_BOF = model.AR_BOF;
-                    dlnm.KLGangLong = model.KLGangLong;
-                    dlnm.KLThepPhe = model.KLThepPhe;
-                    dlnm.KLThepLong = model.KlThepLong;
-                    dlnm.IsChuyenCa = model.IsChuyenCa;
-                    dlnm.NgaySx = model.Ngay;
-                    dlnm.IsTrungMeThoi = isTrung;
-
-                    if (dlnm.TempKey == Guid.Empty)
-                        dlnm.TempKey = Guid.NewGuid();
-
-                    _context.DLNM_HRC2s.Update(dlnm);
-                }
-
-                // Lưu map
-                dlnmMap[model.RowKey] = dlnm;
-            }
-
-            // ====== SAVE 1 (lưu DLNM + IsTrung) ======
-            await _context.SaveChangesAsync();
-
-            // ====== XỬ LÝ PHỤ LIỆU ======
-            foreach (var model in models)
-            {
-                var dlnm = dlnmMap[model.RowKey];
-
-                // Xóa phụ liệu cũ (CHỈ xóa phụ liệu thực tế, KHÔNG xóa phân bổ)
-                var oldPL = await _context.PhuLieu_HRC2s
-                    .Where(x => 
-                        x.ID_MeThoi == dlnm.ID &&
-                        (x.IsPhanBo != true)) // ⭐ CHỈ xóa phụ liệu thực tế, giữ lại phân bổ
-                    .ToListAsync();
-
-                _context.PhuLieu_HRC2s.RemoveRange(oldPL);
-
-                // Xóa phân bổ cũ của mẻ này (nếu có) để update lại
-                var oldPhanBo = await _context.PhuLieu_HRC2s
-                    .Where(x => 
-                        x.ID_MeThoi == dlnm.ID &&
-                        x.IsPhanBo == true)
-                    .ToListAsync();
-
-                _context.PhuLieu_HRC2s.RemoveRange(oldPhanBo);
-
-                // Thêm mới phụ liệu thực tế và phân bổ
-                foreach (var pl in model.hRC2_PhuLieus)
-                {
-                    // Nếu là phân bổ, cần lấy TenHienThi từ Header_Keys nếu chưa có
-                    string tenHienThi = pl.TenHienThi;
-                    if (pl.IsPhanBo == true && pl.ID_HeaderKey.HasValue && string.IsNullOrEmpty(tenHienThi))
-                    {
-                        var headerKey = await _context.Header_Keys
-                            .Where(k => k.Id == pl.ID_HeaderKey.Value)
-                            .Select(k => k.TenHienThi)
-                            .FirstOrDefaultAsync();
-                        tenHienThi = headerKey;
-                    }
-
-                    _context.PhuLieu_HRC2s.Add(new PhuLieu_HRC2
-                    {
-                        BieuMau = model.BieuMau,
-                        MeThoi = model.MeThoi,
-                        ID_PhuLieu = pl.ID_PhuLieu, // Phân bổ không có ID_PhuLieu
-                        TenPhuLieu = pl.TenPhuLieu, // Phân bổ không có TenPhuLieu
-                        KLPhuGia = pl.KLPhuGia,
-                        ID_HeaderKey = pl.ID_HeaderKey,
-                        TenHienThi = tenHienThi ?? pl.TenHienThi,
-                        ID_MeThoi = dlnm.ID,
-                        IsPhanBo = pl.IsPhanBo ?? false // ⭐ Sử dụng flag từ model
-                    });
-                }
-            }
-
-            // SAVE 2 — lưu phụ liệu
-            await _context.SaveChangesAsync();
-        }
-
-
         // Helper
         private double? TryGetDouble(JsonElement row, string key)
         {
@@ -826,8 +495,6 @@ namespace dataproduct.api.Business
 
             return null;
         }
-
-
 
     }
 }

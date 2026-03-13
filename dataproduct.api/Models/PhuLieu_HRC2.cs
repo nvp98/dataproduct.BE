@@ -22,5 +22,9 @@ public partial class PhuLieu_HRC2
     public Guid? Id_Phieu { get; set; }
     [NotMapped]
     public Guid TempKey { get; set; }
+
+    public bool? IsManual { get; set; } = false;
+    public double? KLPhuGia_Manual { get; set; }
+    
 }
 

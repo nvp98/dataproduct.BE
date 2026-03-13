@@ -253,8 +253,9 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
             entity.Property(e => e.TyTrong)
                 .HasColumnName("TyTrong")
-                .HasPrecision(18, 3); // ⭐ decimal(18, 3) - 3 chữ số thập phân
+                .HasPrecision(18, 3); 
             entity.Property(e => e.IsUsedThongKe).HasColumnName("IsUsedThongKe");
+            entity.Property(e => e.LoaiThongKe).HasColumnName("LoaiThongKe");
         });
 
         modelBuilder.Entity<Header_Mapping>(entity =>
@@ -311,6 +312,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia");
             entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
             entity.Property(e => e.TenHienThi).HasColumnName("TenHienThi");
+            entity.Property(e => e.IsManual).HasColumnName("IsManual");
+            entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
         });
         modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC2>(entity =>
         {
@@ -330,6 +333,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TuongQuanCuoiCa).HasColumnName("TuongQuanCuoiCa");
             entity.Property(e => e.TongThucTe).HasColumnName("TongThucTe");
             entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.IDSilo).HasColumnName("IDSilo");
         });
         modelBuilder.Entity<STD_NXT_TOTAL_HRC2>(entity =>
         {

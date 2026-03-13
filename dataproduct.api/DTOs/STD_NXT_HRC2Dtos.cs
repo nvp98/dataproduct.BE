@@ -33,6 +33,7 @@ namespace dataproduct.api.DTOs
         public decimal? TonCuoiCa { get; set; }
         public string? TuongQuanCuoiCa { get; set; }
         public decimal? TongThucTe { get; set; }
+        public int? IDSilo { get; set; }
     }
 
 

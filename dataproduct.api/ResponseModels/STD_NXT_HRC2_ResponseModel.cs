@@ -22,6 +22,8 @@ namespace dataproduct.api.ResponseModels
         public int Id_HeaderKey { get; set; }
         public string? TenNguyenLieu { get; set; }
         public int? ViTri { get; set; }
+        public int? IDSilo { get; set; }
+        public string? TenSilo { get; set; }
         public decimal? TonDauCa { get; set; }
         public string? TuongQuanDauCa { get; set; }
         public decimal? NhapVaoTrongCa { get; set; }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -63,6 +63,7 @@ namespace dataproduct.api.Repositories
                            existingDetail.TonCuoiCa = detailDto.TonCuoiCa;
                            existingDetail.TuongQuanCuoiCa = detailDto.TuongQuanCuoiCa;
                            existingDetail.TongThucTe = detailDto.TongThucTe;
+                           existingDetail.IDSilo = detailDto.IDSilo;
                            
                            _context.STD_XUAT_NHAP_TON_HRC2s.Update(existingDetail);
                        }
@@ -87,7 +88,8 @@ namespace dataproduct.api.Repositories
                                TyTrong = detailDto.TyTrong,
                                TonCuoiCa = detailDto.TonCuoiCa,
                                TuongQuanCuoiCa = detailDto.TuongQuanCuoiCa,
-                               TongThucTe = detailDto.TongThucTe
+                               TongThucTe = detailDto.TongThucTe,
+                               IDSilo = detailDto.IDSilo
                            };
                            
                            await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(newDetail);
@@ -136,7 +138,6 @@ namespace dataproduct.api.Repositories
                            existingSum.TongSuDung = summaryDto.TongSuDung;
                            existingSum.TongSDTrenSoSach = summaryDto.TongSDTrenSoSach;
                            existingSum.ChenhLech = summaryDto.ChenhLech;
-                           
                            _context.STD_NXT_TOTAL_HRC2s.Update(existingSum);
                        }
                        else
@@ -241,66 +242,261 @@ namespace dataproduct.api.Repositories
                throw new Exception(ex.Message);
            }
         }
-        
+
+
+        //public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
+        //{
+        //    var listUsedNXT = await _context.Header_Keys
+        //        .Where(x => x.IsUsedNXT == true)
+        //        .ToListAsync();
+
+        //    var ngaySx = phieu.NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now;
+        //    var ca = phieu.Ca.Value;
+        //    var bieuMau = phieu.MaBm;
+        //    if(listUsedNXT.Any())
+        //    {
+        //        foreach (var item in listUsedNXT)
+        //        {
+        //            foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
+        //            {
+
+        //                var detail = new STD_XUAT_NHAP_TON_HRC2
+        //                {
+        //                    Id_Phieu = phieu.Idphieu,
+        //                    NgaySX = ngaySx,
+        //                    Ca = ca,
+        //                    Scope = (int)tohop,
+        //                    BieuMau = bieuMau,
+        //                    Id_HeaderKey = item.Id,
+        //                    TenNguyenLieu = item.TenHienThi,
+        //                    TyTrong = item.TyTrong, 
+        //                    ViTri = 1
+        //                };
+        //                await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(detail);
+        //            }
+
+        //            var summary = new STD_NXT_TOTAL_HRC2
+        //            {
+        //                Id_Phieu = phieu.Idphieu,
+        //                NgaySX = ngaySx,
+        //                Ca = ca,
+        //                Id_HeaderKey = item.Id,
+        //                TenNguyenLieu = item.TenHienThi
+        //            };
+        //            await _context.STD_NXT_TOTAL_HRC2s.AddAsync(summary);
+        //        }
+        //        await _context.SaveChangesAsync();
+
+        //        // Khởi tạo dữ liệu cho STD_NXT_Filter_Init
+        //        await GetHRC2FilterInitAsync(new InitXuatNhapTonHRC2Request
+        //        {
+        //            NgaySX = ngaySx,
+        //            Ca = ca,
+        //            IdPhieu = phieu.Idphieu,
+        //            HeaderKeys = listUsedNXT.Select(x => new IdHeaderKeyModel { Id_HeaderKey = x.Id }).ToList()
+        //        });
+        //    }
+        //    else
+        //    {
+        //        throw new Exception("Không có Header Key nào được sử dụng cho STD NXT");
+        //    }
+        //}
+        private class HeaderKeyInfo
+        {
+            public int Id { get; set; }
+            public string TenHienThi { get; set; }
+            public decimal? TyTrong { get; set; }
+        }
+
 
         public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
         {
-            var listUsedNXT = await _context.Header_Keys
-                .Where(x => x.IsUsedNXT == true)
-                .ToListAsync();
-
             var ngaySx = phieu.NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now;
             var ca = phieu.Ca.Value;
             var bieuMau = phieu.MaBm;
-            if(listUsedNXT.Any())
-            {
-                foreach (var item in listUsedNXT)
-                {
-                    foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
-                    {
-                        
-                        var detail = new STD_XUAT_NHAP_TON_HRC2
-                        {
-                            Id_Phieu = phieu.Idphieu,
-                            NgaySX = ngaySx,
-                            Ca = ca,
-                            Scope = (int)tohop,
-                            BieuMau = bieuMau,
-                            Id_HeaderKey = item.Id,
-                            TenNguyenLieu = item.TenHienThi,
-                            TyTrong = item.TyTrong, 
-                            ViTri = 1
-                        };
-                        await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(detail);
-                    }
+            var ngaySxOnly = DateOnly.FromDateTime(ngaySx);
+            var currentMonthStart = new DateOnly(ngaySxOnly.Year, ngaySxOnly.Month, 1);
 
-                    var summary = new STD_NXT_TOTAL_HRC2
+            bool isFirstCaOfMonth = ca == 1 && ngaySxOnly == currentMonthStart;
+
+            List<int> allHeaderKeyIds = new();
+            Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
+
+            // -------------------------------------------------------
+            // Lấy danh sách nguồn
+            // -------------------------------------------------------
+            if (isFirstCaOfMonth)
+            {
+                var defaults = await _context.Header_Keys
+                    .Where(x => x.IsUsedNXT == true)
+                    .Select(x => new { x.Id, x.TenHienThi, x.TyTrong })
+                    .ToListAsync();
+
+                if (!defaults.Any())
+                    throw new Exception("Không có Header Key mặc định nào (IsUsedNXT = true)");
+
+                foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
+                {
+                    sourceByScope[(int)tohop] = defaults
+                        .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null))
+                        .ToList();
+                }
+
+                allHeaderKeyIds = defaults.Select(x => x.Id).ToList();
+            }
+            else
+            {
+                // Tìm phiếu gần nhất trong tháng, không vượt qua ca 1 ngày 1
+                var prevPhieu = await _context.BmPhieus
+                    .Where(x => x.MaBm == "HRC2_STD_NXT"
+                             && (x.NgaySX > currentMonthStart
+                                 || (x.NgaySX == currentMonthStart && x.Ca == 1))
+                             && (x.NgaySX < ngaySxOnly
+                                 || (x.NgaySX == ngaySxOnly && x.Ca < ca)))
+                    .OrderByDescending(x => x.NgaySX)
+                    .ThenByDescending(x => x.Ca)
+                    .Select(x => x.Idphieu)
+                    .FirstOrDefaultAsync();
+
+                if (prevPhieu == default)
+                    throw new Exception($"Không tìm thấy phiếu nào trong tháng này trước ca hiện tại (NgaySX: {ngaySx:dd/MM/yyyy}, Ca: {ca})");
+
+                // Lấy danh sách phụ liệu từ phiếu gần nhất
+                var prevRecords = await _context.STD_XUAT_NHAP_TON_HRC2s
+                    .Where(x => x.Id_Phieu == prevPhieu)
+                    .Select(x => new
+                    {
+                        x.Id_HeaderKey,
+                        x.TenNguyenLieu,
+                        x.TyTrong,
+                        x.Scope,
+                        x.IDSilo
+                    })
+                    .ToListAsync();
+
+                if (!prevRecords.Any())
+                    throw new Exception($"Phiếu ca trước không có dữ liệu phụ liệu (IdPhieu: {prevPhieu})");
+
+                // Group theo Scope → dedup theo Id_HeaderKey trong mỗi Scope
+                sourceByScope = prevRecords
+                    .GroupBy(x => x.Scope)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g
+                            .GroupBy(x => x.Id_HeaderKey)
+                            .Select(hg => hg.First())
+                            .Select(x => (x.Id_HeaderKey, x.TenNguyenLieu, x.TyTrong, x.IDSilo))
+                            .ToList()
+                    );
+
+                allHeaderKeyIds = prevRecords
+                    .Select(x => x.Id_HeaderKey)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // -------------------------------------------------------
+            // MERGE STD_XUAT_NHAP_TON_HRC2 theo từng Scope độc lập
+            // -------------------------------------------------------
+            var existingRecords = await _context.STD_XUAT_NHAP_TON_HRC2s
+                .Where(x => x.Id_Phieu == phieu.Idphieu)
+                .Select(x => new { x.Id_HeaderKey, x.Scope })
+                .ToListAsync();
+
+            foreach (var (scope, sourceItems) in sourceByScope)
+            {
+                var sourceKeys = sourceItems.Select(x => x.Id_HeaderKey).ToList();
+                var existingKeysInScope = existingRecords
+                    .Where(x => x.Scope == scope)
+                    .Select(x => x.Id_HeaderKey)
+                    .ToList();
+
+                var newKeys = sourceKeys.Except(existingKeysInScope).ToList();
+                var removedKeys = existingKeysInScope.Except(sourceKeys).ToList();
+
+                // Xóa dư
+                if (removedKeys.Any())
+                {
+                    var toRemove = await _context.STD_XUAT_NHAP_TON_HRC2s
+                        .Where(x => x.Id_Phieu == phieu.Idphieu
+                                 && x.Scope == scope
+                                 && removedKeys.Contains(x.Id_HeaderKey))
+                        .ToListAsync();
+                    _context.STD_XUAT_NHAP_TON_HRC2s.RemoveRange(toRemove);
+                }
+
+                // Thêm mới
+                foreach (var item in sourceItems.Where(x => newKeys.Contains(x.Id_HeaderKey)))
+                {
+                    await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(new STD_XUAT_NHAP_TON_HRC2
                     {
                         Id_Phieu = phieu.Idphieu,
                         NgaySX = ngaySx,
                         Ca = ca,
-                        Id_HeaderKey = item.Id,
-                        TenNguyenLieu = item.TenHienThi
-                    };
-                    await _context.STD_NXT_TOTAL_HRC2s.AddAsync(summary);
+                        Scope = scope,
+                        BieuMau = bieuMau,
+                        Id_HeaderKey = item.Id_HeaderKey,
+                        TenNguyenLieu = item.TenNguyenLieu,
+                        TyTrong = item.TyTrong,
+                        IDSilo = item.IDSilo,
+                        ViTri = 1
+                    });
                 }
-                await _context.SaveChangesAsync();
+            }
 
-                // Khởi tạo dữ liệu cho STD_NXT_Filter_Init
-                await GetHRC2FilterInitAsync(new InitXuatNhapTonHRC2Request
+            // -------------------------------------------------------
+            // MERGE STD_NXT_TOTAL_HRC2
+            // -------------------------------------------------------
+            var existingTotalKeys = await _context.STD_NXT_TOTAL_HRC2s
+                .Where(x => x.Id_Phieu == phieu.Idphieu)
+                .Select(x => x.Id_HeaderKey)
+                .ToListAsync();
+
+            var newTotalKeys = allHeaderKeyIds.Except(existingTotalKeys).ToList();
+            var removedTotalKeys = existingTotalKeys.Except(allHeaderKeyIds).ToList();
+
+            if (removedTotalKeys.Any())
+            {
+                var toRemove = await _context.STD_NXT_TOTAL_HRC2s
+                    .Where(x => x.Id_Phieu == phieu.Idphieu
+                             && removedTotalKeys.Contains(x.Id_HeaderKey))
+                    .ToListAsync();
+                _context.STD_NXT_TOTAL_HRC2s.RemoveRange(toRemove);
+            }
+
+            var allSourceItems = sourceByScope.Values
+                .SelectMany(x => x)
+                .GroupBy(x => x.Id_HeaderKey)
+                .Select(g => g.First())
+                .ToList();
+
+            foreach (var item in allSourceItems.Where(x => newTotalKeys.Contains(x.Id_HeaderKey)))
+            {
+                await _context.STD_NXT_TOTAL_HRC2s.AddAsync(new STD_NXT_TOTAL_HRC2
                 {
+                    Id_Phieu = phieu.Idphieu,
                     NgaySX = ngaySx,
                     Ca = ca,
-                    IdPhieu = phieu.Idphieu,
-                    HeaderKeys = listUsedNXT.Select(x => new IdHeaderKeyModel { Id_HeaderKey = x.Id }).ToList()
+                    Id_HeaderKey = item.Id_HeaderKey,
+                    TenNguyenLieu = item.TenNguyenLieu
                 });
             }
-            else
-            {
-                throw new Exception("Không có Header Key nào được sử dụng cho STD NXT");
-            }
-        }
 
+            await _context.SaveChangesAsync();
+
+            // -------------------------------------------------------
+            // Gọi SP: init TonDauCa + TonCuoiCa default
+            // -------------------------------------------------------
+            await GetHRC2FilterInitAsync(new InitXuatNhapTonHRC2Request
+            {
+                NgaySX = ngaySx,
+                Ca = ca,
+                IdPhieu = phieu.Idphieu,
+                HeaderKeys = allHeaderKeyIds
+                             .Select(id => new IdHeaderKeyModel { Id_HeaderKey = id })
+                             .ToList()
+            });
+        }
         private static DataTable ToHeaderKeyDataTable(List<IdHeaderKeyModel> data)
         {
             var table = new DataTable();
@@ -345,6 +541,18 @@ namespace dataproduct.api.Repositories
             }
             var details = await _context.STD_XUAT_NHAP_TON_HRC2s.Where(x => x.Id_Phieu == phieuId).ToListAsync();
             var summary = await _context.STD_NXT_TOTAL_HRC2s.Where(x => x.Id_Phieu == phieuId).ToListAsync();
+
+            var siloIds = details
+                .Where(x => x.IDSilo.HasValue)
+                .Select(x => x.IDSilo!.Value)
+                .Distinct()
+                .ToList();
+
+            var siloNameById = siloIds.Count > 0
+                ? await _context.Silos
+                    .Where(s => siloIds.Contains(s.Id))
+                    .ToDictionaryAsync(s => s.Id, s => s.TenSilo)
+                : new Dictionary<int, string>();
             return new STD_NXT_HRC2_GetDetailResponse
             {
                 Id_Phieu = phieuId,
@@ -357,6 +565,8 @@ namespace dataproduct.api.Repositories
                     Id_HeaderKey = x.Id_HeaderKey,
                     TenNguyenLieu = x.TenNguyenLieu,
                     ViTri = x.ViTri,
+                    IDSilo = x.IDSilo,
+                    TenSilo = x.IDSilo.HasValue && siloNameById.TryGetValue(x.IDSilo.Value, out var name) ? name : null,
                     TonDauCa = x.TonDauCa,
                     TuongQuanDauCa = x.TuongQuanDauCa,
                     NhapVaoTrongCa = x.NhapVaoTrongCa,
