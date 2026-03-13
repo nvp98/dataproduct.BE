@@ -1,6 +1,8 @@
 using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
 using dataproduct.api.Services;
+using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -140,6 +142,118 @@ namespace dataproduct.api.Controllers
                 );
 
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpGet("search-grouped")]
+        public async Task<IActionResult> SearchGrouped(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page = 1, int pageSize = 10)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100; // Giới hạn tối đa 100 records mỗi trang
+
+            try
+            {
+                var result = await _service.SearchGroupedWithPagingAsync(
+                    NgaySX,
+                    Ca,
+                    LoaiBM,
+                    Scope,
+                    searchText,
+                    page,
+                    pageSize
+                );
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        // Thống kê: trả về list Header_Key IsUsedThongKe + dữ liệu theo REPORT_NO
+        [HttpPost("search-thongke")]
+        public async Task<IActionResult> SearchThongKe([FromBody] SearchThongKe dto)
+        {
+            try
+            {
+                var paged = await _service.SearchGroupedWithPagingAsync(dto);
+
+                var first = paged.Data.FirstOrDefault();
+                var headers = first != null && first.phuLieuHeaderTables != null
+                    ? first.phuLieuHeaderTables
+                    : new List<PhuLieuHeaderTable>();
+
+                // Đơn giản hóa: mỗi dòng chỉ còn Data + Values (IDHeaderKey, KLPhuGia)
+                var rows = paged.Data
+                    .Where(x => x.dulieu != null)
+                    .Select(x =>
+                    {
+                        var detail = x.dulieu;
+                        var data = detail.data;
+                        var mappedByHeaderKey = (detail.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                            .Where(m => m.ID_HeaderKey.HasValue)
+                            .GroupBy(m => m.ID_HeaderKey!.Value)
+                            .ToDictionary(g => g.Key, g => g.First());
+
+                        var phanBoByHeaderKey = (detail.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                            .Where(m => m.ID_HeaderKey.HasValue)
+                            .GroupBy(m => m.ID_HeaderKey!.Value)
+                            .ToDictionary(g => g.Key, g => g.First());
+
+                        // Build values theo đúng danh sách headers (đảm bảo có cả phụ liệu thêm mới manual_col)
+                        var values = headers
+                            .Select(h =>
+                            {
+                                mappedByHeaderKey.TryGetValue(h.IDHeaderKey, out var mapped);
+                                phanBoByHeaderKey.TryGetValue(h.IDHeaderKey, out var phanBo);
+
+                                return new HRC2ThongKeValue
+                                {
+                                    IDHeaderKey = h.IDHeaderKey,
+                                    KLPhuGia = mapped?.KLPhuGiaTotal ?? mapped?.KLPhuGia,
+                                    KLPhuGia_Manual = phanBo?.KLPhuGia_Manual ?? mapped?.KLPhuGia_Manual,
+                                    IsManual = phanBo?.IsManual ?? mapped?.IsManual
+                                };
+                            })
+                            .ToList();
+
+                        return new HRC2ThongKeRow
+                        {
+                            Data = data,
+                            Values = values
+                        };
+                    })
+                    .ToList();
+
+                return Ok(new
+                {
+                    phuLieuHeaderTables = headers,
+                    data = rows,
+                    totalRecords = paged.TotalRecords,
+                    page = paged.Page,
+                    pageSize = paged.PageSize,
+                    totalPages = paged.TotalPages
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("export-thongke")]
+        public async Task<IActionResult> ExportThongKe([FromBody] SearchThongKe dto)
+        {
+            try
+            {
+                var file = await _service.ExportThongKeExcelAsync(dto);
+                return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex)
             {

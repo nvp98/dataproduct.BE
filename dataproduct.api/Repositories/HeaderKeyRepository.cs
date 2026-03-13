@@ -101,6 +101,7 @@ namespace dataproduct.api.Repositories
                 IsActive = h.IsActive,
                 NgayTao = h.NgayTao,
                 IsUsedNXT = h.IsUsedNXT,
+                IsUsedThongKe = h.IsUsedThongKe,
                 ThuTu = h.ThuTu.HasValue ? (int?)h.ThuTu.Value : null,
                 TyTrong = h.TyTrong.HasValue ? (decimal?)h.TyTrong.Value : null,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
@@ -137,6 +138,7 @@ namespace dataproduct.api.Repositories
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
@@ -163,11 +165,13 @@ namespace dataproduct.api.Repositories
                     NgayTao = hk != null ? hk.NgayTao : null,
                     NgayTaoPhuLieu = pl != null ? pl.NgayTao : null,
                     IsUsedNXT = hk != null ? hk.IsUsedNXT : null,
+                    IsUsedThongKe = hk != null ? hk.IsUsedThongKe : null,
                     ThuTu = hk != null && hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
                     TyTrong = hk != null && hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = m.ID_PhuLieu,
                     TenNguonDuLieu = m.TenNguonDuLieu,
-                    TenPhuLieu = pl != null ? pl.TenPhuLieu : null
+                    TenPhuLieu = pl != null ? pl.TenPhuLieu : null,
+                    LoaiThongKe = hk != null ? hk.LoaiThongKe : null
                 };
 
             // (2) HeaderKey chưa được móc nối
@@ -186,11 +190,13 @@ namespace dataproduct.api.Repositories
                     NgayTao = hk.NgayTao,
                     NgayTaoPhuLieu = null,
                     IsUsedNXT = hk.IsUsedNXT,
+                    IsUsedThongKe = hk != null ? hk.IsUsedThongKe : null,
                     ThuTu = hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
                     TyTrong = hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = null,
                     TenNguonDuLieu = null,
-                    TenPhuLieu = null
+                    TenPhuLieu = null,
+                    LoaiThongKe = hk != null ? hk.LoaiThongKe : null
                 };
 
             // (3) PhuLieu_NM chưa được móc nối
@@ -209,11 +215,13 @@ namespace dataproduct.api.Repositories
                     NgayTao = null,
                     NgayTaoPhuLieu = pl.NgayTao,
                     IsUsedNXT = null,
+                    IsUsedThongKe = null,
                     ThuTu = null,
                     TyTrong = null, // ⭐ Thêm field TyTrong để khớp với các query khác
                     ID_PhuLieu = pl.ID_PhuLieu,
                     TenNguonDuLieu = null,
-                    TenPhuLieu = pl.TenPhuLieu
+                    TenPhuLieu = pl.TenPhuLieu,
+                    LoaiThongKe = null
                 };
 
             // Union 3 tập dữ liệu thành 1 query
@@ -282,7 +290,18 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.IsUsedNXT != true);
                 }
             }
-
+            
+            if (IsUsedThongKe.HasValue)
+            {
+                if (IsUsedThongKe.Value)
+                {
+                    query = query.Where(x => x.IsUsedThongKe == true);
+                }
+                else
+                {
+                    query = query.Where(x => x.IsUsedThongKe != true);
+                }
+            }
             // Filter theo khoảng ngày (áp dụng trên "Ngày tạo hiệu lực": ưu tiên NgayTaoPhuLieu, fallback NgayTao)
             if (FromDate.HasValue)
             {

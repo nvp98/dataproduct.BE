@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
@@ -28,6 +28,11 @@ namespace dataproduct.api.Services
         {
             return await _repo.PhanBoAsync(entity);
         }
-       
+
+        public async Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity)
+        {
+            return await _repo.ThuHoiPhanBoAsync(entity);
+        }
+
     }
 }

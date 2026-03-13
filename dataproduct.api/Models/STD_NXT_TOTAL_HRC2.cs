@@ -38,5 +38,8 @@ public class STD_NXT_TOTAL_HRC2
     public decimal? ChenhLech { get; set; }
 
     public Guid Id_Phieu { get; set; }
+    public bool? HasPhanBo { get; set; }
+
+    
 }
 

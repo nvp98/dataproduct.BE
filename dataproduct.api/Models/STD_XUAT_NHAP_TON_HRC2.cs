@@ -51,5 +51,6 @@ public class STD_XUAT_NHAP_TON_HRC2
     public decimal? TongThucTe { get; set; }
 
     public Guid Id_Phieu { get; set; }
+    public int? IDSilo { get; set; }
 }
 
