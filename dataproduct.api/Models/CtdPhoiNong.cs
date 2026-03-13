@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.Models;
 
@@ -52,4 +53,7 @@ public partial class CtdPhoiNong
     public int? TinhTrangCTD { get; set; }
 
     public int? TinhTrangQLCL { get; set; }
+
+    [NotMapped]
+    public DateOnly? NgayDuc { get; set; }
 }

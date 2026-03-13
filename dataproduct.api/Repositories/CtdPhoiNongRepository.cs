@@ -32,7 +32,28 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrEmpty(Me))
                 query = query.Where(x => x.Me == Me);
 
-            return await query.ToListAsync();
+            var results = await query.ToListAsync();
+
+            var bkIds = results
+                .Where(x => x.IdBkPhoiThep.HasValue)
+                .Select(x => x.IdBkPhoiThep!.Value)
+                .Distinct()
+                .ToList();
+
+            if (bkIds.Count > 0)
+            {
+                var bkMap = await _context.BkPhoiThep
+                    .Where(x => bkIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id, x => x.NgaySx);
+
+                foreach (var item in results)
+                {
+                    if (item.IdBkPhoiThep.HasValue && bkMap.TryGetValue(item.IdBkPhoiThep.Value, out var ngayDuc))
+                        item.NgayDuc = ngayDuc;
+                }
+            }
+
+            return results;
         }
 
         public async Task<CtdPhoiNong?> GetByIdAsync(int id)

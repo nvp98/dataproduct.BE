@@ -398,7 +398,7 @@ namespace dataproduct.api.Services
             {
                 ws.Cell(currentRow, 1).Value = currentRow - 5;
                 ws.Cell(currentRow, 2).Value = t.NgaySx.ToString("dd/MM/yyyy");
-                ws.Cell(currentRow, 3).Value = t.Ca;
+                ws.Cell(currentRow, 3).Value = t.Ca + t.Kip;
                 ws.Cell(currentRow, 4).Value = t.Me;
                 ws.Cell(currentRow, 5).Value = t.Mac;
                 ws.Cell(currentRow, 6).Value = t.KichThuoc;
