@@ -59,29 +59,42 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Lấy danh sách MaBM cho menu: Việc tôi bắt đầu (XULY, CHOT) và Việc đến tôi (PHEDUYET).
-        /// QuyenChucNang null coi như XULY (1) để tương thích dữ liệu cũ.
+        /// Lấy danh sách MaBM cho menu:
+        /// - processing (Việc tôi bắt đầu): MaBM có QuyenChucNang = 1 (XULY) hoặc 4 (XULY_VA_PHEDUYET).
+        /// - approving (Việc đến tôi): MaBM có QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET), hợp với list từ BM_PheDuyet (phiếu có user là người duyệt).
+        /// MaBM có trong cả hai list thì FE hiển thị ở cả "Việc tôi bắt đầu" và "Việc đến tôi".
         /// </summary>
         public async Task<MenuPermissionsDto> GetMenuPermissionsAsync(int idTaiKhoan)
         {
             var data = (await _repo.GetByTaiKhoanIdAsync(idTaiKhoan)).ToList();
+
+            // Việc tôi bắt đầu: chỉ QuyenChucNang = 1 (XULY) hoặc 4 (XULY_VA_PHEDUYET)
             var processing = data
                 .Where(x =>
                 {
                     var q = x.QuyenChucNang;
-                    return q == null
-                        || q == (byte)QuyenChucNangEnum.XULY
-                        || q == (byte)QuyenChucNangEnum.CHOT
+                    return q == (byte)QuyenChucNangEnum.XULY
                         || q == (byte)QuyenChucNangEnum.XULY_VA_PHEDUYET;
                 })
-                .Select(x => x.MaBm)
+                .Select(x => x.MaBm != null ? x.MaBm.Trim() : null)
                 .Where(x => !string.IsNullOrEmpty(x))
                 .Distinct()
                 .ToList();
 
-            // Việc đến tôi: chỉ cần user nằm trong list phê duyệt của phiếu (BM_PheDuyet) và CapDuyet != 0
-            // Không phụ thuộc vào BM_QuyenXL.QuyenChucNang
-            var approving = await _context.BmPheDuyets
+            // Việc đến tôi: QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET) từ BM_QuyenXL, kết hợp với list từ BM_PheDuyet
+            var approvingFromQuyenXl = data
+                .Where(x =>
+                {
+                    var q = x.QuyenChucNang;
+                    return q == (byte)QuyenChucNangEnum.PHEDUYET
+                        || q == (byte)QuyenChucNangEnum.XULY_VA_PHEDUYET;
+                })
+                .Select(x => x.MaBm != null ? x.MaBm.Trim() : null)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct()
+                .ToList();
+
+            var approvingFromPheDuyet = await _context.BmPheDuyets
                 .Where(pd =>
                     pd.NguoiDuyetId == idTaiKhoan
                     && (pd.CapDuyet ?? 0) != 0
@@ -94,6 +107,12 @@ namespace dataproduct.api.Services
                 .Where(maBm => !string.IsNullOrEmpty(maBm))
                 .Distinct()
                 .ToListAsync();
+
+            var approving = approvingFromQuyenXl
+                .Union(approvingFromPheDuyet)
+                .Distinct()
+                .ToList();
+
             return new MenuPermissionsDto
             {
                 ProcessingForms = processing,
