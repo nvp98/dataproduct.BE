@@ -73,43 +73,59 @@ namespace dataproduct.api.Services
                 return "";
             }
         }
-
-        private async Task<string> FormatChuKyBase64Async(string? chuKy)
+        private async Task<string> FormatChuKyBase64Async(string? chuKy, bool daKy = false)
         {
+            // Nếu chưa có chữ ký
             if (string.IsNullOrWhiteSpace(chuKy))
-                return "";
-
-            // Nếu đã là base64 image (bắt đầu bằng data:image)
-            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
             {
-                return $"<img src=\"{chuKy}\" style=\"max-width: 150px; max-height: 80px;\" />";
+                // Nếu đã ký nhưng chưa có ảnh chữ ký
+                if (daKy)
+                {
+                    return @"
+                        <div style='text-align:center'>
+                            <div style='font-style:italic;color:red'>Đã ký</div>
+                            <div style='font-size:11px;color:red'>(Chưa cập nhật chữ ký)</div>
+                        </div>";
+                }
+
+                return "";
             }
 
-            // Nếu là URL (http/https) hoặc relative path
+            // Nếu đã là base64 image
+            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"<img src=\"{chuKy}\" style=\"max-width:150px;max-height:80px;\" />";
+            }
+
+            // Nếu là URL
             if (chuKy.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
                 var base64 = await ConvertImageUrlToBase64Async(chuKy);
                 if (!string.IsNullOrEmpty(base64))
                 {
-                    return $"<img src=\"{base64}\" style=\"max-width: 150px; max-height: 80px;\" />";
+                    return $"<img src=\"{base64}\" style=\"max-width:150px;max-height:80px;\" />";
                 }
             }
             else if (chuKy.StartsWith("/"))
             {
-                // Nếu là đường dẫn relative, ghép với domain
                 var domain = _configuration.GetValue<string>("AppSettings:Domain") ?? "https://report.hoaphatdungquat.vn";
                 var fullUrl = domain.TrimEnd('/') + chuKy;
+
                 var base64 = await ConvertImageUrlToBase64Async(fullUrl);
                 if (!string.IsNullOrEmpty(base64))
                 {
-                    return $"<img src=\"{base64}\" style=\"max-width: 150px; max-height: 80px;\" />";
+                    return $"<img src=\"{base64}\" style=\"max-width:150px;max-height:80px;\" />";
                 }
             }
 
-            // Nếu không phải là link/base64, trả về text gốc
-            return chuKy;
+            return @"
+                    <div style='text-align:center'>
+                        <div style='font-style:italic;color:red'>Đã ký</div>
+                        <div style='font-size:11px;color:red'>(Chưa cập nhật chữ ký)</div>
+                    </div>";
         }
         
+
         public async Task<List<SanLuongPhoiDto>> GetByKipNgayAsync( string ca, string kip,DateTime ngaySX)
         {
             return await _repo.GetSanLuongPhoiAsync(ca,kip, ngaySX);
@@ -255,9 +271,20 @@ namespace dataproduct.api.Services
             var bPhanNhan = khoPhoi.TenPhongBan;
 
 
-            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy);
-            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy);
-            var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy);
+            var signXuongDuc = await FormatChuKyBase64Async(
+                  xuongDuc?.ChuKy,
+                  xuongDuc?.TinhTrang == 1
+              );
+
+            var signQLCL = await FormatChuKyBase64Async(
+                qlcl?.ChuKy,
+                qlcl?.TinhTrang == 1
+            );
+
+            var signKhoPhoi = await FormatChuKyBase64Async(
+                khoPhoi?.ChuKy,
+                khoPhoi?.TinhTrang == 1
+            );
 
             html = html
                 // Header
@@ -625,9 +652,9 @@ namespace dataproduct.api.Services
             var chucVuNhan = khoPhoi.TenViTri;
             var bPhanNhan = khoPhoi.TenPhongBan;
 
-            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy);
-            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy);
-            var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy);
+            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy,xuongDuc?.TinhTrang == 1);
+            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy,qlcl?.TinhTrang == 1);
+            var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy, khoPhoi?.TinhTrang == 1);
 
             html = html
                 // Header
