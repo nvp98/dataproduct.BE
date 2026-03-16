@@ -22,6 +22,8 @@ namespace dataproduct.api.ResponseModels
         public int Id_HeaderKey { get; set; }
         public string? TenNguyenLieu { get; set; }
         public int? ViTri { get; set; }
+        public int? IDSilo { get; set; }
+        public string? TenSilo { get; set; }
         public decimal? TonDauCa { get; set; }
         public string? TuongQuanDauCa { get; set; }
         public decimal? NhapVaoTrongCa { get; set; }
@@ -43,6 +45,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? TongSuDung { get; set; }
         public decimal? TongSDTrenSoSach { get; set; }
         public decimal? ChenhLech { get; set; }
+        public bool? HasPhanBo { get; set; }
     }
 }
 

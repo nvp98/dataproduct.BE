@@ -38,17 +38,17 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
-        /// Lấy quyền xử lý theo ID
+        /// Lấy quyền menu theo tài khoản: Việc tôi bắt đầu (processingForms) và Việc đến tôi (approvingForms).
         /// </summary>
-        /// <param name="id">ID quyền xử lý</param>
-        /// <returns>Chi tiết quyền xử lý</returns>
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        [HttpGet("menu-permissions")]
+        public async Task<IActionResult> GetMenuPermissions([FromQuery] int idTaiKhoan)
         {
             try
             {
-                var result = await _service.GetByIdAsync(id);
-                return result == null ? NotFound() : Ok(result);
+                if (idTaiKhoan <= 0)
+                    return BadRequest("idTaiKhoan phải lớn hơn 0.");
+                var data = await _service.GetMenuPermissionsAsync(idTaiKhoan);
+                return Ok(data);
             }
             catch (Exception ex)
             {
@@ -59,9 +59,7 @@ namespace dataproduct.api.Controllers
         /// <summary>
         /// Lấy danh sách quyền theo ID tài khoản
         /// </summary>
-        /// <param name="idTaiKhoan">ID tài khoản</param>
-        /// <returns>Danh sách quyền của tài khoản</returns>
-        [HttpGet("tai-khoan/{idTaiKhoan}")]
+        [HttpGet("tai-khoan/{idTaiKhoan:int}")]
         public async Task<IActionResult> GetByTaiKhoanId(int idTaiKhoan)
         {
             try
@@ -76,15 +74,17 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
-        /// Lấy quyền menu theo tài khoản: Việc tôi bắt đầu (processingForms) và Việc đến tôi (approvingForms).
+        /// Lấy quyền xử lý theo ID
         /// </summary>
-        [HttpGet("menu-permissions")]
-        public async Task<IActionResult> GetMenuPermissions([FromQuery] int idTaiKhoan)
+        /// <param name="id">ID quyền xử lý</param>
+        /// <returns>Chi tiết quyền xử lý</returns>
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById(int id)
         {
             try
             {
-                var data = await _service.GetMenuPermissionsAsync(idTaiKhoan);
-                return Ok(data);
+                var result = await _service.GetByIdAsync(id);
+                return result == null ? NotFound() : Ok(result);
             }
             catch (Exception ex)
             {

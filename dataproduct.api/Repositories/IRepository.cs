@@ -68,6 +68,7 @@ namespace dataproduct.api.Repositories
         Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize);
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
         Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca);
+        Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto);
     }
     public interface IHeaderKeyRepository
     {
@@ -82,6 +83,7 @@ namespace dataproduct.api.Repositories
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
@@ -104,8 +106,10 @@ namespace dataproduct.api.Repositories
     {
         Task<STD_NXT_HRC2_UpsertResponse> UpsertAsync(STD_NXT_HRC2_UpsertDto entity);
         Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
+        Task GetHRC2FilterInitAsync(InitXuatNhapTonHRC2Request request);
         Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
     }

@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
@@ -158,7 +158,20 @@ namespace dataproduct.api.Repositories
 
         public async Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request)
         {
-            var query = _context.BmPhieus.Where(x => x.IsDelete != 1 && x.IsLock != 1).OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).AsQueryable();
+            var query = _context.BmPhieus
+                .Where(x => x.IsDelete != 1 && x.IsLock != 1)
+                // Nếu truyền NguoiDuyetId => chỉ lấy phiếu có user này trong ds phê duyệt
+                .Where(x => !request.NguoiDuyetId.HasValue || request.NguoiDuyetId.Value <= 0
+                    ? true
+                    : _context.BmPheDuyets.Any(pd =>
+                        pd.PhieuId == x.Idphieu &&
+                        pd.NguoiDuyetId == request.NguoiDuyetId.Value &&
+                        pd.CapDuyet != 0
+                    )
+                )
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.Ca)
+                .AsQueryable();
             if (request.TuNgay.HasValue)
             {
                 query = query.Where(x => x.NgaySX >= DateOnly.FromDateTime(request.TuNgay.Value));

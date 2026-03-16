@@ -16,6 +16,8 @@ public partial class Header_Key
     public decimal? ThuTu { get; set; }
     public bool? IsUsedNXT { get; set; }
     public decimal? TyTrong { get; set; }
+    public bool? IsUsedThongKe { get; set; }
+    public byte? LoaiThongKe { get; set; }
 }
 
 

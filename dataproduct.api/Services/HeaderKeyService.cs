@@ -52,6 +52,8 @@ namespace dataproduct.api.Services
             existing.IsActive = entity.IsActive;
             existing.ThuTu = entity.ThuTu;
             existing.IsUsedNXT = entity.IsUsedNXT;
+            existing.IsUsedThongKe = entity.IsUsedThongKe;
+            existing.LoaiThongKe = entity.LoaiThongKe;
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;
@@ -87,6 +89,7 @@ namespace dataproduct.api.Services
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
@@ -99,6 +102,7 @@ namespace dataproduct.api.Services
                 LoaiPhieu,
                 TrangThai,
                 IsUsedNXT,
+                IsUsedThongKe,
                 FromDate,
                 ToDate,
                 SortThuTu,

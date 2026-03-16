@@ -41,6 +41,34 @@ namespace dataproduct.api.ResponseModels
         public List<HeaderKeyGroupedByReportNoModel> phanBoPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>(); // Dữ liệu phân bổ (IsPhanBo = true)
     }
 
+    public class HRC2FilterThongKe
+    {
+        public List<PhuLieuHeaderTable> phuLieuHeaderTables { get; set; }
+        public HRC2GroupedByReportNoModel dulieu { get; set; }
+
+    }
+
+    // Đơn giản hóa dữ liệu thống kê: mỗi HeaderKey -> một giá trị KLPhuGia đã sum
+    public class HRC2ThongKeValue
+    {
+        public int IDHeaderKey { get; set; }
+        public double? KLPhuGia { get; set; }
+        public double? KLPhuGia_Manual { get; set; }
+        public bool? IsManual { get; set; }
+    }
+
+    public class HRC2ThongKeRow
+    {
+        public DLNM_HRC2_ResponseModels? Data { get; set; }
+        public List<HRC2ThongKeValue> Values { get; set; } = new List<HRC2ThongKeValue>();
+    }
+
+    public class PhuLieuHeaderTable
+    {
+        public int IDHeaderKey { get; set; }
+        public string TenPhuLieu { get; set; }
+        public byte LoaiThongKe { get; set; }
+    }
     public class FilterSTD_NXTResponse
     {
         public string? BieuMau { get; set; }
