@@ -205,6 +205,7 @@ namespace dataproduct.api.Services
             string chucVuNguoiLap = "";
             string chucVuNguoiCTD = "";
             string chucVuNguoiQLCL = "";
+            string KipLV = "";
 
             //var firstItem = data.FirstOrDefault();
             if (id != null)
@@ -214,6 +215,8 @@ namespace dataproduct.api.Services
 
                 if (phieu != null)
                 {
+
+                    KipLV = phieu.Kip ?? "";
                     // 1. Lấy danh sách phê duyệt + chữ ký (đã bao gồm thông tin đầy đủ)
                     var pheDuyets = await _pdservice.GetPheDuyetPhieuAsync(phieu.Idphieu);
 
@@ -249,6 +252,7 @@ namespace dataproduct.api.Services
                             chucVuNguoiQLCL = nguoiQLCL.TenViTri ?? "";
                         }
                     }
+
                 }
             }
 
@@ -285,6 +289,7 @@ namespace dataproduct.api.Services
                 </tr>");
             }
             var tongKLChung = data.Sum(x => x.TongKl);
+            var tongSTChung = data.Sum(x => x.SoThanhLoai1);
 
             // Tính toán thời gian ca kíp
             string tuGio = "", denGio = "", tuNgay = "", denNgay = "";
@@ -322,9 +327,11 @@ namespace dataproduct.api.Services
                 .Replace("{{LogoUrl}}", logoUrl)
                 .Replace("{{NgaySX}}", NgaySX?.ToString("dd/MM/yyyy") ?? "")
                 .Replace("{{Ca}}", Ca?.ToString() ?? "")
-                .Replace("{{Kip}}", Ca?.ToString() ?? "")
+                .Replace("{{Kip}}",KipLV?.ToString() ?? "")
                 .Replace("{{MayDuc}}", Xuong.ToString() ?? "")
                 .Replace("{{TongKhoiLuong}}", tongKLChung.ToString() ?? "")
+                .Replace("{{TongSTL1}}", tongSTChung.ToString() ?? "")
+                .Replace("{{TongKLL1}}", tongKLChung.ToString() ?? "")
                 .Replace("{{TuGio}}", tuGio)
                 .Replace("{{TuNgay}}", tuNgay)
                 .Replace("{{DenGio}}", denGio)

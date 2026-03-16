@@ -105,120 +105,152 @@
       .sign div {
         width: 30%;
       }
+        table.sign-table,
+        table.sign-table td {
+            border: none !important;
+            border-collapse: collapse;
+        }
     </style>
   </head>
   <body>
-    <!-- HEADER -->
-    <div class="header">
-      <div class="header-left">
-        <img src="{{LogoUrl}}" alt="Logo" /><br />
-        CÔNG TY CỔ PHẦN THÉP<br />
-        HÒA PHÁT DUNG QUẤT
+      <!-- HEADER -->
+      <div class="header">
+          <div class="header-left">
+              <img src="{{LogoUrl}}" alt="Logo" /><br />
+              CÔNG TY CỔ PHẦN THÉP<br />
+              HÒA PHÁT DUNG QUẤT
+          </div>
+          <div class="header-right">
+              BM.06/QT.05.11<br />
+              Ngày hiệu lực: 10/05/2025<br />
+              Lần sửa đổi: 01
+          </div>
       </div>
-      <div class="header-right">
-        BM.06/QT.05.11<br />
-        Ngày hiệu lực: 10/05/2025<br />
-        Lần sửa đổi: 01
+
+      <!-- TITLE -->
+      <div class="title">BIÊN BẢN</div>
+      <div class="title">GIAO NHẬN PHÔI NÓNG</div>
+
+      <!-- INFO -->
+      <div class="sub-title">
+          Kíp: {{Ca}}{{Kip}} &nbsp;&nbsp; ngày {{TuGio}}h {{TuNgay}} đến {{DenGio}}h ngày
+          {{DenNgay}}
       </div>
-    </div>
 
-    <!-- TITLE -->
-    <div class="title">BIÊN BẢN</div>
-    <div class="title">GIAO NHẬN PHÔI NÓNG</div>
+      <div class="info-line"><b>Máy đúc:</b> {{MayDuc}}</div>
 
-    <!-- INFO -->
-    <div class="sub-title">
-      Kíp: {{Kip}} &nbsp;&nbsp; từ {{TuGio}}h {{TuNgay}} đến {{DenGio}}h
-      {{DenNgay}}
-    </div>
+      <div class="info-line">Chúng tôi gồm:</div>
+      <div class="info-line">
+          1. Ông/bà: {{NguoiLapPhieu}} &nbsp;&nbsp; Chức vụ: {{ChucVuNguoiLap}}
+          &nbsp;&nbsp; BP: {{BPNguoiLap}}
+      </div>
+      <div class="info-line">
+          2. Ông/bà: {{NguoiNhanCTD}} &nbsp;&nbsp; Chức vụ: {{ChucVuCTD}}
+          &nbsp;&nbsp; BP: {{BPCTD}}
+      </div>
+      <div class="info-line">
+          3. Ông/bà: {{NguoiNhanQLCL}} &nbsp;&nbsp; Chức vụ: {{ChucVuQLCL}}
+          &nbsp;&nbsp; BP: {{BPQLCL}}
+      </div>
 
-    <div class="info-line"><b>Máy đúc:</b> {{MayDuc}}</div>
+      <div class="info-line">
+          Cùng nhau thống nhất lập "Biên bản giao nhận phôi nóng" chi tiết như sau:
+      </div>
 
-    <div class="info-line">Chúng tôi gồm:</div>
-    <div class="info-line">
-      1. Ông/bà: {{NguoiLapPhieu}} &nbsp;&nbsp; Chức vụ: {{ChucVuNguoiLap}}
-      &nbsp;&nbsp; BP: {{BPNguoiLap}}
-    </div>
-    <div class="info-line">
-      2. Ông/bà: {{NguoiNhanCTD}} &nbsp;&nbsp; Chức vụ: {{ChucVuCTD}}
-      &nbsp;&nbsp; BP: {{BPCTD}}
-    </div>
-    <div class="info-line">
-      3. Ông/bà: {{NguoiNhanQLCL}} &nbsp;&nbsp; Chức vụ: {{ChucVuQLCL}}
-      &nbsp;&nbsp; BP: {{BPQLCL}}
-    </div>
+      <!-- TABLE -->
+      <table>
+          <thead>
+              <tr>
+                  <th rowspan="2">STT</th>
+                  <th rowspan="2">Mẻ</th>
+                  <th rowspan="2">Mác</th>
+                  <th rowspan="2">Kích thước</th>
+                  <th colspan="2">Loại I</th>
+                  <th colspan="2">Loại II TPHH</th>
+                  <th colspan="2">Loại II BM</th>
+                  <th colspan="2">Loại III</th>
+                  <th rowspan="2">Tổng<br />khối lượng<br />(tấn)</th>
+              </tr>
+              <tr>
+                  <th>Số thanh</th>
+                  <th>Khối lượng<br />(tấn)</th>
+                  <th>Số thanh</th>
+                  <th>Khối lượng<br />(tấn)</th>
+                  <th>Số thanh</th>
+                  <th>Khối lượng<br />(tấn)</th>
+                  <th>Số thanh</th>
+                  <th>Khối lượng<br />(tấn)</th>
+              </tr>
+          </thead>
+          <tbody>
+              {{Rows}}
+          </tbody>
+          <tfoot>
+              <tr>
+                  <td colspan="2"></td>
+                  <td></td>
+                  <td></td>
+                  <td><b>{{TongSTL1}}</b></td>
+                  <td><b>{{TongKLL1}}</b></td>
+                  <td></td>
+                  <td>-</td>
+                  <td></td>
+                  <td>-</td>
+                  <td></td>
+                  <td>-</td>
+                  <td><b>{{TongKhoiLuong}}</b></td>
+              </tr>
+          </tfoot>
+      </table>
 
-    <div class="info-line">
-      Cùng nhau thống nhất lập "Biên bản giao nhận phôi nóng" chi tiết như sau:
-    </div>
+      <!-- NOTE -->
+      <div class="note">
+          <b>Lưu ý:</b><br />
+          - Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn nằm trên bàn con lăn
+          đều bàn giao ngay trong kíp, không để lẫn sang kíp sau.<br />
+          - Thời điểm xác nhận biên bản giao nhận phôi nóng ở hai thời điểm 8h00 và
+          20h00.<br />
+          - Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực tế.
+      </div>
 
-    <!-- TABLE -->
-    <table>
-      <thead>
-        <tr>
-          <th rowspan="2">STT</th>
-          <th rowspan="2">Mẻ</th>
-          <th rowspan="2">Mác</th>
-          <th rowspan="2">Kích thước</th>
-          <th colspan="2">Loại I</th>
-          <th colspan="2">Loại II TPHH</th>
-          <th colspan="2">Loại II BM</th>
-          <th colspan="2">Loại III</th>
-          <th rowspan="2">Tổng<br />khối lượng<br />(tấn)</th>
-        </tr>
-        <tr>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{Rows}}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="12"><b>Tổng</b></td>
-          <td><b>{{TongKhoiLuong}}</b></td>
-        </tr>
-      </tfoot>
-    </table>
+      <!-- SIGN -->
+      <table class="sign-table" style="width:100%; margin-top:20px; text-align:center;">
+          <tr>
+              <td style="width: 33%; font-weight: bold;">
+                  NM.CT DAI
+              </td>
+              <td style="width: 33%; font-weight: bold;">
+                  P.QLCL
+              </td>
+              <td style="width: 33%; font-weight: bold;">
+                  NM.HRC1
+              </td>
+          </tr>
 
-    <!-- NOTE -->
-    <div class="note">
-      <b>Lưu ý:</b><br />
-      - Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn nằm trên bàn con lăn
-      đều bàn giao ngay trong kíp, không để lẫn sang kíp sau.<br />
-      - Thời điểm xác nhận biên bản giao nhận phôi nóng ở hai thời điểm 8h00 và
-      20h00.<br />
-      - Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực tế.
-    </div>
+          <tr>
+              <td style="height:70px;">
+                  {{ChuKyNguoiNhanCTD}}
+              </td>
+              <td>
+                  {{ChuKyNguoiNhanQLCL}}
+              </td>
+              <td>
+                  {{ChuKyNguoiLap}}
+              </td>
+          </tr>
 
-    <!-- SIGN -->
-    <table
-      style="width: 100%; margin-top: 40px; text-align: center; border: none"
-    >
-      <tr>
-        <td style="width: 33%; border: none">
-          <b>NM.CT DAI</b><br /><br /><br />
-          {{ChuKyNguoiNhanCTD}} <br />
-          {{NguoiNhanCTD}}
-        </td>
-        <td style="width: 33%; border: none">
-          <b>P.QLCL</b><br /><br /><br />
-          {{ChuKyNguoiNhanQLCL}} <br />
-          {{NguoiNhanQLCL}}
-        </td>
-        <td style="width: 33%; border: none">
-          <b>NM.HRC1</b><br /><br /><br />
-          {{ChuKyNguoiLap}} <br />
-          {{NguoiLapPhieu}}
-        </td>
-      </tr>
-    </table>
+          <tr>
+              <td style="padding-top:5px; font-weight:normal;">
+                  {{NguoiNhanCTD}}
+              </td>
+              <td style="padding-top:5px; font-weight:normal;">
+                  {{NguoiNhanQLCL}}
+              </td>
+              <td style="padding-top:5px; font-weight:normal;">
+                  {{NguoiLapPhieu}}
+              </td>
+          </tr>
+      </table>
+
   </body>
 </html>
