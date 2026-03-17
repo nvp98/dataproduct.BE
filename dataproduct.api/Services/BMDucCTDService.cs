@@ -25,7 +25,7 @@ namespace dataproduct.api.Services
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IPhieuRepository _repoPhieu;
-        
+
 
         public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu)
         {
@@ -53,7 +53,7 @@ namespace dataproduct.api.Services
                 httpClient.Timeout = TimeSpan.FromSeconds(10);
                 var imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
                 var base64 = Convert.ToBase64String(imageBytes);
-                
+
                 // Xác định content type từ extension
                 var extension = Path.GetExtension(imageUrl).ToLower();
                 var mimeType = extension switch
@@ -124,17 +124,17 @@ namespace dataproduct.api.Services
                         <div style='font-size:11px;color:red'>(Chưa cập nhật chữ ký)</div>
                     </div>";
         }
-        
 
-        public async Task<List<SanLuongPhoiDto>> GetByKipNgayAsync( string ca, string kip,DateTime ngaySX)
+
+        public async Task<List<SanLuongPhoiDto>> GetByKipNgayAsync(string ca, string kip, DateTime ngaySX)
         {
-            return await _repo.GetSanLuongPhoiAsync(ca,kip, ngaySX);
+            return await _repo.GetSanLuongPhoiAsync(ca, kip, ngaySX);
         }
-        public async Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca,string kip,DateTime ngaySX, int mayduc)
+        public async Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
         {
-            return await _repo.GetPhoiNhapKhoAsync(ca, kip, ngaySX,mayduc);
+            return await _repo.GetPhoiNhapKhoAsync(ca, kip, ngaySX, mayduc);
         }
-        public async Task<ExportFileResult> ExportPdfSanLuongAsync( DateOnly? NgaySX,int? Ca, string? Kip, Guid? idPhieu,List<PheDuyetDto> pheDuyets)
+        public async Task<ExportFileResult> ExportPdfSanLuongAsync(DateOnly? NgaySX, int? Ca, string? Kip, Guid? idPhieu, List<PheDuyetDto> pheDuyets)
         {
             if (!NgaySX.HasValue || !Ca.HasValue || string.IsNullOrEmpty(Kip))
                 throw new ArgumentException("Thiếu tham số Ngày / Ca / Kíp");
@@ -189,9 +189,9 @@ namespace dataproduct.api.Services
             );
 
             var html = await File.ReadAllTextAsync(templatePath);
-            
 
-           
+
+
             var rows = new StringBuilder();
             int tongSoThanh = 0;
             decimal tongKhoiLuong = 0;
@@ -246,12 +246,12 @@ namespace dataproduct.api.Services
                     <td>{t.TongSoThanh}</td>
                     <td>{t.TongKhoiLuong:N0}</td>
                 </tr>");
-              }
+            }
 
             var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
-            
+
             // Convert logo và chữ ký sang base64
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
@@ -351,7 +351,7 @@ namespace dataproduct.api.Services
                     PaperSize = PaperKind.A4,
                     Orientation = Orientation.Landscape
                 },
-                        Objects =
+                Objects =
                 {
                 new ObjectSettings
                     {
@@ -521,7 +521,7 @@ namespace dataproduct.api.Services
             int mayDuc = (int)phieu.MayDuc;
             // Tính toán thời gian ca kíp
             string tuGio = "", denGio = "", tuNgay = "", denNgay = "";
-          
+
             if (request.NgaySX != default && request.Ca > 0)
             {
                 var ngayBatDau = DateOnly.FromDateTime(request.NgaySX);
@@ -602,7 +602,7 @@ namespace dataproduct.api.Services
 
                 tongStLoai3 += t.StLoai3 ?? 0;
                 tongKlLoai3 += t.KlLoai3 ?? 0;
-                stt += 1;  
+                stt += 1;
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
@@ -633,7 +633,7 @@ namespace dataproduct.api.Services
             var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
-       
+
 
             // Convert logo và chữ ký sang base64
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
@@ -652,8 +652,8 @@ namespace dataproduct.api.Services
             var chucVuNhan = khoPhoi.TenViTri;
             var bPhanNhan = khoPhoi.TenPhongBan;
 
-            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy,xuongDuc?.TinhTrang == 1);
-            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy,qlcl?.TinhTrang == 1);
+            var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy, xuongDuc?.TinhTrang == 1);
+            var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy, qlcl?.TinhTrang == 1);
             var signKhoPhoi = await FormatChuKyBase64Async(khoPhoi?.ChuKy, khoPhoi?.TinhTrang == 1);
 
             html = html
@@ -757,6 +757,33 @@ namespace dataproduct.api.Services
                 FileName = $"BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
                 ContentType = "application/pdf"
             };
+        }
+
+        public async Task<ExportFileResult> ExportPdfPhoiNhapKhoByPhieuAsync(Guid phieuId)
+        {
+            if (phieuId == Guid.Empty)
+                throw new ArgumentException("Thiếu IdPhiếu");
+
+            var phieu = await _repoPhieu.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+            phieu.Kip = "A"; // Mặc định kíp A nếu chưa có, vì kíp là bắt buộc để xuất
+            if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue || string.IsNullOrWhiteSpace(phieu.Kip))
+                throw new ArgumentException("Phiếu thiếu thông tin Ngày / Ca / Kíp");
+
+            var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(phieuId);
+
+            var request = new PhoiNhapKhoPdfDTOReq
+            {
+                IdPhieu = phieuId,
+                NgaySX = phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue),
+                Ca = phieu.Ca.Value,
+                Kip = phieu.Kip,
+                MayDuc = phieu.MayDuc ?? 0,
+                listNguoiPheDuyet = pheDuyets
+            };
+
+            return await ExportPdfPhoiNhapKhoAsync(request);
         }
         public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuAsync(DateOnly? fromDate, DateOnly? toDate)
         {
@@ -935,7 +962,7 @@ namespace dataproduct.api.Services
 
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
-           
+
             return stream.ToArray();
         }
 

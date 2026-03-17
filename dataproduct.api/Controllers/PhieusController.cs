@@ -132,6 +132,20 @@ namespace dataproduct.api.Controllers
             return Ok(new { success = true });
         }
 
+        [HttpGet("{id:guid}/export-pdf")]
+        public async Task<IActionResult> ExportPdf(Guid id)
+        {
+            var file = await _service.ExportPdfDynamicAsync(id);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpGet("export-excel-tonghop")]
+        public async Task<IActionResult> ExportExcelTongHop([FromQuery] string maBm, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate)
+        {
+            var file = await _service.ExportTongHopExcelDynamicAsync(maBm, fromDate, toDate);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
 
         [HttpPut("{id}/status-extended")]
         public async Task<IActionResult> UpdateStatusExtended(Guid id, [FromBody] UpdatePhieuStatusRequest request)

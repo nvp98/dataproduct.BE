@@ -50,6 +50,12 @@ builder.Services.Scan(scan => scan
     .AddClasses(c => c.Where(t => t.Name.EndsWith("Service")))
         .AsSelf()
         .WithScopedLifetime()
+    .AddClasses(c => c.Where(t => t.Name.EndsWith("Initializer")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime()
+    .AddClasses(c => c.Where(t => t.Name.EndsWith("Exporter")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime()
 );
 
 

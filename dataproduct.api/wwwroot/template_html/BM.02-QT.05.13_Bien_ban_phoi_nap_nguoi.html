@@ -121,15 +121,16 @@
         HÒA PHÁT DUNG QUẤT
       </div>
       <div class="header-right">
-        BM.06/QT.05.11<br />
-        Ngày hiệu lực: 10/05/2025<br />
-        Lần sửa đổi: 01
+        BM.02/QT.05.13<br />
+        Ngày hiệu lực: 15/08/2025<br />
+        Lần sửa đổi: 03
       </div>
     </div>
 
     <!-- TITLE -->
     <div class="title">BIÊN BẢN</div>
-    <div class="title">GIAO NHẬN PHÔI NÓNG</div>
+    <div class="title">GIAO NHẬN PHÔI NẠP NGUỘI</div>
+    <div class="title">Xưởng cán: {{XuongCan}}</div>
 
     <!-- INFO -->
     <div class="sub-title">
@@ -137,49 +138,31 @@
       ngày {{DenNgay}}
     </div>
 
-    <div class="info-line"><b>Máy đúc:</b> {{MayDuc}}</div>
-
     <div class="info-line">Chúng tôi gồm:</div>
     <div class="info-line">
-      1. Ông/bà: {{NguoiLapPhieu}} &nbsp;&nbsp; Chức vụ: {{ChucVuNguoiLap}}
-      &nbsp;&nbsp; BP: {{BPNguoiLap}}
+      1. Ông/bà: {{NguoiNhanHRC1}} &nbsp;&nbsp; Chức vụ: {{ChucVuNhanHRC1}}
+      &nbsp;&nbsp; BP: {{BPHRC1}}
     </div>
     <div class="info-line">
-      2. Ông/bà: {{NguoiNhanCTD}} &nbsp;&nbsp; Chức vụ: {{ChucVuCTD}}
-      &nbsp;&nbsp; BP: {{BPCTD}}
-    </div>
-    <div class="info-line">
-      3. Ông/bà: {{NguoiNhanQLCL}} &nbsp;&nbsp; Chức vụ: {{ChucVuQLCL}}
+      2. Ông/bà: {{NguoiNhanQLCL}} &nbsp;&nbsp; Chức vụ: {{ChucVuNhanQLCL}}
       &nbsp;&nbsp; BP: {{BPQLCL}}
     </div>
-
     <div class="info-line">
-      Cùng nhau thống nhất lập "Biên bản giao nhận phôi nóng" chi tiết như sau:
+      3. Ông/bà: {{NguoiNhanCTD}} &nbsp;&nbsp; Chức vụ: {{ChucVuNhanCTD}}
+      &nbsp;&nbsp; BP: {{BPCTD}}
     </div>
 
     <!-- TABLE -->
     <table>
       <thead>
         <tr>
-          <th rowspan="2">STT</th>
-          <th rowspan="2">Mẻ</th>
-          <th rowspan="2">Mác</th>
-          <th rowspan="2">Kích thước</th>
-          <th colspan="2">Loại I</th>
-          <th colspan="2">Loại II TPHH</th>
-          <th colspan="2">Loại II BM</th>
-          <th colspan="2">Loại III</th>
-          <th rowspan="2">Tổng<br />khối lượng<br />(tấn)</th>
-        </tr>
-        <tr>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
-          <th>Số thanh</th>
-          <th>Khối lượng<br />(tấn)</th>
+          <th>STT</th>
+          <th>Mẻ</th>
+          <th>Mác</th>
+          <th>Kích thước</th>
+          <th>Tổng số thanh</th>
+          <th>Tổng khối lượng</th>
+          <th>Ghi chú</th>
         </tr>
       </thead>
       <tbody>
@@ -190,27 +173,18 @@
           <td colspan="2" style="font-weight: bold">Tổng</td>
           <td></td>
           <td></td>
-          <td><b>{{TongSTL1}}</b></td>
-          <td><b>{{TongKLL1}}</b></td>
+          <td><b>{{TongST}}</b></td>
+          <td><b>{{TongKL}}</b></td>
           <td></td>
-          <td>-</td>
-          <td></td>
-          <td>-</td>
-          <td></td>
-          <td>-</td>
-          <td><b>{{TongKhoiLuong}}</b></td>
         </tr>
       </tfoot>
     </table>
 
     <!-- NOTE -->
     <div class="note">
-      <b>Lưu ý:</b><br />
-      - Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn nằm trên bàn con lăn
-      đều bàn giao ngay trong kíp, không để lẫn sang kíp sau.<br />
-      - Thời điểm xác nhận biên bản giao nhận phôi nóng ở hai thời điểm 8h00 và
-      20h00.<br />
-      - Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực tế.
+      <b>Ghi chú:</b><br />
+      - <br />
+      - <br />
     </div>
 
     <!-- SIGN -->
@@ -219,21 +193,21 @@
       style="width: 100%; margin-top: 20px; text-align: center"
     >
       <tr>
-        <td style="width: 33%; font-weight: bold">NM.CT DAI</td>
-        <td style="width: 33%; font-weight: bold">P.QLCL</td>
         <td style="width: 33%; font-weight: bold">NM.HRC1</td>
+        <td style="width: 33%; font-weight: bold">P.QLCL</td>
+        <td style="width: 33%; font-weight: bold">NM.CT DAI</td>
       </tr>
 
       <tr>
-        <td style="height: 70px">{{ChuKyNguoiNhanCTD}}</td>
+        <td style="height: 70px">{{ChuKyNguoiNhanHRC1}}</td>
         <td>{{ChuKyNguoiNhanQLCL}}</td>
-        <td>{{ChuKyNguoiLap}}</td>
+        <td>{{ChuKyNguoiNhanCTD}}</td>
       </tr>
 
       <tr>
-        <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanCTD}}</td>
+        <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanHRC1}}</td>
         <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanQLCL}}</td>
-        <td style="padding-top: 5px; font-weight: normal">{{NguoiLapPhieu}}</td>
+        <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanCTD}}</td>
       </tr>
     </table>
   </body>

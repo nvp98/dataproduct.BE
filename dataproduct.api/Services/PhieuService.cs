@@ -3,6 +3,8 @@ using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
+using dataproduct.api.Services.Exporters;
+using dataproduct.api.Services.Initializers;
 using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
@@ -18,6 +20,9 @@ namespace dataproduct.api.Business
         private readonly BmPheDuyetService _pheDuyetService;
         private readonly ProductFormContext _context;
         private readonly DLNMHRC2Service _dlnmHrc2Service;
+        private readonly IEnumerable<IPhieuJsonInitializer> _jsonInitializers;
+        private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
+        private readonly IEnumerable<IPhieuExcelExporter> _excelExporters;
 
         public PhieuService(
             IPhieuRepository repo,
@@ -25,7 +30,10 @@ namespace dataproduct.api.Business
             IBMPheDuyetRepository pheDuyetRepo,
             BmPheDuyetService pheDuyetService,
             ProductFormContext context,
-            DLNMHRC2Service dlnmHrc2Service)
+            DLNMHRC2Service dlnmHrc2Service,
+            IEnumerable<IPhieuJsonInitializer> jsonInitializers,
+            IEnumerable<IPhieuPdfExporter> pdfExporters,
+            IEnumerable<IPhieuExcelExporter> excelExporters)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
@@ -33,6 +41,34 @@ namespace dataproduct.api.Business
             _pheDuyetService = pheDuyetService;
             _context = context;
             _dlnmHrc2Service = dlnmHrc2Service;
+            _jsonInitializers = jsonInitializers;
+            _pdfExporters = pdfExporters;
+            _excelExporters = excelExporters;
+        }
+
+        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var exporter = _pdfExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export PDF cho biểu mẫu: {phieu.MaBm}");
+
+            return await exporter.ExportPdfAsync(phieuId);
+        }
+
+        public async Task<DTOs.Export.ExportFileResult> ExportTongHopExcelDynamicAsync(string? maBm, DateOnly? fromDate, DateOnly? toDate)
+        {
+            if (string.IsNullOrWhiteSpace(maBm))
+                throw new ArgumentException("Thiếu maBm");
+
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(maBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export Excel tổng hợp cho biểu mẫu: {maBm}");
+
+            return await exporter.ExportTongHopExcelAsync(fromDate, toDate);
         }
 
         public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
@@ -148,16 +184,19 @@ namespace dataproduct.api.Business
             };
         }
 
-        public async Task<BmPhieu> CreateAsync(JsonElement formData)
+        public async Task<BmPhieu?> CreateAsync(JsonElement formData)
         {
             await CheckDuplicateAsync(formData);
 
             try
             {
                 var phieu = await _repo.AddAsync(formData);
+
+                await RunJsonInitializersAsync(phieu);
+
                 return phieu;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return null;
             }
@@ -172,7 +211,7 @@ namespace dataproduct.api.Business
             if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return null;
 
             // save data khi them cho hrc2
-            string bm = formData.GetProperty("maBm").GetString();
+            string? bm = formData.GetProperty("maBm").GetString();
             if (bm == "HRC2_BB_NauLuyen_BOF" || bm == "HRC2_BB_NauLuyen_LF" || bm == "HRC2_BB_NauLuyen_RH")
             {
                 await _dlnmHrc2Service.SaveHRC2ManualFromPhieuFormAsync(formData);
@@ -207,6 +246,10 @@ namespace dataproduct.api.Business
 
             // 4. Gọi repository để lưu
             await _repo.UpdateAsync(existing);
+
+            // 4.1 Đồng bộ lại dữ liệu bảng chi tiết từ DataJson.
+            await RunJsonInitializersAsync(existing);
+
             // Cập nhật thông tin phê duyệt
             // Lưu thông tin phê duyệt
 
@@ -382,6 +425,8 @@ namespace dataproduct.api.Business
             if (status == 1)
             {
                 var allPheDuyet = await _pheDuyetRepo.GetByIdPhieuAsync(id);
+                if (allPheDuyet == null)
+                    return false;
                 var isCreatorZero = allPheDuyet.Where(x => x.CapDuyet == 0).FirstOrDefault();
                 if (isCreatorZero == null) return false;
                 isCreatorZero.TinhTrang = 1;
@@ -468,7 +513,7 @@ namespace dataproduct.api.Business
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await tran.RollbackAsync();
                 return false;
@@ -499,7 +544,7 @@ namespace dataproduct.api.Business
         }
         private async Task CheckDuplicateAsync(JsonElement formData)
         {
-            string maBM = formData.TryGetProperty("maBm", out var mBm)
+            string? maBM = formData.TryGetProperty("maBm", out var mBm)
                 ? mBm.GetString()
                 : null;
 
@@ -534,6 +579,21 @@ namespace dataproduct.api.Business
                 );
             }
         }
+
+        private async Task RunJsonInitializersAsync(BmPhieu? phieu)
+        {
+            if (phieu == null)
+                return;
+
+            foreach (var initializer in _jsonInitializers)
+            {
+                if (initializer.CanHandle(phieu.MaBm))
+                {
+                    await initializer.InitializeAsync(phieu);
+                }
+            }
+        }
+
     }
 }
 

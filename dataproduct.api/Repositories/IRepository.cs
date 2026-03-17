@@ -151,6 +151,15 @@ namespace dataproduct.api.Repositories
 
     }
     //  End NM CTD 
+
+    public interface ICtdPhoiNguoiRepository
+    {
+        Task<IEnumerable<CtdPhoiNguoi>> GetByPhieuIdAsync(Guid phieuId);
+        Task AddAsync(CtdPhoiNguoi entity);
+        Task AddListAsync(List<CtdPhoiNguoi> entities);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
+    }
+
     public interface IBmQuyenXlRepository
     {
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
