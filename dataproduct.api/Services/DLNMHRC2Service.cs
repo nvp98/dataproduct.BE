@@ -5,6 +5,7 @@ using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text.Json;
 
 namespace dataproduct.api.Services
@@ -50,10 +51,17 @@ namespace dataproduct.api.Services
                 return val.GetDouble();
 
             if (val.ValueKind == JsonValueKind.String &&
-                double.TryParse(val.GetString(), out var d))
+                double.TryParse(val.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
                 return d;
 
             return null;
+        }
+
+        private int? TryGetInt(JsonElement row, string key)
+        {
+            var d = TryGetDouble(row, key);
+            if (!d.HasValue) return null;
+            return (int)d.Value;
         }
 
         public async Task<(List<HRC2InsertModel> Models, HashSet<int> ManualColHeaderKeyIds)> BuildModelToInsert(JsonElement formData)
@@ -92,24 +100,45 @@ namespace dataproduct.api.Services
                 .SelectMany(g => dynamicRoot.GetProperty(g).EnumerateArray())
                 .ToList();
 
-            // Preload tất cả label cần thiết 1 lần — tránh query trong vòng lặp
-            var manualColIds = dynamicCols
-                .Select(col => col.GetProperty("dataIndex").GetString())
-                .Where(di => di.StartsWith("manual_col_"))
-                .Select(di => int.TryParse(di.Substring("manual_col_".Length), out var id) ? id : (int?)null)
-                .Where(id => id.HasValue)
-                .Select(id => id.Value)
-                .Distinct()
-                .ToList();
+            var table1 = formData.GetProperty("table1").EnumerateArray().ToList();
+
+            // -------------------------------------------------------
+            // Thu thập manual_col_* từ cả dynamic meta lẫn row payload
+            // (FE có thể không lưu meta manual_col_{id} do phân bổ vào json phiếu,
+            // nhưng vẫn gửi value trong row khi user sửa để BE lưu.)
+            // -------------------------------------------------------
+            var manualColIds = new HashSet<int>();
+
+            foreach (var col in dynamicCols)
+            {
+                var di = col.GetProperty("dataIndex").GetString();
+                if (di != null && di.StartsWith("manual_col_"))
+                {
+                    if (int.TryParse(di.Substring("manual_col_".Length), out var id))
+                        manualColIds.Add(id);
+                }
+            }
+
+            foreach (var row in table1)
+            {
+                foreach (var prop in row.EnumerateObject())
+                {
+                    var name = prop.Name;
+                    if (!name.StartsWith("manual_col_", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var suffix = name.Substring("manual_col_".Length);
+                    if (int.TryParse(suffix, out var id))
+                        manualColIds.Add(id);
+                }
+            }
+
             var manualColHeaderKeyIds = new HashSet<int>(manualColIds);
 
-            var headerKeyLabelMap = manualColIds.Any()
+            var headerKeyLabelMap = manualColIds.Count > 0
                 ? await _context.Header_Keys
                     .Where(k => manualColIds.Contains(k.Id))
                     .ToDictionaryAsync(k => k.Id, k => k.TenHienThi)
                 : new Dictionary<int, string>();
-
-            var table1 = formData.GetProperty("table1").EnumerateArray().ToList();
 
             foreach (var row in table1)
             {
@@ -167,6 +196,11 @@ namespace dataproduct.api.Services
                         KLGangLong = TryGetDouble(row, "klGangLong"),
                         KLThepPhe = TryGetDouble(row, "klThepPhe"),
                         KlThepLong = TryGetDouble(row, "klThepLong"),
+                        QueLayMau = TryGetInt(row, "queLayMau"),
+                        QueDoNhiet = TryGetInt(row, "queDoNhiet"),
+                        GhiChu = row.TryGetProperty("ghiChu", out var gcProp) && gcProp.ValueKind == JsonValueKind.String
+                            ? gcProp.GetString()
+                            : null,
                         IsNM = false,
                         IsChuyenCa = false,
                         hRC2_PhuLieus = phuLieus
@@ -187,6 +221,7 @@ namespace dataproduct.api.Services
             Dictionary<int, string> headerKeyLabelMap)
         {
             var result = new List<HRC2_PhuLieuInSertModel>();
+            var processedManualCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var col in dynamicCols)
             {
@@ -229,10 +264,12 @@ namespace dataproduct.api.Services
                         BieuMau = loaiBM,
                         ID_HeaderKey = headerKeyId,
                         TenHienThi = label,
-                        IsPhanBo = true,
+                        // manual_col_* là "điều chỉnh tay", KHÔNG phải "phân bổ"
+                        IsPhanBo = false,
                         IsManual = true,
                         KLPhuGia_Manual = currentNumeric
                     });
+                    processedManualCols.Add(dataIndex);
                     continue;
                 }
 
@@ -276,6 +313,40 @@ namespace dataproduct.api.Services
                     IsPhanBo = false,
                     IsManual = isManual,
                     KLPhuGia_Manual = klPhuGia_Manual
+                });
+            }
+
+            // -------------------------------------------------------
+            // Bổ sung manual_col_* từ row payload (kể cả khi FE không lưu meta trong table1DynamicColumns.adjust)
+            // -------------------------------------------------------
+            foreach (var prop in row.EnumerateObject())
+            {
+                var dataIndex = prop.Name;
+                if (!dataIndex.StartsWith("manual_col_", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (processedManualCols.Contains(dataIndex))
+                    continue;
+
+                var suffix = dataIndex.Substring("manual_col_".Length);
+                if (!int.TryParse(suffix, out var headerKeyIdParsed))
+                    continue;
+
+                var currentNumeric = TryConvertNumeric(prop.Value);
+                if (!currentNumeric.HasValue) continue;
+                if (!isNMRow && currentNumeric.Value == 0) continue;
+
+                headerKeyLabelMap.TryGetValue(headerKeyIdParsed, out var label);
+
+                result.Add(new HRC2_PhuLieuInSertModel
+                {
+                    MeThoi = meThoi,
+                    BieuMau = loaiBM,
+                    ID_HeaderKey = headerKeyIdParsed,
+                    TenHienThi = label,
+                    // manual_col_* là "điều chỉnh tay", KHÔNG phải "phân bổ"
+                    IsPhanBo = false,
+                    IsManual = true,
+                    KLPhuGia_Manual = currentNumeric
                 });
             }
 
@@ -352,6 +423,9 @@ namespace dataproduct.api.Services
                         KLGangLong = model.KLGangLong,
                         KLThepPhe = model.KLThepPhe,
                         KLThepLong = model.KlThepLong,
+                        QueLayMau = model.QueLayMau,
+                        QueDoNhiet = model.QueDoNhiet,
+                        GhiChu = model.GhiChu,
                         IsNM = false,
                         IsChuyenCa = model.IsChuyenCa,
                         IsTrungMeThoi = isTrung,
@@ -371,6 +445,9 @@ namespace dataproduct.api.Services
                     existing.KLGangLong = model.KLGangLong;
                     existing.KLThepPhe = model.KLThepPhe;
                     existing.KLThepLong = model.KlThepLong;
+                    existing.QueLayMau = model.QueLayMau;
+                    existing.QueDoNhiet = model.QueDoNhiet;
+                    existing.GhiChu = model.GhiChu;
                     existing.IsChuyenCa = model.IsChuyenCa;
                     existing.NgaySx = model.Ngay;
                     existing.IsTrungMeThoi = isTrung;
@@ -397,15 +474,56 @@ namespace dataproduct.api.Services
 
                 foreach (var pl in model.hRC2_PhuLieus)
                 {
-                    var existing = existingPL.FirstOrDefault(x =>
+                    // manual_col_* (điều chỉnh tay)
+                    var isManualAdjustRow =
+                        (pl.IsManual == true) &&
+                        (pl.IsPhanBo != true) &&
+                        pl.ID_HeaderKey.HasValue &&
+                        !pl.ID_PhuLieu.HasValue;
+
+                    // Với điều chỉnh tay: match theo (ID_MeThoi, ID_HeaderKey, ID_PhuLieu=null, IsManual=true), bỏ qua IsPhanBo
+                    // để tránh duplicate và migrate các bản ghi cũ (từng lưu sai IsPhanBo=true) về IsPhanBo=false.
+                    PhuLieu_HRC2? existing = null;
+                    if (isManualAdjustRow)
+                    {
+                        existing = existingPL
+                            .Where(x =>
+                                x.ID_MeThoi == dlnm.ID &&
+                                x.ID_HeaderKey == pl.ID_HeaderKey &&
+                                x.ID_PhuLieu == null &&
+                                x.IsManual == true)
+                            .OrderBy(x => x.IsPhanBo == true ? 1 : 0)
+                            .FirstOrDefault();
+                    }
+
+                    existing ??= existingPL.FirstOrDefault(x =>
                         x.ID_MeThoi == dlnm.ID &&
                         x.ID_HeaderKey == pl.ID_HeaderKey &&
                         x.ID_PhuLieu == pl.ID_PhuLieu &&
                         x.IsPhanBo == (pl.IsPhanBo ?? false));
 
-                    // IsNM=true + không phải phanbo → skip
-                    if (existing == null && dlnm.IsNM == true && !(pl.IsPhanBo ?? false))
-                        continue;
+                    // Fallback cho NM row: sp_Sync_HRC2_FromNM có thể tạo record không có ID_HeaderKey.
+                    // Thử tìm theo ID_PhuLieu (bỏ qua ID_HeaderKey), sau đó backfill ID_HeaderKey.
+                    // Hạn chế cho dòng NM gốc: nếu là phụ liệu tự động (IsManual!=true, IsPhanBo=false) và chưa có record,
+                    // thì KHÔNG tạo mới mà bỏ qua (chỉ dùng record do stored procedure sync).
+                    if (existing == null &&
+                        dlnm.IsNM == true &&
+                        !(pl.IsPhanBo ?? false) &&
+                        pl.IsManual != true)
+                    {
+                        if (pl.ID_PhuLieu.HasValue)
+                        {
+                            existing = existingPL.FirstOrDefault(x =>
+                                x.ID_MeThoi == dlnm.ID &&
+                                x.ID_PhuLieu == pl.ID_PhuLieu &&
+                                x.IsPhanBo == false);
+                            // Backfill ID_HeaderKey nếu chưa được set bởi stored procedure
+                            if (existing != null && existing.ID_HeaderKey == null && pl.ID_HeaderKey.HasValue)
+                                existing.ID_HeaderKey = pl.ID_HeaderKey;
+                        }
+                        // Nếu vẫn không tìm được → không có record gốc từ NM → bỏ qua
+                        if (existing == null) continue;
+                    }
 
                     if (existing == null)
                     {
@@ -428,6 +546,11 @@ namespace dataproduct.api.Services
                     else
                     {
                         existing.KLPhuGia = pl.KLPhuGia;
+                        existing.IsPhanBo = pl.IsPhanBo ?? false;
+                        if (pl.ID_HeaderKey.HasValue)
+                            existing.ID_HeaderKey = pl.ID_HeaderKey;
+                        if (!string.IsNullOrWhiteSpace(pl.TenHienThi))
+                            existing.TenHienThi = pl.TenHienThi;
 
                         if (pl.IsManual == true)
                         {
@@ -454,7 +577,8 @@ namespace dataproduct.api.Services
             var toDelete = await _context.PhuLieu_HRC2s
                 .Where(x =>
                     dlnmIds.Contains(x.ID_MeThoi) &&
-                    x.IsPhanBo == true &&
+                    // manual_col_* là "điều chỉnh tay" => IsPhanBo = false
+                    x.IsPhanBo == false &&
                     x.IsManual == true &&
                     x.ID_HeaderKey.HasValue &&
                     !allowed.Contains(x.ID_HeaderKey.Value))
@@ -619,19 +743,14 @@ namespace dataproduct.api.Services
             };
         }
 
-        public async Task<PagedResult<HRC2FilterThongKe>> SearchGroupedWithPagingAsync(
-            SearchThongKe dto
-        )
+        public async Task<SearchThongKeApiResponse> SearchThongKeAsync(SearchThongKe dto)
         {
-            var (data, totalCount) = await _repo.SearchThongKeAsync(dto);
+            return await _repo.SearchThongKeApiAsync(dto);
+        }
 
-            return new PagedResult<HRC2FilterThongKe>
-            {
-                Data = data.ToList(),
-                TotalRecords = totalCount,
-                Page = dto.Page ?? 0,
-                PageSize = dto.PageSize ?? 0
-            };
+        public async Task<List<ThongKeSumItem>> GetThongKeSumAsync(SearchThongKe dto)
+        {
+            return await _repo.GetThongKeSumAsync(dto);
         }
 
         public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
@@ -641,6 +760,8 @@ namespace dataproduct.api.Services
 
         public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
         {
+            // Sync dữ liệu HRC2 mới nhất từ NM về DB hiện tại trước khi group/sum
+            await _hrc2NMSyncService.SyncFromNmStoredProcAsync();
             var result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
             if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
             {
@@ -675,13 +796,12 @@ namespace dataproduct.api.Services
             dto.Page = null;
             dto.PageSize = null;
 
-            var (rows, _) = await _repo.SearchThongKeAsync(dto);
-            var list = rows.ToList();
+            var result = await SearchThongKeAsync(dto);
 
-            if (!list.Any())
+            if (!result.Data.Any())
                 throw new InvalidOperationException("Không có dữ liệu phù hợp với điều kiện lọc để xuất Excel.");
 
-            var headers = list.First().phuLieuHeaderTables ?? new List<PhuLieuHeaderTable>();
+            var headers = result.PhuLieuHeaderTables;
 
             var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
             var templateFileName = loaiBmKey == "BOF" ? "PKH_BOF.xlsx" : "PKH_LFRH.xlsx";
@@ -756,15 +876,22 @@ namespace dataproduct.api.Services
 
             // Sau các phụ liệu, bổ sung các cột cố định tùy theo loại BM
             int extraStartCol = headerStartCol + headers.Count;
+            int? fuelStartCol = null;
+            int? noteCol = null;
+            int? scrapCol = null;
+            int? gasCol = null;
+            int? queLayMauCol = null;
+            int? queDoNhietCol = null;
+            int? noteColLfRh = null;
 
             if (loaiBmKey == "BOF")
             {
                 // Hình 2: Nhiên liệu (m3) / Oxy / Nitơ / Ghi chú / KL thép phế trong thùng gang (tấn)
-                int fuelStartCol = extraStartCol;
+                fuelStartCol = extraStartCol;
 
                 // Dòng 6: merge 2 cột cho "Nhiên liệu (m3)"
-                ws.Range(6, fuelStartCol, 6, fuelStartCol + 1).Merge();
-                var fuelHeader = ws.Range(6, fuelStartCol, 6, fuelStartCol + 1);
+                ws.Range(6, fuelStartCol.Value, 6, fuelStartCol.Value + 1).Merge();
+                var fuelHeader = ws.Range(6, fuelStartCol.Value, 6, fuelStartCol.Value + 1);
                 fuelHeader.Merge();
                 fuelHeader.Value = "Nhiên liệu (m³)";
                 fuelHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -773,13 +900,13 @@ namespace dataproduct.api.Services
                 fuelHeader.Style.Font.Bold = true;
 
                 // Dòng 7: "Oxy" và "Nitơ"
-                ws.Cell(7, fuelStartCol).Value = "Oxy";
-                ws.Cell(7, fuelStartCol + 1).Value = "Nitơ";
+                ws.Cell(7, fuelStartCol.Value).Value = "Oxy";
+                ws.Cell(7, fuelStartCol.Value + 1).Value = "Nitơ";
 
                 // "Ghi chú" – merge 2 dòng 6-7
-                int noteCol = fuelStartCol + 2;
-                ws.Range(6, noteCol, 7, noteCol).Merge();
-                var noteHeader = ws.Range(6, noteCol, 7, noteCol);
+                noteCol = fuelStartCol.Value + 2;
+                ws.Range(6, noteCol.Value, 7, noteCol.Value).Merge();
+                var noteHeader = ws.Range(6, noteCol.Value, 7, noteCol.Value);
                 noteHeader.Merge();
                 noteHeader.Value = "Ghi chú";
                 noteHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -788,8 +915,8 @@ namespace dataproduct.api.Services
                 noteHeader.Style.Font.Bold = true;
 
                 // "KL thép phế trong thùng gang (tấn)" – merge 2 dòng 6-7
-                int scrapCol = fuelStartCol + 3;
-                var scrapHeader = ws.Range(6, scrapCol, 7, scrapCol);
+                scrapCol = fuelStartCol.Value + 3;
+                var scrapHeader = ws.Range(6, scrapCol.Value, 7, scrapCol.Value);
                 scrapHeader.Merge();
                 scrapHeader.Value = "KL thép phế trong thùng gang (tấn)";
                 scrapHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -800,19 +927,19 @@ namespace dataproduct.api.Services
             else
             {
                 // LF/RH – tương tự hình 1
-                int gasCol = extraStartCol;
+                gasCol = extraStartCol;
 
                 // Cột "Khí" (dòng 6) + "Argon (m3)" (dòng 7)
-                ws.Cell(6, gasCol).Value = "Khí";
-                ws.Cell(7, gasCol).Value = "Argon (m³)";
-                ws.Range(6, gasCol, 7, gasCol).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                ws.Range(6, gasCol, 7, gasCol).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                ws.Range(6, gasCol, 7, gasCol).Style.Alignment.WrapText = true;
-                ws.Range(6, gasCol, 7, gasCol).Style.Font.Bold = true;
+                ws.Cell(6, gasCol.Value).Value = "Khí";
+                ws.Cell(7, gasCol.Value).Value = "Argon (m³)";
+                ws.Range(6, gasCol.Value, 7, gasCol.Value).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Range(6, gasCol.Value, 7, gasCol.Value).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                ws.Range(6, gasCol.Value, 7, gasCol.Value).Style.Alignment.WrapText = true;
+                ws.Range(6, gasCol.Value, 7, gasCol.Value).Style.Font.Bold = true;
 
                 // "Que lấy mẫu (Cái)" – merge 2 dòng 6-7
-                int queLayMauCol = gasCol + 1;
-                var queLayMauHeader = ws.Range(6, queLayMauCol, 7, queLayMauCol);
+                queLayMauCol = gasCol.Value + 1;
+                var queLayMauHeader = ws.Range(6, queLayMauCol.Value, 7, queLayMauCol.Value);
                 queLayMauHeader.Merge();
                 queLayMauHeader.Value = "Que lấy mẫu (Cái)";
                 queLayMauHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -821,8 +948,8 @@ namespace dataproduct.api.Services
                 queLayMauHeader.Style.Font.Bold = true;
 
                 // "Que đo nhiệt (Cái)" – merge 2 dòng 6-7
-                int queDoNhietCol = gasCol + 2;
-                var queDoNhietHeader = ws.Range(6, queDoNhietCol, 7, queDoNhietCol);
+                queDoNhietCol = gasCol.Value + 2;
+                var queDoNhietHeader = ws.Range(6, queDoNhietCol.Value, 7, queDoNhietCol.Value);
                 queDoNhietHeader.Merge();
                 queDoNhietHeader.Value = "Que đo nhiệt (Cái)";
                 queDoNhietHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -831,8 +958,8 @@ namespace dataproduct.api.Services
                 queDoNhietHeader.Style.Font.Bold = true;
 
                 // "Ghi chú" – merge 2 dòng 6-7
-                int noteColLfRh = gasCol + 3;
-                var noteLfRhHeader = ws.Range(6, noteColLfRh, 7, noteColLfRh);
+                noteColLfRh = gasCol.Value + 3;
+                var noteLfRhHeader = ws.Range(6, noteColLfRh.Value, 7, noteColLfRh.Value);
                 noteLfRhHeader.Merge();
                 noteLfRhHeader.Value = "Ghi chú";
                 noteLfRhHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -844,9 +971,9 @@ namespace dataproduct.api.Services
             int startRow = 8;
             int currentRow = startRow;
 
-            foreach (var item in list)
+            foreach (var row in result.Data)
             {
-                var d = item.dulieu?.data;
+                var d = row.Data;
                 if (d == null) continue;
 
                 ws.Cell(currentRow, 1).Value = currentRow - startRow + 1;
@@ -856,14 +983,12 @@ namespace dataproduct.api.Services
                 ws.Cell(currentRow, 4).Value = d.KLGangLongCCT;
                 ws.Cell(currentRow, 5).Value = d.KLThepPhe;
 
-                var valueByHeaderKeyId = (item.dulieu?.mappedPhulieus ?? Enumerable.Empty<HeaderKeyGroupedByReportNoModel>())
-                    .Where(x => x.ID_HeaderKey.HasValue)
-                    .ToDictionary(
-                        x => x.ID_HeaderKey!.Value,
-                        x => x.KLPhuGiaTotal ?? x.KLPhuGia ?? 0
-                    );
+                // Values đã được align theo thứ tự headers từ SearchThongKeApiAsync
+                var valueByHeaderKeyId = row.Values
+                    .Where(v => v.TotalKLPhuGia.HasValue)
+                    .ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia!.Value);
 
-                int colIndex = 6;
+                int colIndex = headerStartCol;
 
                 foreach (var h in headers)
                 {
@@ -871,6 +996,60 @@ namespace dataproduct.api.Services
                         ws.Cell(currentRow, colIndex).Value = value;
 
                     colIndex++;
+                }
+
+                // ===== set value cho các cột extra sau vùng phụ liệu =====
+                if (loaiBmKey == "BOF")
+                {
+                    // Nhiên liệu: Oxy / Nitơ
+                    if (fuelStartCol.HasValue)
+                    {
+                        if (d.O2.HasValue) ws.Cell(currentRow, fuelStartCol.Value).Value = d.O2.Value;
+                        if (d.N2.HasValue) ws.Cell(currentRow, fuelStartCol.Value + 1).Value = d.N2.Value;
+                    }
+
+                    // Ghi chú: hiện chưa có field → để trống
+                    if (noteCol.HasValue)
+                    {
+                        // ws.Cell(currentRow, noteCol.Value).Value = d.GhiChu; // nếu sau này có field
+                    }
+
+                    // KL thép phế trong thùng gang (tấn)
+                    if (scrapCol.HasValue && d.KLThepPhe.HasValue)
+                    {
+                        ws.Cell(currentRow, scrapCol.Value).Value = d.KLThepPhe.Value;
+                    }
+                }
+                else
+                {
+                    // Khí Argon (m3): LF dùng AR_LF, RH dùng AR_RH
+                    if (gasCol.HasValue)
+                    {
+                        var ar = loaiBmKey == "LF" ? d.AR_LF : d.AR_RH;
+                        if (ar.HasValue) ws.Cell(currentRow, gasCol.Value).Value = ar.Value;
+                    }
+
+                    // Que lấy mẫu / Que đo nhiệt / Ghi chú: map theo model nếu có field tương ứng
+                    // Ví dụ: nếu sau này DLNM_HRC2/DLNM_HRC2_ResponseModels có:
+                    //   public double? QueLayMau { get; set; }
+                    //   public double? QueDoNhiet { get; set; }
+                    //   public string? GhiChu { get; set; }
+                    // thì các dòng dưới sẽ tự ghi giá trị, còn hiện tại field chưa có nên Excel để trống.
+                    //
+                    if (queLayMauCol.HasValue && d.QueLayMau.HasValue)
+                    {
+                        ws.Cell(currentRow, queLayMauCol.Value).Value = d.QueLayMau.Value;
+                    }
+
+                    if (queDoNhietCol.HasValue && d.QueDoNhiet.HasValue)
+                    {
+                        ws.Cell(currentRow, queDoNhietCol.Value).Value = d.QueDoNhiet.Value;
+                    }
+
+                    if (noteColLfRh.HasValue && !string.IsNullOrWhiteSpace(d.GhiChu))
+                    {
+                        ws.Cell(currentRow, noteColLfRh.Value).Value = d.GhiChu;
+                    }
                 }
 
                 // tăng chiều cao dòng dữ liệu cho dễ đọc
@@ -895,7 +1074,7 @@ namespace dataproduct.api.Services
             ws.Cell(totalRow, 4).FormulaA1 = $"SUM(D{startRow}:D{lastDataRow})";
             ws.Cell(totalRow, 5).FormulaA1 = $"SUM(E{startRow}:E{lastDataRow})";
 
-            int col = 6;
+            int col = headerStartCol;
 
             foreach (var h in headers)
             {
@@ -907,73 +1086,73 @@ namespace dataproduct.api.Services
             currentRow += 2;
 
             // ===== HEADER FOOTER =====
-            ws.Range(currentRow, 16, currentRow, 19).Merge();
-            ws.Range(currentRow, 20, currentRow, 23).Merge();
-            ws.Range(currentRow, 24, currentRow, 27).Merge();
+            // ws.Range(currentRow, 16, currentRow, 19).Merge();
+            // ws.Range(currentRow, 20, currentRow, 23).Merge();
+            // ws.Range(currentRow, 24, currentRow, 27).Merge();
 
-            ws.Cell(currentRow, 16).Value = "Tồn đầu kíp";
-            ws.Cell(currentRow, 20).Value = "Nhập trong kíp";
-            ws.Cell(currentRow, 24).Value = "Tồn cuối kíp";
+            // ws.Cell(currentRow, 16).Value = "Tồn đầu kíp";
+            // ws.Cell(currentRow, 20).Value = "Nhập trong kíp";
+            // ws.Cell(currentRow, 24).Value = "Tồn cuối kíp";
 
-            ws.Row(currentRow).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            ws.Row(currentRow).Style.Font.Bold = true;
+            // ws.Row(currentRow).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            // ws.Row(currentRow).Style.Font.Bold = true;
 
-            List<string> materials;
+            // List<string> materials;
 
-            if (loaiBmKey.Contains("BOF"))
-            {
-                materials = new List<string>
-                {
-                    "Lượng Vôi",
-                    "Lượng Dolomite",
-                    "Lượng Quặng",
-                    "Lượng FeSi",
-                    "Lượng SiMn",
-                    "Lượng FeMn",
-                    "Lượng Than",
-                    "Lượng AL",
-                    "FeCrHC",
-                    "Lượng Chất tăng cacbon",
-                    "Lượng HC-FeMn75",
-                    "Nguyên liệu khác: Coke",
-                    "FeP",
-                    "Lượng FeCr LC",
-                    "Bauxite",
-                    "LDSF",
-                    "Chất cải tính xỉ"
-                };
-            }
-            else
-            {
-                materials = new List<string>
-                {
-                    "Tồn trên silo",
-                    "Lượng SiMn (kg)",
-                    "Lượng FeSi (kg)",
-                    "Lượng vôi (kg)",
-                    "Lượng than (kg)",
-                    "Lượng FeMn (kg)",
-                    "Lượng Huỳnh thạch (kg)",
-                    "Lượng Nhôm (kg)",
-                    "Khác"
-                };
-            }
+            // if (loaiBmKey.Contains("BOF"))
+            // {
+            //     materials = new List<string>
+            //     {
+            //         "Lượng Vôi",
+            //         "Lượng Dolomite",
+            //         "Lượng Quặng",
+            //         "Lượng FeSi",
+            //         "Lượng SiMn",
+            //         "Lượng FeMn",
+            //         "Lượng Than",
+            //         "Lượng AL",
+            //         "FeCrHC",
+            //         "Lượng Chất tăng cacbon",
+            //         "Lượng HC-FeMn75",
+            //         "Nguyên liệu khác: Coke",
+            //         "FeP",
+            //         "Lượng FeCr LC",
+            //         "Bauxite",
+            //         "LDSF",
+            //         "Chất cải tính xỉ"
+            //     };
+            // }
+            // else
+            // {
+            //     materials = new List<string>
+            //     {
+            //         "Tồn trên silo",
+            //         "Lượng SiMn (kg)",
+            //         "Lượng FeSi (kg)",
+            //         "Lượng vôi (kg)",
+            //         "Lượng than (kg)",
+            //         "Lượng FeMn (kg)",
+            //         "Lượng Huỳnh thạch (kg)",
+            //         "Lượng Nhôm (kg)",
+            //         "Khác"
+            //     };
+            // }
 
-            int r = currentRow + 1;
+            // int r = currentRow + 1;
 
-            foreach (var m in materials)
-            {
-                ws.Range(r, 1, r, 15).Merge();
-                ws.Cell(r, 1).Value = m;
+            // foreach (var m in materials)
+            // {
+            //     ws.Range(r, 1, r, 15).Merge();
+            //     ws.Cell(r, 1).Value = m;
 
-                ws.Range(r, 16, r, 19).Merge();
-                ws.Range(r, 20, r, 23).Merge();
-                ws.Range(r, 24, r, 27).Merge();
+            //     ws.Range(r, 16, r, 19).Merge();
+            //     ws.Range(r, 20, r, 23).Merge();
+            //     ws.Range(r, 24, r, 27).Merge();
 
-                r++;
-            }
+            //     r++;
+            // }
 
-            int lastFooterRow = r - 1;
+            int lastFooterRow =currentRow;
 
             // ===== BORDER TOÀN BỘ =====
 

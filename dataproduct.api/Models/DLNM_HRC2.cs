@@ -15,7 +15,6 @@ public partial class DLNM_HRC2
     public int? Scope { get; set; }
     public string? MeThoi { get; set; }
     public string? MacThep { get; set; }
-
     public double? O2 { get; set; }
     public double? AR_RH { get; set; }
     public double? N2 { get; set; }
@@ -24,6 +23,9 @@ public partial class DLNM_HRC2
     public double? KLGangLong { get; set; }
     public double? KLThepPhe { get; set; }
     public double? KLThepLong { get; set; }
+    public int? QueLayMau { get; set; }
+    public int? QueDoNhiet { get; set; }
+    public string? GhiChu { get; set; }
     public bool? IsNM { get; set; }
     public bool? IsChuyenCa  { get; set; }
     public double? KLGangLongCCT { get; set; }

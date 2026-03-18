@@ -64,7 +64,8 @@ namespace dataproduct.api.Repositories
                            existingDetail.TuongQuanCuoiCa = detailDto.TuongQuanCuoiCa;
                            existingDetail.TongThucTe = detailDto.TongThucTe;
                            existingDetail.IDSilo = detailDto.IDSilo;
-                           
+                           existingDetail.LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe;
+
                            _context.STD_XUAT_NHAP_TON_HRC2s.Update(existingDetail);
                        }
                        else
@@ -89,7 +90,8 @@ namespace dataproduct.api.Repositories
                                TonCuoiCa = detailDto.TonCuoiCa,
                                TuongQuanCuoiCa = detailDto.TuongQuanCuoiCa,
                                TongThucTe = detailDto.TongThucTe,
-                               IDSilo = detailDto.IDSilo
+                               IDSilo = detailDto.IDSilo,
+                               LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe
                            };
                            
                            await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(newDetail);
@@ -243,64 +245,6 @@ namespace dataproduct.api.Repositories
            }
         }
 
-
-        //public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
-        //{
-        //    var listUsedNXT = await _context.Header_Keys
-        //        .Where(x => x.IsUsedNXT == true)
-        //        .ToListAsync();
-
-        //    var ngaySx = phieu.NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now;
-        //    var ca = phieu.Ca.Value;
-        //    var bieuMau = phieu.MaBm;
-        //    if(listUsedNXT.Any())
-        //    {
-        //        foreach (var item in listUsedNXT)
-        //        {
-        //            foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
-        //            {
-
-        //                var detail = new STD_XUAT_NHAP_TON_HRC2
-        //                {
-        //                    Id_Phieu = phieu.Idphieu,
-        //                    NgaySX = ngaySx,
-        //                    Ca = ca,
-        //                    Scope = (int)tohop,
-        //                    BieuMau = bieuMau,
-        //                    Id_HeaderKey = item.Id,
-        //                    TenNguyenLieu = item.TenHienThi,
-        //                    TyTrong = item.TyTrong, 
-        //                    ViTri = 1
-        //                };
-        //                await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(detail);
-        //            }
-
-        //            var summary = new STD_NXT_TOTAL_HRC2
-        //            {
-        //                Id_Phieu = phieu.Idphieu,
-        //                NgaySX = ngaySx,
-        //                Ca = ca,
-        //                Id_HeaderKey = item.Id,
-        //                TenNguyenLieu = item.TenHienThi
-        //            };
-        //            await _context.STD_NXT_TOTAL_HRC2s.AddAsync(summary);
-        //        }
-        //        await _context.SaveChangesAsync();
-
-        //        // Khởi tạo dữ liệu cho STD_NXT_Filter_Init
-        //        await GetHRC2FilterInitAsync(new InitXuatNhapTonHRC2Request
-        //        {
-        //            NgaySX = ngaySx,
-        //            Ca = ca,
-        //            IdPhieu = phieu.Idphieu,
-        //            HeaderKeys = listUsedNXT.Select(x => new IdHeaderKeyModel { Id_HeaderKey = x.Id }).ToList()
-        //        });
-        //    }
-        //    else
-        //    {
-        //        throw new Exception("Không có Header Key nào được sử dụng cho STD NXT");
-        //    }
-        //}
         private class HeaderKeyInfo
         {
             public int Id { get; set; }
@@ -315,9 +259,6 @@ namespace dataproduct.api.Repositories
             var ca = phieu.Ca.Value;
             var bieuMau = phieu.MaBm;
             var ngaySxOnly = DateOnly.FromDateTime(ngaySx);
-            var currentMonthStart = new DateOnly(ngaySxOnly.Year, ngaySxOnly.Month, 1);
-
-            bool isFirstCaOfMonth = ca == 1 && ngaySxOnly == currentMonthStart;
 
             List<int> allHeaderKeyIds = new();
             Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
@@ -325,42 +266,56 @@ namespace dataproduct.api.Repositories
             // -------------------------------------------------------
             // Lấy danh sách nguồn
             // -------------------------------------------------------
-            if (isFirstCaOfMonth)
+            // Tìm phiếu gần nhất trước ca hiện tại (không giới hạn theo tháng)
+            var prevPhieu = await _context.BmPhieus
+                .Where(x => x.MaBm == "HRC2_STD_NXT"
+                         && (x.NgaySX < ngaySxOnly
+                             || (x.NgaySX == ngaySxOnly && x.Ca < ca)))
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.Ca)
+                .Select(x => x.Idphieu)
+                .FirstOrDefaultAsync();
+
+            if (prevPhieu == default)
             {
+                // Không có phiếu trước đó trong tháng → dùng danh sách Header_Key mặc định
                 var defaults = await _context.Header_Keys
-                    .Where(x => x.IsUsedNXT == true)
-                    .Select(x => new { x.Id, x.TenHienThi, x.TyTrong })
+                    .Where(x => x.IsUsedThongKe == true)
+                    .Select(x => new { x.Id, x.TenHienThi, x.TyTrong, x.LoaiThongKe })
                     .ToListAsync();
 
                 if (!defaults.Any())
-                    throw new Exception("Không có Header Key mặc định nào (IsUsedNXT = true)");
+                    throw new Exception("Không có Header Key mặc định nào (IsUsedThongKe = true)");
+
+                var defaultsBof = defaults
+                    .Where(x => x.LoaiThongKe == 1 || x.LoaiThongKe == 3)
+                    .ToList();
+                var defaultsLfRh = defaults
+                    .Where(x => x.LoaiThongKe == 2 || x.LoaiThongKe == 3)
+                    .ToList();
+
+                if (!defaultsBof.Any() || !defaultsLfRh.Any())
+                    throw new Exception("Thiếu cấu hình Header Key mặc định theo LoaiThongKe (cần đủ nhóm 1&3 và 2&3).");
 
                 foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
                 {
-                    sourceByScope[(int)tohop] = defaults
+                    var selected = (tohop == ToHopSTDNXT.BOF6 || tohop == ToHopSTDNXT.BOF7)
+                        ? defaultsBof
+                        : defaultsLfRh;
+
+                    sourceByScope[(int)tohop] = selected
                         .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null))
                         .ToList();
                 }
 
-                allHeaderKeyIds = defaults.Select(x => x.Id).ToList();
+                allHeaderKeyIds = defaultsBof
+                    .Concat(defaultsLfRh)
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
             }
             else
             {
-                // Tìm phiếu gần nhất trong tháng, không vượt qua ca 1 ngày 1
-                var prevPhieu = await _context.BmPhieus
-                    .Where(x => x.MaBm == "HRC2_STD_NXT"
-                             && (x.NgaySX > currentMonthStart
-                                 || (x.NgaySX == currentMonthStart && x.Ca == 1))
-                             && (x.NgaySX < ngaySxOnly
-                                 || (x.NgaySX == ngaySxOnly && x.Ca < ca)))
-                    .OrderByDescending(x => x.NgaySX)
-                    .ThenByDescending(x => x.Ca)
-                    .Select(x => x.Idphieu)
-                    .FirstOrDefaultAsync();
-
-                if (prevPhieu == default)
-                    throw new Exception($"Không tìm thấy phiếu nào trong tháng này trước ca hiện tại (NgaySX: {ngaySx:dd/MM/yyyy}, Ca: {ca})");
-
                 // Lấy danh sách phụ liệu từ phiếu gần nhất
                 var prevRecords = await _context.STD_XUAT_NHAP_TON_HRC2s
                     .Where(x => x.Id_Phieu == prevPhieu)
@@ -575,7 +530,8 @@ namespace dataproduct.api.Repositories
                     TyTrong = x.TyTrong,
                     TonCuoiCa = x.TonCuoiCa,
                     TuongQuanCuoiCa = x.TuongQuanCuoiCa,
-                    TongThucTe = x.TongThucTe
+                    TongThucTe = x.TongThucTe,
+                    LuongSuDungKiemKe = x.LuongSuDungKiemKe
                 }).ToList(),
                 Summary = summary.Select(x => new NXTSummaryResponseModel
                 {
@@ -617,48 +573,51 @@ namespace dataproduct.api.Repositories
                     throw new Exception("Chênh lệch không khớp với dữ liệu đã lưu. Vui lòng lưu lại trước khi phân bổ.");
                 }
 
-                // ========== BƯỚC 2: Lấy danh sách ID_PhuLieu từ Header_Mapping ==========
-                var phuLieuIds = await _context.Header_Mappings
-                    .Where(m => m.ID_HeaderKey == entity.Id_HeaderKey)
-                    .Select(m => m.ID_PhuLieu)
+                // ========== BƯỚC 2: Lấy tất cả mẻ trong DLNM_HRC2 theo ngày/ca ==========
+                var dlnmInCa = await _context.DLNM_HRC2s
+                    .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca)
+                    .ToListAsync();
+
+                if (!dlnmInCa.Any())
+                {
+                    throw new Exception($"Không tìm thấy mẻ nào trong ngày {entity.NgaySX:dd/MM/yyyy} ca {entity.Ca}.");
+                }
+
+                var allDlnmIds = dlnmInCa.Select(x => x.ID).ToList();
+
+                // ========== BƯỚC 3: Tìm mẻ thực sự có sử dụng phụ liệu thuộc HeaderKey này ==========
+                // Lấy ID_PhuLieu mapped vào HeaderKey
+                var mappedPhuLieuIds = await _context.Header_Mappings
+                    .Where(hm => hm.ID_HeaderKey == entity.Id_HeaderKey)
+                    .Select(hm => hm.ID_PhuLieu)
+                    .ToListAsync();
+
+                // Tìm mẻ có PhuLieu_HRC2 (không phải phanBo) cho HeaderKey này
+                // — khớp qua ID_PhuLieu → mapping hoặc ID_HeaderKey trực tiếp
+                var meThoiIdsWithPhuLieu = await _context.PhuLieu_HRC2s
+                    .Where(pl =>
+                        allDlnmIds.Contains(pl.ID_MeThoi) &&
+                        (pl.IsPhanBo != true) &&
+                        (
+                            (pl.ID_PhuLieu.HasValue && mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)) ||
+                            pl.ID_HeaderKey == entity.Id_HeaderKey
+                        ))
+                    .Select(pl => pl.ID_MeThoi)
                     .Distinct()
                     .ToListAsync();
 
-                if (!phuLieuIds.Any())
+                if (!meThoiIdsWithPhuLieu.Any())
                 {
-                    throw new Exception($"HeaderKey {entity.Id_HeaderKey} chưa được móc nối với phụ liệu nào.");
+                    throw new Exception($"Không tìm thấy mẻ nào trong ngày {entity.NgaySX:dd/MM/yyyy} ca {entity.Ca} có sử dụng phụ liệu này.");
                 }
 
-                // ========== BƯỚC 3 & 4: Kết hợp query - Lấy các PhuLieu_HRC2 có sử dụng HeaderKey này ==========
-                // Tìm các PhuLieu_HRC2 có:
-                // - ID_PhuLieu trong danh sách phuLieuIds (từ Header_Mapping)
-                // - ID_HeaderKey = entity.Id_HeaderKey (đảm bảo đúng mapping)
-                // - ID_MeThoi thuộc các mẻ trong ngày/ca (join với DLNM_HRC2s)
-                // - IsPhanBo != true (CHỈ lấy phụ liệu thực tế, không lấy phân bổ cũ)
-                var phuLieuRecords = await (
-                    from pl in _context.PhuLieu_HRC2s
-                    join dlnm in _context.DLNM_HRC2s on pl.ID_MeThoi equals dlnm.ID
-                    where phuLieuIds.Contains(pl.ID_PhuLieu ?? -1) &&
-                          dlnm.Ngay == entity.NgaySX &&
-                          dlnm.Ca == entity.Ca &&
-                          (pl.IsPhanBo != true)
-                    select pl
-                ).ToListAsync();
-
-                if (!phuLieuRecords.Any())
-                {
-                    throw new Exception($"Không tìm thấy mẻ nào sử dụng HeaderKey {entity.Id_HeaderKey} trong ngày {entity.NgaySX:dd/MM/yyyy} ca {entity.Ca}.");
-                }
-
-                // Lấy danh sách ID_MeThoi duy nhất (mỗi mẻ chỉ phân bổ 1 lần)
-                var meThoiIds = phuLieuRecords
-                    .Select(x => x.ID_MeThoi)
-                    .Distinct()
-                    .ToList();
+                // Chỉ phân bổ cho các mẻ thực sự có dùng phụ liệu đó
+                var meThoiIds = meThoiIdsWithPhuLieu;
+                var dlnmLookupAll = dlnmInCa.ToDictionary(x => x.ID);
 
                 // ========== BƯỚC 5: Tính khối lượng phân bổ cho mỗi mẻ ==========
                 var soMe = meThoiIds.Count;
-                var klPhanBo = entity.ChenhLech / soMe; // Chia đều
+                var klPhanBo = entity.ChenhLech / soMe; // Chia đều cho các mẻ có dùng phụ liệu
 
                 // ========== BƯỚC 6: Lấy thông tin Header_Key để lấy TenHienThi ==========
                 var headerKey = await _context.Header_Keys
@@ -686,12 +645,7 @@ namespace dataproduct.api.Repositories
                 // ========== BƯỚC 8: Upsert record phân bổ cho mỗi mẻ ==========
                 foreach (var meThoiId in meThoiIds)
                 {
-                    // Lấy DLNM_HRC2 để lấy thông tin mẻ
-                    var dlnm = await _context.DLNM_HRC2s
-                        .Where(x => x.ID == meThoiId)
-                        .FirstOrDefaultAsync();
-
-                    if (dlnm == null) continue;
+                    if (!dlnmLookupAll.TryGetValue(meThoiId, out var dlnm)) continue;
 
                     // Kiểm tra xem đã có record phân bổ cho mẻ này chưa
                     if (oldPhanBoLookup.TryGetValue(meThoiId, out var existingPhanBo))
