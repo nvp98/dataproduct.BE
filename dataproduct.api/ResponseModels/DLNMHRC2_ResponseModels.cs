@@ -26,6 +26,9 @@ namespace dataproduct.api.ResponseModels
         public double? KLGangLongCR { get; set; }
         public double? KLThepLong { get; set; }
         public bool? IsTrungMeThoi { get; set; }
+        public int? QueLayMau { get; set; }
+        public int? QueDoNhiet { get; set; }
+        public string? GhiChu { get; set; }
     }
     public class HRC2DetailByReportNoModel
     {
@@ -39,6 +42,7 @@ namespace dataproduct.api.ResponseModels
         public List<HeaderKeyGroupedByReportNoModel> mappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> unmappedPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> phanBoPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>(); // Dữ liệu phân bổ (IsPhanBo = true)
+        public List<HeaderKeyGroupedByReportNoModel> manualAdjustPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>(); // Điều chỉnh tay (IsManual = true, IsPhanBo != true)
     }
 
     public class HRC2FilterThongKe
@@ -52,9 +56,20 @@ namespace dataproduct.api.ResponseModels
     public class HRC2ThongKeValue
     {
         public int IDHeaderKey { get; set; }
+        /// <summary>Giá trị tự động từ NM.</summary>
         public double? KLPhuGia { get; set; }
+        /// <summary>Giá trị chỉnh tay trên UI (ưu tiên hơn KLPhuGia).</summary>
         public double? KLPhuGia_Manual { get; set; }
         public bool? IsManual { get; set; }
+        /// <summary>Lượng được phân bổ từ PhanBoAsync (null nếu không có phân bổ).</summary>
+        public double? KLPhanBo { get; set; }
+        /// <summary>
+        /// Giá trị tổng hợp cuối cùng để thống kê:
+        /// effectiveKL = KLPhuGia_Manual ?? KLPhuGia
+        /// Nếu có phân bổ: TotalKLPhuGia = KLPhanBo + effectiveKL
+        /// Không có phân bổ: TotalKLPhuGia = effectiveKL
+        /// </summary>
+        public double? TotalKLPhuGia { get; set; }
     }
 
     public class HRC2ThongKeRow
@@ -68,6 +83,24 @@ namespace dataproduct.api.ResponseModels
         public int IDHeaderKey { get; set; }
         public string TenPhuLieu { get; set; }
         public byte LoaiThongKe { get; set; }
+    }
+
+    public class SearchThongKeApiResponse
+    {
+        public List<PhuLieuHeaderTable> PhuLieuHeaderTables { get; set; } = new();
+        public List<HRC2ThongKeRow> Data { get; set; } = new();
+        public int TotalRecords { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+    }
+
+    /// <summary>Mỗi phần tử là tổng TotalKLPhuGia theo HeaderKey trên toàn khoảng lọc.</summary>
+    public class ThongKeSumItem
+    {
+        public int IDHeaderKey { get; set; }
+        public string? TenPhuLieu { get; set; }
+        public double? TotalKLPhuGia { get; set; }
     }
     public class FilterSTD_NXTResponse
     {

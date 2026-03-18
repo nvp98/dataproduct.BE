@@ -69,6 +69,8 @@ namespace dataproduct.api.Repositories
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
         Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca);
         Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto);
+        Task<SearchThongKeApiResponse> SearchThongKeApiAsync(SearchThongKe dto);
+        Task<List<ThongKeSumItem>> GetThongKeSumAsync(SearchThongKe dto);
     }
     public interface IHeaderKeyRepository
     {

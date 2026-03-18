@@ -31,6 +31,9 @@ namespace dataproduct.api.DTOs
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
         public double? KlThepLong { get; set; }
+        public int? QueLayMau { get; set; }
+        public int? QueDoNhiet { get; set; }
+        public string? GhiChu { get; set; }
     }
 
     public class ChuyenMeThoiRequest
@@ -64,6 +67,9 @@ namespace dataproduct.api.DTOs
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
         public double? KlThepLong { get; set; }
+        public int? QueLayMau { get; set; }
+        public int? QueDoNhiet { get; set; }
+        public string? GhiChu { get; set; }
 
         public bool IsNM { get; set; }
         public bool IsChuyenCa { get; set; }

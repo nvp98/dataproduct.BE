@@ -33,6 +33,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? TonCuoiCa { get; set; }
         public string? TuongQuanCuoiCa { get; set; }
         public decimal? TongThucTe { get; set; }
+        public decimal? LuongSuDungKiemKe { get; set; }
     }
 
     public class NXTSummaryResponseModel
