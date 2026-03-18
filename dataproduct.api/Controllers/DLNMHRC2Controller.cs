@@ -182,64 +182,23 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var paged = await _service.SearchGroupedWithPagingAsync(dto);
+                var result = await _service.SearchThongKeAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
 
-                var first = paged.Data.FirstOrDefault();
-                var headers = first != null && first.phuLieuHeaderTables != null
-                    ? first.phuLieuHeaderTables
-                    : new List<PhuLieuHeaderTable>();
-
-                // Đơn giản hóa: mỗi dòng chỉ còn Data + Values (IDHeaderKey, KLPhuGia)
-                var rows = paged.Data
-                    .Where(x => x.dulieu != null)
-                    .Select(x =>
-                    {
-                        var detail = x.dulieu;
-                        var data = detail.data;
-                        var mappedByHeaderKey = (detail.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
-                            .Where(m => m.ID_HeaderKey.HasValue)
-                            .GroupBy(m => m.ID_HeaderKey!.Value)
-                            .ToDictionary(g => g.Key, g => g.First());
-
-                        var phanBoByHeaderKey = (detail.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
-                            .Where(m => m.ID_HeaderKey.HasValue)
-                            .GroupBy(m => m.ID_HeaderKey!.Value)
-                            .ToDictionary(g => g.Key, g => g.First());
-
-                        // Build values theo đúng danh sách headers (đảm bảo có cả phụ liệu thêm mới manual_col)
-                        var values = headers
-                            .Select(h =>
-                            {
-                                mappedByHeaderKey.TryGetValue(h.IDHeaderKey, out var mapped);
-                                phanBoByHeaderKey.TryGetValue(h.IDHeaderKey, out var phanBo);
-
-                                return new HRC2ThongKeValue
-                                {
-                                    IDHeaderKey = h.IDHeaderKey,
-                                    KLPhuGia = mapped?.KLPhuGiaTotal ?? mapped?.KLPhuGia,
-                                    KLPhuGia_Manual = phanBo?.KLPhuGia_Manual ?? mapped?.KLPhuGia_Manual,
-                                    IsManual = phanBo?.IsManual ?? mapped?.IsManual
-                                };
-                            })
-                            .ToList();
-
-                        return new HRC2ThongKeRow
-                        {
-                            Data = data,
-                            Values = values
-                        };
-                    })
-                    .ToList();
-
-                return Ok(new
-                {
-                    phuLieuHeaderTables = headers,
-                    data = rows,
-                    totalRecords = paged.TotalRecords,
-                    page = paged.Page,
-                    pageSize = paged.PageSize,
-                    totalPages = paged.TotalPages
-                });
+        // Tổng cộng từng phụ liệu trên toàn khoảng lọc — tách riêng để FE gọi lazy
+        [HttpPost("sum-thongke")]
+        public async Task<IActionResult> SumThongKe([FromBody] SearchThongKe dto)
+        {
+            try
+            {
+                var result = await _service.GetThongKeSumAsync(dto);
+                return Ok(result);
             }
             catch (Exception ex)
             {
