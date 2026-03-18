@@ -154,7 +154,7 @@ namespace dataproduct.api.Services
             int startRow = 16;
             int currentRow = startRow;
 
-            foreach (var t in query.Where(x => x.TinhTrang == 1))
+            foreach (var t in query)
             {
                 ws.Cell(currentRow, 1).Value = currentRow - 2;
                 ws.Cell(currentRow, 2).Value = t.Me;
@@ -327,7 +327,7 @@ namespace dataproduct.api.Services
                 .Replace("{{LogoUrl}}", logoUrl)
                 .Replace("{{NgaySX}}", NgaySX?.ToString("dd/MM/yyyy") ?? "")
                 .Replace("{{Ca}}", Ca?.ToString() ?? "")
-                .Replace("{{Kip}}",KipLV?.ToString() ?? "")
+                .Replace("{{Kip}}", KipLV?.ToString() ?? "")
                 .Replace("{{MayDuc}}", Xuong.ToString() ?? "")
                 .Replace("{{TongKhoiLuong}}", tongKLChung.ToString() ?? "")
                 .Replace("{{TongSTL1}}", tongSTChung.ToString() ?? "")
