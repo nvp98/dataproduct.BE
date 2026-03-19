@@ -32,6 +32,10 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<CtdPhoiNong> CtdPhoiNongs { get; set; }
 
+    public virtual DbSet<CtdSoTheoDoi> CtdSoTheoDois { get; set; }
+
+    public virtual DbSet<CtdStdDienBien> CtdStdDienBiens { get; set; }
+
     public virtual DbSet<DLNM_HRC2> DLNM_HRC2s { get; set; }
 
     public virtual DbSet<Header_Key> Header_Keys { get; set; }
@@ -53,10 +57,10 @@ public partial class ProductFormContext : DbContext
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
     public virtual DbSet<Silo> Silos { get; set; }
     public virtual DbSet<BmKiemKePhuLieu> BmKiemKePhuLieus { get; set; }
-    public virtual DbSet<MapSiloPhuLieuNM> MapSiloPhuLieuNMs { get; set; }  
-//    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-//        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
+    public virtual DbSet<MapSiloPhuLieuNM> MapSiloPhuLieuNMs { get; set; }
+    //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+    //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -217,6 +221,44 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TongSt).HasColumnName("TongST");
         });
 
+        modelBuilder.Entity<CtdSoTheoDoi>(entity =>
+        {
+            entity.ToTable("CTD_SoTheoDoi");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Idphieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.LoaiMacPhoi).HasColumnName("LoaiMacPhoi");
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.PhoiRaLo).HasColumnName("PhoiRaLo");
+            entity.Property(e => e.PhoiHoiLo).HasColumnName("PhoiHoiLo");
+            entity.Property(e => e.PhoiRaSan).HasColumnName("PhoiRaSan");
+            entity.Property(e => e.PhoiPheCn).HasColumnName("PhoiPheCN");
+            entity.Property(e => e.LoaiSp)
+                .HasMaxLength(20)
+                .HasColumnName("LoaiSP");
+            entity.Property(e => e.LoaiPhoi).HasColumnName("LoaiPhoi");
+            entity.Property(e => e.MacThep)
+                .HasMaxLength(20)
+                .HasColumnName("MacThep");
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<CtdStdDienBien>(entity =>
+        {
+            entity.ToTable("CTD_STD_DienBien");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Idphieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.TuGio).HasColumnName("TuGio");
+            entity.Property(e => e.DenGio).HasColumnName("DenGio");
+            entity.Property(e => e.ThietBi).HasMaxLength(50);
+            entity.Property(e => e.MoTa)
+                .HasMaxLength(250)
+                .HasColumnName("MoTa");
+            entity.Property(e => e.LoaiSuCo).HasMaxLength(50);
+            entity.Property(e => e.PheCongNghe).HasMaxLength(50);
+        });
+
         modelBuilder.Entity<DLNM_HRC2>(entity =>
         {
             entity.ToTable("DLNM_HRC2");
@@ -254,7 +296,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
             entity.Property(e => e.TyTrong)
                 .HasColumnName("TyTrong")
-                .HasPrecision(18, 3); 
+                .HasPrecision(18, 3);
             entity.Property(e => e.IsUsedThongKe).HasColumnName("IsUsedThongKe");
             entity.Property(e => e.LoaiThongKe).HasColumnName("LoaiThongKe");
         });
@@ -385,7 +427,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Scope).HasColumnName("Scope");
         });
         modelBuilder.Entity<Silo>(entity =>
-        {   
+        {
             entity.ToTable("Silo");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.TenSilo).HasColumnName("TenSilo");
@@ -393,10 +435,10 @@ public partial class ProductFormContext : DbContext
                 .HasColumnName("TheTich")
                 .HasPrecision(18, 3);
             entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
-            entity.Property(e => e.Scope).HasColumnName("Scope"); 
+            entity.Property(e => e.Scope).HasColumnName("Scope");
             entity.Property(e => e.TinhTrang).HasColumnName("TinhTrang");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
-            entity.Property(e => e.NhaMay).HasColumnName("NhaMay"); 
+            entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
         });
         modelBuilder.Entity<BmKiemKePhuLieu>(entity =>
         {
