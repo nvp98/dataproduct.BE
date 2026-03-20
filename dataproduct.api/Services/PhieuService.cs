@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
@@ -19,6 +20,7 @@ namespace dataproduct.api.Business
         private readonly IBMPheDuyetRepository _pheDuyetRepo;
         private readonly BmPheDuyetService _pheDuyetService;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
         private readonly DLNMHRC2Service _dlnmHrc2Service;
         private readonly IEnumerable<IPhieuJsonInitializer> _jsonInitializers;
         private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
@@ -30,6 +32,7 @@ namespace dataproduct.api.Business
             IBMPheDuyetRepository pheDuyetRepo,
             BmPheDuyetService pheDuyetService,
             ProductFormContext context,
+            ProductDataMasterDbContext masterContext,
             DLNMHRC2Service dlnmHrc2Service,
             IEnumerable<IPhieuJsonInitializer> jsonInitializers,
             IEnumerable<IPhieuPdfExporter> pdfExporters,
@@ -40,6 +43,7 @@ namespace dataproduct.api.Business
             _pheDuyetRepo = pheDuyetRepo;
             _pheDuyetService = pheDuyetService;
             _context = context;
+            _masterContext = masterContext;
             _dlnmHrc2Service = dlnmHrc2Service;
             _jsonInitializers = jsonInitializers;
             _pdfExporters = pdfExporters;
@@ -199,7 +203,8 @@ namespace dataproduct.api.Business
                     return null;
                 }
 
-                // Init dữ liệu liên quan theo maBm (HRC2_STD_NXT sẽ chạy qua HRC2StdNxtJsonInitializer)
+                await ResolveAndSaveKipAsync(phieu);
+
                 await RunJsonInitializersAsync(phieu);
 
                 await _context.SaveChangesAsync();
@@ -256,7 +261,10 @@ namespace dataproduct.api.Business
             // 4. Gọi repository để lưu
             await _repo.UpdateAsync(existing);
 
-            // 4.1 Đồng bộ lại dữ liệu bảng chi tiết từ DataJson.
+            // 4.1 Đồng bộ kíp nếu Ca hoặc NgaySX thay đổi
+            await ResolveAndSaveKipAsync(existing);
+
+            // 4.2 Đồng bộ lại dữ liệu bảng chi tiết từ DataJson.
             await RunJsonInitializersAsync(existing);
 
             // Cập nhật thông tin phê duyệt
@@ -548,6 +556,30 @@ namespace dataproduct.api.Business
                     $"Đã tồn tại phiếu {maBM} cho ngày {NgaySX:dd/MM/yyyy} ca {Ca}"
                 );
             }
+        }
+
+        /// <summary>
+        /// Tra cứu Tbl_Kip theo NgaySX + Ca, nếu tìm thấy thì cập nhật Kip và Idkip trên phiếu.
+        /// </summary>
+        private async Task ResolveAndSaveKipAsync(BmPhieu? phieu)
+        {
+            if (phieu is null || !phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
+                return;
+
+            var kip = await _masterContext.Tbl_Kip
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.NgayLamViec == phieu.NgaySX.Value
+                                       && x.TenCa == phieu.Ca.Value.ToString());
+
+            if (kip is null)
+                return;
+
+            if (phieu.Kip == kip.TenKip && phieu.Idkip == kip.ID_Kip)
+                return;
+
+            phieu.Kip = kip.TenKip;
+            phieu.Idkip = kip.ID_Kip;
+            await _repo.UpdateAsync(phieu);
         }
 
         private async Task RunJsonInitializersAsync(BmPhieu? phieu)

@@ -162,6 +162,16 @@ namespace dataproduct.api.Repositories
         Task DeleteByPhieuIdAsync(Guid phieuId);
     }
 
+    public interface ICtdSoTheoDoiRepository
+    {
+        Task AddSoTheoDoiListAsync(List<CtdSoTheoDoi> entities);
+        Task AddDienBienListAsync(List<CtdStdDienBien> entities);
+        Task DeleteSoTheoDoiByPhieuIdAsync(Guid phieuId);
+        Task DeleteDienBienByPhieuIdAsync(Guid phieuId);
+        Task<List<CtdSoTheoDoi>> GetSoTheoDoiByPhieuIdAsync(Guid phieuId);
+        Task<List<CtdStdDienBien>> GetDienBienByPhieuIdAsync(Guid phieuId);
+    }
+
     public interface IBmQuyenXlRepository
     {
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);

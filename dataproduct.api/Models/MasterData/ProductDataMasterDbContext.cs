@@ -18,6 +18,7 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<TaiKhoan> Tbl_TaiKhoan { get; set; }
     public DbSet<PhongBan> Tbl_PhongBan { get; set; }
     public DbSet<ViTri> Tbl_ViTri { get; set; }
+    public DbSet<Tbl_Kip> Tbl_Kip { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         //modelBuilder.Entity<TaiKhoan>(entity =>
