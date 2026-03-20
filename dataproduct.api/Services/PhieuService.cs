@@ -190,14 +190,30 @@ namespace dataproduct.api.Business
 
             try
             {
-                var phieu = await _repo.AddAsync(formData);
+                using var tran = await _context.Database.BeginTransactionAsync();
 
+                var phieu = await _repo.AddAsync(formData);
+                if (phieu == null)
+                {
+                    await tran.RollbackAsync();
+                    return null;
+                }
+
+                // Init dữ liệu liên quan theo maBm (HRC2_STD_NXT sẽ chạy qua HRC2StdNxtJsonInitializer)
                 await RunJsonInitializersAsync(phieu);
+
+                await _context.SaveChangesAsync();
+                await tran.CommitAsync();
 
                 return phieu;
             }
             catch (Exception)
             {
+                try
+                {
+                    await _context.Database.RollbackTransactionAsync();
+                }
+                catch { }
                 return null;
             }
         }
@@ -209,13 +225,6 @@ namespace dataproduct.api.Business
             if (existing == null) return null;
             // Cho phép update khi ĐangLuu (0), Đã thu hồi (3) hoặc Hiệu chỉnh (7 = phiếu clone đang chỉnh sửa). Lưu ở trạng thái 7 không đổi TinhTrang.
             if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return null;
-
-            // save data khi them cho hrc2
-            string? bm = formData.GetProperty("maBm").GetString();
-            if (bm == "HRC2_BB_NauLuyen_BOF" || bm == "HRC2_BB_NauLuyen_LF" || bm == "HRC2_BB_NauLuyen_RH")
-            {
-                await _dlnmHrc2Service.SaveHRC2ManualFromPhieuFormAsync(formData);
-            }
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
             if (formData.TryGetProperty("NgaySX", out var ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null)
@@ -484,45 +493,6 @@ namespace dataproduct.api.Business
         }
 
 
-        public async Task<bool> InitializeAsync(Guid phieuId)
-        {
-            using var tran = await _context.Database.BeginTransactionAsync();
-
-            try
-            {
-                var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == phieuId);
-
-                if (phieu == null)
-                {
-                    return false;
-                }
-
-                // Xác định loại biểu mẫu để chạy logic riêng
-                switch (phieu.MaBm)
-                {
-                    case "HRC2_STD_NXT":
-                        await InitializeHRC2_STD_NXTAsync(phieu);
-                        break;
-                    // them các biểu mẫu khác nếu cần khởi tạo default
-                    default:
-                        break;
-                }
-                await _context.SaveChangesAsync();
-                await tran.CommitAsync();
-
-
-                return true;
-            }
-            catch (Exception)
-            {
-                await tran.RollbackAsync();
-                return false;
-            }
-        }
-        public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
-        {
-            await _std_nxt_hrc2Repo.InitializeHRC2_STD_NXTAsync(phieu);
-        }
         // Helper
         private double? TryGetDouble(JsonElement row, string key)
         {

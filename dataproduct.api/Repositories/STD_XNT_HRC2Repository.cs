@@ -65,6 +65,8 @@ namespace dataproduct.api.Repositories
                            existingDetail.TongThucTe = detailDto.TongThucTe;
                            existingDetail.IDSilo = detailDto.IDSilo;
                            existingDetail.LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe;
+                           existingDetail.TyLeBOF = detailDto.TyLeBOF;
+                           existingDetail.TyLeTinhLuyen = detailDto.TyLeTinhLuyen;
 
                            _context.STD_XUAT_NHAP_TON_HRC2s.Update(existingDetail);
                        }
@@ -91,7 +93,9 @@ namespace dataproduct.api.Repositories
                                TuongQuanCuoiCa = detailDto.TuongQuanCuoiCa,
                                TongThucTe = detailDto.TongThucTe,
                                IDSilo = detailDto.IDSilo,
-                               LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe
+                               LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe,
+                               TyLeBOF = detailDto.TyLeBOF,
+                               TyLeTinhLuyen = detailDto.TyLeTinhLuyen
                            };
                            
                            await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(newDetail);
@@ -261,7 +265,7 @@ namespace dataproduct.api.Repositories
             var ngaySxOnly = DateOnly.FromDateTime(ngaySx);
 
             List<int> allHeaderKeyIds = new();
-            Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
+            Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo, decimal? TyLeBOF, decimal? TyLeTinhLuyen)>> sourceByScope = new();
 
             // -------------------------------------------------------
             // Lấy danh sách nguồn
@@ -280,39 +284,23 @@ namespace dataproduct.api.Repositories
             {
                 // Không có phiếu trước đó trong tháng → dùng danh sách Header_Key mặc định
                 var defaults = await _context.Header_Keys
-                    .Where(x => x.IsUsedThongKe == true)
-                    .Select(x => new { x.Id, x.TenHienThi, x.TyTrong, x.LoaiThongKe })
+                    .Where(x => x.IsUsedNXT == true)
+                    .Select(x => new { x.Id, x.TenHienThi, x.TyTrong})
                     .ToListAsync();
 
                 if (!defaults.Any())
-                    throw new Exception("Không có Header Key mặc định nào (IsUsedThongKe = true)");
+                    throw new Exception("Không có Header Key mặc định nào (IsUsedNXT = true)");
 
-                var defaultsBof = defaults
-                    .Where(x => x.LoaiThongKe == 1 || x.LoaiThongKe == 3)
+                var defaultItems = defaults
+                    .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null, (decimal?)null, (decimal?)null))
                     .ToList();
-                var defaultsLfRh = defaults
-                    .Where(x => x.LoaiThongKe == 2 || x.LoaiThongKe == 3)
-                    .ToList();
-
-                if (!defaultsBof.Any() || !defaultsLfRh.Any())
-                    throw new Exception("Thiếu cấu hình Header Key mặc định theo LoaiThongKe (cần đủ nhóm 1&3 và 2&3).");
 
                 foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
                 {
-                    var selected = (tohop == ToHopSTDNXT.BOF6 || tohop == ToHopSTDNXT.BOF7)
-                        ? defaultsBof
-                        : defaultsLfRh;
-
-                    sourceByScope[(int)tohop] = selected
-                        .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null))
-                        .ToList();
+                    sourceByScope[(int)tohop] = defaultItems;
                 }
 
-                allHeaderKeyIds = defaultsBof
-                    .Concat(defaultsLfRh)
-                    .Select(x => x.Id)
-                    .Distinct()
-                    .ToList();
+                allHeaderKeyIds = defaults.Select(x => x.Id).ToList();
             }
             else
             {
@@ -325,7 +313,9 @@ namespace dataproduct.api.Repositories
                         x.TenNguyenLieu,
                         x.TyTrong,
                         x.Scope,
-                        x.IDSilo
+                        x.IDSilo,
+                        x.TyLeBOF,
+                        x.TyLeTinhLuyen
                     })
                     .ToListAsync();
 
@@ -340,7 +330,7 @@ namespace dataproduct.api.Repositories
                         g => g
                             .GroupBy(x => x.Id_HeaderKey)
                             .Select(hg => hg.First())
-                            .Select(x => (x.Id_HeaderKey, x.TenNguyenLieu, x.TyTrong, x.IDSilo))
+                            .Select(x => (x.Id_HeaderKey, x.TenNguyenLieu, x.TyTrong, x.IDSilo, x.TyLeBOF, x.TyLeTinhLuyen))
                             .ToList()
                     );
 
@@ -394,6 +384,8 @@ namespace dataproduct.api.Repositories
                         TenNguyenLieu = item.TenNguyenLieu,
                         TyTrong = item.TyTrong,
                         IDSilo = item.IDSilo,
+                        TyLeBOF = item.TyLeBOF,
+                        TyLeTinhLuyen = item.TyLeTinhLuyen,
                         ViTri = 1
                     });
                 }
@@ -462,7 +454,7 @@ namespace dataproduct.api.Repositories
                 table.Rows.Add(item.Id_HeaderKey);
             }
 
-            return table;
+             return table;
         }
 
         public async Task GetHRC2FilterInitAsync(InitXuatNhapTonHRC2Request request)
@@ -484,8 +476,6 @@ namespace dataproduct.api.Repositories
                 parameters
             );
         }
-
-
 
         public async Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId)
         {
@@ -531,7 +521,9 @@ namespace dataproduct.api.Repositories
                     TonCuoiCa = x.TonCuoiCa,
                     TuongQuanCuoiCa = x.TuongQuanCuoiCa,
                     TongThucTe = x.TongThucTe,
-                    LuongSuDungKiemKe = x.LuongSuDungKiemKe
+                    LuongSuDungKiemKe = x.LuongSuDungKiemKe,
+                    TyLeBOF = x.TyLeBOF,
+                    TyLeTinhLuyen = x.TyLeTinhLuyen
                 }).ToList(),
                 Summary = summary.Select(x => new NXTSummaryResponseModel
                 {
@@ -552,6 +544,20 @@ namespace dataproduct.api.Repositories
         {
             try
             {
+                // ========== BƯỚC 0: Lưu tỷ lệ phân bổ vào DB nếu được truyền vào ==========
+                if (entity.TyLeBOF != null || entity.TyLeTinhLuyen != null)
+                {
+                    var tyLeRows = await _context.STD_XUAT_NHAP_TON_HRC2s
+                        .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
+                        .ToListAsync();
+
+                    foreach (var row in tyLeRows)
+                    {
+                        if (entity.TyLeBOF != null) row.TyLeBOF = entity.TyLeBOF;
+                        if (entity.TyLeTinhLuyen != null) row.TyLeTinhLuyen = entity.TyLeTinhLuyen;
+                    }
+                }
+
                 // ========== BƯỚC 1: Kiểm tra dữ liệu đã được lưu chưa ==========
                 var details = await _context.STD_NXT_TOTAL_HRC2s
                     .Where(x =>
@@ -615,9 +621,54 @@ namespace dataproduct.api.Repositories
                 var meThoiIds = meThoiIdsWithPhuLieu;
                 var dlnmLookupAll = dlnmInCa.ToDictionary(x => x.ID);
 
-                // ========== BƯỚC 5: Tính khối lượng phân bổ cho mỗi mẻ ==========
-                var soMe = meThoiIds.Count;
-                var klPhanBo = entity.ChenhLech / soMe; // Chia đều cho các mẻ có dùng phụ liệu
+                // ========== BƯỚC 5: Tính khối lượng phân bổ theo tỷ lệ BOF / Tinh luyện ==========
+                var tyLeRecord = await _context.STD_XUAT_NHAP_TON_HRC2s
+                    .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
+                    .Select(x => new { x.TyLeBOF, x.TyLeTinhLuyen })
+                    .FirstOrDefaultAsync();
+
+                Dictionary<long, decimal> klPhanBoByMeThoi;
+
+                if (tyLeRecord?.TyLeBOF != null || tyLeRecord?.TyLeTinhLuyen != null)
+                {
+                    // Phân nhóm mẻ theo BieuMau: BOF vs Tinh luyện (LF, RH,...)
+                    var bofMeIds = meThoiIds
+                        .Where(id => dlnmLookupAll.TryGetValue(id, out var d) &&
+                                     d.BieuMau != null &&
+                                     d.BieuMau.StartsWith("BOF", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    var tinhLuyenMeIds = meThoiIds.Except(bofMeIds).ToList();
+
+                    klPhanBoByMeThoi = new Dictionary<long, decimal>();
+
+                    if (bofMeIds.Any() && tyLeRecord?.TyLeBOF is decimal tyLeBOF && tyLeBOF > 0)
+                    {
+                        var bofAmount = entity.ChenhLech * tyLeBOF / 100;
+                        var klPerBof = bofAmount / bofMeIds.Count;
+                        foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = klPerBof;
+                    }
+                    else
+                    {
+                        foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = 0;
+                    }
+
+                    if (tinhLuyenMeIds.Any() && tyLeRecord?.TyLeTinhLuyen is decimal tyLeTinhLuyen && tyLeTinhLuyen > 0)
+                    {
+                        var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyen / 100;
+                        var klPerTinhLuyen = tinhLuyenAmount / tinhLuyenMeIds.Count;
+                        foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTinhLuyen;
+                    }
+                    else
+                    {
+                        foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = 0;
+                    }
+                }
+                else
+                {
+                    // Fallback: chia đều cho tất cả mẻ (hành vi cũ)
+                    var klEqual = entity.ChenhLech / meThoiIds.Count;
+                    klPhanBoByMeThoi = meThoiIds.ToDictionary(id => id, _ => klEqual);
+                }
 
                 // ========== BƯỚC 6: Lấy thông tin Header_Key để lấy TenHienThi ==========
                 var headerKey = await _context.Header_Keys
@@ -646,6 +697,8 @@ namespace dataproduct.api.Repositories
                 foreach (var meThoiId in meThoiIds)
                 {
                     if (!dlnmLookupAll.TryGetValue(meThoiId, out var dlnm)) continue;
+
+                    var klPhanBo = klPhanBoByMeThoi.TryGetValue(meThoiId, out var kl) ? kl : 0;
 
                     // Kiểm tra xem đã có record phân bổ cho mẻ này chưa
                     if (oldPhanBoLookup.TryGetValue(meThoiId, out var existingPhanBo))

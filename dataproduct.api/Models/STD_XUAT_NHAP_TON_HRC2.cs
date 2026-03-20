@@ -54,5 +54,11 @@ public class STD_XUAT_NHAP_TON_HRC2
     public int? IDSilo { get; set; }
     [Column(TypeName = "decimal(18,3)")]
     public decimal? LuongSuDungKiemKe { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeBOF { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeTinhLuyen { get; set; }
 }
 
