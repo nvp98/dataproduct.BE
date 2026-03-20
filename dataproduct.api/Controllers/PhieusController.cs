@@ -122,16 +122,6 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        [HttpPost("{id:guid}/initialize")]
-        public async Task<IActionResult> Initialize(Guid id)
-        {
-            var ok = await _service.InitializeAsync(id);
-            if (!ok)
-                return BadRequest(new { success = false, message = "Initialize thất bại" });
-
-            return Ok(new { success = true });
-        }
-
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id)
         {
