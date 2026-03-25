@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Utils;
@@ -14,11 +15,13 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly PheDuyetService _pdservice;
+        private readonly ProductDataMasterDbContext _mastercontext;
 
-        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, ProductDataMasterDbContext mastercontext)
         {
             _context = context;
             _pdservice = pdservice;
+            _mastercontext = mastercontext;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -251,5 +254,9 @@ namespace dataproduct.api.Repositories
             return (result, totalCount);
         }
 
+        public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
+        {
+            return await _mastercontext.Tbl_LoCao.AsNoTracking().ToListAsync();
+        }
     }
 }

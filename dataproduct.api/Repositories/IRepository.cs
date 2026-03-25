@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
@@ -28,6 +29,7 @@ namespace dataproduct.api.Repositories
 
         Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc);
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
+        Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync();
     }
     public interface IBMPheDuyetRepository
     {
@@ -246,5 +248,17 @@ namespace dataproduct.api.Repositories
             int nhaMay,
             string? bieuMau
         );
+
+        /*============= NMLG==================*/
+
+    }
+
+
+    public interface INMLGRepository
+    {
+        Task<List<SiLoTonDto>> GetSiLoTon(int? idLoCao, int? idCa, DateTime? ngay);
+        Task<List<SiLo_LG>> GetSiLoWithLoCaoAsync(int? idLoCao);
+        Task<SiLo_LG> AddSiLoAsync(SiLo_LG entity);
+        Task<SiLo_LG> UpdateSiLoAsync(int id, SiLo_LG entity);
     }
 }
