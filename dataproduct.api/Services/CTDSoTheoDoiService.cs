@@ -5,6 +5,7 @@ using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -66,7 +67,8 @@ namespace dataproduct.api.Services
                         soTheoDoiEntities.Add(new CtdSoTheoDoi
                         {
                             Idphieu = phieu.Idphieu,
-                            LoaiMacPhoi = TryGetInt(row, "loaiMacPhoi", "LoaiMacPhoi") ?? index,
+                            LoaiMacPhoi = TryGetInt(row, "MacPhoiLoai", "LoaiMacPhoi") ?? index,
+                            TenMacPhoi = TryGetString(row, "macPhoi", "tenMacPhoi", "MacPhoi"),
                             KichThuoc = TryGetString(row, "kichThuoc", "KichThuoc"),
                             PhoiRaLo = TryGetInt(row, "soPhoiRaKhoiLo", "PhoiRaKhoiLo", "PhoiRaLo"),
                             PhoiHoiLo = TryGetInt(row, "soPhoiHoiLo", "PhoiHoiLo"),
@@ -165,10 +167,18 @@ namespace dataproduct.api.Services
             var signTruongKip = await FormatChuKyBase64Async(truongKip?.ChuKy, truongKip?.TinhTrang == 1);
             var signNvVanHanh = await FormatChuKyBase64Async(nvVanHanh?.ChuKy, nvVanHanh?.TinhTrang == 1);
 
-            // Dữ liệu loại I, II, III
-            var loaiI = soTheoDoiList.FirstOrDefault(x => x.LoaiMacPhoi == 1) ?? new CtdSoTheoDoi();
-            var loaiII = soTheoDoiList.FirstOrDefault(x => x.LoaiMacPhoi == 2) ?? new CtdSoTheoDoi();
-            var loaiIII = soTheoDoiList.FirstOrDefault(x => x.LoaiMacPhoi == 3) ?? new CtdSoTheoDoi();
+            // Dữ liệu loại I, II, III (hỗ trợ nhiều dòng cho cùng một loại)
+            var loaiIList = soTheoDoiList.Where(x => x.LoaiMacPhoi == 1).ToList();
+            var loaiIIList = soTheoDoiList.Where(x => x.LoaiMacPhoi == 2).ToList();
+            var loaiIIIList = soTheoDoiList.Where(x => x.LoaiMacPhoi == 3).ToList();
+
+            var loaiI = loaiIList.FirstOrDefault() ?? new CtdSoTheoDoi();
+            var loaiII = loaiIIList.FirstOrDefault() ?? new CtdSoTheoDoi();
+            var loaiIII = loaiIIIList.FirstOrDefault() ?? new CtdSoTheoDoi();
+
+            var loaiIExtraRows = BuildSoTheoDoiExtraRows(loaiIList.Skip(1), "I");
+            var loaiIIExtraRows = BuildSoTheoDoiExtraRows(loaiIIList.Skip(1), "II");
+            var loaiIIIExtraRows = BuildSoTheoDoiExtraRows(loaiIIIList.Skip(1), "III");
 
             // Rows diễn biến
             var dienBienRows = new StringBuilder();
@@ -208,7 +218,7 @@ namespace dataproduct.api.Services
                 .Replace("{{DenGio}}", denGio)
                 .Replace("{{DenNgay}}", denNgay)
                 // Loại I
-                .Replace("{{LoaiI_MacPhoi}}", loaiI.MacThep ?? "")
+                .Replace("{{LoaiI_MacPhoi}}", loaiI.TenMacPhoi + (loaiI.LoaiPhoi == 1 ? "- Phôi nóng" : loaiI.LoaiPhoi == 2 ? "- Phôi nguội" : "") ?? "")
                 .Replace("{{LoaiI_KichThuoc}}", loaiI.KichThuoc ?? "")
                 .Replace("{{LoaiI_PhoiRaLo}}", loaiI.PhoiRaLo?.ToString() ?? "")
                 .Replace("{{LoaiI_PhoiHoiLo}}", loaiI.PhoiHoiLo?.ToString() ?? "")
@@ -217,8 +227,9 @@ namespace dataproduct.api.Services
                 .Replace("{{LoaiI_LoaiSp}}", loaiI.LoaiSp ?? "")
                 .Replace("{{LoaiI_MacThep}}", loaiI.MacThep ?? "")
                 .Replace("{{LoaiI_LenhSanXuat}}", loaiI.LenhSanXuat ?? "")
+                .Replace("{{LoaiI_ExtraRows}}", loaiIExtraRows)
                 // Loại II
-                .Replace("{{LoaiII_MacPhoi}}", loaiII.MacThep ?? "")
+                .Replace("{{LoaiII_MacPhoi}}", loaiII.TenMacPhoi + (loaiII.LoaiPhoi == 1 ? "- Phôi nóng" : loaiII.LoaiPhoi == 2 ? "- Phôi nguội" : "") ?? "")
                 .Replace("{{LoaiII_KichThuoc}}", loaiII.KichThuoc ?? "")
                 .Replace("{{LoaiII_PhoiRaLo}}", loaiII.PhoiRaLo?.ToString() ?? "")
                 .Replace("{{LoaiII_PhoiHoiLo}}", loaiII.PhoiHoiLo?.ToString() ?? "")
@@ -227,8 +238,9 @@ namespace dataproduct.api.Services
                 .Replace("{{LoaiII_LoaiSp}}", loaiII.LoaiSp ?? "")
                 .Replace("{{LoaiII_MacThep}}", loaiII.MacThep ?? "")
                 .Replace("{{LoaiII_LenhSanXuat}}", loaiII.LenhSanXuat ?? "")
+                .Replace("{{LoaiII_ExtraRows}}", loaiIIExtraRows)
                 // Loại III
-                .Replace("{{LoaiIII_MacPhoi}}", loaiIII.MacThep ?? "")
+                .Replace("{{LoaiIII_MacPhoi}}", loaiIII.TenMacPhoi + (loaiIII.LoaiPhoi == 1 ? "- Phôi nóng" : loaiIII.LoaiPhoi == 2 ? "- Phôi nguội" : "") ?? "")
                 .Replace("{{LoaiIII_KichThuoc}}", loaiIII.KichThuoc ?? "")
                 .Replace("{{LoaiIII_PhoiRaLo}}", loaiIII.PhoiRaLo?.ToString() ?? "")
                 .Replace("{{LoaiIII_PhoiHoiLo}}", loaiIII.PhoiHoiLo?.ToString() ?? "")
@@ -237,6 +249,7 @@ namespace dataproduct.api.Services
                 .Replace("{{LoaiIII_LoaiSp}}", loaiIII.LoaiSp ?? "")
                 .Replace("{{LoaiIII_MacThep}}", loaiIII.MacThep ?? "")
                 .Replace("{{LoaiIII_LenhSanXuat}}", loaiIII.LenhSanXuat ?? "")
+                .Replace("{{LoaiIII_ExtraRows}}", loaiIIIExtraRows)
                 // Diễn biến
                 .Replace("{{DienBienRows}}", dienBienRows.ToString())
                 // Chữ ký
@@ -513,6 +526,32 @@ namespace dataproduct.api.Services
                 || TryGetArray(root, "nguyenLieuSanPham", out rows)
                 || TryGetArray(root, "section1", out rows);
         }
+
+        private static string BuildSoTheoDoiExtraRows(IEnumerable<CtdSoTheoDoi> rows, string loai)
+        {
+            var sb = new StringBuilder();
+            var index = 2;
+
+            foreach (var row in rows)
+            {
+                sb.Append($@"
+                    <hr style=""border:0;border-top:1px dashed #999;margin:6px 0;"" />
+                    <div class=""info-row""><b>- Mác phôi loại {Encode(loai)} :</b> {Encode(row.TenMacPhoi)} {Encode(row.LoaiPhoi == 1 ? " - Phôi nóng" : row.LoaiPhoi == 2 ? " - Phôi nguội" : "")}</div>
+                    <div class=""info-row"">- Kích thước: {Encode(row.KichThuoc)} mm</div>
+                    <div class=""info-row"">- Số phôi ra khỏi lò: &nbsp;<b>{Encode(row.PhoiRaLo)}</b></div>
+                    <div class=""info-row"">- Số phôi hồi lò: &nbsp;<b>{Encode(row.PhoiHoiLo)}</b></div>
+                    <div class=""info-row"">- Số phôi cần ra sản (T/P): {Encode(row.PhoiRaSan)}</div>
+                    <div class=""info-row"">- Số phôi phế công nghệ: &nbsp;<b>{Encode(row.PhoiPheCn)}</b></div>
+                    <div class=""info-row"">- Loại sản phẩm: <b>{Encode(row.LoaiSp)}</b> Mác thép: <b>{Encode(row.MacThep)}</b></div>
+                    <div class=""info-row"">- Lệnh sản xuất: <b>{Encode(row.LenhSanXuat)}</b></div>");
+
+                index++;
+            }
+
+            return sb.ToString();
+        }
+
+        private static string Encode(object? value) => WebUtility.HtmlEncode(value?.ToString() ?? "");
 
         private bool TryGetDienBienRows(JsonElement root, out JsonElement rows)
         {

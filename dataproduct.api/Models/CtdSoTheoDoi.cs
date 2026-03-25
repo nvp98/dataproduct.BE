@@ -10,6 +10,8 @@ public partial class CtdSoTheoDoi
 
     public int? LoaiMacPhoi { get; set; }
 
+    public string? TenMacPhoi { get; set; }
+
     public string? KichThuoc { get; set; }
 
     public int? PhoiRaLo { get; set; }

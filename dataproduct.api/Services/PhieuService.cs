@@ -249,7 +249,8 @@ namespace dataproduct.api.Business
 
             if (formData.TryGetProperty("idphongBan", out var idphongBan) && idphongBan.ValueKind != JsonValueKind.Null)
                 existing.IdphongBan = idphongBan.GetInt32();
-
+            if (formData.TryGetProperty("scope", out var scopeProp) && scopeProp.ValueKind != JsonValueKind.Null)
+                existing.Scope = scopeProp.GetInt32();
 
             // 3. Lưu lại JSON gốc (form động)
             existing.DataJson = formData.GetRawText();

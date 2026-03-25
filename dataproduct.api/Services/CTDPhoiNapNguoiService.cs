@@ -253,7 +253,7 @@ namespace dataproduct.api.Services
             var ca = phieu.Ca ?? 1;
             var kip = phieu.Kip ?? "";
             var ngaySX = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today);
-            var xuongCan = phieu.MayDuc?.ToString() ?? "";
+            var xuongCan = phieu.Scope?.ToString() ?? "";
 
             // Tính khoảng thời gian ca
             string tuGio = "", denGio = "", tuNgay = "", denNgay = "";
@@ -420,7 +420,10 @@ namespace dataproduct.api.Services
                     x.Ca,
                     x.Kip,
                     x.MayDuc,
-                    x.TinhTrang
+                    x.TinhTrang,
+                    x.Scope,
+                    x.DataJson,
+                    x.MaBm,
                 })
                 .ToListAsync();
 
@@ -446,7 +449,8 @@ namespace dataproduct.api.Services
                             d.SoThanh,
                             d.TongKl,
                             d.GhiChu,
-                            p.TinhTrang
+                            p.TinhTrang,
+                            p.Scope
                         }).ToList();
 
             var templatePath = Path.Combine(_env.WebRootPath, "templates", "BM_TongHopPhoiNapNguoi.xlsx");
@@ -468,7 +472,7 @@ namespace dataproduct.api.Services
                 ws.Cell(rowIndex, 1).Value = item.NgaySX?.ToDateTime(TimeOnly.MinValue);
                 ws.Cell(rowIndex, 2).Value = item.Kip;
                 ws.Cell(rowIndex, 3).Value = item.Ca;
-                ws.Cell(rowIndex, 4).Value = item.MayDuc;
+                ws.Cell(rowIndex, 4).Value = item.Scope;
                 ws.Cell(rowIndex, 5).Value = item.Me;
                 ws.Cell(rowIndex, 6).Value = item.Mac;
                 ws.Cell(rowIndex, 7).Value = item.KichThuoc;
