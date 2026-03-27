@@ -18,6 +18,8 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<BkNguyenLieu> BkNguyenLieus { get; set; }
 
+    public virtual DbSet<BkKcscanBbxlSanxuat> BkKcscanBbxlSanxuats { get; set; }
+
     public virtual DbSet<BkPhoiThep> BkPhoiThep { get; set; }
 
     public virtual DbSet<BmPheDuyet> BmPheDuyets { get; set; }
@@ -31,6 +33,8 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<CtdPhoiNguoi> CtdPhoiNguois { get; set; }
 
     public virtual DbSet<CtdPhoiNong> CtdPhoiNongs { get; set; }
+
+    public virtual DbSet<CtdPhieuXuLyKph> CtdPhieuXuLyKphs { get; set; }
 
     public virtual DbSet<CtdSoTheoDoi> CtdSoTheoDois { get; set; }
 
@@ -84,6 +88,38 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(150)
                 .HasColumnName("TenNVL");
             entity.Property(e => e.TronId).HasColumnName("Tron_ID");
+        });
+
+        modelBuilder.Entity<BkKcscanBbxlSanxuat>(entity =>
+        {
+            entity.ToTable("BK_KCSCAN_BBXL_SANXUAT");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.WorkshopName).HasMaxLength(100).HasColumnName("WorkshopName");
+            entity.Property(e => e.Order).HasMaxLength(100).HasColumnName("Order");
+            entity.Property(e => e.ProcessProductionDate).HasColumnName("ProcessProductionDate");
+            entity.Property(e => e.ProcessShiftName).HasMaxLength(20).HasColumnName("ProcessShiftName");
+            entity.Property(e => e.NewProductName).HasMaxLength(100).HasColumnName("NewProductName");
+            entity.Property(e => e.Product).HasMaxLength(100).HasColumnName("Product");
+            entity.Property(e => e.NewGradeCode).HasMaxLength(50).HasColumnName("NewGradeCode");
+            entity.Property(e => e.NewLength).HasColumnType("float").HasColumnName("NewLength");
+            entity.Property(e => e.NewNumOfBar).HasColumnName("NewNumOfBar");
+            entity.Property(e => e.NewWeight).HasColumnType("float").HasColumnName("NewWeight");
+            entity.Property(e => e.NewClassifyCode).HasMaxLength(50).HasColumnName("NewClassifyCode");
+            entity.Property(e => e.Reason).HasMaxLength(255).HasColumnName("Reason");
+            entity.Property(e => e.Measures).HasMaxLength(255).HasColumnName("Measures");
+            entity.Property(e => e.InProductName).HasMaxLength(100).HasColumnName("InProductName");
+            entity.Property(e => e.InProduct).HasMaxLength(100).HasColumnName("InProduct");
+            entity.Property(e => e.InGradeCode).HasMaxLength(50).HasColumnName("InGradeCode");
+            entity.Property(e => e.InLength).HasColumnType("float").HasColumnName("InLength");
+            entity.Property(e => e.InNumOfBar).HasColumnName("InNumOfBar");
+            entity.Property(e => e.InWeight).HasColumnType("float").HasColumnName("InWeight");
+            entity.Property(e => e.InClassifyCode).HasMaxLength(10).HasColumnName("InClassifyCode");
+            entity.Property(e => e.InShiftName).HasMaxLength(50).HasColumnName("InShiftName");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("CreatedAt");
+            entity.Property(e => e.NgayXL).HasColumnName("NgayXL");
+            entity.Property(e => e.CaXL).HasMaxLength(20).HasColumnName("CaXL");
+            entity.Property(e => e.XuongCan).HasColumnName("XuongCan");
         });
 
         modelBuilder.Entity<BkPhoiThep>(entity =>
@@ -219,6 +255,40 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TinhTrangQLCL).HasColumnName("TinhTrangQLCL");
             entity.Property(e => e.TongKl).HasColumnName("TongKL");
             entity.Property(e => e.TongSt).HasColumnName("TongST");
+        });
+
+        modelBuilder.Entity<CtdPhieuXuLyKph>(entity =>
+        {
+            entity.ToTable("CTD_Phieu_XuLyKPH");
+
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.IdPhieu).HasColumnName("IdPhieu");
+            entity.Property(e => e.InSanPham).HasMaxLength(100);
+            entity.Property(e => e.InMacThep).HasMaxLength(50);
+            entity.Property(e => e.InChieuDai).HasMaxLength(50);
+            entity.Property(e => e.InSoMe).HasMaxLength(100);
+            entity.Property(e => e.InSoThanh);
+            entity.Property(e => e.InKhoiLuong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.InCaNgaySx)
+                .HasMaxLength(100)
+                .HasColumnName("InCaNgaySX");
+            entity.Property(e => e.InLoai).HasMaxLength(50);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.Measures).HasMaxLength(500);
+            entity.Property(e => e.NewSanPham).HasMaxLength(100);
+            entity.Property(e => e.NewMacThep).HasMaxLength(50);
+            entity.Property(e => e.NewChieuDai).HasMaxLength(50);
+            entity.Property(e => e.NewSoMe).HasMaxLength(100);
+            entity.Property(e => e.NewSoThanh);
+            entity.Property(e => e.NewKhoiLuong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.NewLoai).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("datetime")
+                .HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.NgayXL).HasColumnName("NgayXL");
+            entity.Property(e => e.CaXL).HasColumnName("CaXL");
+            entity.Property(e => e.KipXL).HasMaxLength(50).HasColumnName("KipXL");
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(50).HasColumnName("LenhSanXuat");
         });
 
         modelBuilder.Entity<CtdSoTheoDoi>(entity =>

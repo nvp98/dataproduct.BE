@@ -9,6 +9,19 @@ using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
+    public interface ICtdPhieuXuLyKphRepository
+    {
+        Task AddRangeAsync(List<CtdPhieuXuLyKph> entities);
+        Task DeleteByIdPhieuAsync(Guid idPhieu);
+        Task<List<CtdPhieuXuLyKph>> GetByIdPhieuAsync(Guid idPhieu);
+    }
+
+    public interface IBKKcscanBbxlSanxuatRepository
+    {
+        Task<IEnumerable<BkKcscanBbxlSanxuat>> GetAllAsync(DateOnly? ngaySX, string? ca, DateOnly? ngayXL, string? caXL, string? order, int? xuongCan);
+        Task<BkKcscanBbxlSanxuat?> GetByIdAsync(long id);
+    }
+
     public interface IBKNguyenLieuRepository
     {
         Task<IEnumerable<BkNguyenLieu>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
