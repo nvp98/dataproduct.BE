@@ -7,6 +7,7 @@ using System.Data;
 
 namespace dataproduct.api.Repositories
 {
+
     public class NMLGRepository : INMLGRepository
     {
         private readonly ProductFormContext _context;
@@ -54,6 +55,47 @@ namespace dataproduct.api.Repositories
 
             await _context.SaveChangesAsync();
             return existing;
+        }
+
+        public async Task<List<NMLG_QuyKhoNapLieu>> GetAsync(DateOnly ngay, int idCa, int idLoCao)
+        {
+            return await _context.NMLG_QuyKhoNapLieu
+                .Where(x => x.Ngay == ngay && x.IDCa == idCa && x.IDLoCao == idLoCao)
+                .ToListAsync();
+        }
+
+        public async Task UpsertAsync(List<NMLG_QuyKhoNapLieu> items)
+        {
+            if (items.Count == 0) return;
+
+            var ngay = items[0].Ngay;
+            var idCa = items[0].IDCa;
+            var idLoCao = items[0].IDLoCao;
+
+            var existing = await _context.NMLG_QuyKhoNapLieu
+                .Where(x => x.Ngay == ngay && x.IDCa == idCa && x.IDLoCao == idLoCao)
+                .ToListAsync();
+
+            var existingDict = existing.ToDictionary(x => x.DataIndex ?? "");
+
+            foreach (var item in items)
+            {
+                var key = item.DataIndex ?? "";
+                if (existingDict.TryGetValue(key, out var record))
+                {
+                    record.TenNVL = item.TenNVL;
+                    record.TongCong = item.TongCong;
+                    record.DoAm = item.DoAm;
+                    record.QuyKho = item.QuyKho;
+                    record.NgayTao = item.NgayTao;
+                }
+                else
+                {
+                    await _context.NMLG_QuyKhoNapLieu.AddAsync(item);
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
     }
 }

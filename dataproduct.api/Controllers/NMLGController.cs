@@ -97,6 +97,48 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        // ca=1: 07:30→19:30 | ca=2: 19:30→07:30 hôm sau
+
+        [HttpGet("naplieu")]
+        public async Task<IActionResult> GetNapLieu([FromQuery] int loCao, [FromQuery] DateTime ngay, [FromQuery] int ca)
+        {
+            try
+            {
+                if (ca != 1 && ca != 2) return BadRequest(new { message = "ca chỉ nhận giá trị 1 hoặc 2" });
+                var (bd, ed) = NMLGService.GetCaRange(ngay, ca);
+                var result = await _service.GetNapLieuAsync(loCao, bd, ed);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("naplieu/mapped")]
+        public async Task<IActionResult> GetNapLieuMapped([FromQuery] int loCao, [FromQuery] DateTime ngay, [FromQuery] int ca)
+        {
+            try
+            {
+                if (ca != 1 && ca != 2) return BadRequest(new { message = "ca chỉ nhận giá trị 1 hoặc 2" });
+                var (bd, ed) = NMLGService.GetCaRange(ngay, ca);
+                var result = await _service.GetNapLieuMappedAsync(loCao, bd, ed);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("naplieu/pivot")]
+        public async Task<IActionResult> GetNapLieuPivot([FromQuery] int loCao, [FromQuery] DateTime ngay, [FromQuery] int ca)
+        {
+            try
+            {
+                if (ca != 1 && ca != 2) return BadRequest(new { message = "ca chỉ nhận giá trị 1 hoặc 2" });
+                var (bd, ed) = NMLGService.GetCaRange(ngay, ca);
+                var result = await _service.GetNapLieuPivotAsync(loCao, bd, ed);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+        
+
         [HttpGet("getkltonsilolocao")]
         public async Task<IActionResult> GetSiLoTonByLoCao(int? idLoCao, int? idCa, DateTime? ngay)
         {
@@ -111,6 +153,43 @@ namespace dataproduct.api.Controllers
                     return NotFound(new { message = "Không có dữ liệu." });
 
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("quykho")]
+        public async Task<IActionResult> GetQuyKho([FromQuery] DateOnly ngay, [FromQuery] int idCa, [FromQuery] int idLoCao)
+        {
+            try
+            {
+                if (idCa != 1 && idCa != 2)
+                    return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
+
+                var result = await _service.GetQuyKhoAsync(ngay, idCa, idLoCao);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("quykho")]
+        public async Task<IActionResult> UpsertQuyKho([FromBody] UpsertQuyKhoRequest request)
+        {
+            try
+            {
+                if (request.IDCa != 1 && request.IDCa != 2)
+                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
+
+                if (request.Items == null || request.Items.Count == 0)
+                    return BadRequest(new { message = "Danh sách Items không được rỗng." });
+
+                await _service.UpsertQuyKhoAsync(request);
+                return Ok(new { message = "Lưu quy khô thành công." });
             }
             catch (Exception ex)
             {

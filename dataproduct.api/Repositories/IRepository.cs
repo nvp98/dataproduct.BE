@@ -260,5 +260,34 @@ namespace dataproduct.api.Repositories
         Task<List<SiLo_LG>> GetSiLoWithLoCaoAsync(int? idLoCao);
         Task<SiLo_LG> AddSiLoAsync(SiLo_LG entity);
         Task<SiLo_LG> UpdateSiLoAsync(int id, SiLo_LG entity);
+
+        Task<List<NMLG_QuyKhoNapLieu>> GetAsync(DateOnly ngay, int idCa, int idLoCao);
+        Task UpsertAsync(List<NMLG_QuyKhoNapLieu> items);
+    }
+    public interface IColumnMappingNhomRepository
+    {
+        Task<List<BM_ColumnMappingNhom>> GetAllAsync(int? loCao);
+        Task<List<BM_ColumnMappingNhom>> GetAllWithColumnsAsync(int loCao);
+        Task<BM_ColumnMappingNhom?> GetByIdAsync(int id);
+        Task AddAsync(BM_ColumnMappingNhom entity);
+        Task UpdateAsync(BM_ColumnMappingNhom entity);
+        Task DeleteAsync(BM_ColumnMappingNhom entity);
+        Task SaveChangesAsync();
+    }
+
+    public interface IColumnMappingRepository
+    {
+        Task<List<BM_ColumnMapping>> GetAllAsync(int? loCao);
+        Task<BM_ColumnMapping?> GetByIdAsync(int id);
+        Task<List<BM_ColumnMapping>> GetColumnsAsync(int loCao);
+
+        Task<bool> ExistsDataIndexAsync(int nhomId, string dataIndex, int? excludeId = null);
+        Task<bool> HasChildrenAsync(int nhomId);
+
+        Task AddAsync(BM_ColumnMapping entity);
+        Task UpdateAsync(BM_ColumnMapping entity);
+        Task DeleteAsync(BM_ColumnMapping entity);
+
+        Task SaveChangesAsync();
     }
 }

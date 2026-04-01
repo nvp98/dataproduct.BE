@@ -24,4 +24,20 @@
         public string? TenNL { get; set; }
         public string? TenNL_DieuChinh { get; set; }
     }
+
+    public class NapLieuItemDto
+    {
+        public long Id { get; set; }
+        public string? TagName { get; set; }
+        public string? TagNameShort { get; set; }
+        public string? YNghia { get; set; }
+        public DateTime Time { get; set; }
+        public double? Value { get; set; }
+    }
+
+    public class NapLieuMappedResult
+    {
+        public List<ColumnDto> Columns { get; set; } = [];
+        public List<Dictionary<string, object?>> Rows { get; set; } = [];
+    }
 }

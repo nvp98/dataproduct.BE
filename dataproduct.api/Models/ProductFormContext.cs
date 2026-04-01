@@ -62,8 +62,43 @@ public partial class ProductFormContext : DbContext
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
     public virtual DbSet<SiLo_LG> SiLo_LG { get; set; }
+    public virtual DbSet<BM_ColumnMappingNhom> BM_ColumnMappingNhom { get; set; }
+    public virtual DbSet<BM_ColumnMapping> BM_ColumnMapping { get; set; }
+    public virtual DbSet<NMLG_QuyKhoNapLieu> NMLG_QuyKhoNapLieu { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<BM_ColumnMappingNhom>(entity =>
+        {
+            entity.ToTable("BM_ColumnMappingNhom");
+            entity.Property(e => e.TenNhom).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<BM_ColumnMapping>(entity =>
+        {
+            entity.ToTable("BM_ColumnMapping");
+            entity.HasOne(e => e.Nhom)
+                  .WithMany(n => n.Columns)
+                  .HasForeignKey(e => e.NhomId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NMLG_QuyKhoNapLieu>(entity =>
+        {
+            entity.ToTable("NMLG_QuyKhoNapLieu");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID").ValueGeneratedOnAdd();
+            entity.Property(e => e.Ngay).HasColumnName("Ngay");
+            entity.Property(e => e.IDCa).HasColumnName("IDCa");
+            entity.Property(e => e.IDLoCao).HasColumnName("IDLoCao");
+            entity.Property(e => e.DataIndex).HasColumnName("DataIndex").HasMaxLength(100);
+            entity.Property(e => e.TenNVL).HasColumnName("TenNVL").HasMaxLength(200);
+            entity.Property(e => e.TongCong).HasColumnName("TongCong").HasColumnType("decimal(10,3)");
+            entity.Property(e => e.DoAm).HasColumnName("DoAm").HasColumnType("decimal(10,3)");
+            entity.Property(e => e.QuyKho).HasColumnName("QuyKho").HasColumnType("decimal(10,3)");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao").HasColumnType("datetime");
+            entity.HasIndex(e => new { e.Ngay, e.IDCa, e.IDLoCao, e.DataIndex }).IsUnique();
+        });
+
         modelBuilder.Entity<BkNguyenLieu>(entity =>
         {
             entity.ToTable("BK_NguyenLieu");
