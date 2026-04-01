@@ -22,6 +22,16 @@ namespace dataproduct.api.Repositories
         Task<BkKcscanBbxlSanxuat?> GetByIdAsync(long id);
     }
 
+    public interface IBkKcsBbxnSanLuongRepository
+    {
+        Task<IEnumerable<BkKcsBbxnSanLuong>> GetAllAsync(DateOnly? ngaySX, string? ca, string? sanPham, string? macThep, string? idXuongCan);
+        Task<BkKcsBbxnSanLuong?> GetByIdAsync(long id);
+        Task<IEnumerable<BkKcsBbxnSanLuong>> GetByIdPhieuAsync(Guid idPhieu);
+        Task UpdateAsync(BkKcsBbxnSanLuong entity);
+        Task UpdateRangeAsync(IEnumerable<BkKcsBbxnSanLuong> entities);
+        Task UpdatePhieuInfoAsync(IEnumerable<long> ids, Guid idPhieu, int tinhTrang);
+    }
+
     public interface IBKNguyenLieuRepository
     {
         Task<IEnumerable<BkNguyenLieu>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);

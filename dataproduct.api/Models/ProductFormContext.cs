@@ -56,6 +56,7 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<BM_SanLuongPhoi> BM_SanLuongPhoi { get; set; }
     public virtual DbSet<BM_PhoiNhapKho> BM_PhoiNhapKho { get; set; }
+    public virtual DbSet<BkKcsBbxnSanLuong> BkKcsBbxnSanLuongs { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -537,6 +538,25 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayBatDau).HasColumnName("NgayBatDau");
             entity.Property(e => e.NgayKetThuc).HasColumnName("NgayKetThuc");
         });
+        modelBuilder.Entity<BkKcsBbxnSanLuong>(entity =>
+        {
+            entity.ToTable("BK_KCS_BBXNSanLuong");
+            entity.Property(e => e.Ca).HasMaxLength(50);
+            entity.Property(e => e.SanPham).HasMaxLength(50);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.ChieuDai).HasColumnType("float");
+            entity.Property(e => e.SoBo).HasColumnName("SoBo");
+            entity.Property(e => e.SoThanh).HasColumnType("decimal(32, 0)");
+            entity.Property(e => e.KhoiLuong).HasColumnType("float");
+            entity.Property(e => e.TenPhanLoai).HasMaxLength(50);
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.TenCa).HasMaxLength(50);
+            entity.Property(e => e.IDXuongCan).HasMaxLength(50).HasColumnName("IDXuongCan");
+            entity.Property(e => e.TenXuongCan).HasMaxLength(50);
+            entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.IDPhieu).HasColumnName("IDPhieu");
+        });
+
         modelBuilder.Entity<PhuLieu_NM>(entity =>
         {
             entity.ToTable("PhuLieu_NM");
