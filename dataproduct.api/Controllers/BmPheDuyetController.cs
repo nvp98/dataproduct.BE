@@ -1,4 +1,4 @@
-﻿using dataproduct.api.Models;
+using dataproduct.api.Models;
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -48,8 +48,15 @@ namespace dataproduct.api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var ok = await _service.UpdateTinhTrangAsync(request.PhieuId, request.NguoiDuyetId, request.TinhTrang);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.UpdateTinhTrangAsync(request.PhieuId, request.NguoiDuyetId, request.TinhTrang);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         //[HttpDelete("{id}")]

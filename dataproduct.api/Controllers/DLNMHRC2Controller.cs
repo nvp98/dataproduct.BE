@@ -3,8 +3,10 @@ using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
 using dataproduct.api.Services;
 using dataproduct.api.ResponseModels;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.IO.Compression;
 
 namespace dataproduct.api.Controllers
 {
@@ -14,10 +16,19 @@ namespace dataproduct.api.Controllers
     {
         private readonly DLNMHRC2Service _service;
         private readonly HRC2_NMSyncService _hrc2NMSyncService;
-        public DLNMHRC2Controller(DLNMHRC2Service service, HRC2_NMSyncService hrc2NMSyncService)
+        private readonly PhieuDetailExcelService _excelService;
+        private readonly IWebHostEnvironment _env;
+
+        public DLNMHRC2Controller(
+            DLNMHRC2Service service,
+            HRC2_NMSyncService hrc2NMSyncService,
+            PhieuDetailExcelService excelService,
+            IWebHostEnvironment env)
         {
             _service = service;
             _hrc2NMSyncService = hrc2NMSyncService;
+            _excelService = excelService;
+            _env = env;
         }
 
         [HttpGet]
@@ -238,7 +249,126 @@ namespace dataproduct.api.Controllers
 
         }
 
+        [HttpGet("export-excel-detail")]
+        public async Task<IActionResult> ExportExcelDetail(
+            [FromQuery] DateOnly ngay,
+            [FromQuery] int ca,
+            [FromQuery] int scope,
+            [FromQuery] string bieuMau,
+            [FromQuery] Guid idPhieu)
+        {
+            try
+            {
+                var phieu = await _excelService.GetBmPhieuByIdOrThrowAsync(idPhieu);
+                if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
+                    throw new InvalidOperationException("Phiếu thiếu NgaySX/Ca để export Excel.");
+
+                var ngayPhieu = phieu.NgaySX.Value;
+                var caPhieu = phieu.Ca.Value;
+                var kipPhieu = phieu.Kip ?? "";
+                var scopePhieu = phieu.Scope ?? scope;
+
+                var templateName = bieuMau.ToUpper() switch
+                {
+                    "BOF" => "HRC2_BB_NauLuyen_BOF",
+                    "LF"  => "HRC2_BB_NauLuyen_LF",
+                    "RH"  => "HRC2_BB_NauLuyen_RH",
+                    _     => throw new NotSupportedException($"Biểu mẫu '{bieuMau}' không hợp lệ. Chỉ hỗ trợ: BOF, LF, RH.")
+                };
+
+                var templatePath = Path.Combine(_env.WebRootPath, "templates", $"{templateName}.xlsx");
+                if (!System.IO.File.Exists(templatePath))
+                    throw new NotSupportedException(
+                        $"Chưa có template Excel cho '{templateName}'. Đặt file tại: wwwroot/templates/{templateName}.xlsx");
+
+                var (headersBOF, headersLFRH, rows) =
+                    await _excelService.GetExportDataAsync(ngayPhieu, caPhieu, bieuMau, scopePhieu);
+
+                bool isBof = bieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase);
+                var headers = isBof ? headersBOF : headersLFRH;
+
+                var dateStr = ngayPhieu.ToString("ddMMyyyy");
+                var fileName = $"{templateName}_Ca{caPhieu}_{dateStr}.xlsx";
+
+                // ClosedXML bị lỗi khi save workbook có drawing phức tạp ra MemoryStream
+                // Workaround: save ra temp file rồi đọc lại bytes
+                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+                try
+                {
+                    using (var workbook = new XLWorkbook(templatePath))
+                    {
+                        var ws = workbook.Worksheets.First();
+                        _excelService.RenderBodyFromDb(
+                            ws,
+                            templateName,
+                            headers,
+                            rows,
+                            scopePhieu,
+                            ngayPhieu: ngayPhieu,
+                            caPhieu: caPhieu,
+                            kip: kipPhieu);
+                        workbook.SaveAs(tempPath);
+                    }
+                    var bytes = System.IO.File.ReadAllBytes(tempPath);
+                    // XLSX là file zip; kiểm tra chữ ký "PK" để tránh trả về bytes lỗi (FE sẽ download thành .xlsx và Excel báo không mở được).
+                    if (bytes == null || bytes.Length < 4 || bytes[0] != (byte)'P' || bytes[1] != (byte)'K')
+                    {
+                        throw new InvalidOperationException(
+                            $"Generated excel bytes không phải định dạng XLSX hợp lệ (template: {templateName}).");
+                    }
+                    // Kiểm tra zip structure (XLSX là file ZIP).
+                    // Không dùng ClosedXML để re-read vì nó không đọc được file có drawing.
+                    try
+                    {
+                        using var ms  = new System.IO.MemoryStream(bytes);
+                        using var zip = new ZipArchive(ms, ZipArchiveMode.Read, true);
+                        if (zip.GetEntry("[Content_Types].xml") == null)
+                            throw new InvalidOperationException("XLSX thiếu entry [Content_Types].xml.");
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"File XLSX sinh ra không hợp lệ. Template: {templateName}. Lỗi: {ex.Message}");
+                    }
+                    return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+                }
+                finally
+                {
+                    if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Trả message thật về FE để dễ debug nguyên nhân export lỗi.
+                // (FE hiện tại đang chỉ show message chung, nên cần phần này để thấy lý do.)
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new { message = ex.Message }
+                );
+            }
+        }
+
+        [HttpGet("export-pdf-detail")]
+        public async Task<IActionResult> ExportPdfDetail(
+            [FromQuery] DateOnly ngay,
+            [FromQuery] int ca,
+            [FromQuery] int scope,
+            [FromQuery] string bieuMau,
+            [FromQuery] Guid idPhieu)
+        {
+            try
+            {
+                var file = await _excelService.ExportPdfDetailAsync(ngay, ca, bieuMau, scope, idPhieu);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpPost("filterSTD_NXT")]
+
         public async Task<IActionResult> FilterSTD_NXT([FromBody] FilterSTD_NXTRequest request)
         {
             try
@@ -252,4 +382,6 @@ namespace dataproduct.api.Controllers
             }   
         }
     }
+
+
 }

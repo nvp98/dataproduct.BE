@@ -73,5 +73,33 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+
+        [HttpPost("khong-phan-bo")]
+        public async Task<IActionResult> KhongPhanBo([FromBody] STD_NXT_HRC2_KhongPhanBoDto entity)
+        {
+            try
+            {
+                var result = await _service.KhongPhanBoAsync(entity);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("related-phieu-statuses")]
+        public async Task<IActionResult> GetRelatedPhieuStatuses([FromBody] STD_NXT_RelatedPhieuStatusRequest request)
+        {
+            try
+            {
+                var result = await _service.GetRelatedPhieuStatusesAsync(request);
+                return Ok(new { data = result });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
     }
 }

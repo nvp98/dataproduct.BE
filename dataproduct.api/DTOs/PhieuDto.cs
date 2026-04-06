@@ -53,10 +53,13 @@ namespace dataproduct.api.DTOs
         public int? Scope { get; set; }
         public int? MayDuc { get; set; }
         public string? MaBm { get; set; }
+        public List<string>? MaBmList { get; set; }
         public string? searchText { get; set; }
+        public int? TinhTrang { get; set; }
         // Nếu có NguoiDuyetId thì trả về danh sách phiếu "việc đến tôi"
         // (phiếu có gắn user này trong BmPheDuyet, CapDuyet != 0)
         public int? NguoiDuyetId { get; set; }
+        public int? NguoiTaoId { get; set; }
         public int page { get; set; } = 1;
         public int pageSize { get; set; } = 10;
     }

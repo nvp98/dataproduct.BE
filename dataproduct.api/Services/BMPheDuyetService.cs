@@ -133,6 +133,8 @@ namespace dataproduct.api.Services
                 return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
             }
 
+            EnsurePhieuOperable(phieu);
+
             // Trường hợp người duyệt chọn Reject (Không xác nhận)
             if (tinhTrang == RejectedStatus)
             {
@@ -220,6 +222,19 @@ namespace dataproduct.api.Services
             }
 
             return true;
+        }
+
+        private static void EnsurePhieuOperable(BmPhieu phieu)
+        {
+            if (phieu.IsDelete == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị xóa hoặc từ chối. Vui lòng quay về danh sách để tải lại dữ liệu mới nhất.");
+            }
+
+            if (phieu.IsLock == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị khóa do đang có bản hiệu chỉnh. Vui lòng quay về danh sách để mở phiếu hợp lệ.");
+            }
         }
     }
 }

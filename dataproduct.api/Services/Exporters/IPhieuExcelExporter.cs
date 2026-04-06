@@ -6,5 +6,7 @@ namespace dataproduct.api.Services.Exporters
     {
         bool CanHandle(string? maBm);
         Task<ExportFileResult> ExportTongHopExcelAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<ExportFileResult> ExportDetailExcelAsync(Guid phieuId) =>
+            throw new NotSupportedException("Chưa hỗ trợ export detail Excel cho biểu mẫu này.");
     }
 }

@@ -6,18 +6,30 @@ namespace dataproduct.api.Models;
 public partial class Header_Key
 {
     public int Id { get; set; }
-   
+
     public Guid KeyGuid  { get; set; } = Guid.NewGuid();
     public string TenHienThi { get; set; }
     public string? Mota { get; set; }
     public string? LoaiPhieu { get; set; }
     public bool IsActive { get; set; }
     public DateTime? NgayTao { get; set; }
-    public decimal? ThuTu { get; set; }
+
+
     public bool? IsUsedNXT { get; set; }
     public decimal? TyTrong { get; set; }
     public bool? IsUsedThongKe { get; set; }
     public byte? LoaiThongKe { get; set; }
+    /// <summary>Thứ tự hiển thị trong ThongKe BOF</summary>
+    public int? ThuTu_TK_BOF { get; set; }
+    /// <summary>Thứ tự hiển thị trong ThongKe LF/RH</summary>
+    public int? ThuTu_TK_LFRH { get; set; }
+
+    // --- Excel export columns ---
+    public bool? IsUsed_Excel { get; set; }
+    /// <summary>1 = BOF, 2 = LF/RH, 3 = All</summary>
+    public byte? LoaiExcel { get; set; }
+    /// <summary>Thứ tự hiển thị trong Excel BOF</summary>
+    public int? ThuTu_Excel_BOF { get; set; }
+    /// <summary>Thứ tự hiển thị trong Excel LF/RH</summary>
+    public int? ThuTu_Excel_LFRH { get; set; }
 }
-
-

@@ -105,7 +105,6 @@ namespace dataproduct.api.Repositories
                             KeyGuid = header?.KeyGuid,
                             TenHienThi = header?.TenHienThi,
                             LoaiPhieu = header?.LoaiPhieu,
-                            ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                         };
                     }).ToList());
 
@@ -127,7 +126,7 @@ namespace dataproduct.api.Repositories
                                 KeyGuid = map.KeyGuid,
                                 TenHienThi = map.TenHienThi,
                                 TenNguonDuLieu = map.TenNguonDuLieu,
-                                ThuTu = map.ThuTu
+                                ThuTu = null
                             });
                         }
                     }
@@ -250,7 +249,6 @@ namespace dataproduct.api.Repositories
                                 TenHienThi = header?.TenHienThi,
                                 LoaiPhieu = header?.LoaiPhieu,
                                 IsActive = header?.IsActive ?? false,
-                                ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                             };
                         }).ToList());
 
@@ -291,7 +289,7 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = map.ThuTu
+                                        ThuTu = null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -387,6 +385,7 @@ namespace dataproduct.api.Repositories
                     .Where(x =>
                         x.MeThoi == meThoi &&
                         x.IsManual == true &&
+                        x.IsAddManual == true &&
                         (x.IsPhanBo != true) &&
                         x.ID_HeaderKey.HasValue)
                     .Select(x => new
@@ -531,7 +530,6 @@ namespace dataproduct.api.Repositories
                                 TenHienThi = header?.TenHienThi,
                                 LoaiPhieu = header?.LoaiPhieu,
                                 IsActive = header?.IsActive ?? false,
-                                ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                             };
                         }).ToList());
 
@@ -572,7 +570,7 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = map.ThuTu
+                                        ThuTu = null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -675,6 +673,7 @@ namespace dataproduct.api.Repositories
                     .Where(x =>
                         x.REPORT_NO == reportNo &&
                         x.IsManual == true &&
+                        x.IsAddManual == true &&
                         (x.IsPhanBo != true) &&
                         x.ID_HeaderKey.HasValue)
                     .Select(x => new
@@ -812,7 +811,6 @@ namespace dataproduct.api.Repositories
                                 TenHienThi = header?.TenHienThi,
                                 LoaiPhieu = header?.LoaiPhieu,
                                 IsActive = header?.IsActive ?? false,
-                                ThuTu = header != null && header.ThuTu.HasValue ? (int?)header.ThuTu.Value : null
                             };
                         }).ToList());
 
@@ -850,7 +848,7 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = map.ThuTu
+                                        ThuTu = null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -951,6 +949,7 @@ namespace dataproduct.api.Repositories
                     .Where(x =>
                         x.ID_MeThoi == id &&
                         x.IsManual == true &&
+                        x.IsAddManual == true &&
                         (x.IsPhanBo != true) &&
                         x.ID_HeaderKey.HasValue)
                     .Select(x => new
@@ -1324,12 +1323,15 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                 allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
             // danh sách header phụ liệu
-            var usedThongKeHeaders = await _context.Header_Keys
+            bool isBofTk1 = loaiBmKey.Contains("BOF");
+            var usedThongKeHeaders = (await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
                     (allowedLoaiThongKe == null ||
                      (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .OrderBy(h => h.ThuTu ?? decimal.MaxValue)
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
+                .ToListAsync())
+                .OrderBy(h => isBofTk1 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
                 .ThenBy(h => h.Id)
                 .Select(h => new PhuLieuHeaderTable
                 {
@@ -1337,7 +1339,7 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                     TenPhuLieu = h.TenHienThi,
                     LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
                 })
-                .ToListAsync();
+                .ToList();
 
             var usedHeaderKeyIds = usedThongKeHeaders.Select(x => x.IDHeaderKey).ToHashSet();
 
@@ -1494,12 +1496,15 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
             else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
                 allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
-            var headers = await _context.Header_Keys
+            bool isBofTk2 = loaiBmKey.Contains("BOF");
+            var headers = (await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
                     (allowedLoaiThongKe == null ||
                      (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .OrderBy(h => h.ThuTu ?? decimal.MaxValue)
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
+                .ToListAsync())
+                .OrderBy(h => isBofTk2 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
                 .ThenBy(h => h.Id)
                 .Select(h => new PhuLieuHeaderTable
                 {
@@ -1507,7 +1512,7 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                     TenPhuLieu = h.TenHienThi,
                     LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
                 })
-                .ToListAsync();
+                .ToList();
 
             int page = dto.Page ?? 1;
             int pageSize = dto.PageSize ?? 20;
@@ -1591,7 +1596,8 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                 {
                     ReportNo = pl.REPORT_NO!.Value,
                     ID_HeaderKey = pl.ID_HeaderKey!.Value,
-                    KLPhuGia = (double?)0,                // không có số liệu tự động
+                    // không có số liệu tự động => trả null để FE phân biệt baseline-null
+                    KLPhuGia = (double?)null,
                     KLPhuGia_Manual = pl.KLPhuGia_Manual, // toàn bộ là giá trị chỉnh tay
                     pl.IsManual
                 })
@@ -1609,7 +1615,9 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                           .ToDictionary(
                               hg => hg.Key,
                               hg => (
-                                  KLPhuGiaTotal: (double?)hg.Sum(x => x.KLPhuGia ?? 0),
+                                  KLPhuGiaTotal: hg.Any(x => x.KLPhuGia.HasValue)
+                                      ? (double?)hg.Sum(x => x.KLPhuGia ?? 0)
+                                      : null,
                                   KLPhuGia_Manual: hg.First().KLPhuGia_Manual,
                                   IsManual: hg.First().IsManual
                               )
@@ -1640,7 +1648,9 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                           .ToDictionary(
                               hg => hg.Key,
                               hg => (
-                                  KLPhuGia: (double?)hg.Sum(x => x.KLPhuGia ?? 0),
+                                  KLPhuGia: hg.Any(x => x.KLPhuGia.HasValue)
+                                      ? (double?)hg.Sum(x => x.KLPhuGia ?? 0)
+                                      : null,
                                   KLPhuGia_Manual: (double?)hg.Sum(x => x.KLPhuGia_Manual ?? 0),
                                   IsManual: hg.First().IsManual
                               )
@@ -1763,15 +1773,17 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
             else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
                 allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
-            var headers = await _context.Header_Keys
+            bool isBofTk3 = loaiBmKey.Contains("BOF");
+            var headers = (await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
                     (allowedLoaiThongKe == null ||
                      (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .OrderBy(h => h.ThuTu ?? decimal.MaxValue)
+                .Select(h => new { h.Id, h.TenHienThi, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
+                .ToListAsync())
+                .OrderBy(h => isBofTk3 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
                 .ThenBy(h => h.Id)
-                .Select(h => new { h.Id, h.TenHienThi })
-                .ToListAsync();
+                .ToList();
 
             if (!headers.Any()) return new List<ThongKeSumItem>();
 
