@@ -130,6 +130,147 @@ namespace dataproduct.api.Services
         {
             return await _repo.GetSanLuongPhoiAsync(ca, kip, ngaySX);
         }
+
+        public async Task<int> InsertSanLuongPhoiFromPhieuJsonAsync(BmPhieu phieu)
+        {
+            if (phieu == null)
+                throw new ArgumentNullException(nameof(phieu));
+
+            var entities = new List<BM_SanLuongPhoi>();
+
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
+            {
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (TryGetRowsElement(root, out var rowsElement))
+                {
+                    foreach (var row in rowsElement.EnumerateArray())
+                    {
+                        if (row.ValueKind != JsonValueKind.Object)
+                            continue;
+
+                        entities.Add(new BM_SanLuongPhoi
+                        {
+                            IdPhieu = phieu.Idphieu,
+                            SoPhieu = phieu.SoPhieu ?? string.Empty,
+                            NgaySX = (phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue),
+                            Kip = phieu.Kip ?? string.Empty,
+                            Ca = phieu.Ca ?? 0,
+                            MayDuc = phieu.MayDuc ?? 0,
+                            MacThep = TryGetString(row, "macThep", "MacThep") ?? string.Empty,
+                            KichThuoc = TryGetString(row, "kichThuoc", "KichThuoc") ?? string.Empty,
+                            StLoai1 = TryGetInt(row, "stLoai1", "StLoai1"),
+                            KlLoai1 = TryGetDecimal(row, "klLoai1", "KlLoai1"),
+                            StPhoiNgan = TryGetInt(row, "stPhoiNgan", "StPhoiNgan"),
+                            KlPhoiNgan = TryGetDecimal(row, "klPhoiNgan", "KlPhoiNgan"),
+                            StLoai2 = TryGetInt(row, "stLoai2", "StLoai2"),
+                            KlLoai2 = TryGetDecimal(row, "klLoai2", "KlLoai2"),
+                            StLoai3 = TryGetInt(row, "stLoai3", "StLoai3"),
+                            KlLoai3 = TryGetDecimal(row, "klLoai3", "KlLoai3"),
+                            TongSoThanh = TryGetInt(row, "tongSoThanh", "TongSoThanh"),
+                            TongKhoiLuong = TryGetDecimal(row, "tongKhoiLuong", "TongKhoiLuong"),
+                            NguoiTaoId = phieu.NguoiTaoId,
+                            ThoiGianTao = DateTime.Now,
+                            TTHD = true
+                        });
+                    }
+                }
+            }
+
+            await _repo.DeleteSanLuongPhoiByPhieuAsync(phieu.Idphieu);
+
+            // Khi phiếu là bản hiệu chỉnh (clone), xóa luôn dữ liệu chi tiết của phiếu gốc
+            // để tránh còn song song dữ liệu "phiếu cũ".
+            if (phieu.ID_PhieuGoc.HasValue
+                && phieu.ID_PhieuGoc.Value != Guid.Empty
+                && phieu.ID_PhieuGoc.Value != phieu.Idphieu)
+            {
+                await _repo.DeleteSanLuongPhoiByPhieuAsync(phieu.ID_PhieuGoc.Value);
+            }
+
+
+
+            if (entities.Count == 0)
+                return 0;
+
+            await _repo.AddSanLuongPhoiListAsync(entities);
+            return entities.Count;
+        }
+
+        private bool TryGetRowsElement(JsonElement root, out JsonElement rows)
+        {
+            rows = default;
+            return TryGetArray(root, "table1", out rows)
+                || TryGetArray(root, "Table1", out rows)
+                || TryGetArray(root, "rows", out rows)
+                || TryGetArray(root, "Rows", out rows)
+                || TryGetArray(root, "data", out rows)
+                || TryGetArray(root, "Data", out rows);
+        }
+
+        private bool TryGetArray(JsonElement obj, string key, out JsonElement array)
+        {
+            array = default;
+            if (obj.TryGetProperty(key, out var element) && element.ValueKind == JsonValueKind.Array)
+            {
+                array = element;
+                return true;
+            }
+
+            return false;
+        }
+
+        private string? TryGetString(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.String)
+                        return value.GetString();
+
+                    return value.ToString();
+                }
+            }
+
+            return null;
+        }
+
+        private int? TryGetInt(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var n))
+                        return n;
+
+                    if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsed))
+                        return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        private decimal? TryGetDecimal(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var n))
+                        return n;
+
+                    if (value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), out var parsed))
+                        return parsed;
+                }
+            }
+
+            return null;
+        }
+
         public async Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
         {
             return await _repo.GetPhoiNhapKhoAsync(ca, kip, ngaySX, mayduc);
@@ -384,52 +525,6 @@ namespace dataproduct.api.Services
             };
         }
 
-        public async Task InsertSanLuongPhoiAsync(SaveSanLuongPhoiDto dto)
-        {
-            try
-            {
-                var entities = dto.Table1.Select(r => new BM_SanLuongPhoi
-                {
-                    IdPhieu = dto.IdPhieu,
-                    SoPhieu = dto.SoPhieu,
-                    NgaySX = dto.NgaySX.Date,
-                    Kip = dto.Kip,
-                    Ca = dto.Ca,
-                    MayDuc = dto.MayDuc,
-                    MacThep = r.MacThep,
-                    KichThuoc = r.KichThuoc,
-                    StLoai1 = r.StLoai1,
-                    KlLoai1 = r.KlLoai1,
-                    StPhoiNgan = r.StPhoiNgan,
-                    KlPhoiNgan = r.KlPhoiNgan,
-                    StLoai2 = r.StLoai2,
-                    KlLoai2 = r.KlLoai2,
-                    StLoai3 = r.StLoai3,
-                    KlLoai3 = r.KlLoai3,
-                    TongSoThanh = r.TongSoThanh,
-                    TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null,
-                    TTHD = true
-                }).ToList();
-                await _repo.InsertSanLuongPhoiAsync(entities);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
-            }
-        }
-        public async Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.HideSanLuongPhoiByPhieuAsync(idPhieu);
-        }
-        public async Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.RestoreSanLuongPhoiByPhieuAsync(idPhieu);
-        }
         public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
             if (idPhieu == Guid.Empty)
@@ -438,43 +533,73 @@ namespace dataproduct.api.Services
             await _repo.DeleteSanLuongPhoiByPhieuAsync(idPhieu);
         }
         //=== PHÔI NHẬP KHO
-        public async Task InsertPhoiNhapKhoAsync(SavePhoiNhapKhoDto dto)
+        public async Task<int> InsertPhoiNhapKhoFromPhieuJsonAsync(BmPhieu phieu)
         {
-            try
+            if (phieu == null)
+                throw new ArgumentNullException(nameof(phieu));
+
+            var entities = new List<BM_PhoiNhapKho>();
+
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
             {
-                var entities = dto.Table1.Select(r => new BM_PhoiNhapKho
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (TryGetRowsElement(root, out var rowsElement))
                 {
-                    IdPhieu = dto.IdPhieu,
-                    SoPhieu = dto.SoPhieu,
-                    NgaySX = dto.NgaySX.Date,
-                    Kip = dto.Kip,
-                    Ca = dto.Ca,
-                    MayDuc = dto.MayDuc,
-                    Me = r.Me,
-                    Mac = r.Mac,
-                    KichThuoc = r.KichThuoc,
-                    StLoai1 = r.StLoai1,
-                    KlLoai1 = r.KlLoai1,
-                    StPhoiNgan = r.StPhoiNgan,
-                    KlPhoiNgan = r.KlPhoiNgan,
-                    CdPhoiNgan = r.CdPhoiNgan,
-                    StLoai2 = r.StLoai2,
-                    KlLoai2 = r.KlLoai2,
-                    StLoai2TP = r.StLoai2TP,
-                    KlLoai2TP = r.KlLoai2TP,
-                    StLoai3 = r.StLoai3,
-                    KlLoai3 = r.KlLoai3,
-                    TongSoThanh = r.TongSoThanh,
-                    TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null,
-                    TTHD = true
-                }).ToList();
-                await _repo.InsertPhoiNhapKhoAsync(entities);
+                    foreach (var row in rowsElement.EnumerateArray())
+                    {
+                        if (row.ValueKind != JsonValueKind.Object)
+                            continue;
+
+                        entities.Add(new BM_PhoiNhapKho
+                        {
+                            IdPhieu = phieu.Idphieu,
+                            SoPhieu = phieu.SoPhieu ?? string.Empty,
+                            NgaySX = (phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue),
+                            Kip = phieu.Kip ?? string.Empty,
+                            Ca = phieu.Ca ?? 0,
+                            MayDuc = phieu.MayDuc ?? 0,
+                            Me = TryGetString(row, "me", "Me") ?? string.Empty,
+                            Mac = TryGetString(row, "mac", "Mac") ?? string.Empty,
+                            KichThuoc = TryGetString(row, "kichThuoc", "KichThuoc") ?? string.Empty,
+                            StLoai1 = TryGetInt(row, "stLoai1", "StLoai1"),
+                            KlLoai1 = TryGetDecimal(row, "klLoai1", "KlLoai1"),
+                            StPhoiNgan = TryGetInt(row, "stPhoiNgan", "StPhoiNgan"),
+                            KlPhoiNgan = TryGetDecimal(row, "klPhoiNgan", "KlPhoiNgan"),
+                            CdPhoiNgan = TryGetDecimal(row, "cdPhoiNgan", "CdPhoiNgan"),
+                            StLoai2 = TryGetInt(row, "stLoai2", "StLoai2"),
+                            KlLoai2 = TryGetDecimal(row, "klLoai2", "KlLoai2"),
+                            StLoai2TP = TryGetInt(row, "stLoai2tp", "StLoai2TP", "StLoai2tp"),
+                            KlLoai2TP = TryGetDecimal(row, "klLoai2tp", "KlLoai2TP", "KlLoai2tp"),
+                            StLoai3 = TryGetInt(row, "stLoai3", "StLoai3"),
+                            KlLoai3 = TryGetDecimal(row, "klLoai3", "KlLoai3"),
+                            TongSoThanh = TryGetInt(row, "tongSoThanh", "TongSoThanh"),
+                            TongKhoiLuong = TryGetDecimal(row, "tongKhoiLuong", "TongKhoiLuong"),
+                            NguoiTaoId = phieu.NguoiTaoId,
+                            ThoiGianTao = DateTime.Now,
+                            TTHD = true
+                        });
+                    }
+                }
             }
-            catch (Exception ex)
+
+            await _repo.DeletePhoiNhapKhoByPhieuAsync(phieu.Idphieu);
+
+            // Khi phiếu là bản hiệu chỉnh (clone), xóa luôn dữ liệu chi tiết của phiếu gốc
+            // để tránh còn song song dữ liệu "phiếu cũ".
+            if (phieu.ID_PhieuGoc.HasValue
+                && phieu.ID_PhieuGoc.Value != Guid.Empty
+                && phieu.ID_PhieuGoc.Value != phieu.Idphieu)
             {
-                throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
+                await _repo.DeletePhoiNhapKhoByPhieuAsync(phieu.ID_PhieuGoc.Value);
             }
+
+            if (entities.Count == 0)
+                return 0;
+
+            await _repo.AddPhoiNhapKhoListAsync(entities);
+            return entities.Count;
         }
         public async Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu)
         {
@@ -482,18 +607,6 @@ namespace dataproduct.api.Services
                 throw new ArgumentException("IdPhieu không hợp lệ");
 
             await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
-        }
-        public async Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.HidePhoiNhapKhoByPhieuAsync(idPhieu);
-        }
-        public async Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
         }
         public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(PhoiNhapKhoPdfDTOReq request)
         {

@@ -94,11 +94,10 @@ namespace dataproduct.api.Repositories
         }
 
 
-        public async Task<List<BM_SanLuongPhoi>> InsertSanLuongPhoiAsync(List<BM_SanLuongPhoi> entity)
+        public async Task AddSanLuongPhoiListAsync(List<BM_SanLuongPhoi> entities)
         {
-            await _context.BM_SanLuongPhoi.AddRangeAsync(entity);
+            await _context.BM_SanLuongPhoi.AddRangeAsync(entities);
             await _context.SaveChangesAsync();
-            return entity;
         }
         public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
@@ -169,11 +168,10 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<BM_PhoiNhapKho>> InsertPhoiNhapKhoAsync(List<BM_PhoiNhapKho> entity)
+        public async Task AddPhoiNhapKhoListAsync(List<BM_PhoiNhapKho> entities)
         {
-            await _context.BM_PhoiNhapKho.AddRangeAsync(entity);
+            await _context.BM_PhoiNhapKho.AddRangeAsync(entities);
             await _context.SaveChangesAsync();
-            return entity;
         }
         public async Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu)
         {
@@ -187,64 +185,11 @@ namespace dataproduct.api.Repositories
             _context.BM_PhoiNhapKho.RemoveRange(entities);
             await _context.SaveChangesAsync();
         }
-        public async Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            var rows = await _context.BM_SanLuongPhoi
-                                     .Where(x => x.IdPhieu == idPhieu)
-                                     .ToListAsync();
-
-            if (!rows.Any()) return;
-
-            rows.ForEach(r => r.TTHD = false);
-            await _context.SaveChangesAsync();
-        }
-
-        /// Khôi phục dữ liệu (TTHD = 1).
-        /// Gọi khi: Assigned bấm "Không xác nhận" trên phiếu clone
-        ///          → clone bị xóa, dữ liệu phiếu cha hiện lại.
-        public async Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            var rows = await _context.BM_SanLuongPhoi
-                                     .Where(x => x.IdPhieu == idPhieu)
-                                     .ToListAsync();
-
-            if (!rows.Any()) return;
-
-            rows.ForEach(r => r.TTHD = true);
-            await _context.SaveChangesAsync();
-        }
-        public async Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu)
-        {
-            var rows = await _context.BM_PhoiNhapKho
-                                     .Where(x => x.IdPhieu == idPhieu)
-                                     .ToListAsync();
-
-            if (!rows.Any()) return;
-
-            rows.ForEach(r => r.TTHD = false);
-            await _context.SaveChangesAsync();
-        }
-
-        /// Khôi phục dữ liệu (TTHD = 1).
-        /// Gọi khi: Assigned bấm "Không xác nhận" trên phiếu clone
-        ///          → clone bị xóa, dữ liệu phiếu cha hiện lại.
-        public async Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu)
-        {
-            var rows = await _context.BM_PhoiNhapKho
-                                     .Where(x => x.IdPhieu == idPhieu)
-                                     .ToListAsync();
-
-            if (!rows.Any()) return;
-
-            rows.ForEach(r => r.TTHD = true);
-            await _context.SaveChangesAsync();
-        }
-
         public async Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate)
         {
             var query = _context.BmPhieus
                 .Where(x => x.IsDelete == 0 &&
-                            x.MaBm == "CTD_BB_GiaoNhanPhoiNhapKho")
+                            x.MaBm == "HRC1_BB_GiaoNhanPhoiNhapKho")
                 .AsQueryable();
 
             if (fromDate.HasValue)
@@ -263,7 +208,7 @@ namespace dataproduct.api.Repositories
             var query = _context.BmPhieus
                 .AsNoTracking()
                 .Where(x => x.IsDelete == 0 &&
-                            x.MaBm == "CTD_BB_Sanluongphoi")
+                            x.MaBm == "HRC1_BB_Sanluongphoi")
                 .AsQueryable();
 
             if (fromDate.HasValue)
