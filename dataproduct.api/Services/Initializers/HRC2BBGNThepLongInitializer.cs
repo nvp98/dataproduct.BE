@@ -18,7 +18,7 @@ namespace dataproduct.api.Services.Initializers
             if (string.IsNullOrWhiteSpace(maBm))
                 return false;
 
-            return maBm.Equals("HRC2_BB_GN_ThepLong", StringComparison.OrdinalIgnoreCase);
+            return maBm.Equals("BBGN_ThepLong", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task InitializeAsync(BmPhieu phieu)
@@ -27,7 +27,7 @@ namespace dataproduct.api.Services.Initializers
                 return;
 
             using var doc = JsonDocument.Parse(phieu.DataJson);
-            await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement);
+            await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement, phieu.Idphieu);
         }
     }
 }

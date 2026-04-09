@@ -19,9 +19,13 @@ public partial class BBGN_ThepLong
     public string? GhiChu { get; set; }
     public string? TinhLuyenLenThang { get; set; }
     public string? PhanLoai { get; set; }
-    public DateTime NgaySX { get; set; }
-    public int Ca { get; set; }
-    public string BieuMau { get; set; }
+    public DateTime? NgaySX { get; set; }
+    public int? Ca { get; set; }
+    public string? BieuMau { get; set; }
+    public byte? NhaMay { get; set; }
+    public int? LoThoi { get; set; }
+    public Guid IdPhieu { get; set; }
+    public bool? IsGhost { get; set; }
 }
 
 

@@ -276,5 +276,6 @@ namespace dataproduct.api.Repositories
     public interface IBBGN_ThepLongRepository
     {
         // Task<IEnumerable<BBGN_ThepLong>> GetAllAsync();
+        Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
     }
 }
