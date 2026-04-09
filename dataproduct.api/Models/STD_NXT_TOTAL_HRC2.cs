@@ -40,6 +40,10 @@ public class STD_NXT_TOTAL_HRC2
     public Guid Id_Phieu { get; set; }
     public bool? HasPhanBo { get; set; }
 
-    
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeBOF { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeTinhLuyen { get; set; }
 }
 

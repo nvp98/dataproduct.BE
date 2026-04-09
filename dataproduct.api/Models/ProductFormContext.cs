@@ -65,6 +65,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<Silo> Silos { get; set; }
     public virtual DbSet<BmKiemKePhuLieu> BmKiemKePhuLieus { get; set; }
     public virtual DbSet<MapSiloPhuLieuNM> MapSiloPhuLieuNMs { get; set; }
+    public virtual DbSet<BBGN_ThepLong> BBGN_ThepLongs { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -377,9 +378,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.LoaiPhieu).HasColumnName("LoaiPhieu");
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
-            entity.Property(e => e.ThuTu)
-                .HasColumnName("ThuTu")
-                .HasPrecision(18, 3);
             entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
             entity.Property(e => e.TyTrong)
                 .HasColumnName("TyTrong")
@@ -581,6 +579,26 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
+        });
+        modelBuilder.Entity<BBGN_ThepLong>(entity =>
+        {
+            entity.ToTable("BBGN_ThepLong");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.MayDuc).HasColumnName("MayDuc");
+            entity.Property(e => e.Me).HasColumnName("Me");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.ThungSo).HasColumnName("ThungSo");
+            entity.Property(e => e.ThoiGian).HasColumnName("ThoiGian");
+            entity.Property(e => e.KlLan1).HasColumnName("KlLan1");
+            entity.Property(e => e.KlLan2).HasColumnName("KlLan2");
+            entity.Property(e => e.KlLan3).HasColumnName("KlLan3");
+            entity.Property(e => e.KlThepLong).HasColumnName("KlThepLong");
+            entity.Property(e => e.GhiChu).HasColumnName("GhiChu");
+            entity.Property(e => e.TinhLuyenLenThang).HasColumnName("TinhLuyenLenThang");
+            entity.Property(e => e.PhanLoai).HasColumnName("PhanLoai");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
         });
         OnModelCreatingPartial(modelBuilder);
     }

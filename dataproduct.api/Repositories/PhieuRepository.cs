@@ -36,7 +36,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<BmPhieu?> GetByIdAsync(Guid id)
         {
-            return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id);
+            return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id && x.IsDelete != 1 && x.IsLock != 1);
         }
 
         public async Task<BmPhieu> AddAsync([FromBody] JsonElement formData)
@@ -61,7 +61,7 @@ namespace dataproduct.api.Repositories
                     NgaySX = NgaySX,
                     Ca = Ca,
                     MayDuc = formData.TryGetProperty("mayduc", out var mdProp) ? mdProp.GetInt32() : null,
-                    //NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
+                    NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
                     Scope = Scope,
                     //XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
                     //IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
@@ -192,13 +192,34 @@ namespace dataproduct.api.Repositories
             {
                 query = query.Where(x => x.MayDuc == request.MayDuc.Value);
             }
-            if (!string.IsNullOrEmpty(request.MaBm))
+            if (request.MaBmList != null && request.MaBmList.Count > 0)
+            {
+                query = query.Where(x => request.MaBmList.Contains(x.MaBm));
+            }
+            else if (!string.IsNullOrEmpty(request.MaBm))
             {
                 query = query.Where(x => x.MaBm == request.MaBm);
             }
             if (!string.IsNullOrEmpty(request.searchText))
             {
                 query = query.Where(x => x.SoPhieu.Contains(request.searchText));
+            }
+            if (request.TinhTrang.HasValue)
+            {
+                query = query.Where(x => x.TinhTrang == request.TinhTrang.Value);
+            }
+            if (request.NguoiTaoId.HasValue && request.NguoiTaoId.Value > 0)
+            {
+                var nguoiTao = request.NguoiTaoId.Value;
+                query = query.Where(x =>
+                    x.NguoiTaoId == null
+                    || x.NguoiTaoId == nguoiTao
+                    || _context.BmPheDuyets.Any(pd =>
+                        pd.PhieuId == x.Idphieu &&
+                        pd.CapDuyet == 0 &&
+                        pd.NguoiDuyetId == nguoiTao
+                    )
+                );
             }
             var totalCount = await query.CountAsync();
             var data = await query.Skip((request.page - 1) * request.pageSize).Take(request.pageSize).ToListAsync();

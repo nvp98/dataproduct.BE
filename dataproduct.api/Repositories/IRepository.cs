@@ -133,8 +133,10 @@ namespace dataproduct.api.Repositories
         Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
         Task GetHRC2FilterInitAsync(InitXuatNhapTonHRC2Request request);
         Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
+        Task<STD_NXT_RelatedPhieuStatusResponse> GetRelatedPhieuStatusesAsync(STD_NXT_RelatedPhieuStatusRequest request);
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
         Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        Task<bool> KhongPhanBoAsync(STD_NXT_HRC2_KhongPhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
     }
@@ -269,5 +271,10 @@ namespace dataproduct.api.Repositories
             int nhaMay,
             string? bieuMau
         );
+    }
+
+    public interface IBBGN_ThepLongRepository
+    {
+        // Task<IEnumerable<BBGN_ThepLong>> GetAllAsync();
     }
 }

@@ -16,7 +16,6 @@ namespace dataproduct.api.Services
         private readonly HRC2_NMSyncService _hrc2NMSyncService;
         private readonly ISTD_NXT_HRC2Repository _stdNxtRepo;
         private readonly ProductFormContext _context;
-
         public DLNMHRC2Service(
             IDLNMHRC2Repository repo,
             HRC2_NMSyncService hrc2NMSyncService,
@@ -119,19 +118,6 @@ namespace dataproduct.api.Services
                 }
             }
 
-            foreach (var row in table1)
-            {
-                foreach (var prop in row.EnumerateObject())
-                {
-                    var name = prop.Name;
-                    if (!name.StartsWith("manual_col_", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    var suffix = name.Substring("manual_col_".Length);
-                    if (int.TryParse(suffix, out var id))
-                        manualColIds.Add(id);
-                }
-            }
-
             var manualColHeaderKeyIds = new HashSet<int>(manualColIds);
 
             var headerKeyLabelMap = manualColIds.Count > 0
@@ -222,18 +208,29 @@ namespace dataproduct.api.Services
         {
             var result = new List<HRC2_PhuLieuInSertModel>();
             var processedManualCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int? rowId = row.TryGetProperty("id", out var rowIdProp) && rowIdProp.ValueKind == JsonValueKind.Number
+                ? rowIdProp.GetInt32()
+                : null;
 
             foreach (var col in dynamicCols)
             {
                 string dataIndex = col.GetProperty("dataIndex").GetString();
-                if (!row.TryGetProperty(dataIndex, out var valProp)) continue;
 
                 bool isAdjustColumn = dataIndex.StartsWith("adjust_") && dataIndex.EndsWith("_adjust");
                 bool isManualAddedAdjust = dataIndex.StartsWith("manual_col_");
 
                 if (isAdjustColumn && !isManualAddedAdjust) continue;
 
-                var currentNumeric = TryConvertNumeric(valProp);
+                double? currentNumeric;
+                if (isManualAddedAdjust)
+                {
+                    currentNumeric = TryResolveManualAdjustValue(row, rowId, meThoi, col, dataIndex);
+                }
+                else
+                {
+                    if (!row.TryGetProperty(dataIndex, out var valProp)) continue;
+                    currentNumeric = TryConvertNumeric(valProp);
+                }
 
                 string label = col.TryGetProperty("label", out var lblProp) ? lblProp.GetString() : null;
 
@@ -267,29 +264,66 @@ namespace dataproduct.api.Services
                         // manual_col_* là "điều chỉnh tay", KHÔNG phải "phân bổ"
                         IsPhanBo = false,
                         IsManual = true,
-                        KLPhuGia_Manual = currentNumeric
+                        KLPhuGia_Manual = currentNumeric,
+                        IsAddManual = true
                     });
                     processedManualCols.Add(dataIndex);
                     continue;
                 }
 
-                // Cột thường: so sánh __orig
+                // Cột thường:
+                // - Ưu tiên marker FE: {dataIndex}__IsManual (có thể xảy ra trường hợp __orig rỗng do record gốc không tồn tại)
+                // - Nếu không có marker hoặc marker không đảm bảo, fallback suy ra dựa trên __orig
                 var origKey = $"{dataIndex}__orig";
                 bool hasOrig = row.TryGetProperty(origKey, out var origProp);
                 var origNumeric = hasOrig ? TryConvertNumeric(origProp) : null;
 
-                bool isManual = hasOrig
-                                && origNumeric.HasValue
-                                && currentNumeric.HasValue
-                                && Math.Abs(currentNumeric.Value - origNumeric.Value) > 0.000001;
+                var manualFlagKey = $"{dataIndex}__IsManual";
+                bool isManualFromFlag = row.TryGetProperty(manualFlagKey, out var manualFlagProp) &&
+                                        manualFlagProp.ValueKind == JsonValueKind.True;
 
-                // isNMRow: chỉ lấy dòng đã sửa tay
-                if (isNMRow && !isManual) continue;
+                bool isManualFromOrig =
+                    hasOrig
+                    && origNumeric.HasValue
+                    && currentNumeric.HasValue
+                    && Math.Abs(currentNumeric.Value - origNumeric.Value) > 0.000001;
 
-                double? klPhuGia = isManual ? origNumeric : currentNumeric;
-                double? klPhuGia_Manual = isManual ? currentNumeric : null;
+                bool isManual = isManualFromFlag || isManualFromOrig;
 
-                if ((klPhuGia == null || klPhuGia == 0)
+                // Luồng bạn yêu cầu:
+                // - Nếu FE chỉ đánh dấu manual bằng {dataIndex}__IsManual=true nhưng __orig rỗng/không parse được,
+                //   thì coi đây giống "manual_col_*": KLPhuGia (tự động) sẽ để null,
+                //   chỉ set KLPhuGia_Manual và IsManual.
+                // - Nếu manual suy ra từ so sánh __orig (có origNumeric) thì giữ baseline KLPhuGia = origNumeric (như cũ).
+                double? klPhuGia;
+                double? klPhuGia_Manual;
+                if (!isManual)
+                {
+                    klPhuGia = currentNumeric;
+                    klPhuGia_Manual = null;
+                }
+                else if (isManualFromOrig)
+                {
+                    klPhuGia = origNumeric; // baseline từ __orig
+                    klPhuGia_Manual = currentNumeric;
+                }
+                else if (origNumeric.HasValue)
+                {
+                    // TH2: user xóa giá trị (currentNumeric=null), nhưng __orig có dữ liệu
+                    // → hoàn tác về gốc: KLPhuGia giữ nguyên, KLPhuGia_Manual = null, IsManual = true
+                    klPhuGia = origNumeric;
+                    klPhuGia_Manual = null;
+                }
+                else
+                {
+                    // manual theo flag nhưng không có __orig → giống manual_col (không có baseline)
+                    klPhuGia = null;
+                    klPhuGia_Manual = currentNumeric;
+                }
+
+                // Chỉ skip khi không phải manual — record manual có thể cần dọn dẹp record cũ trong DB
+                if (!isManual
+                    && (klPhuGia == null || klPhuGia == 0)
                     && (klPhuGia_Manual == null || klPhuGia_Manual == 0)) continue;
 
                 int? idPhuLieu = null;
@@ -312,45 +346,63 @@ namespace dataproduct.api.Services
                     TenHienThi = label,
                     IsPhanBo = false,
                     IsManual = isManual,
-                    KLPhuGia_Manual = klPhuGia_Manual
-                });
-            }
-
-            // -------------------------------------------------------
-            // Bổ sung manual_col_* từ row payload (kể cả khi FE không lưu meta trong table1DynamicColumns.adjust)
-            // -------------------------------------------------------
-            foreach (var prop in row.EnumerateObject())
-            {
-                var dataIndex = prop.Name;
-                if (!dataIndex.StartsWith("manual_col_", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (processedManualCols.Contains(dataIndex))
-                    continue;
-
-                var suffix = dataIndex.Substring("manual_col_".Length);
-                if (!int.TryParse(suffix, out var headerKeyIdParsed))
-                    continue;
-
-                var currentNumeric = TryConvertNumeric(prop.Value);
-                if (!currentNumeric.HasValue) continue;
-                if (!isNMRow && currentNumeric.Value == 0) continue;
-
-                headerKeyLabelMap.TryGetValue(headerKeyIdParsed, out var label);
-
-                result.Add(new HRC2_PhuLieuInSertModel
-                {
-                    MeThoi = meThoi,
-                    BieuMau = loaiBM,
-                    ID_HeaderKey = headerKeyIdParsed,
-                    TenHienThi = label,
-                    // manual_col_* là "điều chỉnh tay", KHÔNG phải "phân bổ"
-                    IsPhanBo = false,
-                    IsManual = true,
-                    KLPhuGia_Manual = currentNumeric
+                    KLPhuGia_Manual = klPhuGia_Manual,
+                    IsAddManual = false
                 });
             }
 
             return result;
+        }
+
+        private double? TryResolveManualAdjustValue(
+            JsonElement row,
+            int? rowId,
+            string meThoi,
+            JsonElement dynamicCol,
+            string dataIndex)
+        {
+            // Backward compatibility: FE cũ vẫn có thể gửi manual_col_* trực tiếp trong row.
+            if (row.TryGetProperty(dataIndex, out var rowVal))
+            {
+                var rowNumeric = TryConvertNumeric(rowVal);
+                if (rowNumeric.HasValue)
+                    return rowNumeric;
+            }
+
+            // FE mới: giá trị nằm trong dynamicCol.values theo từng row.
+            if (!dynamicCol.TryGetProperty("values", out var valuesProp) ||
+                valuesProp.ValueKind != JsonValueKind.Array)
+                return null;
+
+            foreach (var item in valuesProp.EnumerateArray())
+            {
+                var itemRowId = item.TryGetProperty("rowId", out var ridProp) &&
+                                ridProp.ValueKind == JsonValueKind.Number
+                    ? ridProp.GetInt32()
+                    : (int?)null;
+
+                var itemMeThoi = item.TryGetProperty("meThoi", out var mtProp) &&
+                                 mtProp.ValueKind == JsonValueKind.String
+                    ? mtProp.GetString()
+                    : null;
+
+                var matchByRowId = rowId.HasValue && itemRowId.HasValue && rowId.Value == itemRowId.Value;
+                var matchByMeThoi = !string.IsNullOrWhiteSpace(meThoi) &&
+                                    !string.IsNullOrWhiteSpace(itemMeThoi) &&
+                                    string.Equals(meThoi, itemMeThoi, StringComparison.OrdinalIgnoreCase);
+
+                if (!matchByRowId && !matchByMeThoi)
+                    continue;
+
+                if (!item.TryGetProperty("value", out var valueProp))
+                    return null;
+
+                var val = TryConvertNumeric(valueProp);
+                if (val.HasValue)
+                    return val;
+            }
+
+            return null;
         }
 
         public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models, HashSet<int> manualColHeaderKeyIds)
@@ -477,6 +529,7 @@ namespace dataproduct.api.Services
                     // manual_col_* (điều chỉnh tay)
                     var isManualAdjustRow =
                         (pl.IsManual == true) &&
+                        (pl.IsAddManual == true) &&
                         (pl.IsPhanBo != true) &&
                         pl.ID_HeaderKey.HasValue &&
                         !pl.ID_PhuLieu.HasValue;
@@ -489,11 +542,20 @@ namespace dataproduct.api.Services
                         existing = existingPL
                             .Where(x =>
                                 x.ID_MeThoi == dlnm.ID &&
-                                x.ID_HeaderKey == pl.ID_HeaderKey &&
                                 x.ID_PhuLieu == null &&
-                                x.IsManual == true)
-                            .OrderBy(x => x.IsPhanBo == true ? 1 : 0)
+                                x.IsManual == true &&
+                                x.IsAddManual == true &&
+                                // Match đúng HeaderKey; chỉ fallback bản ghi cũ chưa có HeaderKey.
+                                (x.ID_HeaderKey == pl.ID_HeaderKey || x.ID_HeaderKey == null))
+                            .OrderBy(x => x.ID_HeaderKey == pl.ID_HeaderKey ? 0 : 1)
+                            .ThenBy(x => x.IsPhanBo == true ? 1 : 0)
                             .FirstOrDefault();
+
+                        // Backfill cho dữ liệu cũ: nếu record manual cũ chưa có HeaderKey thì gán lại.
+                        if (existing != null && !existing.ID_HeaderKey.HasValue && pl.ID_HeaderKey.HasValue)
+                        {
+                            existing.ID_HeaderKey = pl.ID_HeaderKey;
+                        }
                     }
 
                     existing ??= existingPL.FirstOrDefault(x =>
@@ -501,6 +563,19 @@ namespace dataproduct.api.Services
                         x.ID_HeaderKey == pl.ID_HeaderKey &&
                         x.ID_PhuLieu == pl.ID_PhuLieu &&
                         x.IsPhanBo == (pl.IsPhanBo ?? false));
+
+                    // Với phụ liệu mapped (phuLieu_*) có ID_PhuLieu:
+                    // ưu tiên update record gốc theo (ID_MeThoi, ID_PhuLieu, IsPhanBo=false),
+                    // không tạo thêm record chỉ vì khác ID_HeaderKey/IsManual.
+                    if (existing == null &&
+                        pl.ID_PhuLieu.HasValue &&
+                        !(pl.IsPhanBo ?? false))
+                    {
+                        existing = existingPL.FirstOrDefault(x =>
+                            x.ID_MeThoi == dlnm.ID &&
+                            x.ID_PhuLieu == pl.ID_PhuLieu &&
+                            x.IsPhanBo == false);
+                    }
 
                     // Fallback cho NM row: sp_Sync_HRC2_FromNM có thể tạo record không có ID_HeaderKey.
                     // Thử tìm theo ID_PhuLieu (bỏ qua ID_HeaderKey), sau đó backfill ID_HeaderKey.
@@ -525,9 +600,41 @@ namespace dataproduct.api.Services
                         if (existing == null) continue;
                     }
 
+                    // "Xóa manual về ban đầu": isManual=true nhưng không có giá trị nào để lưu
+                    // (KLPhuGia_Manual=null VÀ KLPhuGia=null/0 → orig của record cũng null/0)
+                    // → DELETE record nếu tồn tại, bỏ qua nếu chưa có
+                    bool isClearManual = pl.IsManual == true
+                        && pl.KLPhuGia_Manual == null
+                        && (pl.KLPhuGia == null || pl.KLPhuGia == 0);
+
+                    if (isClearManual)
+                    {
+                        if (existing != null && (existing.KLPhuGia == null || existing.KLPhuGia == 0))
+                        {
+                            _context.PhuLieu_HRC2s.Remove(existing);
+                            existingPL.Remove(existing);
+                        }
+                        else if (existing != null)
+                        {
+                            // Record có KLPhuGia thật (từ NM/SP) → chỉ reset manual, không xóa
+                            existing.IsManual = true;
+                            existing.KLPhuGia_Manual = null;
+                        }
+                        continue;
+                    }
+
                     if (existing == null)
                     {
-                        await _context.PhuLieu_HRC2s.AddAsync(new PhuLieu_HRC2
+                        // Không sinh mới cho phụ liệu mapped khi đang lưu sửa tay;
+                        // chỉ update trên record đã có để tránh duplicate.
+                        // Tuy nhiên, nếu FE gửi manual marker cho phụ liệu mapped (phuLieu_*),
+                        // mà record gốc chưa tồn tại (do UI tổng hợp theo mẻ), thì cần INSERT mới để lưu đúng.
+                        if (pl.ID_PhuLieu.HasValue && !(pl.IsPhanBo ?? false) && pl.IsManual != true)
+                        {
+                            continue;
+                        }
+
+                        var newEntity = new PhuLieu_HRC2
                         {
                             REPORT_NO = dlnm.REPORT_NO,
                             BieuMau = model.BieuMau,
@@ -537,15 +644,20 @@ namespace dataproduct.api.Services
                             KLPhuGia = pl.KLPhuGia,
                             KLPhuGia_Manual = pl.KLPhuGia_Manual,
                             IsManual = pl.IsManual ?? false,
+                            IsAddManual = pl.IsAddManual ?? false,
                             ID_HeaderKey = pl.ID_HeaderKey,
                             TenHienThi = pl.TenHienThi,
                             ID_MeThoi = dlnm.ID,
                             IsPhanBo = pl.IsPhanBo ?? false
-                        });
+                        };
+
+                        await _context.PhuLieu_HRC2s.AddAsync(newEntity);
+                        // Cập nhật cache in-memory để các item sau trong cùng request không bị add trùng.
+                        existingPL.Add(newEntity);
                     }
                     else
                     {
-                        existing.KLPhuGia = pl.KLPhuGia;
+                        // KLPhuGia (orig) KHÔNG BAO GIỜ bị ghi đè trên record đã tồn tại (spec invariant)
                         existing.IsPhanBo = pl.IsPhanBo ?? false;
                         if (pl.ID_HeaderKey.HasValue)
                             existing.ID_HeaderKey = pl.ID_HeaderKey;
@@ -556,14 +668,18 @@ namespace dataproduct.api.Services
                         {
                             existing.IsManual = true;
                             existing.KLPhuGia_Manual = pl.KLPhuGia_Manual;
+                            existing.IsAddManual = pl.IsAddManual ?? false;
                         }
-                        else if (!(existing.IsManual ?? false))
+                        else
                         {
+                            // Payload không còn manual marker => reset về dữ liệu gốc
                             existing.IsManual = false;
                             existing.KLPhuGia_Manual = null;
+                            existing.IsAddManual = false;
                         }
 
-                        _context.PhuLieu_HRC2s.Update(existing);
+                        // existing được track sẵn từ query hoặc vừa Add trong cùng DbContext.
+                        // Không ép Update để tránh lỗi "temporary value" khi entity đang ở state Added.
                     }
                 }
             }
@@ -580,6 +696,10 @@ namespace dataproduct.api.Services
                     // manual_col_* là "điều chỉnh tay" => IsPhanBo = false
                     x.IsPhanBo == false &&
                     x.IsManual == true &&
+                    x.IsAddManual == true &&
+                    // Chỉ cleanup các record kiểu manual_col_* (không có ID_PhuLieu).
+                    // Tránh xóa nhầm manual của cột phụ liệu mapped (phuLieu_*) có ID_PhuLieu.
+                    x.ID_PhuLieu == null &&
                     x.ID_HeaderKey.HasValue &&
                     !allowed.Contains(x.ID_HeaderKey.Value))
                 .ToListAsync();
@@ -1200,5 +1320,6 @@ namespace dataproduct.api.Services
             };
 
         }
+
     }
 }
