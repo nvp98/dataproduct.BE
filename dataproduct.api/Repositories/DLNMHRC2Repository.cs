@@ -1269,182 +1269,206 @@ namespace dataproduct.api.Repositories
             return result;
         }
 
-        public async Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto)
-        {
-            var query = _context.DLNM_HRC2s.AsQueryable();
+        // public async Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto)
+        // {
+        //     var query = _context.DLNM_HRC2s.AsQueryable();
 
-if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
-            {
-                query = query.Where(x =>
-                    x.Ngay.HasValue &&
-                    x.Ngay.Value.Date >= dto.TuNgay.Value.Date &&
-                    x.Ngay.Value.Date <= dto.DenNgay.Value.Date);
-            }
+        //     if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
+        //     {
+        //         query = query.Where(x =>
+        //             x.Ngay.HasValue &&
+        //             x.Ngay.Value.Date >= dto.TuNgay.Value.Date &&
+        //             x.Ngay.Value.Date <= dto.DenNgay.Value.Date);
+        //     }
 
-            if (dto.Ca.HasValue)
-                query = query.Where(x => x.Ca == dto.Ca.Value);
+        //     if (dto.Ca.HasValue)
+        //         query = query.Where(x => x.Ca == dto.Ca.Value);
 
-            if (!string.IsNullOrEmpty(dto.LoaiBM))
-                query = query.Where(x => x.BieuMau == dto.LoaiBM);
+        //     if (!string.IsNullOrEmpty(dto.LoaiBM))
+        //         query = query.Where(x => x.BieuMau == dto.LoaiBM);
 
-            if (dto.Scope.HasValue)
-                query = query.Where(x => x.Scope == dto.Scope.Value);
+        //     if (dto.Scope.HasValue)
+        //         query = query.Where(x => x.Scope == dto.Scope.Value);
 
-            if (!string.IsNullOrWhiteSpace(dto.SearchText))
-            {
-                var search = dto.SearchText.Trim();
+        //     if (!string.IsNullOrWhiteSpace(dto.SearchText))
+        //     {
+        //         var search = dto.SearchText.Trim();
 
-                if (int.TryParse(search, out var searchReportNo))
-                {
-                    query = query.Where(x => x.REPORT_NO == searchReportNo);
-                }
-                else
-                {
-                    query = query.Where(x =>
-                        (x.MacThep ?? "").Contains(search) ||
-                        (x.MeThoi ?? "").Contains(search));
-                }
-            }
+        //         if (int.TryParse(search, out var searchReportNo))
+        //         {
+        //             query = query.Where(x => x.REPORT_NO == searchReportNo);
+        //         }
+        //         else
+        //         {
+        //             query = query.Where(x =>
+        //                 (x.MacThep ?? "").Contains(search) ||
+        //                 (x.MeThoi ?? "").Contains(search));
+        //         }
+        //     }
 
-            // đếm report_no unique
-            var totalCount = await query
-                .Where(x => x.REPORT_NO.HasValue)
-                .Select(x => x.REPORT_NO)
-                .Distinct()
-                .CountAsync();
+        //     // Đếm tổng bản ghi thống kê:
+        //     // - Nhóm theo REPORT_NO với dữ liệu NM (có REPORT_NO)
+        //     // - Giữ riêng từng dòng nhập tay IsNM = false dù không có REPORT_NO
+        //     var totalByReportNo = await query
+        //         .Where(x => x.REPORT_NO.HasValue)
+        //         .Select(x => x.REPORT_NO)
+        //         .Distinct()
+        //         .CountAsync();
 
-            // lọc loại thống kê theo LoaiBM
-            var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
-            HashSet<byte>? allowedLoaiThongKe = null;
+        //     var totalManualRows = await query
+        //         .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+        //         .Select(x => x.ID)
+        //         .Distinct()
+        //         .CountAsync();
 
-            if (loaiBmKey.Contains("BOF"))
-                allowedLoaiThongKe = new HashSet<byte> { 1, 3 };
-            else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
-                allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
+        //     var totalCount = totalByReportNo + totalManualRows;
 
-            // danh sách header phụ liệu
-            bool isBofTk1 = loaiBmKey.Contains("BOF");
-            var usedThongKeHeaders = (await _context.Header_Keys
-                .Where(h =>
-                    h.IsUsedThongKe == true &&
-                    (allowedLoaiThongKe == null ||
-                     (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
-                .ToListAsync())
-                .OrderBy(h => isBofTk1 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
-                .ThenBy(h => h.Id)
-                .Select(h => new PhuLieuHeaderTable
-                {
-                    IDHeaderKey = h.Id,
-                    TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
-                })
-                .ToList();
+        //     // lọc loại thống kê theo LoaiBM
+        //     var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
+        //     HashSet<byte>? allowedLoaiThongKe = null;
 
-            var usedHeaderKeyIds = usedThongKeHeaders.Select(x => x.IDHeaderKey).ToHashSet();
+        //     if (loaiBmKey.Contains("BOF"))
+        //         allowedLoaiThongKe = new HashSet<byte> { 1, 3 };
+        //     else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
+        //         allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
-            // lấy dữ liệu group theo REPORT_NO trực tiếp SQL
-            var groupedIds = query
-             .Where(x => x.REPORT_NO.HasValue)
-             .GroupBy(x => x.REPORT_NO)
-             .Select(g => g.Max(x => x.ID));
+        //     // danh sách header phụ liệu
+        //     bool isBofTk1 = loaiBmKey.Contains("BOF");
+        //     var usedThongKeHeaders = (await _context.Header_Keys
+        //         .Where(h =>
+        //             h.IsUsedThongKe == true &&
+        //             (allowedLoaiThongKe == null ||
+        //              (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
+        //         .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
+        //         .ToListAsync())
+        //         .OrderBy(h => isBofTk1 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
+        //         .ThenBy(h => h.Id)
+        //         .Select(h => new PhuLieuHeaderTable
+        //         {
+        //             IDHeaderKey = h.Id,
+        //             TenPhuLieu = h.TenHienThi,
+        //             LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
+        //         })
+        //         .ToList();
 
-            IQueryable<DLNM_HRC2> groupedQuery = _context.DLNM_HRC2s
-            .Where(x => groupedIds.Contains(x.ID))
-            .OrderByDescending(x => x.Ngay)
-            .ThenByDescending(x => x.REPORT_NO);
+        //     var usedHeaderKeyIds = usedThongKeHeaders.Select(x => x.IDHeaderKey).ToHashSet();
 
-            if (dto.Page.HasValue && dto.PageSize.HasValue)
-            {
-                groupedQuery = groupedQuery
-                    .Skip((dto.Page.Value - 1) * dto.PageSize.Value)
-                    .Take(dto.PageSize.Value);
-            }
+        //     // Lấy dữ liệu:
+        //     // 1) Dòng NM: group theo REPORT_NO, lấy bản ghi mới nhất mỗi report
+        //     // 2) Dòng nhập tay IsNM=false không có REPORT_NO: lấy trực tiếp theo ID
+        //     var groupedIdsByReportNo = query
+        //         .Where(x => x.REPORT_NO.HasValue)
+        //         .GroupBy(x => x.REPORT_NO)
+        //         .Select(g => g.Max(x => x.ID));
 
-            var groupedData = await groupedQuery
-                .AsNoTracking()
-                .ToListAsync();
+        //     var manualIds = query
+        //         .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+        //         .Select(x => x.ID);
 
-            var result = new List<HRC2FilterThongKe>();
+        //     var selectedIds = groupedIdsByReportNo.Union(manualIds);
 
-            foreach (var x in groupedData)
-            {
-                if (!x.REPORT_NO.HasValue || x.REPORT_NO.Value == 0)
-                    continue;
+        //     IQueryable<DLNM_HRC2> groupedQuery = _context.DLNM_HRC2s
+        //         .Where(x => selectedIds.Contains(x.ID))
+        //         .OrderByDescending(x => x.Ngay)
+        //         .ThenByDescending(x => x.REPORT_NO)
+        //         .ThenByDescending(x => x.ID);
 
-                var detail = await GetByReportNoGroupedAsync(x.REPORT_NO.Value);
+        //     if (dto.Page.HasValue && dto.PageSize.HasValue)
+        //     {
+        //         groupedQuery = groupedQuery
+        //             .Skip((dto.Page.Value - 1) * dto.PageSize.Value)
+        //             .Take(dto.PageSize.Value);
+        //     }
 
-                if (detail == null)
-                    continue;
+        //     var groupedData = await groupedQuery
+        //         .AsNoTracking()
+        //         .ToListAsync();
 
-                // mapped
-                var mappedById = (detail.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
-                    .Where(p => p.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(p.ID_HeaderKey.Value))
-                    .GroupBy(p => p.ID_HeaderKey!.Value)
-                    .ToDictionary(g => g.Key, g => g.First());
+        //     var result = new List<HRC2FilterThongKe>();
 
-                var mappedOrdered = new List<HeaderKeyGroupedByReportNoModel>();
+        //     foreach (var x in groupedData)
+        //     {
+        //         HRC2GroupedByReportNoModel? detail = null;
+        //         if (x.REPORT_NO.HasValue && x.REPORT_NO.Value != 0)
+        //         {
+        //             detail = await GetByReportNoGroupedAsync(x.REPORT_NO.Value);
+        //         }
+        //         else if (x.IsNM == false)
+        //         {
+        //             detail = await GetByIdGroupedAsync((int)x.ID);
+        //         }
 
-                foreach (var h in usedThongKeHeaders)
-                {
-                    if (mappedById.TryGetValue(h.IDHeaderKey, out var item))
-                    {
-                        mappedOrdered.Add(item);
-                    }
-                    else
-                    {
-                        mappedOrdered.Add(new HeaderKeyGroupedByReportNoModel
-                        {
-                            ID_HeaderKey = h.IDHeaderKey,
-                            TenHienThi = h.TenPhuLieu,
-                            KLPhuGia = null,
-                            KLPhuGiaTotal = null
-                        });
-                    }
-                }
+        //         if (detail == null)
+        //             continue;
 
-                detail.mappedPhulieus = mappedOrdered;
+        //         // mapped
+        //         var mappedById = (detail.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+        //             .Where(p => p.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(p.ID_HeaderKey.Value))
+        //             .GroupBy(p => p.ID_HeaderKey!.Value)
+        //             .ToDictionary(g => g.Key, g => g.First());
 
-                // phân bổ
-                var phanBoById = (detail.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
-                    .Where(p => p.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(p.ID_HeaderKey.Value))
-                    .GroupBy(p => p.ID_HeaderKey!.Value)
-                    .ToDictionary(g => g.Key, g => g.First());
+        //         var mappedOrdered = new List<HeaderKeyGroupedByReportNoModel>();
 
-                var phanBoOrdered = new List<HeaderKeyGroupedByReportNoModel>();
+        //         foreach (var h in usedThongKeHeaders)
+        //         {
+        //             if (mappedById.TryGetValue(h.IDHeaderKey, out var item))
+        //             {
+        //                 mappedOrdered.Add(item);
+        //             }
+        //             else
+        //             {
+        //                 mappedOrdered.Add(new HeaderKeyGroupedByReportNoModel
+        //                 {
+        //                     ID_HeaderKey = h.IDHeaderKey,
+        //                     TenHienThi = h.TenPhuLieu,
+        //                     KLPhuGia = null,
+        //                     KLPhuGiaTotal = null
+        //                 });
+        //             }
+        //         }
 
-                foreach (var h in usedThongKeHeaders)
-                {
-                    if (phanBoById.TryGetValue(h.IDHeaderKey, out var item))
-                    {
-                        phanBoOrdered.Add(item);
-                    }
-                    else
-                    {
-                        phanBoOrdered.Add(new HeaderKeyGroupedByReportNoModel
-                        {
-                            ID_HeaderKey = h.IDHeaderKey,
-                            TenHienThi = h.TenPhuLieu,
-                            KLPhuGia = null,
-                            KLPhuGiaTotal = null
-                        });
-                    }
-                }
+        //         detail.mappedPhulieus = mappedOrdered;
 
-                detail.phanBoPhulieus = phanBoOrdered;
-                detail.unmappedPhulieus = new List<HeaderKeyGroupedByReportNoModel>();
+        //         // phân bổ
+        //         var phanBoById = (detail.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+        //             .Where(p => p.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(p.ID_HeaderKey.Value))
+        //             .GroupBy(p => p.ID_HeaderKey!.Value)
+        //             .ToDictionary(g => g.Key, g => g.First());
 
-                result.Add(new HRC2FilterThongKe
-                {
-                    dulieu = detail,
-                    phuLieuHeaderTables = usedThongKeHeaders
-                });
-            }
+        //         var phanBoOrdered = new List<HeaderKeyGroupedByReportNoModel>();
 
-            return (result, totalCount);
+        //         foreach (var h in usedThongKeHeaders)
+        //         {
+        //             if (phanBoById.TryGetValue(h.IDHeaderKey, out var item))
+        //             {
+        //                 phanBoOrdered.Add(item);
+        //             }
+        //             else
+        //             {
+        //                 phanBoOrdered.Add(new HeaderKeyGroupedByReportNoModel
+        //                 {
+        //                     ID_HeaderKey = h.IDHeaderKey,
+        //                     TenHienThi = h.TenPhuLieu,
+        //                     KLPhuGia = null,
+        //                     KLPhuGiaTotal = null
+        //                 });
+        //             }
+        //         }
+
+        //         detail.phanBoPhulieus = phanBoOrdered;
+        //         detail.unmappedPhulieus = new List<HeaderKeyGroupedByReportNoModel>();
+
+        //         result.Add(new HRC2FilterThongKe
+        //         {
+        //             dulieu = detail,
+        //             phuLieuHeaderTables = usedThongKeHeaders
+        //         });
+        //     }
+
+        //     return (result, totalCount);
 
 
-        }
+        // }
 
         /// <summary>
         /// Phiên bản tối ưu cho API search-thongke: batch load toàn bộ phụ liệu của trang hiện tại
@@ -1481,12 +1505,22 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                         (x.MeThoi ?? "").Contains(search));
             }
 
-            // === 2. Total count (distinct REPORT_NO) ===
-            var totalCount = await query
+            // === 2. Total count ===
+            // - Bản ghi NM: đếm theo REPORT_NO unique
+            // - Bản ghi nhập tay IsNM=false không có REPORT_NO: đếm theo từng dòng
+            var totalByReportNo = await query
                 .Where(x => x.REPORT_NO.HasValue)
                 .Select(x => x.REPORT_NO)
                 .Distinct()
                 .CountAsync();
+
+            var totalManualRows = await query
+                .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+                .Select(x => x.ID)
+                .Distinct()
+                .CountAsync();
+
+            var totalCount = totalByReportNo + totalManualRows;
 
             // === 3. Header columns ===
             var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
@@ -1530,16 +1564,25 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
 
             var usedHeaderKeyIds = headers.Select(x => x.IDHeaderKey).ToHashSet();
 
-            // === 4. Paged DLNM records (one per REPORT_NO, lấy bản ghi ID lớn nhất) ===
-            var groupedIds = query
+            // === 4. Paged DLNM records ===
+            // - NM có REPORT_NO: lấy 1 bản ghi đại diện/report (ID lớn nhất)
+            // - Nhập tay IsNM=false không REPORT_NO: lấy trực tiếp từng bản ghi
+            var groupedIdsByReportNo = query
                 .Where(x => x.REPORT_NO.HasValue)
                 .GroupBy(x => x.REPORT_NO)
                 .Select(g => g.Max(x => x.ID));
 
+            var manualIds = query
+                .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+                .Select(x => x.ID);
+
+            var selectedIds = groupedIdsByReportNo.Union(manualIds);
+
             IQueryable<DLNM_HRC2> pagedQuery = _context.DLNM_HRC2s
-                .Where(x => groupedIds.Contains(x.ID))
+                .Where(x => selectedIds.Contains(x.ID))
                 .OrderByDescending(x => x.Ngay)
-                .ThenByDescending(x => x.REPORT_NO);
+                .ThenByDescending(x => x.REPORT_NO)
+                .ThenByDescending(x => x.ID);
 
             if (dto.Page.HasValue && dto.PageSize.HasValue)
                 pagedQuery = pagedQuery
@@ -1658,90 +1701,134 @@ if (dto.TuNgay.HasValue && dto.DenNgay.HasValue)
                 );
 
             // === 7. Assemble rows ===
-            var rows = pagedItems
-                .Where(x => x.REPORT_NO.HasValue)
-                .Select(x =>
+            var rows = new List<HRC2ThongKeRow>();
+            foreach (var x in pagedItems)
+            {
+                // Nhập tay không có REPORT_NO: dùng logic theo ID để vẫn lên thống kê
+                if (!x.REPORT_NO.HasValue || x.REPORT_NO.Value == 0)
                 {
-                    var reportNo = x.REPORT_NO!.Value;
-                    mappedByReportNo.TryGetValue(reportNo, out var mappedDict);
-                    phanBoByReportNo.TryGetValue(reportNo, out var phanBoDict);
-
-                    var values = headers.Select(h =>
+                    if (x.IsNM == false)
                     {
-                        double? klPhuGia = null;
-                        double? klPhuGia_Manual = null;
-                        bool? isManual = null;
-
-                        if (mappedDict != null && mappedDict.TryGetValue(h.IDHeaderKey, out var mapped))
+                        var detailById = await GetByIdGroupedAsync((int)x.ID);
+                        if (detailById != null)
                         {
-                            klPhuGia = FormatNumber(mapped.KLPhuGiaTotal);
-                            klPhuGia_Manual = FormatNumber(mapped.KLPhuGia_Manual); // giá trị chỉnh tay trên UI
-                            isManual = mapped.IsManual;
+                            var mappedById = (detailById.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                                .Where(p => p.ID_HeaderKey.HasValue)
+                                .ToDictionary(p => p.ID_HeaderKey!.Value, p => p);
+
+                            var phanBoById = (detailById.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                                .Where(p => p.ID_HeaderKey.HasValue)
+                                .ToDictionary(p => p.ID_HeaderKey!.Value, p => p);
+
+                            var valuesById = headers.Select(h =>
+                            {
+                                mappedById.TryGetValue(h.IDHeaderKey, out var mapped);
+                                phanBoById.TryGetValue(h.IDHeaderKey, out var phanBo);
+
+                                var klPhuGia = FormatNumber(mapped?.KLPhuGia);
+                                var klPhuGiaManual = FormatNumber(mapped?.KLPhuGia_Manual);
+                                var effectiveKL = klPhuGiaManual ?? klPhuGia;
+                                var klPhanBo = FormatNumber(phanBo?.KLPhuGia);
+                                var totalKL = klPhanBo.HasValue
+                                    ? FormatNumber((klPhanBo ?? 0) + (effectiveKL ?? 0))
+                                    : effectiveKL;
+
+                                return new HRC2ThongKeValue
+                                {
+                                    IDHeaderKey = h.IDHeaderKey,
+                                    KLPhuGia = klPhuGia,
+                                    KLPhuGia_Manual = klPhuGiaManual,
+                                    IsManual = mapped?.IsManual,
+                                    KLPhanBo = klPhanBo,
+                                    TotalKLPhuGia = totalKL
+                                };
+                            }).ToList();
+
+                            rows.Add(new HRC2ThongKeRow
+                            {
+                                Data = detailById.data,
+                                Values = valuesById
+                            });
                         }
+                    }
+                    continue;
+                }
 
-                        // effectiveKL: ưu tiên giá trị chỉnh tay, fallback về giá trị tự động
-                        var effectiveKL = klPhuGia_Manual ?? klPhuGia;
+                var reportNo = x.REPORT_NO!.Value;
+                mappedByReportNo.TryGetValue(reportNo, out var mappedDict);
+                phanBoByReportNo.TryGetValue(reportNo, out var phanBoDict);
 
-                        double? totalKLPhuGia;
+                var values = headers.Select(h =>
+                {
+                    double? klPhuGia = null;
+                    double? klPhuGia_Manual = null;
+                    bool? isManual = null;
 
-                        double? klPhanBo = null;
-
-                        if (phanBoDict != null && phanBoDict.TryGetValue(h.IDHeaderKey, out var phanBo))
-                        {
-                            klPhanBo = FormatNumber(phanBo.KLPhuGia);
-                            totalKLPhuGia = FormatNumber((phanBo.KLPhuGia ?? 0) + (effectiveKL ?? 0));
-                            // isManual = phanBo.IsManual;
-                        }
-                        else
-                        {
-                            totalKLPhuGia = effectiveKL;
-                        }
-
-                        return new HRC2ThongKeValue
-                        {
-                            IDHeaderKey = h.IDHeaderKey,
-                            KLPhuGia = klPhuGia,
-                            KLPhuGia_Manual = klPhuGia_Manual,
-                            IsManual = isManual,
-                            KLPhanBo = klPhanBo,
-                            TotalKLPhuGia = totalKLPhuGia
-                        };
-                    }).ToList();
-
-                    return new HRC2ThongKeRow
+                    if (mappedDict != null && mappedDict.TryGetValue(h.IDHeaderKey, out var mapped))
                     {
-                        Data = new DLNM_HRC2_ResponseModels
-                        {
-                            ID = x.ID,
-                            REPORT_NO = x.REPORT_NO,
-                            NgaySx = x.NgaySx,
-                            Ngay = x.Ngay,
-                            Ca = x.Ca,
-                            BieuMau = x.BieuMau,
-                            Scope = x.Scope,
-                            MeThoi = x.MeThoi,
-                            MacThep = x.MacThep,
-                            O2 = FormatNumber(x.O2),
-                            AR_RH = FormatNumber(x.AR_RH),
-                            N2 = FormatNumber(x.N2),
-                            AR_BOF = FormatNumber(x.AR_BOF),
-                            AR_LF = FormatNumber(x.AR_LF),
-                            KLGangLong = FormatNumber(x.KLGangLong),
-                            KLThepPhe = FormatNumber(x.KLThepPhe),
-                            KLGangLongCCT = FormatNumber(x.KLGangLongCCT),
-                            KLGangLongCR = FormatNumber(x.KLGangLongCR),
-                            KLThepLong = FormatNumber(x.KLThepLong),
-                            IsNM = x.IsNM,
-                            IsChuyenCa = x.IsChuyenCa,
-                            IsTrungMeThoi = x.IsTrungMeThoi,
-                            QueLayMau = x.QueLayMau,
-                            QueDoNhiet = x.QueDoNhiet,
-                            GhiChu = x.GhiChu
-                        },
-                        Values = values
+                        klPhuGia = FormatNumber(mapped.KLPhuGiaTotal);
+                        klPhuGia_Manual = FormatNumber(mapped.KLPhuGia_Manual);
+                        isManual = mapped.IsManual;
+                    }
+
+                    var effectiveKL = klPhuGia_Manual ?? klPhuGia;
+                    double? klPhanBo = null;
+                    double? totalKLPhuGia;
+
+                    if (phanBoDict != null && phanBoDict.TryGetValue(h.IDHeaderKey, out var phanBo))
+                    {
+                        klPhanBo = FormatNumber(phanBo.KLPhuGia);
+                        totalKLPhuGia = FormatNumber((phanBo.KLPhuGia ?? 0) + (effectiveKL ?? 0));
+                    }
+                    else
+                    {
+                        totalKLPhuGia = effectiveKL;
+                    }
+
+                    return new HRC2ThongKeValue
+                    {
+                        IDHeaderKey = h.IDHeaderKey,
+                        KLPhuGia = klPhuGia,
+                        KLPhuGia_Manual = klPhuGia_Manual,
+                        IsManual = isManual,
+                        KLPhanBo = klPhanBo,
+                        TotalKLPhuGia = totalKLPhuGia
                     };
-                })
-                .ToList();
+                }).ToList();
+
+                rows.Add(new HRC2ThongKeRow
+                {
+                    Data = new DLNM_HRC2_ResponseModels
+                    {
+                        ID = x.ID,
+                        REPORT_NO = x.REPORT_NO,
+                        NgaySx = x.NgaySx,
+                        Ngay = x.Ngay,
+                        Ca = x.Ca,
+                        BieuMau = x.BieuMau,
+                        Scope = x.Scope,
+                        MeThoi = x.MeThoi,
+                        MacThep = x.MacThep,
+                        O2 = FormatNumber(x.O2),
+                        AR_RH = FormatNumber(x.AR_RH),
+                        N2 = FormatNumber(x.N2),
+                        AR_BOF = FormatNumber(x.AR_BOF),
+                        AR_LF = FormatNumber(x.AR_LF),
+                        KLGangLong = FormatNumber(x.KLGangLong),
+                        KLThepPhe = FormatNumber(x.KLThepPhe),
+                        KLGangLongCCT = FormatNumber(x.KLGangLongCCT),
+                        KLGangLongCR = FormatNumber(x.KLGangLongCR),
+                        KLThepLong = FormatNumber(x.KLThepLong),
+                        IsNM = x.IsNM,
+                        IsChuyenCa = x.IsChuyenCa,
+                        IsTrungMeThoi = x.IsTrungMeThoi,
+                        QueLayMau = x.QueLayMau,
+                        QueDoNhiet = x.QueDoNhiet,
+                        GhiChu = x.GhiChu
+                    },
+                    Values = values
+                });
+            }
 
             return new SearchThongKeApiResponse
             {
