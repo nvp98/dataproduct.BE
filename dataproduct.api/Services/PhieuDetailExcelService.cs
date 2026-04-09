@@ -552,7 +552,7 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 1).Value = stt++;
                 ws.Cell(r, 2).Value = row.MeNauSo  ?? "";
                 ws.Cell(r, 3).Value = row.MacThep  ?? "";
-                ws.Cell(r, 4).Value = Num(row.KLGangLong);
+                ws.Cell(r, 4).Value = Num(row.KLGangLongCCT);
                 ws.Cell(r, 5).Value = Num(row.KLThepPhe);
                 for (int i = 0; i < n; i++)
                     ws.Cell(r, s + i).Value = row.PhuGia.TryGetValue(headerKeys[i].Id, out var kl)
@@ -568,7 +568,7 @@ namespace dataproduct.api.Services
             ws.Range(r, 1, r, 3).Merge();
             ws.Cell(r, 1).Value           = "Tổng cộng";
             ws.Cell(r, 1).Style.Font.Bold = true;
-            ws.Cell(r, 4).Value = data.Sum(d => d.KLGangLong ?? 0);
+            ws.Cell(r, 4).Value = data.Sum(d => d.KLGangLongCCT ?? 0);
             ws.Cell(r, 5).Value = data.Sum(d => d.KLThepPhe  ?? 0);
             for (int i = 0; i < n; i++)
             {
@@ -947,7 +947,7 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 1).Value = n++;
                 ws.Cell(r, 2).Value = d.MeThoi  ?? "";
                 ws.Cell(r, 3).Value = d.MacThep ?? "";
-                ws.Cell(r, 4).Value = Num(d.KLGangLong);
+                ws.Cell(r, 4).Value = Num(d.KLGangLongCCT);
                 ws.Cell(r, 5).Value = Num(d.KLThepPhe);
 
                 for (int i = 0; i < headers.Count; i++)
@@ -1052,7 +1052,7 @@ namespace dataproduct.api.Services
             ws.Cell(r, 1).Style.Font.Bold            = true;
             ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-            ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => x.Data?.KLGangLong ?? 0);
+            ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => x.Data?.KLGangLongCCT ?? 0);
             ws.Cell(r, 5).Value = (XLCellValue)rows.Sum(x => x.Data?.KLThepPhe  ?? 0);
 
             for (int i = 0; i < headers.Count; i++)
@@ -1601,7 +1601,7 @@ namespace dataproduct.api.Services
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
-                sb.Append($"<td>{PFmt(d.KLGangLong)}</td><td>{PFmt(d.KLThepPhe)}</td>");
+                sb.Append($"<td>{PFmt(d.KLGangLongCCT)}</td><td>{PFmt(d.KLThepPhe)}</td>");
                 foreach (var hx in headers)
                     sb.Append($"<td>{PFmt(vm.TryGetValue(hx.IDHeaderKey, out var kl) ? kl : null)}</td>");
                 sb.Append($"<td>{PFmt(d.O2)}</td><td>{PFmt(d.N2)}</td>");
@@ -1612,7 +1612,7 @@ namespace dataproduct.api.Services
             }
             // Tổng cộng
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
-            sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLGangLong ?? 0))}</td>");
+            sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLGangLongCCT ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepPhe  ?? 0))}</td>");
             foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2 ?? 0))}</td>");

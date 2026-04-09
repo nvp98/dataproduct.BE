@@ -26,7 +26,7 @@ namespace dataproduct.api.DTOs.Export
     {
         public string? MeNauSo { get; set; }
         public string? MacThep { get; set; }
-        public double? KLGangLong { get; set; }
+        public double? KLGangLongCCT { get; set; }
         public double? KLThepPhe { get; set; }
         /// <summary>Khối lượng từng phụ gia, key = HeaderKey.Id.</summary>
         public Dictionary<int, double?> PhuGia { get; set; } = new();
