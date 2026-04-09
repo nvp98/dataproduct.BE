@@ -40,6 +40,8 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<CtdStdDienBien> CtdStdDienBiens { get; set; }
 
+    public virtual DbSet<CtdGiaoNhanPhoi> CtdGiaoNhanPhois { get; set; }
+
     public virtual DbSet<DLNM_HRC2> DLNM_HRC2s { get; set; }
 
     public virtual DbSet<Header_Key> Header_Keys { get; set; }
@@ -328,6 +330,20 @@ public partial class ProductFormContext : DbContext
                 .HasColumnName("MoTa");
             entity.Property(e => e.LoaiSuCo).HasMaxLength(50);
             entity.Property(e => e.PheCongNghe).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<CtdGiaoNhanPhoi>(entity =>
+        {
+            entity.ToTable("CTD_GiaoNhanPhoi");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MaViTri).HasMaxLength(50);
+            entity.Property(e => e.ViTri).HasMaxLength(200);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.SoCay).HasColumnName("SoCay");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.IdPhieu).HasColumnName("IDPhieu");
         });
 
         modelBuilder.Entity<DLNM_HRC2>(entity =>

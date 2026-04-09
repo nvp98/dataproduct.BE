@@ -210,6 +210,9 @@ namespace dataproduct.api.Business
                 await _context.SaveChangesAsync();
                 await tran.CommitAsync();
 
+                // Đồng bộ kíp nếu Ca hoặc NgaySX thay đổi
+                await ResolveAndSaveKipAsync(phieu);
+
                 return phieu;
             }
             catch (Exception)
