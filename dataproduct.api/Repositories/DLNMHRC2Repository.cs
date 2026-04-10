@@ -1051,19 +1051,57 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
+        // public async Task DeleteAsync(long id)
+        // {
+        //     var item = await _context.DLNM_HRC2s.FindAsync(id);
+        //     if (item != null)
+        //     {
+        //         _context.DLNM_HRC2s.Remove(item);
+
+        //         var relatedPhuLieuItems = await _context.PhuLieu_HRC2s
+        //             .Where(x => x.ID_MeThoi == id)
+        //             .ToListAsync();
+        //         _context.PhuLieu_HRC2s.RemoveRange(relatedPhuLieuItems);
+        //         await _context.SaveChangesAsync();
+        //     }
+        // }
         public async Task DeleteAsync(long id)
         {
             var item = await _context.DLNM_HRC2s.FindAsync(id);
-            if (item != null)
+            if (item == null) return;
+
+            // Đếm số record còn lại sau khi xóa (loại chính nó ra)
+            var countAfterDelete = await _context.DLNM_HRC2s
+                .CountAsync(x => x.MeThoi == item.MeThoi 
+                            && x.BieuMau == item.BieuMau
+                            && x.ID != id);
+
+            // Xóa chính
+            _context.DLNM_HRC2s.Remove(item);
+
+            // Nếu sau khi xóa chỉ còn < 2 (tức là còn 0 hoặc 1)
+            if (countAfterDelete < 2)
             {
-                _context.DLNM_HRC2s.Remove(item);
-                
-                var relatedPhuLieuItems = await _context.PhuLieu_HRC2s
-                    .Where(x => x.ID_MeThoi == id)
+                var remainItems = await _context.DLNM_HRC2s
+                    .Where(x => x.MeThoi == item.MeThoi 
+                            && x.BieuMau == item.BieuMau
+                            && x.ID != id)
                     .ToListAsync();
-                _context.PhuLieu_HRC2s.RemoveRange(relatedPhuLieuItems);
-                await _context.SaveChangesAsync();
+
+                foreach (var x in remainItems)
+                {
+                    x.IsTrungMeThoi = false;
+                }
             }
+
+            // Xóa phụ liệu
+            var relatedPhuLieuItems = await _context.PhuLieu_HRC2s
+                .Where(x => x.ID_MeThoi == id)
+                .ToListAsync();
+
+            _context.PhuLieu_HRC2s.RemoveRange(relatedPhuLieuItems);
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<bool> ExistsAsync(int id)
@@ -1503,6 +1541,9 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x =>
                         (x.MacThep ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
+            }
+            if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value){
+                query = query.Where(x => x.IsTrungMeThoi == true);
             }
 
             // === 2. Total count ===

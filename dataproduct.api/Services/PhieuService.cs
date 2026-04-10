@@ -599,7 +599,7 @@ namespace dataproduct.api.Business
             };
         }
 
-        private async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
+        public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
         {
             // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
             var idPhieus = await _context.BmPhieus

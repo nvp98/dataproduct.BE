@@ -176,6 +176,13 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("hrc2-std-nxt/status")]
+        public async Task<IActionResult> GetStatusHRC2StdNxt([FromQuery] DateOnly ngaySX, [FromQuery] int ca)
+        {
+            var status = await _service.GetStatusHRC2_STD_NXT(ngaySX, ca);
+            return Ok(new { tinhTrang = status });
+        }
+
         [HttpPut("{id}/sync-nguoi-tao")]
         public async Task<IActionResult> SyncNguoiTao(Guid id, [FromBody] int? NguoiTaoID)
         {

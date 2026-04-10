@@ -63,11 +63,10 @@ namespace dataproduct.api.ResponseModels
         public bool? IsManual { get; set; }
         /// <summary>Lượng được phân bổ từ PhanBoAsync (null nếu không có phân bổ).</summary>
         public double? KLPhanBo { get; set; }
+        /// <summary>KL hiển thị trên cột phụ liệu: KLPhuGia_Manual ?? KLPhuGia (không cộng phân bổ).</summary>
+        public double? EffectiveKL { get; set; }
         /// <summary>
-        /// Giá trị tổng hợp cuối cùng để thống kê:
-        /// effectiveKL = KLPhuGia_Manual ?? KLPhuGia
-        /// Nếu có phân bổ: TotalKLPhuGia = KLPhanBo + effectiveKL
-        /// Không có phân bổ: TotalKLPhuGia = effectiveKL
+        /// Giá trị tổng hợp cuối cùng để thống kê (effectiveKL + phân bổ nếu có).
         /// </summary>
         public double? TotalKLPhuGia { get; set; }
     }
