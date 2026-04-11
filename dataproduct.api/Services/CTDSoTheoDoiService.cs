@@ -358,7 +358,7 @@ namespace dataproduct.api.Services
                 ws1.Cell(r, 2).Value = row.p.Ca;
                 ws1.Cell(r, 3).Value = row.p.Kip;
                 ws1.Cell(r, 4).Value = row.d.LoaiMacPhoi switch { 1 => "I", 2 => "II", 3 => "III", _ => row.d.LoaiMacPhoi?.ToString() }; ;
-                ws1.Cell(r, 5).Value = row.d.LoaiMacPhoi switch { 1 => "I", 2 => "II", 3 => "III", _ => row.d.LoaiMacPhoi?.ToString() };
+                ws1.Cell(r, 5).Value = row.d.TenMacPhoi;
                 ws1.Cell(r, 6).Value = row.d.LoaiPhoi switch
                 {
                     1 => "loại I",
@@ -367,14 +367,13 @@ namespace dataproduct.api.Services
                     _ => row.d.LoaiPhoi?.ToString()
                 };
                 ws1.Cell(r, 7).Value = row.d.KichThuoc;
-                ws1.Cell(r, 8).Value = row.d.PhoiHoiLo;
-                ws1.Cell(r, 9).Value = row.d.PhoiRaLo;
-                ws1.Cell(r, 10).Value = row.d.PhoiHoiLo;
-                ws1.Cell(r, 11).Value = row.d.PhoiRaSan;
-                ws1.Cell(r, 12).Value = row.d.PhoiPheCn;
-                ws1.Cell(r, 13).Value = row.d.LoaiSp;
-                ws1.Cell(r, 14).Value = row.d.MacThep;
-                ws1.Cell(r, 15).Value = row.d.LenhSanXuat;
+                ws1.Cell(r, 8).Value = row.d.PhoiRaLo;
+                ws1.Cell(r, 9).Value = row.d.PhoiHoiLo;
+                ws1.Cell(r, 10).Value = row.d.PhoiRaSan;
+                ws1.Cell(r, 11).Value = row.d.PhoiPheCn;
+                ws1.Cell(r, 12).Value = row.d.LoaiSp;
+                ws1.Cell(r, 13).Value = row.d.MacThep;
+                ws1.Cell(r, 14).Value = row.d.LenhSanXuat;
                 ws1.Cell(r, 15).Value = row.p.SoPhieu;
                 ws1.Cell(r, 16).Value = TinhTrangToText(row.p.TinhTrang);
             }
