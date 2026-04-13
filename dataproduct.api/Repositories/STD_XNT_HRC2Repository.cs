@@ -542,7 +542,9 @@ namespace dataproduct.api.Repositories
                     ChenhLech = x.ChenhLech,
                     HasPhanBo = x.HasPhanBo,
                     TyLeBOF = x.TyLeBOF,
-                    TyLeTinhLuyen = x.TyLeTinhLuyen
+                    TyLeTinhLuyen = x.TyLeTinhLuyen,
+                    KLPB_BOF = x.KLPB_BOF,
+                    KLPB_TL = x.KLPB_TL
                 }).ToList()
             };
         }
@@ -762,6 +764,8 @@ namespace dataproduct.api.Repositories
                 }
 
                 Dictionary<long, decimal> klPhanBoByMeThoi;
+                decimal? klPerBofToPersist = null;
+                decimal? klPerTinhLuyenToPersist = null;
 
                 if (tyLeBOF != null || tyLeTinhLuyen != null)
                 {
@@ -785,28 +789,34 @@ namespace dataproduct.api.Repositories
                     {
                         var bofAmount = entity.ChenhLech * tyLeBOFValue / 100;
                         var klPerBof = bofAmount / bofMeIds.Count;
+                        klPerBofToPersist = klPerBof;
                         foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = klPerBof;
                     }
                     else
                     {
                         foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = 0;
+                        if (bofMeIds.Any()) klPerBofToPersist = 0;
                     }
 
                     if (tinhLuyenMeIds.Any() && tyLeTinhLuyen is decimal tyLeTinhLuyenValue && tyLeTinhLuyenValue > 0)
                     {
                         var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyenValue / 100;
                         var klPerTinhLuyen = tinhLuyenAmount / tinhLuyenMeIds.Count;
+                        klPerTinhLuyenToPersist = klPerTinhLuyen;
                         foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTinhLuyen;
                     }
                     else
                     {
                         foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = 0;
+                        if (tinhLuyenMeIds.Any()) klPerTinhLuyenToPersist = 0;
                     }
                 }
                 else
                 {
                     // Fallback: chia đều cho tất cả mẻ (hành vi cũ)
                     var klEqual = entity.ChenhLech / meThoiIds.Count;
+                    klPerBofToPersist = null;
+                    klPerTinhLuyenToPersist = null;
                     klPhanBoByMeThoi = meThoiIds.ToDictionary(id => id, _ => klEqual);
                 }
 
@@ -884,6 +894,8 @@ namespace dataproduct.api.Repositories
                 }
 
                 details.HasPhanBo = true;
+                details.KLPB_BOF = klPerBofToPersist;
+                details.KLPB_TL = klPerTinhLuyenToPersist;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -937,6 +949,8 @@ namespace dataproduct.api.Repositories
                 summary.HasPhanBo = null;
                 summary.TyLeBOF = null;
                 summary.TyLeTinhLuyen = null;
+                summary.KLPB_BOF = null;
+                summary.KLPB_TL = null;
 
                 await _context.SaveChangesAsync();
                 return true;

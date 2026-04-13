@@ -342,9 +342,9 @@ namespace dataproduct.api.Repositories
             var totalCount = await query.CountAsync();
 
             // Lấy dữ liệu với pagination: phụ liệu mới trước (NgayTaoPhuLieu DESC) rồi header key mới (NgayTao DESC)
-            var ordered = query
-                .OrderByDescending(x => x.NgayTaoPhuLieu)
-                .ThenByDescending(x => x.NgayTao);
+            var ordered = query.OrderByDescending(x => x.NgayTao);
+                //.OrderByDescending(x => x.NgayTaoPhuLieu)
+                //.ThenByDescending(x => x.NgayTao);
 
             var data = await ordered
                 .ThenBy(x => x.MappingId == null ? 1 : 0)

@@ -62,7 +62,8 @@ namespace dataproduct.api.Services
         /// Lấy danh sách MaBM cho menu:
         /// - processing (Việc tôi bắt đầu): MaBM có QuyenChucNang = 1 (XULY) hoặc 4 (XULY_VA_PHEDUYET).
         /// - approving (Việc đến tôi): MaBM có QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET), hợp với list từ BM_PheDuyet (phiếu có user là người duyệt).
-        /// MaBM có trong cả hai list thì FE hiển thị ở cả "Việc tôi bắt đầu" và "Việc đến tôi".
+        /// - viewing (Chỉ xem): MaBM có QuyenChucNang = 5 (XEM).
+        /// MaBM có trong nhiều list thì FE có thể hiển thị theo nhu cầu.
         /// </summary>
         public async Task<MenuPermissionsDto> GetMenuPermissionsAsync(int idTaiKhoan)
         {
@@ -113,10 +114,19 @@ namespace dataproduct.api.Services
                 .Distinct()
                 .ToList();
 
+            // Chỉ xem: QuyenChucNang = 5 (XEM)
+            var viewing = data
+                .Where(x => x.QuyenChucNang == (byte)QuyenChucNangEnum.XEM)
+                .Select(x => x.MaBm != null ? x.MaBm.Trim() : null)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct()
+                .ToList();
+
             return new MenuPermissionsDto
             {
                 ProcessingForms = processing,
-                ApprovingForms = approving
+                ApprovingForms = approving,
+                ViewingForms = viewing
             };
         }
 

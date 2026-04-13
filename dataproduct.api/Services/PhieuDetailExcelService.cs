@@ -37,6 +37,18 @@ namespace dataproduct.api.Services
             return phieu;
         }
 
+        public async Task<BmPhieu?> GetBmPhieuByMaBmNgayCaScopeAsync(string maBm, DateOnly ngay, int ca, int scope)
+        {
+            return await _context.BmPhieus
+                .Where(x => x.MaBm == maBm
+                         && x.NgaySX == ngay
+                         && x.Ca == ca
+                         && x.Scope == scope
+                         && x.IsDelete != 1)
+                .OrderByDescending(x => x.NgayTao)
+                .FirstOrDefaultAsync();
+        }
+
         // -------------------------------------------------------
         // Column position helpers
         // -------------------------------------------------------
@@ -262,6 +274,7 @@ namespace dataproduct.api.Services
                             KLPhuGia_Manual = klPhuGia_Manual,
                             IsManual = isManual,
                             KLPhanBo = klPhanBo,
+                            EffectiveKL = RoundNumber(effectiveKL),
                             TotalKLPhuGia = totalKLPhuGia
                         };
                     }).ToList();
@@ -941,7 +954,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
@@ -976,7 +989,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
@@ -1011,7 +1024,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
@@ -1059,7 +1072,7 @@ namespace dataproduct.api.Services
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1093,7 +1106,7 @@ namespace dataproduct.api.Services
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1127,7 +1140,7 @@ namespace dataproduct.api.Services
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1597,7 +1610,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
@@ -1614,7 +1627,7 @@ namespace dataproduct.api.Services
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLGangLongCCT ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepPhe  ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2 ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2 ?? 0))}</td>");
             sb.Append("<td></td>");
@@ -1632,7 +1645,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
@@ -1648,7 +1661,7 @@ namespace dataproduct.api.Services
             }
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepLong ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR_LF     ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.QueLayMau  ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.QueDoNhiet ?? 0))}</td>");
@@ -1667,7 +1680,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
@@ -1683,7 +1696,7 @@ namespace dataproduct.api.Services
             }
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepLong ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR_RH      ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2         ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2         ?? 0))}</td>");

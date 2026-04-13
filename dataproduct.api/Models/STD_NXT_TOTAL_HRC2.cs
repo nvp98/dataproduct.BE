@@ -45,5 +45,12 @@ public class STD_NXT_TOTAL_HRC2
 
     [Column(TypeName = "decimal(18,3)")]
     public decimal? TyLeTinhLuyen { get; set; }
+
+    // Khối lượng phân bổ (tính theo 1 mẻ) sau khi chia theo nhóm mẻ
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_BOF { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_TL { get; set; }
 }
 

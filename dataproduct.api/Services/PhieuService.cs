@@ -457,6 +457,7 @@ namespace dataproduct.api.Business
                 // 5. Clone mang trạng thái Hiệu chỉnh (7), hiện nút Lưu / Lưu và Gửi như Đang lưu
                 phieu.IsClone = true;
                 phieu.VersionClone = nextVersion;
+                phieu.Kip = phieuGoc.Kip;
                 // ID_PhieuGoc luôn trỏ về phiếu cha (phiếu bị bấm clone), hỗ trợ clone nhiều tầng: A -> A1 -> A2...
                 phieu.ID_PhieuGoc = phieuGoc.Idphieu;
                 phieu.TinhTrang = 7;
@@ -599,7 +600,26 @@ namespace dataproduct.api.Business
             };
         }
 
-        private async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
+        public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request)
+        {
+            var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
+            var dataList = data.ToList();
+
+            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            {
+                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+            }
+
+            return new PagedResult<SearchPhieuResponseModel>
+            {
+                Data = dataList,
+                TotalRecords = totalCount,
+                Page = request.page,
+                PageSize = request.pageSize
+            };
+        }
+
+        public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
         {
             // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
             var idPhieus = await _context.BmPhieus
