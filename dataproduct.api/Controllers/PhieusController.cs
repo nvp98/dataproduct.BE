@@ -129,6 +129,20 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpPost("search-by-user")]
+        public async Task<IActionResult> SearchByUser([FromBody] SearchPhieuByUserRequest request)
+        {
+            try
+            {
+                var result = await _service.SearchWithPagingByUserAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id)
         {

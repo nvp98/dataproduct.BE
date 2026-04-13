@@ -37,6 +37,18 @@ namespace dataproduct.api.Services
             return phieu;
         }
 
+        public async Task<BmPhieu?> GetBmPhieuByMaBmNgayCaScopeAsync(string maBm, DateOnly ngay, int ca, int scope)
+        {
+            return await _context.BmPhieus
+                .Where(x => x.MaBm == maBm
+                         && x.NgaySX == ngay
+                         && x.Ca == ca
+                         && x.Scope == scope
+                         && x.IsDelete != 1)
+                .OrderByDescending(x => x.NgayTao)
+                .FirstOrDefaultAsync();
+        }
+
         // -------------------------------------------------------
         // Column position helpers
         // -------------------------------------------------------

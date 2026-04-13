@@ -348,6 +348,80 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("export-excel-tieuhao")]
+        public async Task<IActionResult> ExportExcelTieuHao(
+            [FromQuery] DateOnly ngay,
+            [FromQuery] int ca)
+        {
+            // Hard-coded: thứ tự sheet và tổ hợp (sheetName, bieuMauShort, maBmFull, scope)
+            var sheetMap = new[]
+            {
+                (SheetName: "BOF_6", BieuMauShort: "BOF", MaBmFull: "HRC2_BB_NauLuyen_BOF", Scope: 6),
+                (SheetName: "BOF_7", BieuMauShort: "BOF", MaBmFull: "HRC2_BB_NauLuyen_BOF", Scope: 7),
+                (SheetName: "LF_6",  BieuMauShort: "LF",  MaBmFull: "HRC2_BB_NauLuyen_LF",  Scope: 6),
+                (SheetName: "RH_1",  BieuMauShort: "RH",  MaBmFull: "HRC2_BB_NauLuyen_RH",  Scope: 1),
+                (SheetName: "RH_2",  BieuMauShort: "RH",  MaBmFull: "HRC2_BB_NauLuyen_RH",  Scope: 2),
+            };
+
+            var templatePath = Path.Combine(_env.WebRootPath, "templates", "TieuHao_HRC2.xlsx");
+            if (!System.IO.File.Exists(templatePath))
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = "Chưa có template TieuHao_HRC2.xlsx. Đặt file tại: wwwroot/templates/TieuHao_HRC2.xlsx" });
+
+            var dateStr  = ngay.ToString("ddMMyyyy");
+            var fileName = $"TieuHao_HRC2_Ca{ca}_{dateStr}.xlsx";
+            var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+
+            try
+            {
+                using (var workbook = new XLWorkbook(templatePath))
+                {
+                    foreach (var item in sheetMap)
+                    {
+                        var ws = workbook.Worksheet(item.SheetName);
+
+                        // Lấy kip từ BmPhieu tương ứng (nếu có)
+                        var phieu = await _excelService.GetBmPhieuByMaBmNgayCaScopeAsync(
+                            item.MaBmFull, ngay, ca, item.Scope);
+                        var kip = phieu?.Kip ?? "";
+
+                        var (headersBOF, headersLFRH, rows) =
+                            await _excelService.GetExportDataAsync(ngay, ca, item.BieuMauShort, item.Scope);
+
+                        var headers = item.BieuMauShort.Equals("BOF", StringComparison.OrdinalIgnoreCase)
+                            ? headersBOF
+                            : headersLFRH;
+
+                        _excelService.RenderBodyFromDb(
+                            ws,
+                            item.MaBmFull,
+                            headers,
+                            rows,
+                            item.Scope,
+                            ngayPhieu: ngay,
+                            caPhieu: ca,
+                            kip: kip);
+                    }
+
+                    workbook.SaveAs(tempPath);
+                }
+
+                var bytes = System.IO.File.ReadAllBytes(tempPath);
+                if (bytes.Length < 4 || bytes[0] != (byte)'P' || bytes[1] != (byte)'K')
+                    throw new InvalidOperationException("File XLSX sinh ra không hợp lệ.");
+
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+            finally
+            {
+                if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+            }
+        }
+
         [HttpGet("export-pdf-detail")]
         public async Task<IActionResult> ExportPdfDetail(
             [FromQuery] DateOnly ngay,
