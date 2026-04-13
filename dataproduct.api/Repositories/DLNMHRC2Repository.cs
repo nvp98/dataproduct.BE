@@ -833,7 +833,12 @@ namespace dataproduct.api.Repositories
                             foreach (var map in activeMaps)
                             {
                                 var headerKeyId = map.ID_HeaderKey;
-                                var formattedValue = FormatNumber(phuLieuItem.KLPhuGia);
+                                // Header_Key Id=5: KLPhuGia ÷ 0.055, làm tròn không chữ số thập phân
+                                var formattedValue = headerKeyId == 5
+                                    ? (phuLieuItem.KLPhuGia.HasValue
+                                        ? (double?)Math.Round(phuLieuItem.KLPhuGia.Value / 0.055, 0, MidpointRounding.AwayFromZero)
+                                        : null)
+                                    : FormatNumber(phuLieuItem.KLPhuGia);
                                 if (!groupedMappedPhuLieus.ContainsKey(headerKeyId))
                                 {
                                     groupedMappedPhuLieus[headerKeyId] = new HeaderKeyGroupedByReportNoModel
@@ -1807,8 +1812,21 @@ namespace dataproduct.api.Repositories
 
                     if (mappedDict != null && mappedDict.TryGetValue(h.IDHeaderKey, out var mapped))
                     {
-                        klPhuGia = FormatNumber(mapped.KLPhuGiaTotal);
-                        klPhuGia_Manual = FormatNumber(mapped.KLPhuGia_Manual);
+                        // Header_Key Id=5: cả KLPhuGia và KLPhuGia_Manual đều ÷ 0.055, làm tròn không chữ số thập phân
+                        if (h.IDHeaderKey == 5)
+                        {
+                            klPhuGia = mapped.KLPhuGiaTotal.HasValue
+                                ? (double?)Math.Round(mapped.KLPhuGiaTotal.Value / 0.055, 0, MidpointRounding.AwayFromZero)
+                                : null;
+                            klPhuGia_Manual = mapped.KLPhuGia_Manual.HasValue
+                                ? mapped.KLPhuGia_Manual.Value 
+                                : null;
+                        }
+                        else
+                        {
+                            klPhuGia = FormatNumber(mapped.KLPhuGiaTotal);
+                            klPhuGia_Manual = FormatNumber(mapped.KLPhuGia_Manual);
+                        }
                         isManual = mapped.IsManual;
                     }
 
@@ -2025,7 +2043,7 @@ namespace dataproduct.api.Repositories
 
             foreach (var item in mappedGrouped)
             {
-                var effectiveKL = item.KLPhuGia_Manual ?? item.KLPhuGia;
+                var effectiveKL = item.KLPhuGia_Manual ?? (item.ID_HeaderKey == 5 ? Math.Round(item.KLPhuGia / 0.055, 0, MidpointRounding.AwayFromZero) : item.KLPhuGia);
                 var total = phanBoLookup.TryGetValue((item.ReportNo, item.ID_HeaderKey), out var phanBoKL)
                     ? phanBoKL + effectiveKL
                     : effectiveKL;
