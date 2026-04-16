@@ -6,10 +6,13 @@ using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
 using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NuGet.Protocol.Core.Types;
 using System;
 using System.Configuration;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
@@ -25,9 +28,10 @@ namespace dataproduct.api.Services
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IPhieuRepository _repoPhieu;
+        private readonly ProductFormContext _context;
 
 
-        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu)
+        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu, ProductFormContext context)
         {
             _repo = repo;
             _pdfConverter = pdfConverter;
@@ -36,6 +40,12 @@ namespace dataproduct.api.Services
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
             _repoPhieu = repoPhieu;
+            _context = context;
+        }
+
+        private static string NormalizeKeyValue(string? value)
+        {
+            return (value ?? string.Empty).Trim().ToUpperInvariant();
         }
 
         private async Task<string> ConvertImageUrlToBase64Async(string imageUrl)
@@ -130,9 +140,226 @@ namespace dataproduct.api.Services
         {
             return await _repo.GetSanLuongPhoiAsync(ca, kip, ngaySX);
         }
-        public async Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
+
+        public async Task<int> InsertSanLuongPhoiFromPhieuJsonAsync(BmPhieu phieu)
+        {
+            if (phieu == null)
+                throw new ArgumentNullException(nameof(phieu));
+
+            var entities = new List<BM_SanLuongPhoi>();
+
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
+            {
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (TryGetRowsElement(root, out var rowsElement))
+                {
+                    foreach (var row in rowsElement.EnumerateArray())
+                    {
+                        if (row.ValueKind != JsonValueKind.Object)
+                            continue;
+
+                        entities.Add(new BM_SanLuongPhoi
+                        {
+                            IdPhieu = phieu.Idphieu,
+                            SoPhieu = phieu.SoPhieu ?? string.Empty,
+                            NgaySX = (phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue),
+                            Kip = phieu.Kip ?? string.Empty,
+                            Ca = phieu.Ca ?? 0,
+                            MayDuc = phieu.MayDuc ?? 0,
+                            MacThep = TryGetString(row, "macThep", "MacThep") ?? string.Empty,
+                            KichThuoc = TryGetString(row, "kichThuoc", "KichThuoc") ?? string.Empty,
+                            StLoai1 = TryGetInt(row, "stLoai1", "StLoai1"),
+                            KlLoai1 = TryGetDecimal(row, "klLoai1", "KlLoai1"),
+                            StPhoiNgan = TryGetInt(row, "stPhoiNgan", "StPhoiNgan"),
+                            KlPhoiNgan = TryGetDecimal(row, "klPhoiNgan", "KlPhoiNgan"),
+                            StLoai2 = TryGetInt(row, "stLoai2", "StLoai2"),
+                            KlLoai2 = TryGetDecimal(row, "klLoai2", "KlLoai2"),
+                            StLoai3 = TryGetInt(row, "stLoai3", "StLoai3"),
+                            KlLoai3 = TryGetDecimal(row, "klLoai3", "KlLoai3"),
+                            TongSoThanh = TryGetInt(row, "tongSoThanh", "TongSoThanh"),
+                            TongKhoiLuong = TryGetDecimal(row, "tongKhoiLuong", "TongKhoiLuong"),
+                            NguoiTaoId = phieu.NguoiTaoId,
+                            ThoiGianTao = DateTime.Now,
+                            TTHD = true
+                        });
+                    }
+                }
+            }
+
+            await _repo.DeleteSanLuongPhoiByPhieuAsync(phieu.Idphieu);
+
+            // Khi phiếu là bản hiệu chỉnh (clone), xóa luôn dữ liệu chi tiết của phiếu gốc
+            // để tránh còn song song dữ liệu "phiếu cũ".
+            if (phieu.ID_PhieuGoc.HasValue
+                && phieu.ID_PhieuGoc.Value != Guid.Empty
+                && phieu.ID_PhieuGoc.Value != phieu.Idphieu)
+            {
+                await _repo.DeleteSanLuongPhoiByPhieuAsync(phieu.ID_PhieuGoc.Value);
+            }
+
+
+
+            if (entities.Count == 0)
+                return 0;
+
+            await _repo.AddSanLuongPhoiListAsync(entities);
+            return entities.Count;
+        }
+
+        private bool TryGetRowsElement(JsonElement root, out JsonElement rows)
+        {
+            rows = default;
+            return TryGetArray(root, "table1", out rows)
+                || TryGetArray(root, "Table1", out rows)
+                || TryGetArray(root, "rows", out rows)
+                || TryGetArray(root, "Rows", out rows)
+                || TryGetArray(root, "data", out rows)
+                || TryGetArray(root, "Data", out rows);
+        }
+
+        private bool TryGetArray(JsonElement obj, string key, out JsonElement array)
+        {
+            array = default;
+            if (obj.TryGetProperty(key, out var element) && element.ValueKind == JsonValueKind.Array)
+            {
+                array = element;
+                return true;
+            }
+
+            return false;
+        }
+
+        private string? TryGetString(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.String)
+                        return value.GetString();
+
+                    return value.ToString();
+                }
+            }
+
+            return null;
+        }
+
+        private int? TryGetInt(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var n))
+                        return n;
+
+                    if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out var parsed))
+                        return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        private decimal? TryGetDecimal(JsonElement row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var n))
+                        return n;
+
+                    if (value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), out var parsed))
+                        return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        public async Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
         {
             return await _repo.GetPhoiNhapKhoAsync(ca, kip, ngaySX, mayduc);
+        }
+
+        public async Task<(List<PhoiNhapKhoListItemDto> Data, int Total)> GetPhoiNhapKhoListAsync(
+            Guid? idPhieu,
+            DateTime? fromDate,
+            DateTime? toDate,
+            string? kip,
+            int? ca,
+            int? mayDuc,
+            string? soPhieu,
+            int page = 1,
+            int pageSize = 200)
+        {
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 200;
+
+            var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
+
+            if (idPhieu.HasValue && idPhieu.Value != Guid.Empty)
+                query = query.Where(x => x.IdPhieu == idPhieu.Value);
+
+            if (fromDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date >= fromDate.Value.Date);
+
+            if (toDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date <= toDate.Value.Date);
+
+            if (!string.IsNullOrWhiteSpace(kip))
+                query = query.Where(x => x.Kip == kip);
+
+            if (ca.HasValue)
+                query = query.Where(x => x.Ca == ca.Value);
+
+            if (mayDuc.HasValue)
+                query = query.Where(x => x.MayDuc == mayDuc.Value);
+
+            if (!string.IsNullOrWhiteSpace(soPhieu))
+                query = query.Where(x => x.SoPhieu.Contains(soPhieu));
+
+            var total = await query.CountAsync();
+
+            var data = await query
+                .OrderByDescending(x => x.ThoiGianTao)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new PhoiNhapKhoListItemDto
+                {
+                    Id = x.Id,
+                    IdPhieu = x.IdPhieu,
+                    SoPhieu = x.SoPhieu,
+                    NgaySX = x.NgaySX,
+                    Kip = x.Kip,
+                    Ca = x.Ca,
+                    MayDuc = x.MayDuc,
+                    Me = x.Me,
+                    Mac = x.Mac,
+                    KichThuoc = x.KichThuoc,
+                    StLoai1 = x.StLoai1,
+                    KlLoai1 = x.KlLoai1,
+                    StPhoiNgan = x.StPhoiNgan,
+                    KlPhoiNgan = x.KlPhoiNgan,
+                    CdPhoiNgan = x.CdPhoiNgan,
+                    StLoai2 = x.StLoai2,
+                    KlLoai2 = x.KlLoai2,
+                    StLoai2TP = x.StLoai2TP,
+                    KlLoai2TP = x.KlLoai2TP,
+                    StLoai3 = x.StLoai3,
+                    KlLoai3 = x.KlLoai3,
+                    TongSoThanh = x.TongSoThanh,
+                    TongKhoiLuong = x.TongKhoiLuong,
+                    TTHD = x.TTHD,
+                    ThoiGianTao = x.ThoiGianTao
+                })
+                .ToListAsync();
+
+            return (data, total);
         }
         public async Task<ExportFileResult> ExportPdfSanLuongAsync(DateOnly? NgaySX, int? Ca, string? Kip, Guid? idPhieu, List<PheDuyetDto> pheDuyets)
         {
@@ -384,52 +611,6 @@ namespace dataproduct.api.Services
             };
         }
 
-        public async Task InsertSanLuongPhoiAsync(SaveSanLuongPhoiDto dto)
-        {
-            try
-            {
-                var entities = dto.Table1.Select(r => new BM_SanLuongPhoi
-                {
-                    IdPhieu = dto.IdPhieu,
-                    SoPhieu = dto.SoPhieu,
-                    NgaySX = dto.NgaySX.Date,
-                    Kip = dto.Kip,
-                    Ca = dto.Ca,
-                    MayDuc = dto.MayDuc,
-                    MacThep = r.MacThep,
-                    KichThuoc = r.KichThuoc,
-                    StLoai1 = r.StLoai1,
-                    KlLoai1 = r.KlLoai1,
-                    StPhoiNgan = r.StPhoiNgan,
-                    KlPhoiNgan = r.KlPhoiNgan,
-                    StLoai2 = r.StLoai2,
-                    KlLoai2 = r.KlLoai2,
-                    StLoai3 = r.StLoai3,
-                    KlLoai3 = r.KlLoai3,
-                    TongSoThanh = r.TongSoThanh,
-                    TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null,
-                    TTHD = true
-                }).ToList();
-                await _repo.InsertSanLuongPhoiAsync(entities);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
-            }
-        }
-        public async Task HideSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.HideSanLuongPhoiByPhieuAsync(idPhieu);
-        }
-        public async Task RestoreSanLuongPhoiByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.RestoreSanLuongPhoiByPhieuAsync(idPhieu);
-        }
         public async Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu)
         {
             if (idPhieu == Guid.Empty)
@@ -438,42 +619,220 @@ namespace dataproduct.api.Services
             await _repo.DeleteSanLuongPhoiByPhieuAsync(idPhieu);
         }
         //=== PHÔI NHẬP KHO
-        public async Task InsertPhoiNhapKhoAsync(SavePhoiNhapKhoDto dto)
+        public async Task<int> InsertPhoiNhapKhoFromPhieuJsonAsync(BmPhieu phieu)
         {
+            if (phieu == null)
+                throw new ArgumentNullException(nameof(phieu));
+
+            var entities = new List<BM_PhoiNhapKho>();
+
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
+            {
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (TryGetRowsElement(root, out var rowsElement))
+                {
+                    foreach (var row in rowsElement.EnumerateArray())
+                    {
+                        if (row.ValueKind != JsonValueKind.Object)
+                            continue;
+
+                        entities.Add(new BM_PhoiNhapKho
+                        {
+                            IdPhieu = phieu.Idphieu,
+                            SoPhieu = phieu.SoPhieu ?? string.Empty,
+                            NgaySX = (phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today)).ToDateTime(TimeOnly.MinValue),
+                            Kip = phieu.Kip ?? string.Empty,
+                            Ca = phieu.Ca ?? 0,
+                            MayDuc = phieu.MayDuc ?? 0,
+                            Me = TryGetString(row, "me", "Me") ?? string.Empty,
+                            Mac = TryGetString(row, "mac", "Mac") ?? string.Empty,
+                            KichThuoc = TryGetString(row, "kichThuoc", "KichThuoc") ?? string.Empty,
+                            StLoai1 = TryGetInt(row, "stLoai1", "StLoai1"),
+                            KlLoai1 = TryGetDecimal(row, "klLoai1", "KlLoai1"),
+                            StPhoiNgan = TryGetInt(row, "stPhoiNgan", "StPhoiNgan"),
+                            KlPhoiNgan = TryGetDecimal(row, "klPhoiNgan", "KlPhoiNgan"),
+                            CdPhoiNgan = TryGetDecimal(row, "cdPhoiNgan", "CdPhoiNgan"),
+                            StLoai2 = TryGetInt(row, "stLoai2", "StLoai2"),
+                            KlLoai2 = TryGetDecimal(row, "klLoai2", "KlLoai2"),
+                            StLoai2TP = TryGetInt(row, "stLoai2tp", "StLoai2TP", "StLoai2tp"),
+                            KlLoai2TP = TryGetDecimal(row, "klLoai2tp", "KlLoai2TP", "KlLoai2tp"),
+                            StLoai3 = TryGetInt(row, "stLoai3", "StLoai3"),
+                            KlLoai3 = TryGetDecimal(row, "klLoai3", "KlLoai3"),
+                            TongSoThanh = TryGetInt(row, "tongSoThanh", "TongSoThanh"),
+                            TongKhoiLuong = TryGetDecimal(row, "tongKhoiLuong", "TongKhoiLuong"),
+                            NguoiTaoId = phieu.NguoiTaoId,
+                            ThoiGianTao = DateTime.Now,
+                            TTHD = true
+                        });
+                    }
+                }
+            }
+
+            await _repo.DeletePhoiNhapKhoByPhieuAsync(phieu.Idphieu);
+
+            // Khi phiếu là bản hiệu chỉnh (clone), xóa luôn dữ liệu chi tiết của phiếu gốc
+            // để tránh còn song song dữ liệu "phiếu cũ".
+            if (phieu.ID_PhieuGoc.HasValue
+                && phieu.ID_PhieuGoc.Value != Guid.Empty
+                && phieu.ID_PhieuGoc.Value != phieu.Idphieu)
+            {
+                await _repo.DeletePhoiNhapKhoByPhieuAsync(phieu.ID_PhieuGoc.Value);
+            }
+
+            if (entities.Count == 0)
+                return 0;
+
+            await _repo.AddPhoiNhapKhoListAsync(entities);
+            return entities.Count;
+        }
+
+        public async Task<int> UpsertPhoiNhapKhoFromAsync(InsertPhoiNhapKhoRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (request.NgaySX == default || request.Ca <= 0)
+                throw new ArgumentException("Thiếu thông tin NgàySX/Ca");
+
+            var incomingRows = (request.Table1 ?? new List<InsertPhoiNhapKhoDto>())
+                .Where(x => !string.IsNullOrWhiteSpace(x.Me) && !string.IsNullOrWhiteSpace(x.Mac))
+                .GroupBy(x => new
+                {
+                    NgaySX = request.NgaySX.Date,
+                    Ca = request.Ca,
+                    Me = NormalizeKeyValue(x.Me),
+                    Mac = NormalizeKeyValue(x.Mac)
+                })
+                .Select(g => g.Last())
+                .ToList();
+
+            if (incomingRows.Count == 0)
+                return 0;
+
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
             try
             {
-                var entities = dto.Table1.Select(r => new BM_PhoiNhapKho
+                var existingRows = await _context.BM_PhoiNhapKho
+                    .Where(x => x.NgaySX.Date == request.NgaySX.Date && x.Ca == request.Ca)
+                    .ToListAsync();
+
+                var inserted = 0;
+                var updated = 0;
+
+                foreach (var row in incomingRows)
                 {
-                    IdPhieu = dto.IdPhieu,
-                    SoPhieu = dto.SoPhieu,
-                    NgaySX = dto.NgaySX.Date,
-                    Kip = dto.Kip,
-                    Ca = dto.Ca,
-                    MayDuc = dto.MayDuc,
-                    Me = r.Me,
-                    Mac = r.Mac,
-                    KichThuoc = r.KichThuoc,
-                    StLoai1 = r.StLoai1,
-                    KlLoai1 = r.KlLoai1,
-                    StPhoiNgan = r.StPhoiNgan,
-                    KlPhoiNgan = r.KlPhoiNgan,
-                    CdPhoiNgan = r.CdPhoiNgan,
-                    StLoai2 = r.StLoai2,
-                    KlLoai2 = r.KlLoai2,
-                    StLoai2TP = r.StLoai2TP,
-                    KlLoai2TP = r.KlLoai2TP,
-                    StLoai3 = r.StLoai3,
-                    KlLoai3 = r.KlLoai3,
-                    TongSoThanh = r.TongSoThanh,
-                    TongKhoiLuong = r.TongKhoiLuong,
-                    NguoiTaoId = null,
-                    TTHD = true
-                }).ToList();
-                await _repo.InsertPhoiNhapKhoAsync(entities);
+                    var match = existingRows.FirstOrDefault(x =>
+                        x.NgaySX.Date == request.NgaySX.Date &&
+                        x.Ca == request.Ca &&
+                        NormalizeKeyValue(x.Me) == NormalizeKeyValue(row.Me) &&
+                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac));
+
+                    if (match == null)
+                    {
+                        var entity = new BM_PhoiNhapKho
+                        {
+                            IdPhieu = request.IdPhieu,
+                            SoPhieu = request.SoPhieu ?? string.Empty,
+                            NgaySX = request.NgaySX.Date,
+                            Kip = request.Kip ?? string.Empty,
+                            Ca = request.Ca,
+                            MayDuc = request.MayDuc,
+                            Me = row.Me ?? string.Empty,
+                            Mac = row.Mac ?? string.Empty,
+                            KichThuoc = row.KichThuoc ?? string.Empty,
+                            StLoai1 = row.StLoai1,
+                            KlLoai1 = row.KlLoai1,
+                            StPhoiNgan = row.StPhoiNgan,
+                            KlPhoiNgan = row.KlPhoiNgan,
+                            CdPhoiNgan = row.CdPhoiNgan,
+                            StLoai2 = row.StLoai2,
+                            KlLoai2 = row.KlLoai2,
+                            StLoai2TP = row.StLoai2TP,
+                            KlLoai2TP = row.KlLoai2TP,
+                            StLoai3 = row.StLoai3,
+                            KlLoai3 = row.KlLoai3,
+                            TongSoThanh = row.TongSoThanh,
+                            TongKhoiLuong = row.TongKhoiLuong,
+                            NguoiTaoId = request.NguoiTaoId,
+                            ThoiGianTao = DateTime.Now,
+                            TTHD = true
+                        };
+
+                        await _context.BM_PhoiNhapKho.AddAsync(entity);
+                        existingRows.Add(entity);
+                        inserted++;
+                        continue;
+                    }
+
+                    match.IdPhieu = request.IdPhieu;
+                    match.SoPhieu = request.SoPhieu ?? string.Empty;
+                    match.Kip = request.Kip ?? string.Empty;
+                    match.MayDuc = request.MayDuc;
+                    match.KichThuoc = row.KichThuoc ?? string.Empty;
+                    match.StLoai1 += row.StLoai1;
+                    match.KlLoai1 += row.KlLoai1;
+                    match.StPhoiNgan += row.StPhoiNgan;
+                    match.KlPhoiNgan += row.KlPhoiNgan;
+                    match.CdPhoiNgan += row.CdPhoiNgan;
+                    match.StLoai2 += row.StLoai2;
+                    match.KlLoai2 += row.KlLoai2;
+                    match.StLoai2TP += row.StLoai2TP;
+                    match.KlLoai2TP += row.KlLoai2TP;
+                    match.StLoai3 += row.StLoai3;
+                    match.KlLoai3 += row.KlLoai3;
+                    match.TongSoThanh += row.TongSoThanh;
+                    match.TongKhoiLuong += row.TongKhoiLuong;
+                    match.NguoiTaoId = request.NguoiTaoId;
+                    match.ThoiGianTao = DateTime.Now;
+                    match.TTHD = true;
+
+                    updated++;
+                }
+
+                await _context.SaveChangesAsync();
+
+                //var ngaySx = DateOnly.FromDateTime(request.NgaySX.Date);
+                //var bkRows = await _context.BkPhoiThep
+                //    .Where(x => x.Me ==  && x.Ca == request.Ca)
+                //    .ToListAsync();
+
+                foreach (var key in incomingRows)
+                {
+                    //var tongDaChuyen = existingRows
+                    //    .Where(x =>
+                    //        x.NgaySX.Date == request.NgaySX.Date &&
+                    //        x.Ca == request.Ca &&
+                    //        NormalizeKeyValue(x.Me) == key.Me &&
+                    //        NormalizeKeyValue(x.Mac) == key.Mac)
+                    //    .Sum(x => x.TongSoThanh ?? 0);
+
+                    //foreach (var bk in bkRows.Where(x =>
+                    //             NormalizeKeyValue(x.Me) == key.Me &&
+                    //             NormalizeKeyValue(x.Mac) == key.Mac))
+                    //{
+                    //    bk.StDaChuyen = tongDaChuyen;
+                    //}
+
+                    var json = JsonSerializer.Serialize(key);
+
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "EXEC sp_CTD_Update_ST_DaChuyen_FromJson @json",
+                        new SqlParameter("@json", json)
+                    );
+                }
+
+                //await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return inserted + updated;
             }
-            catch (Exception ex)
+            catch
             {
-                throw new Exception("Lỗi khi lưu sản lượng phôi", ex);
+                await tx.RollbackAsync();
+                throw;
             }
         }
         public async Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu)
@@ -483,17 +842,32 @@ namespace dataproduct.api.Services
 
             await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
         }
-        public async Task HidePhoiNhapKhoByPhieuAsync(Guid idPhieu)
+
+        public async Task<int> ThuHoiPhoiNhapKhoRowsAsync(List<int> ids)
         {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.HidePhoiNhapKhoByPhieuAsync(idPhieu);
-        }
-        public async Task RestorePhoiNhapKhoByPhieuAsync(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty)
-                throw new ArgumentException("IdPhieu không hợp lệ");
-            await _repo.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
+            if (ids == null || ids.Count == 0)
+                throw new ArgumentException("Danh sách dòng thu hồi không hợp lệ");
+
+            var validIds = ids.Where(x => x > 0).Distinct().ToList();
+            if (validIds.Count == 0)
+                throw new ArgumentException("Danh sách dòng thu hồi không hợp lệ");
+
+            try
+            {
+                var json = JsonSerializer.Serialize(validIds.Select(id => new { id }));
+
+                var affected = await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_CTD_ThuHoi_PhoiNhapKho_ByIds @json",
+                    new SqlParameter("@json", json)
+                );
+
+                return affected;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                throw;
+            }
         }
         public async Task<ExportFileResult> ExportPdfPhoiNhapKhoAsync(PhoiNhapKhoPdfDTOReq request)
         {
@@ -787,63 +1161,52 @@ namespace dataproduct.api.Services
         }
         public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuAsync(DateOnly? fromDate, DateOnly? toDate)
         {
-            var phieuList = await _repo.GetDataAsync(fromDate, toDate);
+            var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
 
-            var result = new List<BmPhieuExportRow>();
+            if (fromDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date >= fromDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
-            foreach (var item in phieuList)
-            {
-                if (string.IsNullOrEmpty(item.DataJson))
-                    continue;
+            if (toDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
-                var json = JsonSerializer.Deserialize<BmPhieuJson>(
-                    item.DataJson,
-                    new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                if (json?.table1 == null)
-                    continue;
-
-                foreach (var row in json.table1)
+            var rows = await query
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.ThoiGianTao)
+                .Select(x => new BmPhieuExportRow
                 {
-                    result.Add(new BmPhieuExportRow
-                    {
-                        SoPhieu = item.SoPhieu,
-                        NgaySX = json.NgaySX,
-                        MayDuc = json.mayduc,
-                        Kip = json.kip,
-                        Ca = json.ca,
+                    SoPhieu = x.SoPhieu,
+                    NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                    MayDuc = x.MayDuc,
+                    Kip = x.Kip,
+                    Ca = x.Ca,
 
-                        Me = row.me,
-                        Mac = row.mac,
-                        KichThuoc = row.kichThuoc,
+                    Me = x.Me,
+                    Mac = x.Mac,
+                    KichThuoc = x.KichThuoc,
 
-                        StLoai1 = row.stLoai1,
-                        KlLoai1 = row.klLoai1,
+                    StLoai1 = x.StLoai1,
+                    KlLoai1 = x.KlLoai1,
 
-                        StLoai2 = row.stLoai2,
-                        KlLoai2 = row.klLoai2,
+                    StLoai2 = x.StLoai2,
+                    KlLoai2 = x.KlLoai2,
 
-                        StLoai2tp = row.stLoai2tp,
-                        KlLoai2tp = row.klLoai2tp,
+                    StLoai2tp = x.StLoai2TP,
+                    KlLoai2tp = x.KlLoai2TP,
 
-                        StPhoiNgan = row.stPhoiNgan,
-                        CdPhoiNgan = row.cdPhoiNgan,
-                        KlPhoiNgan = row.klPhoiNgan,
+                    StPhoiNgan = x.StPhoiNgan,
+                    CdPhoiNgan = x.CdPhoiNgan,
+                    KlPhoiNgan = x.KlPhoiNgan,
 
-                        StLoai3 = row.stLoai3,
-                        KlLoai3 = row.klLoai3,
+                    StLoai3 = x.StLoai3,
+                    KlLoai3 = x.KlLoai3,
 
-                        TongSoThanh = row.tongSoThanh,
-                        TongKhoiLuong = row.tongKhoiLuong,
-                        TinhTrang = item.TinhTrang,
-                    });
-                }
-            }
+                    TongSoThanh = x.TongSoThanh,
+                    TongKhoiLuong = x.TongKhoiLuong,
+                    TinhTrang = x.TTHD == true ? 2 : 0,
+                })
+                .ToListAsync();
 
-            return result;
+            return rows;
         }
 
 
