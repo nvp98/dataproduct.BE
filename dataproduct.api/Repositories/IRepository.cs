@@ -155,7 +155,7 @@ namespace dataproduct.api.Repositories
     public interface ICtdBMDucCTDRepository
     {
         Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
-        Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
+        Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
         Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
         Task AddSanLuongPhoiListAsync(List<BM_SanLuongPhoi> entities);
         Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu);

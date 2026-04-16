@@ -15,7 +15,7 @@ namespace dataproduct.api.Repositories
         {
             _context = context;
         }
-        public async Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync( string ca,string kip,DateTime ngaySX)
+        public async Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX)
         {
             return await _context.Database
              .SqlQueryRaw<SanLuongPhoiDto>(
@@ -26,10 +26,10 @@ namespace dataproduct.api.Repositories
              )
          .ToListAsync();
         }
-        public async Task<List<PhoinhapkhoDto>> GetPhoiNhapKhoAsync(string ca,string kip,DateTime ngaySX, int mayduc)
+        public async Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
         {
             return await _context.Database
-             .SqlQueryRaw<PhoinhapkhoDto>(
+             .SqlQueryRaw<PhoinhapkhoNhanPhoiDto>(
                  "EXEC sp_CTD_GetPhoiNhapKho_ByKipNgay @p_Kip, @p_NgaySX, @p_Ca,@p_MayDuc",
                  new SqlParameter("@p_Kip", kip),
                  new SqlParameter("@p_NgaySX", ngaySX),
@@ -39,7 +39,7 @@ namespace dataproduct.api.Repositories
          .ToListAsync();
         }
 
-        public async Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca,string kip,DateTime ngaySX, int? mayDuc = null,Guid? idPhieu = null)
+        public async Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null)
         {
             var query = _context.BM_SanLuongPhoi
                 .AsNoTracking()
@@ -88,7 +88,7 @@ namespace dataproduct.api.Repositories
 
                     TongSoThanh = x.TongSoThanh,
                     TongKhoiLuong = x.TongKhoiLuong,
-                    TTHD =true
+                    TTHD = true
                 })
                 .ToListAsync();
         }
@@ -104,7 +104,7 @@ namespace dataproduct.api.Repositories
             var entities = await _context.BM_SanLuongPhoi
             .Where(x => x.IdPhieu == idPhieu)
             .ToListAsync();
-         
+
             if (!entities.Any())
                 return;
 
@@ -157,7 +157,7 @@ namespace dataproduct.api.Repositories
 
                     StPhoiNgan = x.StPhoiNgan,
                     KlPhoiNgan = x.KlPhoiNgan,
-                    CdPhoiNgan =x.CdPhoiNgan,
+                    CdPhoiNgan = x.CdPhoiNgan,
 
                     StLoai3 = x.StLoai3,
                     KlLoai3 = x.KlLoai3,
@@ -217,8 +217,8 @@ namespace dataproduct.api.Repositories
             if (toDate.HasValue)
                 query = query.Where(x => x.NgaySX <= toDate);
 
-             query = query.Where(p => !_context.BmPhieus.Any(c => c.ID_PhieuGoc == p.Idphieu));
-                
+            query = query.Where(p => !_context.BmPhieus.Any(c => c.ID_PhieuGoc == p.Idphieu));
+
 
             return await query.ToListAsync();
         }

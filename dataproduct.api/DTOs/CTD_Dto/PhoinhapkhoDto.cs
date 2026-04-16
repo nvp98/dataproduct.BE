@@ -10,7 +10,7 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public string Mac { get; set; }
         public string KichThuoc { get; set; }
-        
+
         public int StLoai1 { get; set; }
         public double KlLoai1 { get; set; }
 
@@ -33,6 +33,11 @@ namespace dataproduct.api.DTOs.CTD_Dto
     }
     public class InsertPhoiNhapKhoDto
     {
+        public string? SoPhieu { get; set; } = null!;
+        public DateTime NgaySX { get; set; }
+        public int? Ca { get; set; }
+        public string? Kip { get; set; } = null!;
+        public int? MayDuc { get; set; }
         public string? Me { get; set; } = null!;
         public string? Mac { get; set; } = null!;
         public string? KichThuoc { get; set; } = null!;
@@ -55,6 +60,52 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public int? TongSoThanh { get; set; }
         public decimal? TongKhoiLuong { get; set; }
+    }
+
+    public class InsertPhoiNhapKhoRequest
+    {
+        public Guid IdPhieu { get; set; }
+        public string SoPhieu { get; set; } = string.Empty;
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+        public string Kip { get; set; } = string.Empty;
+        public int MayDuc { get; set; }
+        public int? NguoiTaoId { get; set; }
+        public List<InsertPhoiNhapKhoDto> Table1 { get; set; } = new();
+    }
+
+    public class PhoiNhapKhoListItemDto
+    {
+        public int Id { get; set; }
+        public Guid IdPhieu { get; set; }
+        public string SoPhieu { get; set; } = string.Empty;
+        public DateTime NgaySX { get; set; }
+        public string Kip { get; set; } = string.Empty;
+        public int Ca { get; set; }
+        public int MayDuc { get; set; }
+        public string Me { get; set; } = string.Empty;
+        public string Mac { get; set; } = string.Empty;
+        public string KichThuoc { get; set; } = string.Empty;
+        public int? StLoai1 { get; set; }
+        public decimal? KlLoai1 { get; set; }
+        public int? StPhoiNgan { get; set; }
+        public decimal? KlPhoiNgan { get; set; }
+        public decimal? CdPhoiNgan { get; set; }
+        public int? StLoai2 { get; set; }
+        public decimal? KlLoai2 { get; set; }
+        public int? StLoai2TP { get; set; }
+        public decimal? KlLoai2TP { get; set; }
+        public int? StLoai3 { get; set; }
+        public decimal? KlLoai3 { get; set; }
+        public int? TongSoThanh { get; set; }
+        public decimal? TongKhoiLuong { get; set; }
+        public bool? TTHD { get; set; }
+        public DateTime ThoiGianTao { get; set; }
+    }
+
+    public class ThuHoiPhoiNhapKhoRequest
+    {
+        public List<int> Ids { get; set; } = new();
     }
 
     public class PhoiNhapKhoPdfDTOReq
@@ -140,4 +191,40 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public int? tongSoThanh { get; set; }
         public decimal? tongKhoiLuong { get; set; }
     }
+
+    public class PhoinhapkhoNhanPhoiDto
+    {
+        public string Me { get; set; }
+
+        public string Mac { get; set; }
+        public string KichThuoc { get; set; }
+
+        public int StLoai1 { get; set; }
+        public double KlLoai1 { get; set; }
+        public int? StDachuyenLoai1 { get; set; }
+
+        public int StPhoiNgan { get; set; }
+        public double KlPhoiNgan { get; set; }
+        public double CdPhoiNgan { get; set; }
+        public int? StDachuyenPhoiNgan { get; set; }
+
+        public int StLoai2 { get; set; }
+        public double KlLoai2 { get; set; }
+        public int? StDachuyenLoai2 { get; set; }
+
+        public int stLoai2tp { get; set; }
+        public double klLoai2tp { get; set; }
+        public int? StDachuyenLoai2tp { get; set; }
+
+        public int StLoai3 { get; set; }
+        public double KlLoai3 { get; set; }
+        public int? StDachuyenLoai3 { get; set; }
+
+        public int TongSoThanh { get; set; }
+        public int? TongST_DaChuyen { get; set; }
+        public double TongKhoiLuong { get; set; }
+
+    }
+
+
 }
