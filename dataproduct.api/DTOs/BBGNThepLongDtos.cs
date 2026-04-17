@@ -51,6 +51,7 @@ namespace dataproduct.api.DTOs
         public string? TinhLuyenLenThang { get; set; }
         public string? PhanLoai { get; set; }
         public bool? IsTrungMeThoi { get; set; }
+        public string? BieuMau { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }
