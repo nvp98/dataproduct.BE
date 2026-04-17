@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.DTOs.LGNL_Dto;
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
@@ -260,34 +261,36 @@ namespace dataproduct.api.Repositories
         Task<List<SiLo_LG>> GetSiLoWithLoCaoAsync(int? idLoCao);
         Task<SiLo_LG> AddSiLoAsync(SiLo_LG entity);
         Task<SiLo_LG> UpdateSiLoAsync(int id, SiLo_LG entity);
-
-        Task<List<NMLG_QuyKhoNapLieu>> GetAsync(DateOnly ngay, int idCa, int idLoCao);
-        Task UpsertAsync(List<NMLG_QuyKhoNapLieu> items);
-    }
-    public interface IColumnMappingNhomRepository
-    {
-        Task<List<BM_ColumnMappingNhom>> GetAllAsync(int? loCao);
-        Task<List<BM_ColumnMappingNhom>> GetAllWithColumnsAsync(int loCao);
-        Task<BM_ColumnMappingNhom?> GetByIdAsync(int id);
-        Task AddAsync(BM_ColumnMappingNhom entity);
-        Task UpdateAsync(BM_ColumnMappingNhom entity);
-        Task DeleteAsync(BM_ColumnMappingNhom entity);
-        Task SaveChangesAsync();
     }
 
-    public interface IColumnMappingRepository
+    public interface ILGNLRepository
     {
-        Task<List<BM_ColumnMapping>> GetAllAsync(int? loCao);
-        Task<BM_ColumnMapping?> GetByIdAsync(int id);
-        Task<List<BM_ColumnMapping>> GetColumnsAsync(int loCao);
+        // TS Mapping lookup
+        Task<List<LGNLTsMappingDto>> GetTsMappingListAsync();
 
-        Task<bool> ExistsDataIndexAsync(int nhomId, string dataIndex, int? excludeId = null);
-        Task<bool> HasChildrenAsync(int nhomId);
+        // Dữ liệu thô LG1_DuLieuNL
+        Task<List<LG1_DuLieuNL>> GetDuLieuRawAsync(
+            IEnumerable<string> tagKeys, int idLoCao, DateTime timeFrom, DateTime timeTo);
 
-        Task AddAsync(BM_ColumnMapping entity);
-        Task UpdateAsync(BM_ColumnMapping entity);
-        Task DeleteAsync(BM_ColumnMapping entity);
+        // SiLo Master
+        Task<List<LG_NL_SiLo>> GetSiLoMasterListAsync(int? idLoCao);
+        Task<LG_NL_SiLo?> GetSiLoMasterByIdAsync(int id);
+        Task<LG_NL_SiLo> AddSiLoMasterAsync(LG_NL_SiLo entity);
+        Task<LG_NL_SiLo?> UpdateSiLoMasterAsync(int id, LG_NL_SiLo entity);
+        Task<bool> DeleteSiLoMasterAsync(int id);
 
-        Task SaveChangesAsync();
+        // Mapping
+        Task<List<LGNLMappingDto>> GetMappingListAsync(DateOnly? ngay, int? idCa, int? idLoCao);
+        Task<LG_NL_Mapping?> GetMappingByIdAsync(int id);
+        Task<LG_NL_Mapping> AddMappingAsync(LG_NL_Mapping entity);
+        Task<LG_NL_Mapping?> UpdateMappingAsync(int id, LG_NL_Mapping entity);
+        Task<bool> DeleteMappingAsync(int id);
+
+        // NVL
+        Task<List<LG_NL_NVL>> GetNvlListAsync(DateOnly? ngay, int? idCa, int? idLoCao);
+        Task<LG_NL_NVL?> GetNvlByIdAsync(int id);
+        Task<LG_NL_NVL> AddNvlAsync(LG_NL_NVL entity);
+        Task<LG_NL_NVL?> UpdateNvlAsync(int id, LG_NL_NVL entity);
+        Task<bool> DeleteNvlAsync(int id);
     }
 }
