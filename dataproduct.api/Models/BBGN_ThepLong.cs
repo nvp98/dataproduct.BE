@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Globalization;
 
 namespace dataproduct.api.Models;
 
@@ -11,7 +12,7 @@ public partial class BBGN_ThepLong
     public string? Me { get; set; }
     public string? MacThep { get; set; }
     public string? ThungSo { get; set; }
-    public DateTime? ThoiGian { get; set; }
+    public string? ThoiGian { get; set; }
     public decimal? KlLan1 { get; set; }
     public decimal? KlLan2 { get; set; }
     public decimal? KlLan3 { get; set; }
@@ -22,10 +23,10 @@ public partial class BBGN_ThepLong
     public DateTime? NgaySX { get; set; }
     public int? Ca { get; set; }
     public string? BieuMau { get; set; }
-    public byte? NhaMay { get; set; }
-    public int? LoThoi { get; set; }
+    public int? Scope { get; set; }
     public Guid IdPhieu { get; set; }
     public bool? IsGhost { get; set; }
+    public bool? IsTrungMeThoi { get; set; }
 }
 
 

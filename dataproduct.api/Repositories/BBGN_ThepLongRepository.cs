@@ -17,10 +17,11 @@ namespace dataproduct.api.Repositories
         {
             // listNew có thể null/empty → coi như toRemove = toàn bộ currentSet
             var listNew = data ?? new List<string>();
+            var maBm = request.NhaMay == (int)NhaMay.HRC1 ? "HRC1_BBGN_ThepLong" : "HRC2_BBGN_ThepLong";
 
-            // Lấy danh sách phiếu ứng với NgaySX/Ca/NhaMay cho biểu mẫu BBGN_ThepLong
+            // Lấy danh sách phiếu ứng với NgaySX/Ca/scope cho biểu mẫu BBGN thép lỏng
             IQueryable<BmPhieu> phieuQuery = _context.BmPhieus
-                .Where(x => x.NgaySX == request.NgaySX && x.Ca == request.Ca && x.MaBm == "BBGN_ThepLong");
+                .Where(x => x.NgaySX == request.NgaySX && x.Ca == request.Ca && x.MaBm == maBm);
 
             if (request.NhaMay == (int)NhaMay.HRC1 || request.NhaMay == (int)NhaMay.HRC2)
             {
@@ -72,8 +73,8 @@ namespace dataproduct.api.Repositories
                             Me = meThoi,
                             NgaySX = request.NgaySX.ToDateTime(TimeOnly.MinValue),
                             Ca = request.Ca,
-                            BieuMau = "BBGN_ThepLong",
-                            NhaMay = (byte)request.NhaMay,
+                            BieuMau = maBm,
+                            Scope = request.NhaMay,
                             IsGhost = false
                         });
                     }
@@ -90,8 +91,8 @@ namespace dataproduct.api.Repositories
                         Me = meThoi,
                         NgaySX = request.NgaySX.ToDateTime(TimeOnly.MinValue),
                         Ca = request.Ca,
-                        BieuMau = "BBGN_ThepLong",
-                        NhaMay = (byte)request.NhaMay,
+                        BieuMau = maBm,
+                        Scope = request.NhaMay,
                         IsGhost = false
                     });
                 }
@@ -118,7 +119,7 @@ namespace dataproduct.api.Repositories
                 var intersect = currentSet.Intersect(newSet, StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (var row in rowsOfPhieu.Where(r => r.Me != null && intersect.Contains(r.Me)))
                 {
-                    if (row.IsGhost.Value == true)
+                    if (row.IsGhost == true)
                     {
                         row.IsGhost = false;
                         _context.BBGN_ThepLongs.Update(row);

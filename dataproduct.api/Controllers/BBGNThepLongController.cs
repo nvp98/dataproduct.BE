@@ -7,6 +7,7 @@ using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.IO.Compression;
+using System.IO;
 
 namespace dataproduct.api.Controllers
 {
@@ -15,11 +16,17 @@ namespace dataproduct.api.Controllers
     public class BBGNThepLongController : ControllerBase
     {
         private readonly BBGN_ThepLongService _service;
+        private readonly SyncPhanLoaiService _syncPhanLoaiService;
+        private readonly IWebHostEnvironment _env;
 
         public BBGNThepLongController(
-            BBGN_ThepLongService service)
+            BBGN_ThepLongService service,
+            SyncPhanLoaiService syncPhanLoaiService,
+            IWebHostEnvironment env)
         {
             _service = service;
+            _syncPhanLoaiService = syncPhanLoaiService;
+            _env = env;
         }
 
         
@@ -66,6 +73,24 @@ namespace dataproduct.api.Controllers
         //     }
         // }
 
+        [HttpPost("/api/phan-loai/sync")]
+        public async Task<IActionResult> SyncPhanLoai([FromBody] SyncPhanLoaiRequest request)
+        {
+            try
+            {
+                var result = await _syncPhanLoaiService.SyncAsync(request);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
         [HttpPost("fetch")]
         public async Task<IActionResult> Fetch([FromBody] FetchMeThoiRequest request)
         {
@@ -76,8 +101,102 @@ namespace dataproduct.api.Controllers
         [HttpPost("load")]
         public async Task<IActionResult> Load([FromBody] LoadBBGNThepLongRequest request)
         {
-            var result = await _service.LoadAsync(request);
-            return Ok(result);
+            try
+            {
+                var result = await _service.LoadAsync(request);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> DeleteRow(int id)
+        {
+            var deleted = await _service.DeleteRowAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+
+        [HttpPost("search-thongke")]
+        public async Task<IActionResult> SearchThongKe([FromBody] SearchThongKeBBGNThepLongRequest request)
+        {
+            try
+            {
+                var result = await _service.SearchThongKeAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("sum-thongke")]
+        public async Task<IActionResult> SumThongKe([FromBody] SearchThongKeBBGNThepLongRequest request)
+        {
+            try
+            {
+                var result = await _service.SumThongKeAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpGet("export-pdf")]
+        public async Task<IActionResult> ExportPdf([FromQuery] Guid idPhieu)
+        {
+            try
+            {
+                var file = await _service.ExportPdfAsync(idPhieu);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpGet("export-excel")]
+        public async Task<IActionResult> ExportExcel([FromQuery] Guid idPhieu)
+        {
+            try
+            {
+                var templatePath = Path.Combine(_env.WebRootPath, "templates", "BBGN_ThepLong.xlsx");
+                if (!System.IO.File.Exists(templatePath))
+                    return StatusCode(StatusCodes.Status500InternalServerError,
+                        "Chưa có template Excel. Đặt file tại: wwwroot/templates/BBGN_ThepLong.xlsx");
+
+                var rows  = await _service.LoadByIdPhieuAsync(idPhieu);
+                var phieu = await _service.GetBmPhieuByIdAsync(idPhieu);
+                var fileName = $"BBGN_ThepLong_{idPhieu:N}.xlsx";
+
+                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+                try
+                {
+                    using (var workbook = new XLWorkbook(templatePath))
+                    {
+                        var ws = workbook.Worksheets.First();
+                        _service.RenderBBGNThepLongExcel(ws, rows, phieu);
+                        workbook.SaveAs(tempPath);
+                    }
+                    var bytes = System.IO.File.ReadAllBytes(tempPath);
+                    return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+                }
+                finally
+                {
+                    if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
         }
     }
 }
