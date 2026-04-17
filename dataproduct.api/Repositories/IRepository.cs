@@ -269,5 +269,26 @@ namespace dataproduct.api.Repositories
     public interface IBBGN_ThepLongRepository
     {
         // Task<IEnumerable<BBGN_ThepLong>> GetAllAsync();
+        Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
+    }
+
+    public interface IMacThepRepository
+    {
+        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep);
+        Task<MacThep?> GetByIdAsync(int id);
+        Task AddAsync(MacThep entity);
+        Task UpdateAsync(MacThep entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsByTenAsync(string tenMacThep, byte nhaMay, int? excludeId = null);
+    }
+
+    public interface IMayDucRepository
+    {
+        Task<IEnumerable<MayDuc>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMayDuc);
+        Task<MayDuc?> GetByIdAsync(int id);
+        Task AddAsync(MayDuc entity);
+        Task UpdateAsync(MayDuc entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsByTenAsync(string tenMayDuc, byte nhaMay, int? excludeId = null);
     }
 }
