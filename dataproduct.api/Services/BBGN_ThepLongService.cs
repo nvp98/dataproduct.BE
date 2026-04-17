@@ -432,7 +432,7 @@ namespace dataproduct.api.Services
         {
             var query = _context.BBGN_ThepLongs
                 .AsNoTracking()
-                .Where(x => x.IsGhost != true && x.BieuMau == "HRC2_BBGN_ThepLong");
+                .Where(x => x.IsGhost != true && x.BieuMau == request.BieuMau);
 
             if (request.TuNgay.HasValue)
             {
