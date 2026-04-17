@@ -1170,6 +1170,52 @@ namespace dataproduct.api.Services
             if (toDate.HasValue)
                 query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
+            var rows = await query
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.ThoiGianTao)
+                .Select(x => new BmPhieuExportRow
+                {
+                    SoPhieu = x.SoPhieu,
+                    NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                    MayDuc = x.MayDuc,
+                    Kip = x.Kip,
+                    Ca = x.Ca,
+                    Me = x.Me,
+                    Mac = x.Mac,
+                    KichThuoc = x.KichThuoc,
+                    StLoai1 = x.StLoai1,
+                    KlLoai1 = x.KlLoai1,
+                    StLoai2 = x.StLoai2,
+                    KlLoai2 = x.KlLoai2,
+                    StLoai2tp = x.StLoai2TP,
+                    KlLoai2tp = x.KlLoai2TP,
+
+                    StPhoiNgan = x.StPhoiNgan,
+                    CdPhoiNgan = x.CdPhoiNgan,
+                    KlPhoiNgan = x.KlPhoiNgan,
+
+                    StLoai3 = x.StLoai3,
+                    KlLoai3 = x.KlLoai3,
+
+
+                    TongSoThanh = x.TongSoThanh,
+                    TongKhoiLuong = x.TongKhoiLuong,
+                    TinhTrang = x.TTHD == true ? 2 : 0,
+                })
+                .ToListAsync();
+            return rows;
+        }
+        public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuPKHAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
+
+
+            if (fromDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date >= fromDate.Value.ToDateTime(TimeOnly.MinValue).Date);
+
+            if (toDate.HasValue)
+                query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
+
             var dataBKMis = await _repo.GetPhoiNhapKhoExportRangeAsync(fromDate, toDate);
 
             var dataBKMisLookup = dataBKMis
@@ -1281,7 +1327,6 @@ namespace dataproduct.api.Services
             return rows.Select(x => x.Row).ToList();
         }
 
-
         public async Task<byte[]> ExportExcelByBmPhieuAsync(DateOnly? fromDate, DateOnly? toDate)
         {
             var data = await GetDataExportExcelByBmPhieuAsync(fromDate, toDate);
@@ -1291,6 +1336,125 @@ namespace dataproduct.api.Services
                 _env.WebRootPath,
                 "templates",
                 "BM_TongHopGiaoNhanPhoiNhapKho.xlsx"
+            );
+
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var workbook = new XLWorkbook(templatePath);
+            var ws = workbook.Worksheet(1);
+
+            ws.Cell("A4").Value = $"Từ ngày: {fromDate:dd/MM/yyyy} đến ngày: {toDate:dd/MM/yyyy}";
+
+            int row = 9;
+            int stt = 1;
+            foreach (var item in data)
+            {
+                // copy format của dòng mẫu
+                if (row > 9)
+                {
+                    ws.Row(9).CopyTo(ws.Row(row));
+                }
+
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.NgaySX?.ToString("dd/MM/yyyy");
+
+                ws.Cell(row, 3).Value = item.Kip;
+                ws.Cell(row, 4).Value = item.Ca;
+                ws.Cell(row, 5).Value = item.MayDuc;
+
+                ws.Cell(row, 6).Value = item.Me;
+                ws.Cell(row, 7).Value = item.Mac;
+                ws.Cell(row, 8).Value = item.KichThuoc;
+
+                ws.Cell(row, 9).Value = item.StLoai1;
+                ws.Cell(row, 10).Value = item.KlLoai1;
+
+                ws.Cell(row, 11).Value = item.StLoai2;
+                ws.Cell(row, 12).Value = item.KlLoai2;
+
+                ws.Cell(row, 13).Value = item.StLoai2tp;
+                ws.Cell(row, 14).Value = item.KlLoai2tp;
+
+                ws.Cell(row, 15).Value = item.StPhoiNgan;
+                ws.Cell(row, 16).Value = item.CdPhoiNgan;
+                ws.Cell(row, 17).Value = item.KlPhoiNgan;
+
+                ws.Cell(row, 18).Value = item.StLoai3;
+                ws.Cell(row, 19).Value = item.KlLoai3;
+
+                ws.Cell(row, 20).Value = item.TongKhoiLuong;
+
+                ws.Cell(row, 21).Value = "";
+                ws.Cell(row, 22).Value = item.SoPhieu;
+                var cell = ws.Cell(row, 23);
+                switch (item.TinhTrang)
+                {
+                    case 0:
+                        cell.Value = "Đang lưu";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGray;
+                        break;
+
+                    case 1:
+                        cell.Value = "Đã gửi";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightBlue;
+                        break;
+
+                    case 2:
+                        cell.Value = "Hoàn thành";
+                        cell.Style.Fill.BackgroundColor = XLColor.LightGreen;
+                        break;
+
+                    case 3:
+                        cell.Value = "Đã thu hồi";
+                        cell.Style.Fill.BackgroundColor = XLColor.Orange;
+                        break;
+
+                    case 4:
+                        cell.Value = "Không xác nhận";
+                        cell.Style.Fill.BackgroundColor = XLColor.Red;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 5:
+                        cell.Value = "Đã chốt";
+                        cell.Style.Fill.BackgroundColor = XLColor.DarkGreen;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    case 6:
+                        cell.Value = "Đang phê duyệt";
+                        cell.Style.Fill.BackgroundColor = XLColor.Yellow;
+                        break;
+
+                    case 7:
+                        cell.Value = "Hiệu chỉnh";
+                        cell.Style.Fill.BackgroundColor = XLColor.MediumPurple;
+                        cell.Style.Font.FontColor = XLColor.White;
+                        break;
+
+                    default:
+                        cell.Value = "Không xác định";
+                        break;
+                }
+                row++;
+            }
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+
+            return stream.ToArray();
+        }
+
+        public async Task<byte[]> ExportExcelByBmPhieuPKHAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var data = await GetDataExportExcelByBmPhieuPKHAsync(fromDate, toDate);
+
+
+            var templatePath = Path.Combine(
+                _env.WebRootPath,
+                "templates",
+                "BM_TongHopGiaoNhanPhoiNhapKhoPKH.xlsx"
             );
 
             if (!File.Exists(templatePath))

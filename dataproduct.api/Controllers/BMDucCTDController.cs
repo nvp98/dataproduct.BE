@@ -176,6 +176,18 @@ namespace dataproduct.api.Controllers
             );
         }
 
+        [HttpGet("export-excelPhoiNhapKhoPKH")]
+        public async Task<IActionResult> ExportExcelPKH(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var fileBytes = await _service.ExportExcelByBmPhieuPKHAsync(fromDate, toDate);
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"TongHopPhoiNhapKhoPKH_{DateTime.Now:yyyyMMddHHmmss}.xlsx"
+            );
+        }
+
 
         [HttpGet("export-excelSanLuongPhoi")]
         public async Task<IActionResult> ExportExcelSLP(DateOnly? fromDate, DateOnly? toDate)
