@@ -39,6 +39,17 @@ namespace dataproduct.api.Repositories
          .ToListAsync();
         }
 
+        public async Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoExportRangeAsync(DateOnly? fromDate, DateOnly? toDate)
+        {
+            return await _context.Database
+             .SqlQueryRaw<PhoinhapkhoNhanPhoiDto>(
+                 "EXEC sp_CTD_GetPhoiNhapKho_ByExportRange @FromDate, @ToDate",
+                 new SqlParameter("@FromDate", fromDate),
+                 new SqlParameter("@ToDate", toDate)
+             )
+         .ToListAsync();
+        }
+
         public async Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null)
         {
             var query = _context.BM_SanLuongPhoi

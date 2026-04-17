@@ -1163,50 +1163,122 @@ namespace dataproduct.api.Services
         {
             var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
 
+
             if (fromDate.HasValue)
                 query = query.Where(x => x.NgaySX.Date >= fromDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
             if (toDate.HasValue)
                 query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
-            var rows = await query
-                .OrderByDescending(x => x.NgaySX)
-                .ThenByDescending(x => x.ThoiGianTao)
-                .Select(x => new BmPhieuExportRow
+            var dataBKMis = await _repo.GetPhoiNhapKhoExportRangeAsync(fromDate, toDate);
+
+            var dataBKMisLookup = dataBKMis
+                .GroupBy(x => new
                 {
-                    SoPhieu = x.SoPhieu,
-                    NgaySX = DateOnly.FromDateTime(x.NgaySX),
-                    MayDuc = x.MayDuc,
-                    Kip = x.Kip,
-                    Ca = x.Ca,
+                    x.NgaySX,
+                    x.Ca,
+                    Me = NormalizeKeyValue(x.Me),
+                    Mac = NormalizeKeyValue(x.Mac),
+                    KichThuoc = NormalizeKeyValue(x.KichThuoc),
+                })
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        StLoai1 = g.Sum(x => x.StLoai1),
+                        KlLoai1 = g.Sum(x => Convert.ToDecimal(x.KlLoai1)),
+                        StLoai2 = g.Sum(x => x.StLoai2),
+                        KlLoai2 = g.Sum(x => Convert.ToDecimal(x.KlLoai2)),
+                        StLoai2tp = g.Sum(x => x.stLoai2tp),
+                        KlLoai2tp = g.Sum(x => Convert.ToDecimal(x.klLoai2tp)),
+                        StPhoiNgan = g.Sum(x => x.StPhoiNgan),
+                        CdPhoiNgan = g.Sum(x => Convert.ToDecimal(x.CdPhoiNgan)),
+                        KlPhoiNgan = g.Sum(x => Convert.ToDecimal(x.KlPhoiNgan)),
+                        StLoai3 = g.Sum(x => x.StLoai3),
+                        KlLoai3 = g.Sum(x => Convert.ToDecimal(x.KlLoai3)),
+                        TongSoThanh = g.Sum(x => x.TongSoThanh),
+                        TongKhoiLuong = g.Sum(x => Convert.ToDecimal(x.TongKhoiLuong)),
+                    });
 
-                    Me = x.Me,
-                    Mac = x.Mac,
-                    KichThuoc = x.KichThuoc,
+            var rows = await (
+                from x in query
+                join p in _context.BmPhieus
+                    .AsNoTracking()
+                    .Select(phieu => new { phieu.Idphieu, phieu.TinhTrang })
+                    on x.IdPhieu equals p.Idphieu into phieuJoin
+                from p in phieuJoin.DefaultIfEmpty()
+                orderby x.NgaySX descending, x.ThoiGianTao descending
+                select new
+                {
+                    Row = new BmPhieuExportRow
+                    {
+                        SoPhieu = x.SoPhieu,
+                        NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                        MayDuc = x.MayDuc,
+                        Kip = x.Kip,
+                        Ca = x.Ca,
 
-                    StLoai1 = x.StLoai1,
-                    KlLoai1 = x.KlLoai1,
+                        Me = x.Me,
+                        Mac = x.Mac,
+                        KichThuoc = x.KichThuoc,
 
-                    StLoai2 = x.StLoai2,
-                    KlLoai2 = x.KlLoai2,
+                        StLoai1 = x.StLoai1,
+                        KlLoai1 = x.KlLoai1,
 
-                    StLoai2tp = x.StLoai2TP,
-                    KlLoai2tp = x.KlLoai2TP,
+                        StLoai2 = x.StLoai2,
+                        KlLoai2 = x.KlLoai2,
 
-                    StPhoiNgan = x.StPhoiNgan,
-                    CdPhoiNgan = x.CdPhoiNgan,
-                    KlPhoiNgan = x.KlPhoiNgan,
+                        StLoai2tp = x.StLoai2TP,
+                        KlLoai2tp = x.KlLoai2TP,
 
-                    StLoai3 = x.StLoai3,
-                    KlLoai3 = x.KlLoai3,
+                        StPhoiNgan = x.StPhoiNgan,
+                        CdPhoiNgan = x.CdPhoiNgan,
+                        KlPhoiNgan = x.KlPhoiNgan,
 
-                    TongSoThanh = x.TongSoThanh,
-                    TongKhoiLuong = x.TongKhoiLuong,
-                    TinhTrang = x.TTHD == true ? 2 : 0,
+                        StLoai3 = x.StLoai3,
+                        KlLoai3 = x.KlLoai3,
+
+                        TongSoThanh = x.TongSoThanh,
+                        TongKhoiLuong = x.TongKhoiLuong,
+                        TinhTrang = p.TinhTrang ?? (x.TTHD == true ? 2 : 0),
+                    },
+                    Key = new
+                    {
+                        NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                        x.Ca,
+                        Me = NormalizeKeyValue(x.Me),
+                        Mac = NormalizeKeyValue(x.Mac),
+                        KichThuoc = NormalizeKeyValue(x.KichThuoc),
+                    }
                 })
                 .ToListAsync();
 
-            return rows;
+            foreach (var item in rows)
+            {
+                if (dataBKMisLookup.TryGetValue(item.Key, out var bk))
+                {
+                    item.Row.StLoai1_BK = bk.StLoai1;
+                    item.Row.KlLoai1_BK = bk.KlLoai1;
+
+                    item.Row.StLoai2_BK = bk.StLoai2;
+                    item.Row.KlLoai2_BK = bk.KlLoai2;
+
+                    item.Row.StLoai2tp_BK = bk.StLoai2tp;
+                    item.Row.KlLoai2tp_BK = bk.KlLoai2tp;
+
+                    item.Row.StPhoiNgan_BK = bk.StPhoiNgan;
+                    item.Row.CdPhoiNgan_BK = bk.CdPhoiNgan;
+                    item.Row.KlPhoiNgan_BK = bk.KlPhoiNgan;
+
+                    item.Row.StLoai3_BK = bk.StLoai3;
+                    item.Row.KlLoai3_BK = bk.KlLoai3;
+
+                    item.Row.TongSoThanh_BK = bk.TongSoThanh;
+                    item.Row.TongKhoiLuong_BK = bk.TongKhoiLuong;
+                }
+            }
+
+            return rows.Select(x => x.Row).ToList();
         }
 
 
@@ -1228,6 +1300,9 @@ namespace dataproduct.api.Services
             var ws = workbook.Worksheet(1);
 
             ws.Cell("A4").Value = $"Từ ngày: {fromDate:dd/MM/yyyy} đến ngày: {toDate:dd/MM/yyyy}";
+
+            static int ToInt(int? value) => value ?? 0;
+            static decimal ToDecimal(decimal? value) => value ?? 0m;
 
             int row = 9;
             int stt = 1;
@@ -1270,6 +1345,35 @@ namespace dataproduct.api.Services
 
                 ws.Cell(row, 21).Value = "";
                 ws.Cell(row, 22).Value = item.SoPhieu;
+
+                // Vùng BK Mis (X -> AI)
+                ws.Cell(row, 24).Value = item.StLoai1_BK;
+                ws.Cell(row, 25).Value = item.KlLoai1_BK;
+                ws.Cell(row, 26).Value = item.StLoai2_BK;
+                ws.Cell(row, 27).Value = item.KlLoai2_BK;
+                ws.Cell(row, 28).Value = item.StLoai2tp_BK;
+                ws.Cell(row, 29).Value = item.KlLoai2tp_BK;
+                ws.Cell(row, 30).Value = item.StPhoiNgan_BK;
+                ws.Cell(row, 31).Value = item.CdPhoiNgan_BK;
+                ws.Cell(row, 32).Value = item.KlPhoiNgan_BK;
+                ws.Cell(row, 33).Value = item.StLoai3_BK;
+                ws.Cell(row, 34).Value = item.KlLoai3_BK;
+                ws.Cell(row, 35).Value = item.TongKhoiLuong_BK;
+
+                // Vùng Chênh lệch = BM - BK Mis (AJ -> AU)
+                ws.Cell(row, 36).Value = ToInt(item.StLoai1) - ToInt(item.StLoai1_BK);
+                ws.Cell(row, 37).Value = ToDecimal(item.KlLoai1) - ToDecimal(item.KlLoai1_BK);
+                ws.Cell(row, 38).Value = ToInt(item.StLoai2) - ToInt(item.StLoai2_BK);
+                ws.Cell(row, 39).Value = ToDecimal(item.KlLoai2) - ToDecimal(item.KlLoai2_BK);
+                ws.Cell(row, 40).Value = ToInt(item.StLoai2tp) - ToInt(item.StLoai2tp_BK);
+                ws.Cell(row, 41).Value = ToDecimal(item.KlLoai2tp) - ToDecimal(item.KlLoai2tp_BK);
+                ws.Cell(row, 42).Value = ToInt(item.StPhoiNgan) - ToInt(item.StPhoiNgan_BK);
+                ws.Cell(row, 43).Value = ToDecimal(item.CdPhoiNgan) - ToDecimal(item.CdPhoiNgan_BK);
+                ws.Cell(row, 44).Value = ToDecimal(item.KlPhoiNgan) - ToDecimal(item.KlPhoiNgan_BK);
+                ws.Cell(row, 45).Value = ToInt(item.StLoai3) - ToInt(item.StLoai3_BK);
+                ws.Cell(row, 46).Value = ToDecimal(item.KlLoai3) - ToDecimal(item.KlLoai3_BK);
+                ws.Cell(row, 47).Value = ToDecimal(item.TongKhoiLuong) - ToDecimal(item.TongKhoiLuong_BK);
+
                 var cell = ws.Cell(row, 23);
                 switch (item.TinhTrang)
                 {

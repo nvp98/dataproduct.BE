@@ -139,21 +139,40 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public int? StLoai1 { get; set; }
         public decimal? KlLoai1 { get; set; }
 
+        public int? StLoai1_BK { get; set; }
+        public decimal? KlLoai1_BK { get; set; }
+
         public int? StLoai2 { get; set; }
         public decimal? KlLoai2 { get; set; }
 
+        public int? StLoai2_BK { get; set; }
+        public decimal? KlLoai2_BK { get; set; }
+
         public int? StLoai2tp { get; set; }
         public decimal? KlLoai2tp { get; set; }
+
+        public int? StLoai2tp_BK { get; set; }
+        public decimal? KlLoai2tp_BK { get; set; }
 
         public int? StPhoiNgan { get; set; }
         public decimal? CdPhoiNgan { get; set; }
         public decimal? KlPhoiNgan { get; set; }
 
+        public int? StPhoiNgan_BK { get; set; }
+        public decimal? CdPhoiNgan_BK { get; set; }
+        public decimal? KlPhoiNgan_BK { get; set; }
+
         public int? StLoai3 { get; set; }
         public decimal? KlLoai3 { get; set; }
 
+        public int? StLoai3_BK { get; set; }
+        public decimal? KlLoai3_BK { get; set; }
+
         public int? TongSoThanh { get; set; }
         public decimal? TongKhoiLuong { get; set; }
+
+        public int? TongSoThanh_BK { get; set; }
+        public decimal? TongKhoiLuong_BK { get; set; }
         public int? TinhTrang { get; set; }
     }
     public class BmPhieuJson
@@ -199,6 +218,8 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public string Mac { get; set; }
         public string KichThuoc { get; set; }
 
+        public DateOnly NgaySX { get; set; }
+        public int Ca { get; set; }
         public int StLoai1 { get; set; }
         public double KlLoai1 { get; set; }
         public int? StDachuyenLoai1 { get; set; }
