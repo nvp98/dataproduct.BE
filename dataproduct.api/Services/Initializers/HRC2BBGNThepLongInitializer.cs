@@ -18,7 +18,11 @@ namespace dataproduct.api.Services.Initializers
             if (string.IsNullOrWhiteSpace(maBm))
                 return false;
 
-            return maBm.Equals("HRC2_BB_GN_ThepLong", StringComparison.OrdinalIgnoreCase);
+            // FE đang gửi maBm theo config: HRC1_BBGN_ThepLong / HRC2_BBGN_ThepLong
+            return maBm.Equals("HRC1_BBGN_ThepLong", StringComparison.OrdinalIgnoreCase)
+                || maBm.Equals("HRC2_BBGN_ThepLong", StringComparison.OrdinalIgnoreCase)
+                // giữ backward compatibility nếu dữ liệu cũ dùng mã rút gọn
+                || maBm.Equals("BBGN_ThepLong", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task InitializeAsync(BmPhieu phieu)
@@ -27,7 +31,7 @@ namespace dataproduct.api.Services.Initializers
                 return;
 
             using var doc = JsonDocument.Parse(phieu.DataJson);
-            await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement);
+            await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement, phieu.Idphieu);
         }
     }
 }
