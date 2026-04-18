@@ -7,10 +7,7 @@ namespace dataproduct.api.Models
     {
         [Key]
         public int ID { get; set; }
-        public DateOnly? Ngay { get; set; }
-        public int? IDCa { get; set; }
         public int? IDLoCao { get; set; }
-        public string? MaNVL { get; set; }
         public string? TenNVL { get; set; }
         public string? DonVi { get; set; }
 

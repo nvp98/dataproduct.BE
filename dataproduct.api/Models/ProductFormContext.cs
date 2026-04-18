@@ -524,25 +524,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao").HasColumnType("datetime");
         });
 
-        modelBuilder.Entity<LG_NL_NVL>(entity =>
-        {
-            entity.ToTable("LG_NL_NVL");
-            entity.HasKey(e => e.ID);
-            entity.Property(e => e.ID).ValueGeneratedOnAdd();
-            entity.Property(e => e.Ngay).HasColumnName("Ngay");
-            entity.Property(e => e.IDCa).HasColumnName("IDCa");
-            entity.Property(e => e.IDLoCao).HasColumnName("IDLoCao");
-            entity.Property(e => e.MaNVL).HasColumnName("MaNVL").HasMaxLength(100);
-            entity.Property(e => e.TenNVL).HasColumnName("TenNVL").HasMaxLength(200);
-            entity.Property(e => e.DonVi).HasColumnName("DonVi").HasMaxLength(50);
-            entity.Property(e => e.SoLuong).HasColumnName("SoLuong").HasColumnType("decimal(10,3)");
-            entity.Property(e => e.DoAm).HasColumnName("DoAm").HasColumnType("decimal(10,3)");
-            entity.Property(e => e.GhiChu).HasColumnName("GhiChu").HasMaxLength(500);
-            entity.Property(e => e.NgayTao).HasColumnName("NgayTao").HasColumnType("datetime");
-            entity.Property(e => e.NhomHienThi).HasColumnName("NhomHienThi").HasMaxLength(200);
-            entity.Property(e => e.ThuTuNhom).HasColumnName("ThuTuNhom");
-        });
-
         // LG1_DuLieuNL — dữ liệu thô nạp liệu từ SCADA (readonly, không migration)
         modelBuilder.Entity<LG1_DuLieuNL>(entity =>
         {

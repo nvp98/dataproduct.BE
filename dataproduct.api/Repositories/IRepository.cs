@@ -265,10 +265,7 @@ namespace dataproduct.api.Repositories
 
     public interface ILGNLRepository
     {
-        // TS Mapping lookup
-        Task<List<LGNLTsMappingDto>> GetTsMappingListAsync();
 
-        // Dữ liệu thô LG1_DuLieuNL
         Task<List<LG1_DuLieuNL>> GetDuLieuRawAsync(
             IEnumerable<string> tagKeys, int idLoCao, DateTime timeFrom, DateTime timeTo);
 

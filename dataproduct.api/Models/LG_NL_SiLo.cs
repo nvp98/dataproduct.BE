@@ -2,9 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace dataproduct.api.Models
 {
-    /// <summary>
-    /// Bảng master quản lý tên Silo theo lò cao.
-    /// </summary>
     public class LG_NL_SiLo
     {
         [Key]

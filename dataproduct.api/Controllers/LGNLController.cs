@@ -15,30 +15,6 @@ namespace dataproduct.api.Controllers
             _service = service;
         }
 
-        [HttpGet("ts-mapping")]
-        public async Task<IActionResult> GetTsMappingList()
-        {
-            try { return Ok(await _service.GetTsMappingListAsync()); }
-            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
-        }
-
-        /// </summary>
-        [HttpGet("dulieu-silo")]
-        public async Task<IActionResult> GetDuLieuSilo(
-            [FromQuery] DateOnly ngay,
-            [FromQuery] int idCa,
-            [FromQuery] int idLoCao)
-        {
-            try
-            {
-                if (idCa != 1 && idCa != 2)
-                    return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
-                var result = await _service.GetDuLieuSiLoAsync(ngay, idCa, idLoCao);
-                return Ok(result);
-            }
-            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
-        }
-
 
         [HttpGet("silo-master")]
         public async Task<IActionResult> GetSiLoMasterList([FromQuery] int? idLoCao)

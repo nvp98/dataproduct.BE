@@ -120,7 +120,6 @@ namespace dataproduct.api.Repositories
                     TenSiLo      = s != null ? s.TenSiLo      : null,
                     TagKey       = s != null ? s.TagKey        : null,
                     IDNVL        = m.IDNVL,
-                    MaNVL        = n != null ? n.MaNVL         : null,
                     TenNVL       = n != null ? n.TenNVL        : null,
                     NhomHienThi  = n != null ? n.NhomHienThi   : null,
                     ThuTuNhom    = n != null ? n.ThuTuNhom     : null,
@@ -172,11 +171,7 @@ namespace dataproduct.api.Repositories
         {
             return await _context.LG_NL_NVL
                 .Where(x =>
-                    (ngay == null || x.Ngay == ngay) &&
-                    (idCa == null || x.IDCa == idCa) &&
                     (idLoCao == null || x.IDLoCao == idLoCao))
-                .OrderBy(x => x.Ngay)
-                .ThenBy(x => x.IDCa)
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -197,10 +192,7 @@ namespace dataproduct.api.Repositories
             var existing = await _context.LG_NL_NVL.FindAsync(id);
             if (existing == null) return null;
 
-            existing.Ngay    = entity.Ngay;
-            existing.IDCa    = entity.IDCa;
             existing.IDLoCao = entity.IDLoCao;
-            existing.MaNVL   = entity.MaNVL;
             existing.TenNVL  = entity.TenNVL;
             existing.DonVi   = entity.DonVi;
             existing.SoLuong = entity.SoLuong;
