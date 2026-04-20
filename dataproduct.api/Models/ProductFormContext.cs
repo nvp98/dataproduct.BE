@@ -504,7 +504,6 @@ public partial class ProductFormContext : DbContext
             entity.HasKey(e => e.ID);
             entity.Property(e => e.ID).ValueGeneratedOnAdd();
             entity.Property(e => e.TagKey).HasColumnName("TagKey").HasMaxLength(100);
-            entity.Property(e => e.TS_Index).HasColumnName("TS_Index").HasMaxLength(20);
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.CreatedDate).HasColumnName("CreatedDate").HasColumnType("datetime");
         });
@@ -536,7 +535,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Value).HasColumnName("Value");
             entity.Property(e => e.ID_LoCao).HasColumnName("ID_LoCao");
             entity.Property(e => e.TagKey).HasColumnName("TagKey").HasMaxLength(100);
-            entity.Property(e => e.TS_Index).HasColumnName("TS_Index");
             entity.Property(e => e.CreatedDate).HasColumnName("CreatedDate").HasColumnType("datetime");
         });
 

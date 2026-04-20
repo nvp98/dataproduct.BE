@@ -12,7 +12,6 @@ namespace dataproduct.api.Models
         [Key]
         public int ID { get; set; }
         public string? TagKey { get; set; }
-        public int? TS_Index { get; set; }
         public bool? IsActive { get; set; }
         public DateTime? CreatedDate { get; set; }
     }

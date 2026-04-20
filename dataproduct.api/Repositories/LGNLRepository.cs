@@ -19,13 +19,11 @@ namespace dataproduct.api.Repositories
         {
             return await _context.LG1_NL_TS_Mapping
                 .Where(x => x.IsActive == true)
-                .OrderBy(x => x.TS_Index)
                 .AsNoTracking()
                 .Select(x => new LGNLTsMappingDto
                 {
                     ID       = x.ID,
                     TagKey   = x.TagKey,
-                    TS_Index = x.TS_Index,
                     IsActive = x.IsActive
                 })
                 .ToListAsync();
