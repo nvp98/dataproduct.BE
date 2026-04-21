@@ -52,6 +52,17 @@ namespace dataproduct.api.Repositories
                                 ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
                                 : null;
                 string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix, Scope, Ca, NgaySX);
+                // lấy tên scope từ formData (an toàn cho cả string/number)
+                string? tenScope = null;
+                if (formData.TryGetProperty("tenScope", out var tenScopeProp))
+                {
+                    tenScope = tenScopeProp.ValueKind switch
+                    {
+                        JsonValueKind.String => tenScopeProp.GetString(),
+                        JsonValueKind.Number => tenScopeProp.GetRawText(),
+                        _ => null
+                    };
+                }
 
                 var phieu = new BmPhieu
                 {
@@ -65,6 +76,7 @@ namespace dataproduct.api.Repositories
                     Scope = Scope,
                     //XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
                     //IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
+                    TenScope = tenScope,
                     DataJson = formData.GetRawText(),
                     NgayTao = DateTime.Now,
                     TinhTrang = 0,
