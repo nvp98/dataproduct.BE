@@ -334,7 +334,7 @@ namespace dataproduct.api.Services
                     Id = x.Id,
                     IdPhieu = x.IdPhieu,
                     SoPhieu = x.SoPhieu,
-                    NgaySX = x.NgaySX,
+                    NgaySX = x.NgaySX, // ngày đúc -> lấy từ BK_PhoiThep
                     Kip = x.Kip,
                     Ca = x.Ca,
                     MayDuc = x.MayDuc,
@@ -355,9 +355,52 @@ namespace dataproduct.api.Services
                     TongSoThanh = x.TongSoThanh,
                     TongKhoiLuong = x.TongKhoiLuong,
                     TTHD = x.TTHD,
-                    ThoiGianTao = x.ThoiGianTao
+                    ThoiGianTao = x.ThoiGianTao,
+                    NgayGiao = x.NgaySX
                 })
                 .ToListAsync();
+
+            if (data.Count > 0)
+            {
+                var meSet = data.Select(x => NormalizeKeyValue(x.Me)).Distinct().ToList();
+                var macSet = data.Select(x => NormalizeKeyValue(x.Mac)).Distinct().ToList();
+                var kichThuocSet = data.Select(x => NormalizeKeyValue(x.KichThuoc)).Distinct().ToList();
+
+                var bkRows = await _context.BkPhoiThep
+                    .AsNoTracking()
+                    .Where(x => meSet.Contains((x.Me ?? string.Empty).Trim().ToUpper())
+                        && macSet.Contains((x.Mac ?? string.Empty).Trim().ToUpper())
+                        && kichThuocSet.Contains((x.KichThuoc ?? string.Empty).Trim().ToUpper()))
+                    .Select(x => new
+                    {
+                        x.Ca,
+                        Kip = (x.Kip ?? string.Empty).Trim().ToUpper(),
+                        MayDuc = x.MayDuc ?? 0,
+                        Me = (x.Me ?? string.Empty).Trim().ToUpper(),
+                        Mac = (x.Mac ?? string.Empty).Trim().ToUpper(),
+                        KichThuoc = (x.KichThuoc ?? string.Empty).Trim().ToUpper(),
+                        x.NgaySx
+                    })
+                    .ToListAsync();
+
+                var bkLookup = bkRows
+                    .GroupBy(x => ( x.Me, x.Mac, x.KichThuoc))
+                    .ToDictionary(g => g.Key, g => g.Max(v => v.NgaySx));
+
+                foreach (var item in data)
+                {
+                    var key = (
+                        NormalizeKeyValue(item.Me),
+                        NormalizeKeyValue(item.Mac),
+                        NormalizeKeyValue(item.KichThuoc)
+                    );
+
+                    if (bkLookup.TryGetValue(key, out var ngaySxFromBk))
+                    {
+                        item.NgaySX = ngaySxFromBk.ToDateTime(TimeOnly.MinValue);
+                    }
+                }
+            }
 
             return (data, total);
         }
@@ -1170,10 +1213,11 @@ namespace dataproduct.api.Services
             if (toDate.HasValue)
                 query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
-            var rows = await query
-                .OrderByDescending(x => x.NgaySX)
-                .ThenByDescending(x => x.ThoiGianTao)
-                .Select(x => new BmPhieuExportRow
+            var rows = await (
+                from x in query
+                join p in _context.BmPhieus on x.IdPhieu equals p.Idphieu
+                orderby x.NgaySX descending, x.ThoiGianTao descending
+                select new BmPhieuExportRow
                 {
                     SoPhieu = x.SoPhieu,
                     NgaySX = DateOnly.FromDateTime(x.NgaySX),
@@ -1189,20 +1233,17 @@ namespace dataproduct.api.Services
                     KlLoai2 = x.KlLoai2,
                     StLoai2tp = x.StLoai2TP,
                     KlLoai2tp = x.KlLoai2TP,
-
                     StPhoiNgan = x.StPhoiNgan,
                     CdPhoiNgan = x.CdPhoiNgan,
                     KlPhoiNgan = x.KlPhoiNgan,
-
                     StLoai3 = x.StLoai3,
                     KlLoai3 = x.KlLoai3,
-
-
                     TongSoThanh = x.TongSoThanh,
                     TongKhoiLuong = x.TongKhoiLuong,
-                    TinhTrang = x.TTHD == true ? 2 : 0,
-                })
-                .ToListAsync();
+                    // 👉 lấy từ bảng Phiếu
+                    TinhTrang = p.TinhTrang
+                }
+                ).ToListAsync();
             return rows;
         }
         public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuPKHAsync(DateOnly? fromDate, DateOnly? toDate)
