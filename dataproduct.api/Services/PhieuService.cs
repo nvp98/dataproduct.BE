@@ -439,8 +439,10 @@ namespace dataproduct.api.Business
                 phieuGoc.IsLock = 1;
                 await _repo.UpdateAsync(phieuGoc);
 
+                await _context.SaveChangesAsync();
+
                 // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
-                var phieu = await _repo.AddAsync(formData);
+                var phieu = await CreateAsync(formData);
                 if (phieu == null) return null;
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
@@ -603,7 +605,7 @@ namespace dataproduct.api.Business
         public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request)
         {
             var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
-            var dataList = data.ToList();
+            var dataList = data.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).ThenBy(x => x.Scope).ToList();
 
             foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
             {

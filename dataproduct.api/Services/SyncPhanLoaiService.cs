@@ -56,11 +56,11 @@ namespace dataproduct.api.Services
             if (phanLoaiMap.Count == 0)
                 return new SyncPhanLoaiResult { TotalFromMySQL = 0, TotalUpdated = 0 };
 
-            // 2. Update vào SQL Server (chỉ những mẻ PhanLoai IS NULL, không phải ghost)
+            // 2. Update vào SQL Server (chỉ những mẻ PhanLoai hoặc MacThepBKMIS IS NULL, không phải ghost)
             var maMesCoData = phanLoaiMap.Keys.ToList();
             var rows = await _context.BBGN_ThepLongs
                 .Where(x => maMesCoData.Contains(x.Me!)
-                         && x.PhanLoai == null
+                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
                          && x.BieuMau == request.BieuMau
                          && x.IsGhost != true)
                 .ToListAsync();
@@ -68,9 +68,10 @@ namespace dataproduct.api.Services
             int updated = 0;
             foreach (var row in rows)
             {
-                if (row.Me != null && phanLoaiMap.TryGetValue(row.Me, out var pl))
+                if (row.Me != null && phanLoaiMap.TryGetValue(row.Me, out var entry))
                 {
-                    row.PhanLoai = pl;
+                    row.PhanLoai = entry.PhanLoai;
+                    row.MacThepBKMIS = entry.GradeCode;
                     _context.BBGN_ThepLongs.Update(row);
                     updated++;
                 }
@@ -98,7 +99,7 @@ namespace dataproduct.api.Services
             var fromDate = DateTime.Today.AddDays(-lookbackDays);
             return await _context.BBGN_ThepLongs
                 .Where(x => x.BieuMau == bieuMau
-                         && x.PhanLoai == null
+                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
                          && x.Me != null
                          && x.IsGhost != true
                          && x.NgaySX >= fromDate)
@@ -110,11 +111,11 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Gọi SP usp_GetPhanLoaiThepLong trong PRODUCT_FORM.
         /// SP tự query Linked Server theo ViewName và danh sách MaMe (JSON array).
-        /// Trả về: BilletLotCode, ClassifyName
+        /// Trả về: BilletLotCode, ClassifyName, GradeCode
         /// </summary>
-        private async Task<Dictionary<string, string>> QueryViaStoredProcAsync(string viewName, List<string> maMes)
+        private async Task<Dictionary<string, (string PhanLoai, string? GradeCode)>> QueryViaStoredProcAsync(string viewName, List<string> maMes)
         {
-            var result  = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var result  = new Dictionary<string, (string PhanLoai, string? GradeCode)>(StringComparer.OrdinalIgnoreCase);
             var maMesJson = JsonSerializer.Serialize(maMes);
 
             await using var conn = new SqlConnection(_sqlConnStr);
@@ -129,10 +130,11 @@ namespace dataproduct.api.Services
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                var maMe    = reader.IsDBNull(0) ? null : reader.GetString(0); // BilletLotCode
+                var maMe     = reader.IsDBNull(0) ? null : reader.GetString(0); // BilletLotCode
                 var phanLoai = reader.IsDBNull(1) ? null : reader.GetString(1); // ClassifyName
+                var gradeCode = reader.FieldCount > 2 && !reader.IsDBNull(2) ? reader.GetString(2) : null; // GradeCode
                 if (!string.IsNullOrWhiteSpace(maMe) && !string.IsNullOrWhiteSpace(phanLoai))
-                    result[maMe] = phanLoai;
+                    result[maMe] = (phanLoai, gradeCode);
             }
 
             return result;

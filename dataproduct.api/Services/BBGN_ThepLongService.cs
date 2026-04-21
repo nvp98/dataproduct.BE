@@ -87,7 +87,7 @@ namespace dataproduct.api.Services
                     var oldMe = existing.Me;
                     existing.Me = me;
                     existing.MayDuc = GetString(row, "mayDuc");
-                    existing.MacThep = GetString(row, "macThep");
+                    existing.IdMacThep = TryParseInt(row, "idMacThep");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
 
@@ -99,6 +99,7 @@ namespace dataproduct.api.Services
                     existing.GhiChu = GetString(row, "ghiChu");
                     existing.TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
                     existing.PhanLoai = GetString(row, "phanLoai");
+                    existing.MacThepBKMIS = GetString(row, "macThepBKMIS");
                     if (!string.IsNullOrWhiteSpace(bieuMau)) existing.BieuMau = bieuMau;
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
                     if (ca.HasValue) existing.Ca = ca.Value;
@@ -121,7 +122,7 @@ namespace dataproduct.api.Services
                     {
                         Me = me,
                         MayDuc = GetString(row, "mayDuc"),
-                        MacThep = GetString(row, "macThep"),
+                        IdMacThep = TryParseInt(row, "idMacThep"),
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
@@ -137,6 +138,7 @@ namespace dataproduct.api.Services
                         GhiChu = GetString(row, "ghiChu"),
                         TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang"),
                         PhanLoai = GetString(row, "phanLoai"),
+                        MacThepBKMIS = GetString(row, "macThepBKMIS"),
                         IdPhieu = idPhieu,
                         IsGhost = false
                     };
@@ -152,7 +154,7 @@ namespace dataproduct.api.Services
 
             await _context.SaveChangesAsync();
 
-            await UpdateDuplicateFlagsForMesAsync(idPhieu, affectedMes);
+            await UpdateDuplicateFlagsForMesAsync(affectedMes);
         }
     
 
@@ -283,7 +285,7 @@ namespace dataproduct.api.Services
 
             // 4. Đồng bộ PhanLoai từ MySQL theo danh sách mẻ của phiếu, rồi đọc lại để trả về đã cập nhật
             var maMes = rows
-                .Where(x => x.IsGhost != true && !string.IsNullOrWhiteSpace(x.Me) && x.PhanLoai == null)
+                .Where(x => x.IsGhost != true && !string.IsNullOrWhiteSpace(x.Me) && (x.PhanLoai == null || x.MacThepBKMIS == null))
                 .Select(x => x.Me!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -301,7 +303,9 @@ namespace dataproduct.api.Services
                     .ToListAsync();
             }
 
-            return rows.Where(x => x.IsGhost != true).ToList();
+            var result = rows.Where(x => x.IsGhost != true).ToList();
+            await ResolveMacThepNamesAsync(result);
+            return result;
         }
 
         public async Task<bool> DeleteRowAsync(int id)
@@ -317,35 +321,28 @@ namespace dataproduct.api.Services
 
             if (!string.IsNullOrWhiteSpace(deletedMe))
             {
-                await UpdateDuplicateFlagsForMesAsync(idPhieu, new[] { deletedMe });
+                await UpdateDuplicateFlagsForMesAsync(new[] { deletedMe });
             }
 
             return true;
         }
 
-        private async Task UpdateDuplicateFlagsForMesAsync(Guid idPhieu, IEnumerable<string> rawMes)
+        private async Task UpdateDuplicateFlagsForMesAsync(IEnumerable<string> rawMes)
         {
             var mes = rawMes
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                .ToList();
 
             if (mes.Count == 0) return;
 
             var rows = await _context.BBGN_ThepLongs
-                .Where(x => x.IdPhieu == idPhieu && x.IsGhost != true && x.Me != null)
+                .Where(x => x.IsGhost != true && x.Me != null && mes.Contains(x.Me))
                 .ToListAsync();
 
-            var targetRows = rows
-                .Where(x => !string.IsNullOrWhiteSpace(x.Me) && mes.Contains(x.Me!.Trim()))
-                .ToList();
-
-            if (targetRows.Count == 0) return;
-
             bool changed = false;
-            var groups = targetRows
-                .GroupBy(x => x.Me!.Trim(), StringComparer.OrdinalIgnoreCase);
+            var groups = rows.GroupBy(x => x.Me!.Trim(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var group in groups)
             {
@@ -382,11 +379,13 @@ namespace dataproduct.api.Services
 
         public async Task<List<BBGN_ThepLong>> LoadByIdPhieuAsync(Guid idPhieu)
         {
-            return await _context.BBGN_ThepLongs
+            var rows = await _context.BBGN_ThepLongs
                 .Where(x => x.IdPhieu == idPhieu && x.IsGhost != true)
                 .OrderBy(x => x.ThoiGian)
                 .ThenBy(x => x.Id)
                 .ToListAsync();
+            await ResolveMacThepNamesAsync(rows);
+            return rows;
         }
 
         public async Task<PagedResult<BBGN_ThepLong>> SearchThongKeAsync(SearchThongKeBBGNThepLongRequest request)
@@ -405,6 +404,8 @@ namespace dataproduct.api.Services
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+
+            await ResolveMacThepNamesAsync(data);
 
             return new PagedResult<BBGN_ThepLong>
             {
@@ -446,6 +447,27 @@ namespace dataproduct.api.Services
                 query = query.Where(x => x.NgaySX.HasValue && x.NgaySX.Value.Date <= toDate);
             }
 
+            if (request.Ca.HasValue)
+                query = query.Where(x => x.Ca == request.Ca.Value);
+
+            if (!string.IsNullOrWhiteSpace(request.Kip))
+            {
+                var kip = request.Kip.Trim();
+                var phieuQuery = _context.BmPhieus
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsDelete != 1 &&
+                        x.IsLock != 1 &&
+                        x.Kip == kip &&
+                        x.MaBm == request.BieuMau);
+
+                if (request.Ca.HasValue)
+                    phieuQuery = phieuQuery.Where(x => x.Ca == request.Ca.Value);
+
+                var idPhieuList = phieuQuery.Select(x => x.Idphieu);
+                query = query.Where(x => idPhieuList.Contains(x.IdPhieu));
+            }
+
             var scope = request.Scope ?? request.MayDuc;
             if (scope.HasValue)
                 query = query.Where(x => x.Scope == scope.Value);
@@ -455,7 +477,8 @@ namespace dataproduct.api.Services
                 var keyword = request.SearchString.Trim();
                 query = query.Where(x =>
                     (x.Me ?? string.Empty).Contains(keyword) ||
-                    (x.MacThep ?? string.Empty).Contains(keyword));
+                    (x.MacThep ?? string.Empty).Contains(keyword) ||
+                    _context.MacTheps.Any(m => m.Id == x.IdMacThep && m.TenMacThep.Contains(keyword)));
             }
 
             if (!string.IsNullOrWhiteSpace(request.ThungSo))
@@ -480,6 +503,22 @@ namespace dataproduct.api.Services
                 query = query.Where(x => x.IsTrungMeThoi == request.IsTrungMeThoi.Value);
 
             return query;
+        }
+
+        private async Task ResolveMacThepNamesAsync(List<BBGN_ThepLong> rows)
+        {
+            var ids = rows.Where(x => x.IdMacThep.HasValue).Select(x => x.IdMacThep!.Value).Distinct().ToList();
+            if (ids.Count == 0) return;
+
+            var map = await _context.MacTheps
+                .Where(x => ids.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.TenMacThep);
+
+            foreach (var row in rows.Where(x => x.IdMacThep.HasValue))
+            {
+                if (map.TryGetValue(row.IdMacThep!.Value, out var ten))
+                    row.MacThep = ten;
+            }
         }
 
         public async Task<BmPhieu?> GetBmPhieuByIdAsync(Guid idPhieu)

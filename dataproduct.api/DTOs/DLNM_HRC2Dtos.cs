@@ -118,6 +118,7 @@ namespace dataproduct.api.DTOs
 
         public string? SearchText { get; set; }
         public bool? IsTrungMeThoi { get; set; } = false;
+        public bool? IsDelete { get; set; }
         public int? Page { get; set; } = 1;
 
         public int? PageSize { get; set; } = 20;

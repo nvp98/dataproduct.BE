@@ -27,6 +27,8 @@ public partial class BBGN_ThepLong
     public Guid IdPhieu { get; set; }
     public bool? IsGhost { get; set; }
     public bool? IsTrungMeThoi { get; set; }
+    public string? MacThepBKMIS { get; set; }
+    public int? IdMacThep { get; set; }
 }
 
 

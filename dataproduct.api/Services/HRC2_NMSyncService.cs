@@ -130,6 +130,7 @@ namespace dataproduct.api.Services
             var rows = await _context.DLNM_HRC2s
                 .Where(x =>
                     x.IsNM == true &&
+                    x.IsDelete != true &&
                     x.Ngay == request.NgaySX &&
                     x.Ca == request.Ca &&
                     x.Scope == request.Scope &&

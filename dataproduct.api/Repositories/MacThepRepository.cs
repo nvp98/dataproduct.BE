@@ -12,7 +12,7 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep)
+        public async Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, int? idMayDuc = null)
         {
             var query = _context.MacTheps.AsQueryable();
 
@@ -22,6 +22,8 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.IsLock == isLock.Value);
             if (!string.IsNullOrWhiteSpace(tenMacThep))
                 query = query.Where(x => x.TenMacThep.Contains(tenMacThep));
+            if (idMayDuc.HasValue)
+                query = query.Where(x => x.IdMayDuc == idMayDuc.Value);
 
             return await query.OrderBy(x => x.NhaMay).ThenBy(x => x.TenMacThep).ToListAsync();
         }
