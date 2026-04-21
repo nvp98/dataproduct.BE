@@ -101,6 +101,7 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public decimal? TongKhoiLuong { get; set; }
         public bool? TTHD { get; set; }
         public DateTime ThoiGianTao { get; set; }
+        public DateTime? NgayGiao { get; set; }
     }
 
     public class ThuHoiPhoiNhapKhoRequest

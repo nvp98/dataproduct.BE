@@ -61,7 +61,7 @@ namespace dataproduct.api.Repositories
             return await _context.CtdSoTheoDois
                 .AsNoTracking()
                 .Where(x => x.Idphieu == phieuId)
-                .OrderBy(x => x.LoaiMacPhoi)
+                // .OrderBy(x => x.LoaiMacPhoi)
                 .ToListAsync();
         }
 
