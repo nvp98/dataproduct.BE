@@ -132,6 +132,19 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+        [HttpDelete("delete-row-nm/{id}")]
+        public async Task<IActionResult> DeleteRowNM(int id)
+        {
+            try
+            {
+                var ok = await _service.DeleteRowNMAsync(id);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
 
         [HttpGet("search")]
         public async Task<IActionResult> Search(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page = 1, int pageSize = 10)

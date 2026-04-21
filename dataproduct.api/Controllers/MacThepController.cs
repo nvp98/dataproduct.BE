@@ -16,32 +16,39 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(byte? nhaMay, bool? isLock, string? tenMacThep)
-            => Ok(await _service.GetAllAsync(nhaMay, isLock, tenMacThep));
+        public async Task<IActionResult> GetAll(byte? nhaMay, bool? isLock, string? tenMacThep, int? idMayDuc)
+            => Ok(await _service.GetAllAsync(nhaMay, isLock, tenMacThep, idMayDuc));
 
         /// <summary>
-        /// API autocomplete: tìm theo tên mác thép + nhà máy.
+        /// API autocomplete: tìm theo tên mác thép + nhà máy + máy đúc + ca/kíp.
         /// </summary>
         [HttpGet("search")]
-        public async Task<IActionResult> Search(string? searchKey, byte? nhaMay, bool? isLock, int page = 1, int pageSize = 30)
+        public async Task<IActionResult> Search(
+            string? searchKey,
+            byte? nhaMay,
+            bool? isLock,
+            int? idMayDuc,
+            int? ca,
+            string? kip,
+            string? maBm,
+            int page = 1,
+            int pageSize = 30)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 30;
             if (pageSize > 200) pageSize = 200;
 
-            var rows = await _service.GetAllAsync(nhaMay, isLock, searchKey);
-            var ordered = rows.OrderBy(x => x.TenMacThep).ToList();
+            var rows = await _service.SearchWithMayDucAsync(nhaMay, isLock, searchKey, idMayDuc, ca, kip, maBm);
 
-            var totalCount = ordered.Count;
-            var data = ordered
+            var totalCount = rows.Count;
+            var data = rows
                 .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new { x.Id, x.TenMacThep, x.NhaMay, x.IsLock });
+                .Take(pageSize);
 
             return Ok(new
             {
                 data,
-                totalCount,
+                totalRecords = totalCount,
                 page,
                 pageSize,
                 totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
@@ -81,6 +88,14 @@ namespace dataproduct.api.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [HttpPatch("{id}/xac-nhan")]
+        public async Task<IActionResult> ToggleXacNhan(int id)
+        {
+            var newValue = await _service.ToggleXacNhanAsync(id);
+            if (newValue == null) return NotFound();
+            return Ok(new { id, isXacNhan = newValue });
         }
 
         [HttpDelete("{id}")]

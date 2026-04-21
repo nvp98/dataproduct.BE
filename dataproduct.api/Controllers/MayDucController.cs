@@ -38,7 +38,7 @@ namespace dataproduct.api.Controllers
             return Ok(new
             {
                 data,
-                totalCount,
+                totalRecords = totalCount,
                 page,
                 pageSize,
                 totalPages = (int)Math.Ceiling((double)totalCount / pageSize)

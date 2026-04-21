@@ -144,7 +144,8 @@ namespace dataproduct.api.Repositories
                 x.MaBm == maBm &&
                 x.NgaySX == ngaySX &&
                 x.Ca == ca &&
-                x.IsDelete != 1
+                x.IsDelete != 1 &&
+                x.IsLock != 1
             );
 
             if (scope.HasValue)
@@ -334,7 +335,11 @@ namespace dataproduct.api.Repositories
                         .Select(q => q.MaBm!)
                         .ToList();
 
-                    // (XEM || PHÊ_DUYỆT) && TinhTrang != 0 — loại phiếu nháp / chưa gửi (0) cho cả hai nhánh
+                    var bbgnThepLongMaBms = new[] { "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong" };
+
+                    // Mặc định vẫn lọc TinhTrang != 0.
+                    // Riêng BBGN thép lỏng: nếu user có tên trong BmPheDuyets của phiếu đó thì vẫn trả về,
+                    // kể cả TinhTrang = 0.
                     query = query.Where(x =>
                         (
                             // Quyền 5 (XEM): phiếu MaBm đó (đã gửi, không còn 0)
@@ -348,7 +353,16 @@ namespace dataproduct.api.Repositories
                                     pd.CapDuyet != 0 &&
                                     pd.NguoiDuyetId == userId))
                         )
-                        && x.TinhTrang != 0
+                        && (
+                            x.TinhTrang != 0
+                            || (
+                                x.MaBm != null &&
+                                bbgnThepLongMaBms.Contains(x.MaBm) &&
+                                _context.BmPheDuyets.Any(pd =>
+                                    pd.PhieuId == x.Idphieu &&
+                                    pd.NguoiDuyetId == userId)
+                            )
+                        )
                     );
                     break;
                 }
@@ -393,7 +407,6 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.TinhTrang == request.TinhTrang.Value);
 
             query = query.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca);
-
             // ===== BƯỚC 5: Paging + Assemble (giống hàm cũ) =====
             var totalCount = await query.CountAsync();
             var data = await query.Skip((request.page - 1) * request.pageSize).Take(request.pageSize).ToListAsync();

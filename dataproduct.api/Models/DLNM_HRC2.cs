@@ -31,6 +31,7 @@ public partial class DLNM_HRC2
     public double? KLGangLongCCT { get; set; }
     public double? KLGangLongCR { get; set; }
     public bool? IsTrungMeThoi { get; set; } = false;
+    public bool? IsDelete { get; set; } = false;
 
     [NotMapped]
     public Guid TempKey { get; set; }

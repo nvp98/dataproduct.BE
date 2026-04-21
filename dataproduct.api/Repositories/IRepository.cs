@@ -275,7 +275,7 @@ namespace dataproduct.api.Repositories
 
     public interface IMacThepRepository
     {
-        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep);
+        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, int? idMayDuc = null);
         Task<MacThep?> GetByIdAsync(int id);
         Task AddAsync(MacThep entity);
         Task UpdateAsync(MacThep entity);

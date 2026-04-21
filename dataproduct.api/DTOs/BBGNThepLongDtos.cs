@@ -41,6 +41,8 @@ namespace dataproduct.api.DTOs
     {
         public DateTime? TuNgay { get; set; }
         public DateTime? DenNgay { get; set; }
+        public int? Ca { get; set; }
+        public string? Kip { get; set; }
         /// <summary>Filter theo ID máy đúc lưu ở Scope.</summary>
         public int? MayDuc { get; set; }
         /// <summary>Alias filter theo Scope (ID máy đúc).</summary>
