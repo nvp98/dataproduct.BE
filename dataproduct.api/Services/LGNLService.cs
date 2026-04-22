@@ -12,6 +12,11 @@ namespace dataproduct.api.Services
         {
             _repo = repo;
         }
+        // ─── TS Mapping lookup ───────────────────────────────────────────────
+
+        public Task<List<LGNLTsMappingDto>> GetTsMappingListAsync()
+            => _repo.GetTsMappingListAsync();
+
         // ─── SiLo Master ─────────────────────────────────────────────────────
 
         public async Task<List<LGNLSiLoMasterDto>> GetSiLoMasterListAsync(int? idLoCao)
@@ -67,9 +72,12 @@ namespace dataproduct.api.Services
 
         public async Task<LGNLMappingDto> AddMappingAsync(CreateLGNLMappingDto dto)
         {
+            var ngayParsed = !string.IsNullOrEmpty(dto.Ngay) && DateOnly.TryParse(dto.Ngay, out var parsed)
+                ? parsed : (DateOnly?)null;
+
             var entity = new LG_NL_Mapping
             {
-                Ngay    = dto.Ngay,
+                Ngay    = ngayParsed,
                 IDCa    = dto.IDCa,
                 IDLoCao = dto.IDLoCao,
                 IDSiLo  = dto.IDSiLo,
@@ -82,9 +90,12 @@ namespace dataproduct.api.Services
 
         public async Task<LGNLMappingDto?> UpdateMappingAsync(int id, UpdateLGNLMappingDto dto)
         {
+            var ngayParsed = !string.IsNullOrEmpty(dto.Ngay) && DateOnly.TryParse(dto.Ngay, out var parsed)
+                ? parsed : (DateOnly?)null;
+
             var entity = new LG_NL_Mapping
             {
-                Ngay    = dto.Ngay,
+                Ngay    = ngayParsed,
                 IDCa    = dto.IDCa,
                 IDLoCao = dto.IDLoCao,
                 IDSiLo  = dto.IDSiLo,
@@ -97,58 +108,98 @@ namespace dataproduct.api.Services
 
         public Task<bool> DeleteMappingAsync(int id) => _repo.DeleteMappingAsync(id);
 
+        // ─── Nhóm NVL ─────────────────────────────────────────────────────────
+
+        public async Task<List<LGNLNhomNvlDto>> GetNhomNvlListAsync(int? idLoCao)
+        {
+            var list = await _repo.GetNhomNvlListAsync(idLoCao);
+            return list.Select(MapNhomNvl).ToList();
+        }
+
+        public async Task<LGNLNhomNvlDto?> GetNhomNvlByIdAsync(int id)
+        {
+            var e = await _repo.GetNhomNvlByIdAsync(id);
+            return e == null ? null : MapNhomNvl(e);
+        }
+
+        public async Task<LGNLNhomNvlDto> AddNhomNvlAsync(CreateLGNLNhomNvlDto dto)
+        {
+            var entity = new LG_NL_NhomNVL
+            {
+                IDLoCao = dto.IDLoCao,
+                TenNhom = dto.TenNhom,
+                ThuTu   = dto.ThuTu,
+                GhiChu  = dto.GhiChu
+            };
+            var result = await _repo.AddNhomNvlAsync(entity);
+            return MapNhomNvl(result);
+        }
+
+        public async Task<LGNLNhomNvlDto?> UpdateNhomNvlAsync(int id, UpdateLGNLNhomNvlDto dto)
+        {
+            var entity = new LG_NL_NhomNVL
+            {
+                IDLoCao = dto.IDLoCao,
+                TenNhom = dto.TenNhom,
+                ThuTu   = dto.ThuTu,
+                GhiChu  = dto.GhiChu
+            };
+            var result = await _repo.UpdateNhomNvlAsync(id, entity);
+            return result == null ? null : MapNhomNvl(result);
+        }
+
+        public Task<bool> DeleteNhomNvlAsync(int id) => _repo.DeleteNhomNvlAsync(id);
+
         // ─── NVL ─────────────────────────────────────────────────────────────
 
-        public async Task<List<LGNLNvlDto>> GetNvlListAsync(DateOnly? ngay, int? idCa, int? idLoCao)
-        {
-            var list = await _repo.GetNvlListAsync(ngay, idCa, idLoCao);
-            return list.Select(MapNvl).ToList();
-        }
+        public Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao)
+            => _repo.GetNvlListAsync(idLoCao);
 
         public async Task<LGNLNvlDto?> GetNvlByIdAsync(int id)
         {
             var e = await _repo.GetNvlByIdAsync(id);
-            return e == null ? null : MapNvl(e);
+            return e == null ? null : MapNvlEntity(e);
         }
 
         public async Task<LGNLNvlDto> AddNvlAsync(CreateLGNLNvlDto dto)
         {
+            string? nhomHienThi = null;
+            if (dto.IDNhomNVL.HasValue)
+            {
+                var nhom = await _repo.GetNhomNvlByIdAsync(dto.IDNhomNVL.Value);
+                nhomHienThi = nhom?.TenNhom;
+            }
             var entity = new LG_NL_NVL
             {
-                IDLoCao      = dto.IDLoCao,
-                TenNVL       = dto.TenNVL,
-                DonVi        = dto.DonVi,
-                SoLuong      = dto.SoLuong,
-                DoAm         = dto.DoAm,
-                GhiChu       = dto.GhiChu,
-                NhomHienThi  = dto.NhomHienThi,
-                ThuTuNhom    = dto.ThuTuNhom
+                IDLoCao     = dto.IDLoCao,
+                IDNhomNVL   = dto.IDNhomNVL,
+                TenNVL      = dto.TenNVL,
+                DonVi       = dto.DonVi,
+                SoLuong     = dto.SoLuong,
+                DoAm        = dto.DoAm,
+                GhiChu      = dto.GhiChu,
             };
             var result = await _repo.AddNvlAsync(entity);
-            return MapNvl(result);
+            return MapNvlEntity(result);
         }
 
         public async Task<LGNLNvlDto?> UpdateNvlAsync(int id, UpdateLGNLNvlDto dto)
         {
             var entity = new LG_NL_NVL
             {
-                IDLoCao      = dto.IDLoCao,
-                TenNVL       = dto.TenNVL,
-                DonVi        = dto.DonVi,
-                SoLuong      = dto.SoLuong,
-                DoAm         = dto.DoAm,
-                GhiChu       = dto.GhiChu,
-                NhomHienThi  = dto.NhomHienThi,
-                ThuTuNhom    = dto.ThuTuNhom
+                IDLoCao     = dto.IDLoCao,
+                IDNhomNVL   = dto.IDNhomNVL,
+                TenNVL      = dto.TenNVL,
+                DonVi       = dto.DonVi,
+                SoLuong     = dto.SoLuong,
+                DoAm        = dto.DoAm,
+                GhiChu      = dto.GhiChu,
             };
             var result = await _repo.UpdateNvlAsync(id, entity);
-            return result == null ? null : MapNvl(result);
+            return result == null ? null : MapNvlEntity(result);
         }
 
-        public Task<bool> DeleteNvlAsync(int id) 
-        {
-            return  _repo.DeleteNvlAsync(id);
-        }
+        public Task<bool> DeleteNvlAsync(int id) => _repo.DeleteNvlAsync(id);
        
 
         private static LGNLSiLoMasterDto MapSiLoMaster(LG_NL_SiLo e) => new()
@@ -173,18 +224,43 @@ namespace dataproduct.api.Services
             NgayTao = e.NgayTao
         };
 
-        private static LGNLNvlDto MapNvl(LG_NL_NVL e) => new()
+        private static LGNLNhomNvlDto MapNhomNvl(LG_NL_NhomNVL e) => new()
+        {
+            ID      = e.ID,
+            IDLoCao = e.IDLoCao,
+            TenNhom = e.TenNhom,
+            ThuTu   = e.ThuTu,
+            GhiChu  = e.GhiChu,
+            NgayTao = e.NgayTao
+        };
+
+        private static LGNLNvlDto MapNvlEntity(LG_NL_NVL e) => new()
         {
             ID          = e.ID,
             IDLoCao     = e.IDLoCao,
+            IDNhomNVL   = e.IDNhomNVL,
             TenNVL      = e.TenNVL,
             DonVi       = e.DonVi,
             SoLuong     = e.SoLuong,
             DoAm        = e.DoAm,
             GhiChu      = e.GhiChu,
             NgayTao     = e.NgayTao,
-            NhomHienThi = e.NhomHienThi,
-            ThuTuNhom   = e.ThuTuNhom
         };
+
+        // ─── Dữ liệu theo LoCao, Ngày ───────────────────────────────
+
+        public async Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
+            int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc)
+        {
+            return await _repo.GetDataByFilterAsync(idLoCao, ngayBatDau, ngayKetThuc);
+        }
+
+        // ─── Pivot dữ liệu nạp liệu theo Silo mapping ───────────────
+
+        public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
+            DateOnly ngay, int idCa, int idLoCao)
+        {
+            return await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
+        }
     }
 }

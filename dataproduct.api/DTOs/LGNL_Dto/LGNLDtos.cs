@@ -59,7 +59,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
 
     public class CreateLGNLMappingDto
     {
-        public DateOnly Ngay { get; set; }
+        public string? Ngay { get; set; }  // Format: "YYYY-MM-DD"
         public int IDCa { get; set; }
         public int IDLoCao { get; set; }
         public int? IDSiLo { get; set; }
@@ -69,11 +69,39 @@ namespace dataproduct.api.DTOs.LGNL_Dto
 
     public class UpdateLGNLMappingDto
     {
-        public DateOnly Ngay { get; set; }
+        public string? Ngay { get; set; }  // Format: "YYYY-MM-DD"
         public int IDCa { get; set; }
         public int IDLoCao { get; set; }
         public int? IDSiLo { get; set; }
         public int? IDNVL { get; set; }
+        public string? GhiChu { get; set; }
+    }
+
+    // ─── Nhóm NVL DTOs ───────────────────────────────────────────────────────
+
+    public class LGNLNhomNvlDto
+    {
+        public int ID { get; set; }
+        public int? IDLoCao { get; set; }
+        public string? TenNhom { get; set; }
+        public int? ThuTu { get; set; }
+        public string? GhiChu { get; set; }
+        public DateTime? NgayTao { get; set; }
+    }
+
+    public class CreateLGNLNhomNvlDto
+    {
+        public int IDLoCao { get; set; }
+        public string TenNhom { get; set; } = string.Empty;
+        public int? ThuTu { get; set; }
+        public string? GhiChu { get; set; }
+    }
+
+    public class UpdateLGNLNhomNvlDto
+    {
+        public int IDLoCao { get; set; }
+        public string TenNhom { get; set; } = string.Empty;
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -82,10 +110,8 @@ namespace dataproduct.api.DTOs.LGNL_Dto
     public class LGNLNvlDto
     {
         public int ID { get; set; }
-        public DateOnly? Ngay { get; set; }
-        public int? IDCa { get; set; }
         public int? IDLoCao { get; set; }
-        public string? MaNVL { get; set; }
+        public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
         public string? DonVi { get; set; }
         public decimal? SoLuong { get; set; }
@@ -98,31 +124,25 @@ namespace dataproduct.api.DTOs.LGNL_Dto
 
     public class CreateLGNLNvlDto
     {
-        public DateOnly Ngay { get; set; }
-        public int IDCa { get; set; }
         public int IDLoCao { get; set; }
-        public string? MaNVL { get; set; }
+        public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
         public string? DonVi { get; set; }
         public decimal? SoLuong { get; set; }
         public decimal? DoAm { get; set; }
         public string? GhiChu { get; set; }
-        public string? NhomHienThi { get; set; }
         public int? ThuTuNhom { get; set; }
     }
 
     public class UpdateLGNLNvlDto
     {
-        public DateOnly Ngay { get; set; }
-        public int IDCa { get; set; }
         public int IDLoCao { get; set; }
-        public string? MaNVL { get; set; }
+        public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
         public string? DonVi { get; set; }
         public decimal? SoLuong { get; set; }
         public decimal? DoAm { get; set; }
         public string? GhiChu { get; set; }
-        public string? NhomHienThi { get; set; }
         public int? ThuTuNhom { get; set; }
     }
 
@@ -149,5 +169,27 @@ namespace dataproduct.api.DTOs.LGNL_Dto
     {
         public List<LGNLColumnDto> Columns { get; set; } = [];
         public List<Dictionary<string, object?>> Rows { get; set; } = [];
+    }
+
+
+    /// </summary>
+    public class LGNLDuLieuScadaDto
+    {
+        public int ID { get; set; }
+        public string? TagName { get; set; }
+        public string? TagKey { get; set; }
+        public DateTime? Time { get; set; }
+        public double? Value { get; set; }
+        public int? IDLoCao { get; set; }
+    }
+
+
+    /// </summary>
+    public class GetLGNLDataByFilterDto
+    {
+        public string? TagKey { get; set; }       
+        public int? IDLoCao { get; set; }          
+        public DateTime? NgayBatDau { get; set; }    
+        public DateTime? NgayKetThuc { get; set; }   
     }
 }

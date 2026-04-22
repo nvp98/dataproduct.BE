@@ -65,11 +65,12 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_NL_SiLo> LG_NL_SiLo { get; set; }
     public virtual DbSet<LG_NL_Mapping> LG_NL_Mapping { get; set; }
     public virtual DbSet<LG_NL_NVL> LG_NL_NVL { get; set; }
+    public virtual DbSet<LG_NL_NhomNVL> LG_NL_NhomNVL { get; set; }
     public virtual DbSet<LG1_NL_TS_Mapping> LG1_NL_TS_Mapping { get; set; }
     public virtual DbSet<LG1_DuLieuNL> LG1_DuLieuNL { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-       
+
 
         modelBuilder.Entity<BkNguyenLieu>(entity =>
         {
@@ -483,63 +484,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
         });
-
-        // LG_NL_SiLo — bảng master tên Silo theo lò cao
-        modelBuilder.Entity<LG_NL_SiLo>(entity =>
-        {
-            entity.ToTable("LG_NL_SiLo");
-            entity.HasKey(e => e.ID);
-            entity.Property(e => e.ID).ValueGeneratedOnAdd();
-            entity.Property(e => e.IDLoCao).HasColumnName("IDLoCao");
-            entity.Property(e => e.TenSiLo).HasColumnName("TenSiLo").HasMaxLength(200);
-            entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
-            entity.Property(e => e.NgayTao).HasColumnName("NgayTao").HasColumnType("datetime");
-            entity.Property(e => e.TagKey).HasColumnName("TagKey").HasMaxLength(100);
-        });
-
-        // LG1_NL_TS_Mapping — lookup TagKey ↔ TS_Index
-        modelBuilder.Entity<LG1_NL_TS_Mapping>(entity =>
-        {
-            entity.ToTable("LG1_NL_TS_Mapping");
-            entity.HasKey(e => e.ID);
-            entity.Property(e => e.ID).ValueGeneratedOnAdd();
-            entity.Property(e => e.TagKey).HasColumnName("TagKey").HasMaxLength(100);
-            entity.Property(e => e.IsActive).HasColumnName("IsActive");
-            entity.Property(e => e.CreatedDate).HasColumnName("CreatedDate").HasColumnType("datetime");
-        });
-
-        // LG_NL_Mapping — mapping Silo ↔ NVL theo ngày/ca
-        modelBuilder.Entity<LG_NL_Mapping>(entity =>
-        {
-            entity.ToTable("LG_NL_Mapping");
-            entity.HasKey(e => e.ID);
-            entity.Property(e => e.ID).ValueGeneratedOnAdd();
-            entity.Property(e => e.Ngay).HasColumnName("Ngay");
-            entity.Property(e => e.IDCa).HasColumnName("IDCa");
-            entity.Property(e => e.IDLoCao).HasColumnName("IDLoCao");
-            entity.Property(e => e.IDSiLo).HasColumnName("IDSiLo");
-            entity.Property(e => e.IDNVL).HasColumnName("IDNVL");
-            entity.Property(e => e.GhiChu).HasColumnName("GhiChu").HasMaxLength(500);
-            entity.Property(e => e.NgayTao).HasColumnName("NgayTao").HasColumnType("datetime");
-        });
-
-        // LG1_DuLieuNL — dữ liệu thô nạp liệu từ SCADA (readonly, không migration)
-        modelBuilder.Entity<LG1_DuLieuNL>(entity =>
-        {
-            entity.ToTable("LG1_DuLieuNL");
-            entity.HasKey(e => e.ID);
-            entity.Property(e => e.ID).HasColumnName("ID");
-            entity.Property(e => e.SourceID).HasColumnName("SourceID");
-            entity.Property(e => e.TagName).HasColumnName("TagName").HasMaxLength(500);
-            entity.Property(e => e.Time).HasColumnName("Time").HasColumnType("datetime");
-            entity.Property(e => e.Value).HasColumnName("Value");
-            entity.Property(e => e.ID_LoCao).HasColumnName("ID_LoCao");
-            entity.Property(e => e.TagKey).HasColumnName("TagKey").HasMaxLength(100);
-            entity.Property(e => e.CreatedDate).HasColumnName("CreatedDate").HasColumnType("datetime");
-        });
-
-        OnModelCreatingPartial(modelBuilder);
     }
-
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

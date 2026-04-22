@@ -265,6 +265,8 @@ namespace dataproduct.api.Repositories
 
     public interface ILGNLRepository
     {
+        // TS Mapping lookup
+        Task<List<LGNLTsMappingDto>> GetTsMappingListAsync();
 
         Task<List<LG1_DuLieuNL>> GetDuLieuRawAsync(
             IEnumerable<string> tagKeys, int idLoCao, DateTime timeFrom, DateTime timeTo);
@@ -283,11 +285,26 @@ namespace dataproduct.api.Repositories
         Task<LG_NL_Mapping?> UpdateMappingAsync(int id, LG_NL_Mapping entity);
         Task<bool> DeleteMappingAsync(int id);
 
+        // Nhóm NVL
+        Task<List<LG_NL_NhomNVL>> GetNhomNvlListAsync(int? idLoCao);
+        Task<LG_NL_NhomNVL?> GetNhomNvlByIdAsync(int id);
+        Task<LG_NL_NhomNVL> AddNhomNvlAsync(LG_NL_NhomNVL entity);
+        Task<LG_NL_NhomNVL?> UpdateNhomNvlAsync(int id, LG_NL_NhomNVL entity);
+        Task<bool> DeleteNhomNvlAsync(int id);
+
         // NVL
-        Task<List<LG_NL_NVL>> GetNvlListAsync(DateOnly? ngay, int? idCa, int? idLoCao);
+        Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao);
         Task<LG_NL_NVL?> GetNvlByIdAsync(int id);
         Task<LG_NL_NVL> AddNvlAsync(LG_NL_NVL entity);
         Task<LG_NL_NVL?> UpdateNvlAsync(int id, LG_NL_NVL entity);
         Task<bool> DeleteNvlAsync(int id);
+
+        // Dữ liệu SCADA filtered by LoCao, Ngày
+        Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
+            int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc);
+
+        // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao)
+        Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
+            DateOnly ngay, int idCa, int idLoCao);
     }
 }

@@ -103,6 +103,9 @@ namespace dataproduct.api.Repositories
                 join n in _context.LG_NL_NVL
                     on m.IDNVL equals n.ID into nvlGroup
                 from n in nvlGroup.DefaultIfEmpty()
+                join nh in _context.LG_NL_NhomNVL
+                    on n.IDNhomNVL equals nh.ID into nhomGroup
+                from nh in nhomGroup.DefaultIfEmpty()
                 where
                     (ngay == null || m.Ngay == ngay) &&
                     (idCa == null || m.IDCa == idCa) &&
@@ -119,8 +122,8 @@ namespace dataproduct.api.Repositories
                     TagKey       = s != null ? s.TagKey        : null,
                     IDNVL        = m.IDNVL,
                     TenNVL       = n != null ? n.TenNVL        : null,
-                    NhomHienThi  = n != null ? n.NhomHienThi   : null,
-                    ThuTuNhom    = n != null ? n.ThuTuNhom     : null,
+                    NhomHienThi  = nh != null ? nh.TenNhom     : null,
+                    ThuTuNhom    = nh != null ? nh.ThuTu       : null,
                     GhiChu       = m.GhiChu,
                     NgayTao      = m.NgayTao
                 }
@@ -163,15 +166,78 @@ namespace dataproduct.api.Repositories
             return true;
         }
 
-        // ─── NVL ─────────────────────────────────────────────────────────────
+        // ─── Nhóm NVL ────────────────────────────────────────────────────────
 
-        public async Task<List<LG_NL_NVL>> GetNvlListAsync(DateOnly? ngay, int? idCa, int? idLoCao)
+        public async Task<List<LG_NL_NhomNVL>> GetNhomNvlListAsync(int? idLoCao)
         {
-            return await _context.LG_NL_NVL
-                .Where(x =>
-                    (idLoCao == null || x.IDLoCao == idLoCao))
+            return await _context.LG_NL_NhomNVL
+                .Where(x => idLoCao == null || x.IDLoCao == idLoCao)
+                .OrderBy(x => x.IDLoCao)
+                .ThenBy(x => x.ThuTu)
                 .AsNoTracking()
                 .ToListAsync();
+        }
+
+        public async Task<LG_NL_NhomNVL?> GetNhomNvlByIdAsync(int id)
+            => await _context.LG_NL_NhomNVL.FindAsync(id);
+
+        public async Task<LG_NL_NhomNVL> AddNhomNvlAsync(LG_NL_NhomNVL entity)
+        {
+            entity.NgayTao = DateTime.Now;
+            await _context.LG_NL_NhomNVL.AddAsync(entity);
+            await _context.SaveChangesAsync();
+            return entity;
+        }
+
+        public async Task<LG_NL_NhomNVL?> UpdateNhomNvlAsync(int id, LG_NL_NhomNVL entity)
+        {
+            var existing = await _context.LG_NL_NhomNVL.FindAsync(id);
+            if (existing == null) return null;
+
+            existing.IDLoCao = entity.IDLoCao;
+            existing.TenNhom = entity.TenNhom;
+            existing.ThuTu   = entity.ThuTu;
+            existing.GhiChu  = entity.GhiChu;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteNhomNvlAsync(int id)
+        {
+            var existing = await _context.LG_NL_NhomNVL.FindAsync(id);
+            if (existing == null) return false;
+            _context.LG_NL_NhomNVL.Remove(existing);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ─── NVL ─────────────────────────────────────────────────────────────
+
+        public async Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao)
+        {
+            return await (
+                from n in _context.LG_NL_NVL
+                join nh in _context.LG_NL_NhomNVL
+                    on n.IDNhomNVL equals nh.ID into nhomGroup
+                from nh in nhomGroup.DefaultIfEmpty()
+                where idLoCao == null || n.IDLoCao == idLoCao
+                orderby n.IDLoCao, nh.ThuTu
+                select new LGNLNvlDto
+                {
+                    ID           = n.ID,
+                    IDLoCao      = n.IDLoCao,
+                    IDNhomNVL    = n.IDNhomNVL,
+                    TenNVL       = n.TenNVL,
+                    DonVi        = n.DonVi,
+                    SoLuong      = n.SoLuong,
+                    DoAm         = n.DoAm,
+                    GhiChu       = n.GhiChu,
+                    NgayTao      = n.NgayTao,
+                    NhomHienThi  = nh != null ? nh.TenNhom : null,
+                    ThuTuNhom    = nh != null ? nh.ThuTu   : null,
+                }
+            ).AsNoTracking().ToListAsync();
         }
 
         public async Task<LG_NL_NVL?> GetNvlByIdAsync(int id)
@@ -190,12 +256,13 @@ namespace dataproduct.api.Repositories
             var existing = await _context.LG_NL_NVL.FindAsync(id);
             if (existing == null) return null;
 
-            existing.IDLoCao = entity.IDLoCao;
-            existing.TenNVL  = entity.TenNVL;
-            existing.DonVi   = entity.DonVi;
-            existing.SoLuong = entity.SoLuong;
-            existing.DoAm    = entity.DoAm;
-            existing.GhiChu  = entity.GhiChu;
+            existing.IDLoCao    = entity.IDLoCao;
+            existing.IDNhomNVL  = entity.IDNhomNVL;
+            existing.TenNVL     = entity.TenNVL;
+            existing.DonVi      = entity.DonVi;
+            existing.SoLuong    = entity.SoLuong;
+            existing.DoAm       = entity.DoAm;
+            existing.GhiChu     = entity.GhiChu;
 
             await _context.SaveChangesAsync();
             return existing;
@@ -208,6 +275,154 @@ namespace dataproduct.api.Repositories
             _context.LG_NL_NVL.Remove(existing);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        // ─── Pivot dữ liệu nạp liệu theo Silo mapping ───────────────
+
+        public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
+            DateOnly ngay, int idCa, int idLoCao)
+        {
+            // 1. Lấy danh sách silo-NVL mapping cho ca/ngày/lò cao
+            var mappings = await (
+                from m in _context.LG_NL_Mapping
+                join s in _context.LG_NL_SiLo on m.IDSiLo equals s.ID into sg
+                from s in sg.DefaultIfEmpty()
+                join n in _context.LG_NL_NVL on m.IDNVL equals n.ID into ng
+                from n in ng.DefaultIfEmpty()
+                join nh in _context.LG_NL_NhomNVL on n.IDNhomNVL equals nh.ID into nhg
+                from nh in nhg.DefaultIfEmpty()
+                where m.IDLoCao == idLoCao && m.IDCa == idCa && m.Ngay == ngay
+                orderby nh != null ? nh.ThuTu : 999, s != null ? s.ThuTu : 999
+                select new
+                {
+                    TagKey    = s != null ? s.TagKey : null,
+                    SiLoId    = s != null ? s.ID : 0,
+                    TenNVL    = n != null ? n.TenNVL : (s != null ? s.TenSiLo : null),
+                    DonVi     = n != null ? n.DonVi : null,
+                    TenNhom   = nh != null ? nh.TenNhom : null,
+                    ThuTuNhom = nh != null ? (nh.ThuTu ?? 999) : 999,
+                }
+            ).AsNoTracking().ToListAsync();
+
+            var valid = mappings.Where(m => !string.IsNullOrEmpty(m.TagKey)).ToList();
+            if (valid.Count == 0)
+                return new LGNLDuLieuSiLoResult();
+
+            // Gán dataIndex duy nhất cho mỗi silo
+            var withIndex = valid.Select(m => new
+            {
+                m.TagKey,
+                DataIndex = $"silo_{m.SiLoId}",
+                m.TenNVL,
+                m.DonVi,
+                m.TenNhom,
+                m.ThuTuNhom,
+            }).ToList();
+
+            // 2. Tính khung thời gian theo ca
+            DateTime timeFrom, timeTo;
+            if (idCa == 1) // Ca ngày: 07:00 → 19:00
+            {
+                timeFrom = ngay.ToDateTime(new TimeOnly(7, 0));
+                timeTo   = ngay.ToDateTime(new TimeOnly(19, 0));
+            }
+            else // Ca đêm: 19:00 → 07:00 hôm sau
+            {
+                timeFrom = ngay.ToDateTime(new TimeOnly(19, 0));
+                timeTo   = ngay.AddDays(1).ToDateTime(new TimeOnly(7, 0));
+            }
+
+            // 3. Truy vấn SCADA data — bao gồm TS0 (số mẻ) ngoài các silo tag
+            var tagKeys = withIndex.Select(m => m.TagKey!).Distinct()
+                .Append("TS0").Distinct().ToList();
+            var rawData = await _context.LG1_DuLieuNL
+                .Where(d => d.ID_LoCao == idLoCao
+                         && d.Time >= timeFrom
+                         && d.Time < timeTo
+                         && tagKeys.Contains(d.TagKey!))
+                .OrderBy(d => d.Time)
+                .AsNoTracking()
+                .ToListAsync();
+
+            // 4. Xây dựng cấu trúc cột (nhóm theo NhomNVL)
+            var tagToIndex = withIndex
+                .GroupBy(m => m.TagKey!)
+                .ToDictionary(g => g.Key, g => g.First().DataIndex);
+
+            var groups = withIndex
+                .GroupBy(m => m.TenNhom)
+                .OrderBy(g => g.Min(m => m.ThuTuNhom));
+
+            var columns = new List<LGNLColumnDto>();
+            foreach (var grp in groups)
+            {
+                var leaves = grp
+                    .GroupBy(m => m.DataIndex)
+                    .Select(g => new LGNLColumnDto
+                    {
+                        Title     = g.First().TenNVL ?? g.Key,
+                        DataIndex = g.Key,
+                    })
+                    .ToList();
+
+                if (grp.Key == null || leaves.Count == 1)
+                    columns.AddRange(leaves);
+                else
+                    columns.Add(new LGNLColumnDto { Title = grp.Key, Children = leaves });
+            }
+
+            // 5. Pivot theo timestamp (mỗi time = 1 mẻ nạp)
+            var rows = rawData
+                .GroupBy(d => d.Time)
+                .OrderBy(g => g.Key)
+                .Select((g, idx) =>
+                {
+                    var row = new Dictionary<string, object?>
+                    {
+                        ["id"]   = idx + 1,
+                        ["time"] = g.Key?.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    };
+                    foreach (var d in g)
+                    {
+                        if (d.TagKey == "TS0")
+                        {
+                            row["soMe"] = d.Value;
+                            continue;
+                        }
+
+                        if (d.TagKey != null && tagToIndex.TryGetValue(d.TagKey, out var di))
+                            row[di] = d.Value;
+                    }
+                    return row;
+                })
+                .ToList();
+
+            return new LGNLDuLieuSiLoResult { Columns = columns, Rows = rows };
+        }
+
+        // ─── Dữ liệu theo LoCao, Ngày ───────────────────────────────
+
+        public async Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
+             int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc)
+        {
+            // Query dữ liệu thô từ LG1_DuLieuNL
+            var query = from d in _context.LG1_DuLieuNL
+                        where
+                              (idLoCao == null || d.ID_LoCao == idLoCao) &&
+                              (ngayBatDau == null || d.Time >= ngayBatDau) &&
+                              (ngayKetThuc == null || d.Time < ngayKetThuc)
+                        orderby d.Time
+                        select new LGNLDuLieuScadaDto
+                        {
+                            ID = d.ID,
+                            TagName = d.TagName,
+                            TagKey = d.TagKey,
+                            Time = d.Time,
+                            Value = d.Value,
+                            IDLoCao = d.ID_LoCao
+                        };
+
+            return await query.AsNoTracking().ToListAsync();
         }
     }
 }

@@ -16,6 +16,13 @@ namespace dataproduct.api.Controllers
         }
 
 
+        [HttpGet("ts-mapping")]
+        public async Task<IActionResult> GetTsMapping()
+        {
+            try { return Ok(await _service.GetTsMappingListAsync()); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpGet("silo-master")]
         public async Task<IActionResult> GetSiLoMasterList([FromQuery] int? idLoCao)
         {
@@ -132,17 +139,63 @@ namespace dataproduct.api.Controllers
         }
 
 
-        [HttpGet("nvl")]
-        public async Task<IActionResult> GetNvlList(
-            [FromQuery] DateOnly? ngay,
-            [FromQuery] int? idCa,
-            [FromQuery] int? idLoCao)
+        [HttpGet("nhom-nvl")]
+        public async Task<IActionResult> GetNhomNvlList([FromQuery] int? idLoCao)
+        {
+            try { return Ok(await _service.GetNhomNvlListAsync(idLoCao)); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("nhom-nvl/{id}")]
+        public async Task<IActionResult> GetNhomNvlById(int id)
         {
             try
             {
-                if (idCa.HasValue && idCa != 1 && idCa != 2)
-                    return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
-                return Ok(await _service.GetNvlListAsync(ngay, idCa, idLoCao));
+                var r = await _service.GetNhomNvlByIdAsync(id);
+                return r == null ? NotFound(new { message = $"Không tìm thấy Nhóm NVL ID={id}" }) : Ok(r);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("nhom-nvl")]
+        public async Task<IActionResult> CreateNhomNvl([FromBody] CreateLGNLNhomNvlDto dto)
+        {
+            try
+            {
+                var r = await _service.AddNhomNvlAsync(dto);
+                return CreatedAtAction(nameof(GetNhomNvlById), new { id = r.ID }, r);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPut("nhom-nvl/{id}")]
+        public async Task<IActionResult> UpdateNhomNvl(int id, [FromBody] UpdateLGNLNhomNvlDto dto)
+        {
+            try
+            {
+                var r = await _service.UpdateNhomNvlAsync(id, dto);
+                return r == null ? NotFound(new { message = $"Không tìm thấy Nhóm NVL ID={id}" }) : Ok(r);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpDelete("nhom-nvl/{id}")]
+        public async Task<IActionResult> DeleteNhomNvl(int id)
+        {
+            try
+            {
+                var ok = await _service.DeleteNhomNvlAsync(id);
+                return ok ? Ok(new { message = "Đã xóa thành công." }) : NotFound(new { message = $"Không tìm thấy Nhóm NVL ID={id}" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("nvl")]
+        public async Task<IActionResult> GetNvlList([FromQuery] int? idLoCao)
+        {
+            try
+            {
+                return Ok(await _service.GetNvlListAsync(idLoCao));
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
@@ -163,8 +216,6 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                if (dto.IDCa != 1 && dto.IDCa != 2)
-                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
                 var r = await _service.AddNvlAsync(dto);
                 return CreatedAtAction(nameof(GetNvlById), new { id = r.ID }, r);
             }
@@ -176,8 +227,6 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                if (dto.IDCa != 1 && dto.IDCa != 2)
-                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
                 var r = await _service.UpdateNvlAsync(id, dto);
                 return r == null ? NotFound(new { message = $"Không tìm thấy NVL ID={id}" }) : Ok(r);
             }
@@ -191,6 +240,45 @@ namespace dataproduct.api.Controllers
             {
                 var ok = await _service.DeleteNvlAsync(id);
                 return ok ? Ok(new { message = "Đã xóa thành công." }) : NotFound(new { message = $"Không tìm thấy NVL ID={id}" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Dữ liệu theo LoCao, Ngày ───────────────────────────────
+
+        [HttpGet("datanaplieu-filter")]
+        public async Task<IActionResult> GetDataNapLieuFilter(
+            [FromQuery] int? idLoCao,
+            [FromQuery] DateTime? ngayBatDau,
+            [FromQuery] DateTime? ngayKetThuc)
+        {
+            try
+            {
+                var result = await _service.GetDataByFilterAsync(idLoCao, ngayBatDau, ngayKetThuc);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Pivot dữ liệu nạp liệu theo Silo mapping.
+        /// Trả về { columns, rows } cho config-driven rendering ở CustomTableLG.
+        /// </summary>
+        [HttpGet("dulieu-silo")]
+        public async Task<IActionResult> GetDuLieuSilo(
+            [FromQuery] string ngay,
+            [FromQuery] int idCa,
+            [FromQuery] int idLoCao)
+        {
+            try
+            {
+                if (!DateOnly.TryParse(ngay, out var parsedNgay))
+                    return BadRequest(new { message = "ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
+                if (idCa != 1 && idCa != 2)
+                    return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
+
+                var result = await _service.GetDuLieuSiloPivotAsync(parsedNgay, idCa, idLoCao);
+                return Ok(result);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

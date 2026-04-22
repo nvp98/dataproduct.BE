@@ -8,6 +8,7 @@ namespace dataproduct.api.Models
         [Key]
         public int ID { get; set; }
         public int? IDLoCao { get; set; }
+        public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
         public string? DonVi { get; set; }
 
@@ -19,7 +20,6 @@ namespace dataproduct.api.Models
 
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
-        public string? NhomHienThi { get; set; }
-        public int? ThuTuNhom { get; set; }
+
     }
 }
