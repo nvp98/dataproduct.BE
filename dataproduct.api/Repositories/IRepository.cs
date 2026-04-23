@@ -275,12 +275,19 @@ namespace dataproduct.api.Repositories
 
     public interface IMacThepRepository
     {
-        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, int? idMayDuc = null);
+        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, List<int>? idMayDucs = null);
         Task<MacThep?> GetByIdAsync(int id);
         Task AddAsync(MacThep entity);
         Task UpdateAsync(MacThep entity);
         Task DeleteAsync(int id);
-        Task<bool> ExistsByTenAsync(string tenMacThep, byte nhaMay, int? excludeId = null);
+        Task<bool> ExistsByTenAndMayDucAsync(string tenMacThep, List<int> idMayDucs, int? excludeId = null);
+    }
+
+    public interface IMacThep_MayDucRepository
+    {
+        Task<List<MacThep_MayDuc>> GetByMacThepIdAsync(int idMacThep);
+        Task<List<MacThep_MayDuc>> GetByMacThepIdsAsync(List<int> idMacTheps);
+        Task SetMayDucsAsync(int idMacThep, List<int> idMayDucs);
     }
 
     public interface IMayDucRepository

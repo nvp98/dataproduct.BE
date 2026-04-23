@@ -316,7 +316,7 @@ namespace dataproduct.api.Repositories
 
                     query = query.Where(x =>
                         x.MaBm != null && xulyMaBms.Contains(x.MaBm) &&
-                        (x.NguoiTaoId == userId || x.TinhTrang == 0)
+                        (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7)
                     );
                     break;
                 }
@@ -435,6 +435,7 @@ namespace dataproduct.api.Repositories
                 MayDuc     = x.MayDuc,
                 TinhTrang  = x.TinhTrang,
                 NguoiTao   = x.NguoiTaoId,
+                TenScope   = x.TenScope
             }).ToList();
 
             foreach (var item in result)
