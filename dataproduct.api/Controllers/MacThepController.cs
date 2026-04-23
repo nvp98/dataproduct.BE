@@ -1,4 +1,3 @@
-using dataproduct.api.Models;
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,29 +15,19 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(byte? nhaMay, bool? isLock, string? tenMacThep, int? idMayDuc)
-            => Ok(await _service.GetAllAsync(nhaMay, isLock, tenMacThep, idMayDuc));
+        public async Task<IActionResult> GetAll(byte? nhaMay, bool? isLock, string? tenMacThep, [FromQuery] List<int>? idMayDucs)
+            => Ok(await _service.GetAllAsync(nhaMay, isLock, tenMacThep, idMayDucs));
 
         /// <summary>
         /// API autocomplete: tìm theo tên mác thép + nhà máy + máy đúc + ca/kíp.
         /// </summary>
-        [HttpGet("search")]
-        public async Task<IActionResult> Search(
-            string? searchKey,
-            byte? nhaMay,
-            bool? isLock,
-            int? idMayDuc,
-            int? ca,
-            string? kip,
-            string? maBm,
-            int page = 1,
-            int pageSize = 30)
+        [HttpPost("search")]
+        public async Task<IActionResult> Search([FromBody] MacThepSearchRequestDto dto)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 30;
-            if (pageSize > 200) pageSize = 200;
+            var page     = dto.Page < 1 ? 1 : dto.Page;
+            var pageSize = dto.PageSize < 1 ? 30 : dto.PageSize > 200 ? 200 : dto.PageSize;
 
-            var rows = await _service.SearchWithMayDucAsync(nhaMay, isLock, searchKey, idMayDuc, ca, kip, maBm);
+            var rows = await _service.SearchWithMayDucAsync(dto.NhaMay, dto.IsLock, dto.SearchKey, dto.IdMayDucs, dto.Ca, dto.Kip, dto.MaBm);
 
             var totalCount = rows.Count;
             var data = rows
@@ -63,11 +52,11 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] MacThep model)
+        public async Task<IActionResult> Create([FromBody] MacThepUpsertDto dto)
         {
             try
             {
-                var created = await _service.CreateAsync(model);
+                var created = await _service.CreateAsync(dto);
                 return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
             }
             catch (InvalidOperationException ex)
@@ -77,11 +66,32 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] MacThep model)
+        public async Task<IActionResult> Update(int id, [FromBody] MacThepUpsertDto dto)
         {
             try
             {
-                var ok = await _service.UpdateAsync(id, model);
+                var ok = await _service.UpdateAsync(id, dto);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id}/may-duc")]
+        public async Task<IActionResult> GetMayDucs(int id)
+        {
+            var result = await _service.GetMayDucsAsync(id);
+            return Ok(result);
+        }
+
+        [HttpPut("{id}/may-duc")]
+        public async Task<IActionResult> SetMayDucs(int id, [FromBody] List<int> idMayDucs)
+        {
+            try
+            {
+                var ok = await _service.SetMayDucsAsync(id, idMayDucs);
                 return ok ? NoContent() : NotFound();
             }
             catch (InvalidOperationException ex)

@@ -560,8 +560,8 @@ namespace dataproduct.api.Services
                 sb.Append($@"
                 <tr>
                   <td>{stt++}</td>
-                  <td{meStyle}>{r.Me ?? ""}</td>
                   <td>{r.MayDuc ?? ""}</td>
+                  <td{meStyle}>{r.Me ?? ""}</td>
                   <td>{r.MacThep ?? ""}</td>
                   <td>{r.ThungSo ?? ""}</td>
                   <td>{r.ThoiGian ?? ""}</td>
@@ -571,7 +571,6 @@ namespace dataproduct.api.Services
                   <td>{(r.KlThepLong.HasValue ? r.KlThepLong.Value.ToString("0.##") : "")}</td>
                   <td>{r.GhiChu ?? ""}</td>
                   <td>{r.TinhLuyenLenThang ?? ""}</td>
-                  <td>{r.PhanLoai ?? ""}</td>
                 </tr>");
                 if (r.KlThepLong.HasValue) sumKl += r.KlThepLong.Value;
             }

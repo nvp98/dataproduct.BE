@@ -69,6 +69,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<BBGN_ThepLong> BBGN_ThepLongs { get; set; }
     public virtual DbSet<MacThep> MacTheps { get; set; }
     public virtual DbSet<MayDuc> MayDucs { get; set; }
+    public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -618,6 +619,13 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
             entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
+        });
+
+        modelBuilder.Entity<MacThep_MayDuc>(entity =>
+        {
+            entity.ToTable("MacThep_MayDuc");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.IdMacThep).HasColumnName("IdMacThep");
             entity.Property(e => e.IdMayDuc).HasColumnName("IdMayDuc");
         });
 
