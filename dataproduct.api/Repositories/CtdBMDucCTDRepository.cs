@@ -28,7 +28,7 @@ namespace dataproduct.api.Repositories
         }
         public async Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc)
         {
-            return await _context.Database
+            var result = await _context.Database
              .SqlQueryRaw<PhoinhapkhoNhanPhoiDto>(
                  "EXEC sp_CTD_GetPhoiNhapKho_ByKipNgay @p_Kip, @p_NgaySX, @p_Ca,@p_MayDuc",
                  new SqlParameter("@p_Kip", kip),
@@ -37,6 +37,37 @@ namespace dataproduct.api.Repositories
                  new SqlParameter("@p_MayDuc", mayduc)
              )
          .ToListAsync();
+
+            // Kiểm tra và set isCaTruoc
+            var currentNgaySX = DateOnly.FromDateTime(ngaySX);
+            var currentCa = int.Parse(ca);
+            foreach (var item in result)
+            {
+                if (item.NgaySX != currentNgaySX || item.Ca != currentCa)
+                {
+                    item.isCaTruoc = true;
+                }
+                else
+                {
+                    item.isCaTruoc = false;
+                }
+                // tính toán ST đã chuyển trong ca
+                if (item.isCaTruoc == true)
+                {
+                    item.ST_CaTruocChuyen = item.TongST_DaChuyen.GetValueOrDefault(0);
+                    item.ST_NhapTrongCa = 0;
+                    item.ST_CaSauChuyen = item.ST_CaTruocChuyen != 0 ? item.TongSoThanh - item.ST_CaTruocChuyen.GetValueOrDefault(0) : 0;
+                }
+                else
+                {
+                    item.ST_CaTruocChuyen = 0;
+                    item.ST_NhapTrongCa = item.TongST_DaChuyen.GetValueOrDefault(0);
+                    item.ST_CaSauChuyen = item.ST_NhapTrongCa != 0 ? item.TongSoThanh - item.ST_NhapTrongCa : 0;
+                }
+                item.TinhTrang_Chuyen = item.TongSoThanh - item.TongST_DaChuyen.GetValueOrDefault(0) == 0 ? 1 : 0;
+            }
+
+            return result;
         }
 
         public async Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoExportRangeAsync(DateOnly? fromDate, DateOnly? toDate)

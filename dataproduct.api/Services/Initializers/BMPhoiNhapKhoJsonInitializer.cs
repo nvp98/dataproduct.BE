@@ -26,7 +26,7 @@ namespace dataproduct.api.Services.Initializers
 
         public async Task InitializeAsync(BmPhieu phieu)
         {
-            await _service.InsertPhoiNhapKhoFromPhieuJsonAsync(phieu);
+            // await _service.InsertPhoiNhapKhoFromPhieuJsonAsync(phieu);
         }
     }
 }
