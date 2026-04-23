@@ -245,6 +245,17 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public int TongSoThanh { get; set; }
         public int? TongST_DaChuyen { get; set; }
         public double TongKhoiLuong { get; set; }
+        [NotMapped]
+        public bool? isCaTruoc { get; set; } = false;
+        [NotMapped]
+        public int? ST_CaTruocChuyen { get; set; }
+        [NotMapped]
+        public int? ST_NhapTrongCa { get; set; }
+        [NotMapped]
+        public int? ST_CaSauChuyen { get; set; }
+
+        [NotMapped]
+        public int? TinhTrang_Chuyen { get; set; }
 
     }
 
