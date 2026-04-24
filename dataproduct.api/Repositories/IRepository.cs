@@ -306,5 +306,10 @@ namespace dataproduct.api.Repositories
         // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao)
         Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
             DateOnly ngay, int idCa, int idLoCao);
+
+        // Đổi NVL cho một silo tại thời điểm cụ thể trong ca (giữ data cũ đúng NVL)
+        Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
+            int idLoCao, DateOnly ngay, int idCa, int idSiLo, int idNVLMoi,
+            DateTime thoiDiem, string? ghiChu);
     }
 }

@@ -260,25 +260,43 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        /// <summary>
-        /// Pivot dữ liệu nạp liệu theo Silo mapping.
-        /// Trả về { columns, rows } cho config-driven rendering ở CustomTableLG.
         /// </summary>
         [HttpGet("dulieu-silo")]
         public async Task<IActionResult> GetDuLieuSilo(
-            [FromQuery] string ngay,
+            [FromQuery] DateOnly ngay,
             [FromQuery] int idCa,
             [FromQuery] int idLoCao)
         {
             try
             {
-                if (!DateOnly.TryParse(ngay, out var parsedNgay))
-                    return BadRequest(new { message = "ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
+                //if (!DateOnly.TryParse(ngay, out var parsedNgay))
+                //    return BadRequest(new { message = "ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
                 if (idCa != 1 && idCa != 2)
                     return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
 
-                var result = await _service.GetDuLieuSiloPivotAsync(parsedNgay, idCa, idLoCao);
+                var result = await _service.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
                 return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("mapping/doi-nvl")]
+        public async Task<IActionResult> DoiNVLGiuaCa([FromBody] LGNLChangeSiLoNVLDto dto)
+        {
+            try
+            {
+                if (!DateOnly.TryParse(dto.Ngay, out var parsedNgay))
+                    return BadRequest(new { message = "Ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
+                if (dto.IDCa != 1 && dto.IDCa != 2)
+                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
+                if (dto.IDSiLo <= 0 || dto.IDNVLMoi <= 0)
+                    return BadRequest(new { message = "IDSiLo và IDNVLMoi phải lớn hơn 0." });
+
+                var result = await _service.ChangeSiLoNVLAsync(
+                    dto.IDLoCao, parsedNgay, dto.IDCa,
+                    dto.IDSiLo, dto.IDNVLMoi, dto.ThoiDiem, dto.GhiChu);
+
+                return Ok(new { message = "Đổi NVL thành công.", id = result.ID });
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

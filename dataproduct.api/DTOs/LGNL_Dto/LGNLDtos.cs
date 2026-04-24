@@ -113,9 +113,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public int? IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
-        public string? DonVi { get; set; }
-        public decimal? SoLuong { get; set; }
-        public decimal? DoAm { get; set; }
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
         public string? NhomHienThi { get; set; }
@@ -127,9 +125,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public int IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
-        public string? DonVi { get; set; }
-        public decimal? SoLuong { get; set; }
-        public decimal? DoAm { get; set; }
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }
     }
@@ -139,9 +135,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public int IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
-        public string? DonVi { get; set; }
-        public decimal? SoLuong { get; set; }
-        public decimal? DoAm { get; set; }
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }
     }
@@ -169,6 +163,20 @@ namespace dataproduct.api.DTOs.LGNL_Dto
     {
         public List<LGNLColumnDto> Columns { get; set; } = [];
         public List<Dictionary<string, object?>> Rows { get; set; } = [];
+        // Config hiệu lực đang được áp dụng (khác ngay/idCa yêu cầu = đang dùng config cũ)
+        public DateOnly? NgayHieuLuc { get; set; }
+        public int? IDCaHieuLuc { get; set; }
+    }
+
+    public class LGNLChangeSiLoNVLDto
+    {
+        public int IDLoCao { get; set; }
+        public string Ngay { get; set; } = string.Empty;   // "yyyy-MM-dd"
+        public int IDCa { get; set; }
+        public int IDSiLo { get; set; }
+        public int IDNVLMoi { get; set; }
+        public DateTime ThoiDiem { get; set; }              // thời điểm bắt đầu dùng NVL mới
+        public string? GhiChu { get; set; }
     }
 
 

@@ -163,20 +163,12 @@ namespace dataproduct.api.Services
 
         public async Task<LGNLNvlDto> AddNvlAsync(CreateLGNLNvlDto dto)
         {
-            string? nhomHienThi = null;
-            if (dto.IDNhomNVL.HasValue)
-            {
-                var nhom = await _repo.GetNhomNvlByIdAsync(dto.IDNhomNVL.Value);
-                nhomHienThi = nhom?.TenNhom;
-            }
             var entity = new LG_NL_NVL
             {
                 IDLoCao     = dto.IDLoCao,
                 IDNhomNVL   = dto.IDNhomNVL,
                 TenNVL      = dto.TenNVL,
-                DonVi       = dto.DonVi,
-                SoLuong     = dto.SoLuong,
-                DoAm        = dto.DoAm,
+                ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
             };
             var result = await _repo.AddNvlAsync(entity);
@@ -190,9 +182,7 @@ namespace dataproduct.api.Services
                 IDLoCao     = dto.IDLoCao,
                 IDNhomNVL   = dto.IDNhomNVL,
                 TenNVL      = dto.TenNVL,
-                DonVi       = dto.DonVi,
-                SoLuong     = dto.SoLuong,
-                DoAm        = dto.DoAm,
+                ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
             };
             var result = await _repo.UpdateNvlAsync(id, entity);
@@ -240,9 +230,7 @@ namespace dataproduct.api.Services
             IDLoCao     = e.IDLoCao,
             IDNhomNVL   = e.IDNhomNVL,
             TenNVL      = e.TenNVL,
-            DonVi       = e.DonVi,
-            SoLuong     = e.SoLuong,
-            DoAm        = e.DoAm,
+            ThuTu       = e.ThuTu,
             GhiChu      = e.GhiChu,
             NgayTao     = e.NgayTao,
         };
@@ -261,6 +249,16 @@ namespace dataproduct.api.Services
             DateOnly ngay, int idCa, int idLoCao)
         {
             return await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
+        }
+
+        // ─── Đổi NVL cho silo tại thời điểm cụ thể trong ca ─────────
+
+        public async Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
+            int idLoCao, DateOnly ngay, int idCa, int idSiLo, int idNVLMoi,
+            DateTime thoiDiem, string? ghiChu)
+        {
+            return await _repo.ChangeSiLoNVLAsync(
+                idLoCao, ngay, idCa, idSiLo, idNVLMoi, thoiDiem, ghiChu);
         }
     }
 }

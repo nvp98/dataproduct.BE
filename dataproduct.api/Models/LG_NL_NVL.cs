@@ -10,13 +10,7 @@ namespace dataproduct.api.Models
         public int? IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
         public string? TenNVL { get; set; }
-        public string? DonVi { get; set; }
-
-        [Column(TypeName = "decimal(10,3)")]
-        public decimal? SoLuong { get; set; }
-
-        [Column(TypeName = "decimal(10,3)")]
-        public decimal? DoAm { get; set; }
+        public int? ThuTu { get; set; }
 
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
