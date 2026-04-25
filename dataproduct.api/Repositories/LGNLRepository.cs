@@ -576,7 +576,7 @@ namespace dataproduct.api.Repositories
                     })
                     .ToList();
 
-                if (grp.Key == null || leaves.Count == 1)
+                if (grp.Key == null)
                     columns.AddRange(leaves);
                 else
                     columns.Add(new LGNLColumnDto { Title = grp.Key, Children = leaves });
