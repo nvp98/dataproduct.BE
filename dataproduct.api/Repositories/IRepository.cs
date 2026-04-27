@@ -311,5 +311,9 @@ namespace dataproduct.api.Repositories
         Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
             int idLoCao, DateOnly ngay, int idCa, int idSiLo, int idNVLMoi,
             DateTime thoiDiem, string? ghiChu);
+
+        // Snapshot trạng thái hiện tại của từng Silo (NVL đang chứa)
+        Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
+            int idLoCao, DateOnly ngay, int idCa);
     }
 }

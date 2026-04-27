@@ -167,7 +167,7 @@ namespace dataproduct.api.Services
             {
                 IDLoCao     = dto.IDLoCao,
                 IDNhomNVL   = dto.IDNhomNVL,
-                TenNVL      = dto.TenNVL,
+                TenNVL_NM   = dto.TenNVL_NM,
                 ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
             };
@@ -181,7 +181,9 @@ namespace dataproduct.api.Services
             {
                 IDLoCao     = dto.IDLoCao,
                 IDNhomNVL   = dto.IDNhomNVL,
-                TenNVL      = dto.TenNVL,
+                TenNVL_NM   = dto.TenNVL_NM,
+                TenNVL_TK = dto.TenNVL_TK,
+                XacNhan = dto.XacNhan,
                 ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
             };
@@ -190,8 +192,18 @@ namespace dataproduct.api.Services
         }
 
         public Task<bool> DeleteNvlAsync(int id) => _repo.DeleteNvlAsync(id);
-       
 
+        public async Task<bool> UpdateXacNhanAsync(UpdateXacNhanDto dto)
+        {
+            var entity = await _repo.GetNvlByIdAsync(dto.ID);
+            if (entity == null) return false;
+
+            entity.XacNhan = dto.XacNhan;
+            entity.NgayXacNhan = DateTime.Now;
+
+            await _repo.UpdateNvlAsync(dto.ID, entity);
+            return true;
+        }
         private static LGNLSiLoMasterDto MapSiLoMaster(LG_NL_SiLo e) => new()
         {
             ID      = e.ID,
@@ -204,14 +216,17 @@ namespace dataproduct.api.Services
 
         private static LGNLMappingDto MapMapping(LG_NL_Mapping e) => new()
         {
-            ID      = e.ID,
-            Ngay    = e.Ngay,
-            IDCa    = e.IDCa,
-            IDLoCao = e.IDLoCao,
-            IDSiLo  = e.IDSiLo,
-            IDNVL   = e.IDNVL,
-            GhiChu  = e.GhiChu,
-            NgayTao = e.NgayTao
+            ID          = e.ID,
+            Ngay        = e.Ngay,
+            IDCa        = e.IDCa,
+            IDLoCao     = e.IDLoCao,
+            IDSiLo      = e.IDSiLo,
+            IDNVL       = e.IDNVL,
+            ThoiDiemBD  = e.ThoiDiemBD,
+            NgayHetHL   = e.NgayHetHL,
+            IDCaHetHL   = e.IDCaHetHL,
+            GhiChu      = e.GhiChu,
+            NgayTao     = e.NgayTao
         };
 
         private static LGNLNhomNvlDto MapNhomNvl(LG_NL_NhomNVL e) => new()
@@ -229,7 +244,7 @@ namespace dataproduct.api.Services
             ID          = e.ID,
             IDLoCao     = e.IDLoCao,
             IDNhomNVL   = e.IDNhomNVL,
-            TenNVL      = e.TenNVL,
+            TenNVL_NM   = e.TenNVL_NM,
             ThuTu       = e.ThuTu,
             GhiChu      = e.GhiChu,
             NgayTao     = e.NgayTao,
@@ -250,6 +265,12 @@ namespace dataproduct.api.Services
         {
             return await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
         }
+
+        // ─── Snapshot trạng thái Silo ──────────────────────────────
+
+        public Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
+            int idLoCao, DateOnly ngay, int idCa)
+            => _repo.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
 
         // ─── Đổi NVL cho silo tại thời điểm cụ thể trong ca ─────────
 

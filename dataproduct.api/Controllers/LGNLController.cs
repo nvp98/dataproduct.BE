@@ -244,6 +244,17 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        [HttpPut("nvl/xac-nhan")]
+        public async Task<IActionResult> UpdateXacNhan([FromBody] UpdateXacNhanDto dto)
+        {
+            try
+            {
+                var ok = await _service.UpdateXacNhanAsync(dto);
+                return ok ? Ok(new { message = "Cập nhật xác nhận thành công." }) : NotFound(new { message = $"Không tìm thấy NVL ID={dto.ID}" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         // ─── Dữ liệu theo LoCao, Ngày ───────────────────────────────
 
         [HttpGet("datanaplieu-filter")]
@@ -275,6 +286,22 @@ namespace dataproduct.api.Controllers
                     return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
 
                 var result = await _service.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("snapshot-silo")]
+        public async Task<IActionResult> GetSnapshotSilo(
+            [FromQuery] DateOnly ngay,
+            [FromQuery] int idCa,
+            [FromQuery] int idLoCao)
+        {
+            try
+            {
+                if (idCa != 1 && idCa != 2)
+                    return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
+                var result = await _service.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
                 return Ok(result);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }

@@ -53,8 +53,24 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public string? TenNVL { get; set; }     // join từ LG_NL_NVL
         public string? NhomHienThi { get; set; }// join từ LG_NL_NVL
         public int? ThuTuNhom { get; set; }     // join từ LG_NL_NVL
+        public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca; có giá trị = đổi NVL giữa ca
+        public DateOnly? NgayHetHL { get; set; }
+        public int? IDCaHetHL { get; set; }
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
+    }
+
+    // ─── Snapshot trạng thái hiện tại của từng Silo ───────────────────────────
+
+    public class LGNLSiloSnapshotDto
+    {
+        public int IDSiLo { get; set; }
+        public string? TenSiLo { get; set; }
+        public int? IDNVL { get; set; }
+        public string? TenNVL { get; set; }
+        public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca
+        public bool DaDoiGiuaCa { get; set; }
+        public int? ThuTu { get; set; }
     }
 
     public class CreateLGNLMappingDto
@@ -112,19 +128,23 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public int ID { get; set; }
         public int? IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
-        public string? TenNVL { get; set; }
+        public string? TenNVL_NM { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
         public string? NhomHienThi { get; set; }
         public int? ThuTuNhom { get; set; }
+        public string? TenNVL_TK { get; set; }
+        public bool? XacNhan { get; set; }
+        public DateTime? NgayXacNhan { get; set; }
+        public int? IDNguoiXacNhan { get; set; }
     }
 
     public class CreateLGNLNvlDto
     {
         public int IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
-        public string? TenNVL { get; set; }
+        public string? TenNVL_NM { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }
@@ -134,10 +154,17 @@ namespace dataproduct.api.DTOs.LGNL_Dto
     {
         public int IDLoCao { get; set; }
         public int? IDNhomNVL { get; set; }
-        public string? TenNVL { get; set; }
+        public string? TenNVL_NM { get; set; }
+        public string? TenNVL_TK { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }
+        public bool? XacNhan { get; set; }
+    }
+    public class UpdateXacNhanDto
+    {
+        public int ID { get; set; }
+        public bool XacNhan { get; set; }
     }
 
     // ─── Dữ liệu Silo — Pivot Result ─────────────────────────────────────────
