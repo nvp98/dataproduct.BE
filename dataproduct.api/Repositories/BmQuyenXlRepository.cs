@@ -46,6 +46,12 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task AddRangeAsync(List<BmQuyenXl> entities)
+        {
+            await _context.BmQuyenXls.AddRangeAsync(entities);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task UpdateAsync(BmQuyenXl entity)
         {
             _context.BmQuyenXls.Update(entity);
@@ -58,6 +64,31 @@ namespace dataproduct.api.Repositories
             if (entity != null)
             {
                 _context.BmQuyenXls.Remove(entity);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task DeleteRangeAsync(List<int> ids)
+        {
+            if (ids.Count == 0) return;
+            var entities = await _context.BmQuyenXls
+                .Where(x => ids.Contains(x.Id))
+                .ToListAsync();
+            if (entities.Count > 0)
+            {
+                _context.BmQuyenXls.RemoveRange(entities);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task DeleteByTaiKhoanAsync(int idTaiKhoan)
+        {
+            var entities = await _context.BmQuyenXls
+                .Where(x => x.IdTaiKhoan == idTaiKhoan)
+                .ToListAsync();
+            if (entities.Count > 0)
+            {
+                _context.BmQuyenXls.RemoveRange(entities);
                 await _context.SaveChangesAsync();
             }
         }

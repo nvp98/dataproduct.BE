@@ -2,66 +2,49 @@ using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using dataproduct.api.Utils.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Services
 {
     public class BmQuyenXlService
     {
         private readonly IBmQuyenXlRepository _repo;
-        private readonly ProductFormContext _context;
 
-        public BmQuyenXlService(IBmQuyenXlRepository repo, ProductFormContext context)
+        public BmQuyenXlService(IBmQuyenXlRepository repo)
         {
             _repo = repo;
-            _context = context;
         }
+
+        private static BmQuyenXlDto ToDto(BmQuyenXl x) => new()
+        {
+            Id = x.Id,
+            IdTaiKhoan = x.IdTaiKhoan,
+            MaBm = x.MaBm,
+            MaKhuVuc = x.MaKhuVuc,
+            QuyenChucNang = x.QuyenChucNang
+        };
 
         public async Task<IEnumerable<BmQuyenXlDto>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc)
         {
             var data = await _repo.GetAllAsync(idTaiKhoan, maBm, maKhuVuc);
-            return data.Select(x => new BmQuyenXlDto
-            {
-                Id = x.Id,
-                IdTaiKhoan = x.IdTaiKhoan,
-                MaBm = x.MaBm,
-                MaKhuVuc = x.MaKhuVuc,
-                QuyenChucNang = x.QuyenChucNang
-            });
+            return data.Select(ToDto);
         }
 
         public async Task<BmQuyenXlDto?> GetByIdAsync(int id)
         {
             var entity = await _repo.GetByIdAsync(id);
-            if (entity == null) return null;
-
-            return new BmQuyenXlDto
-            {
-                Id = entity.Id,
-                IdTaiKhoan = entity.IdTaiKhoan,
-                MaBm = entity.MaBm,
-                MaKhuVuc = entity.MaKhuVuc,
-                QuyenChucNang = entity.QuyenChucNang
-            };
+            return entity == null ? null : ToDto(entity);
         }
 
         public async Task<IEnumerable<BmQuyenXlDto>> GetByTaiKhoanIdAsync(int idTaiKhoan)
         {
             var data = await _repo.GetByTaiKhoanIdAsync(idTaiKhoan);
-            return data.Select(x => new BmQuyenXlDto
-            {
-                Id = x.Id,
-                IdTaiKhoan = x.IdTaiKhoan,
-                MaBm = x.MaBm,
-                MaKhuVuc = x.MaKhuVuc,
-                QuyenChucNang = x.QuyenChucNang
-            });
+            return data.Select(ToDto);
         }
 
         /// <summary>
         /// Lấy danh sách MaBM cho menu:
         /// - processing (Việc tôi bắt đầu): MaBM có QuyenChucNang = 1 (XULY) hoặc 4 (XULY_VA_PHEDUYET).
-        /// - approving (Việc đến tôi): MaBM có QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET), hợp với list từ BM_PheDuyet (phiếu có user là người duyệt).
+        /// - approving (Việc đến tôi): MaBM có QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET).
         /// - viewing (Chỉ xem): MaBM có QuyenChucNang = 5 (XEM).
         /// MaBM có trong nhiều list thì FE có thể hiển thị theo nhu cầu.
         /// </summary>
@@ -82,8 +65,8 @@ namespace dataproduct.api.Services
                 .Distinct()
                 .ToList();
 
-            // Việc đến tôi: QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET) từ BM_QuyenXL, kết hợp với list từ BM_PheDuyet
-            var approvingFromQuyenXl = data
+            // Việc đến tôi: QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET) từ BM_QuyenXL
+            var approving = data
                 .Where(x =>
                 {
                     var q = x.QuyenChucNang;
@@ -92,25 +75,6 @@ namespace dataproduct.api.Services
                 })
                 .Select(x => x.MaBm != null ? x.MaBm.Trim() : null)
                 .Where(x => !string.IsNullOrEmpty(x))
-                .Distinct()
-                .ToList();
-
-            var approvingFromPheDuyet = await _context.BmPheDuyets
-                .Where(pd =>
-                    pd.NguoiDuyetId == idTaiKhoan
-                    && (pd.CapDuyet ?? 0) != 0
-                    && pd.PhieuId != null)
-                .Join(
-                    _context.BmPhieus.Where(p => p.IsDelete != 1),
-                    pd => pd.PhieuId,
-                    p => (Guid?)p.Idphieu,
-                    (pd, p) => p.MaBm ?? "")
-                .Where(maBm => !string.IsNullOrEmpty(maBm))
-                .Distinct()
-                .ToListAsync();
-
-            var approving = approvingFromQuyenXl
-                .Union(approvingFromPheDuyet)
                 .Distinct()
                 .ToList();
 
@@ -183,6 +147,49 @@ namespace dataproduct.api.Services
         {
             if (!await _repo.ExistsAsync(id)) return false;
             await _repo.DeleteAsync(id);
+            return true;
+        }
+
+        /// <summary>
+        /// Lưu hàng loạt: tích Descartes (MaBm × MaKhuVuc × QuyenChucNang) → mỗi tổ hợp = 1 dòng.
+        /// IdsToDelete: xóa các bản ghi cũ trước khi tạo mới (dùng khi cập nhật toàn bộ quyền user).
+        /// </summary>
+        public async Task<List<BmQuyenXl>> BulkSaveAsync(BmQuyenXlBulkSaveDto dto)
+        {
+            if (dto.IdsToDelete.Count > 0)
+                await _repo.DeleteRangeAsync(dto.IdsToDelete);
+
+            var entities = new List<BmQuyenXl>();
+            foreach (var item in dto.Items)
+            {
+                foreach (var maKhuVuc in item.MaKhuVucs)
+                {
+                    foreach (var quyen in item.QuyenChucNangs)
+                    {
+                        var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, item.MaBm, maKhuVuc, quyen);
+                        if (isDuplicate)
+                            throw new InvalidOperationException(
+                                $"Quyền xử lý đã tồn tại cho Tài khoản ID: {dto.IdTaiKhoan}, Mã BM: '{item.MaBm}', Khu vực: '{maKhuVuc}', Quyền: {quyen}"
+                            );
+
+                        entities.Add(new BmQuyenXl
+                        {
+                            IdTaiKhoan = dto.IdTaiKhoan,
+                            MaBm = item.MaBm,
+                            MaKhuVuc = maKhuVuc,
+                            QuyenChucNang = quyen
+                        });
+                    }
+                }
+            }
+
+            await _repo.AddRangeAsync(entities);
+            return entities;
+        }
+
+        public async Task<bool> DeleteByTaiKhoanAsync(int idTaiKhoan)
+        {
+            await _repo.DeleteByTaiKhoanAsync(idTaiKhoan);
             return true;
         }
     }

@@ -298,77 +298,52 @@ namespace dataproduct.api.Repositories
             // ===== BƯỚC 3: Filter theo LoaiVung =====
             switch (loaiVung)
             {
-                case 1: // Việc tôi bắt đầu — quyền 1 | 4
+                case 1: // Việc tôi bắt đầu — quyền 1|4, lọc MaKhuVuc → Scope
                 {
                     if (!request.UserId.HasValue || request.UserId.Value <= 0)
                         return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
                     var userId = request.UserId.Value;
 
-                    var xulyMaBms = await _context.BmQuyenXls
-                        .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
-                                    (q.QuyenChucNang == 1 || q.QuyenChucNang == 4))
-                        .Select(q => q.MaBm!)
-                        .ToListAsync();
-
-                    if (!xulyMaBms.Any())
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-
                     query = query.Where(x =>
-                        x.MaBm != null && xulyMaBms.Contains(x.MaBm) &&
+                        x.MaBm != null &&
+                        _context.BmQuyenXls.Any(q =>
+                            q.IdTaiKhoan == userId &&
+                            q.MaBm == x.MaBm &&
+                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                            (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                        ) &&
                         (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7)
                     );
                     break;
                 }
 
-                case 2: // Việc đến tôi — quyền 2 | 4 (BmPheDuyets) + quyền 5 (tất cả)
+                case 2: // Việc đến tôi — quyền 2|4 (BmPheDuyets), lọc MaKhuVuc → Scope
                 {
                     if (!request.UserId.HasValue || request.UserId.Value <= 0)
                         return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
                     var userId = request.UserId.Value;
 
-                    var quyens = await _context.BmQuyenXls
-                        .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
-                                    (q.QuyenChucNang == 2 || q.QuyenChucNang == 4 || q.QuyenChucNang == 5))
-                        .Select(q => new { q.MaBm, q.QuyenChucNang })
-                        .ToListAsync();
-
-                    if (!quyens.Any())
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-
-                    var pheDuyetMaBms = quyens
-                        .Where(q => q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
-                        .Select(q => q.MaBm!)
-                        .ToList();
-
-                    var xemMaBms = quyens
-                        .Where(q => q.QuyenChucNang == 5)
-                        .Select(q => q.MaBm!)
-                        .ToList();
-
                     var bbgnThepLongMaBms = new[] { "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong" };
 
-                    // Mặc định vẫn lọc TinhTrang != 0.
-                    // Riêng BBGN thép lỏng: nếu user có tên trong BmPheDuyets của phiếu đó thì vẫn trả về,
-                    // kể cả TinhTrang = 0.
                     query = query.Where(x =>
+                        x.MaBm != null &&
+                        _context.BmQuyenXls.Any(q =>
+                            q.IdTaiKhoan == userId &&
+                            q.MaBm == x.MaBm &&
+                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                            (q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
+                        ) &&
+                        _context.BmPheDuyets.Any(pd =>
+                            pd.PhieuId == x.Idphieu &&
+                            pd.CapDuyet != null && pd.CapDuyet != 0 &&
+                            pd.NguoiDuyetId == userId
+                        ) &&
                         (
-                            // Quyền 5 (XEM): phiếu MaBm đó (đã gửi, không còn 0)
-                            (xemMaBms.Any() && x.MaBm != null && xemMaBms.Contains(x.MaBm))
-                            ||
-                            // Quyền 2|4 (PHÊ DUYỆT): user trong BmPheDuyets, CapDuyet != 0
-                            (pheDuyetMaBms.Any() && x.MaBm != null && pheDuyetMaBms.Contains(x.MaBm) &&
-                                _context.BmPheDuyets.Any(pd =>
-                                    pd.PhieuId == x.Idphieu &&
-                                    pd.CapDuyet != null &&
-                                    pd.CapDuyet != 0 &&
-                                    pd.NguoiDuyetId == userId))
-                        )
-                        && (
                             x.TinhTrang != 0
                             || (
-                                x.MaBm != null &&
+                                // Riêng BBGN thép lỏng: trả về kể cả TinhTrang=0 nếu user có trong BmPheDuyets
                                 bbgnThepLongMaBms.Contains(x.MaBm) &&
                                 _context.BmPheDuyets.Any(pd =>
                                     pd.PhieuId == x.Idphieu &&
@@ -379,11 +354,30 @@ namespace dataproduct.api.Repositories
                     break;
                 }
 
-                case 3: // Thống kê — chỉ PKH / Admin
+                case 3: // Chỉ xem — quyền 5, lọc MaKhuVuc → Scope
+                {
+                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+
+                    var userId = request.UserId.Value;
+
+                    query = query.Where(x =>
+                        x.MaBm != null &&
+                        _context.BmQuyenXls.Any(q =>
+                            q.IdTaiKhoan == userId &&
+                            q.MaBm == x.MaBm &&
+                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                            q.QuyenChucNang == 5
+                        ) &&
+                        x.TinhTrang != 0
+                    );
+                    break;
+                }
+
+                case 4: // Thống kê — chỉ PKH / Admin, không filter theo user
                 {
                     if (request.IsThongKeUser != true)
                         return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-                    // Không filter thêm theo user — show tất cả phiếu
                     break;
                 }
 

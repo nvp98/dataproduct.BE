@@ -33,4 +33,23 @@ namespace dataproduct.api.DTOs
         public string? MaKhuVuc { get; set; }
         public byte? QuyenChucNang { get; set; }
     }
+
+    public class BmQuyenXlRowDto
+    {
+        public string? MaBm { get; set; }
+        public List<string> MaKhuVucs { get; set; } = new();
+        /// <summary>Danh sách quyền. Tích Descartes với MaKhuVucs → mỗi tổ hợp = 1 dòng.</summary>
+        public List<byte> QuyenChucNangs { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Payload lưu hàng loạt: mỗi tổ hợp (MaBm × MaKhuVuc × QuyenChucNang) lưu thành 1 dòng trong BmQuyenXl.
+    /// IdsToDelete: danh sách ID cần xóa trước khi tạo mới (dùng khi cập nhật toàn bộ quyền của user).
+    /// </summary>
+    public class BmQuyenXlBulkSaveDto
+    {
+        public int IdTaiKhoan { get; set; }
+        public List<int> IdsToDelete { get; set; } = new();
+        public List<BmQuyenXlRowDto> Items { get; set; } = new();
+    }
 }

@@ -196,8 +196,11 @@ namespace dataproduct.api.Repositories
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
         Task<BmQuyenXl?> GetByIdAsync(int id);
         Task AddAsync(BmQuyenXl entity);
+        Task AddRangeAsync(List<BmQuyenXl> entities);
         Task UpdateAsync(BmQuyenXl entity);
         Task DeleteAsync(int id);
+        Task DeleteRangeAsync(List<int> ids);
+        Task DeleteByTaiKhoanAsync(int idTaiKhoan);
         Task<bool> ExistsAsync(int id);
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
         /// <summary>

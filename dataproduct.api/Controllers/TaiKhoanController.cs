@@ -191,6 +191,42 @@ namespace dataproduct.api.Controllers
             return Ok(result);
         }
 
+        [HttpGet("list-ky-duyet")]
+        public async Task<IActionResult> ListkyDuyet([FromQuery] string maBm, int loaiQuyen)
+        {
+            var quyenChucNangList = loaiQuyen == (int)LoaiQuyenChucNangEnum.NguoiTao
+                ? new List<byte> { 1, 4 }
+                : new List<byte> { 2, 4 };
+
+            var idTaiKhoans = await _formContext.BmQuyenXls
+                .Where(x => x.MaBm == maBm
+                    && x.QuyenChucNang != null
+                    && quyenChucNangList.Contains(x.QuyenChucNang.Value))
+                .Select(x => x.IdTaiKhoan)
+                .Where(id => id != null)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            var taiKhoanList = await _context.Tbl_TaiKhoan
+                .Include(x => x.PhongBan)
+                .Where(x => idTaiKhoans.Contains(x.ID_TaiKhoan))
+                .Select(x => new
+                {
+                    x.ID_TaiKhoan,
+                    x.HoVaTen,
+                    x.TenTaiKhoan,
+                    x.PhongBan_API,
+                    x.Xuong_API,
+                    x.PhongBan.TenNgan,
+                    x.ChuKy,
+                    TenPhongBan = x.PhongBan != null ? x.PhongBan.TenPhongBan : null
+                })
+                .ToListAsync();
+
+            return Ok(taiKhoanList);
+        }
+
     }
 
 }
@@ -199,5 +235,10 @@ public class LoginRequest
 {
     public string username { get; set; } = "";
     public string password { get; set; } = "";
+}
+
+public enum LoaiQuyenChucNangEnum{
+    NguoiTao = 1,
+    NguoiDuyet = 2
 }
 
