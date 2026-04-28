@@ -1,4 +1,5 @@
 using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
@@ -14,11 +15,13 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly PheDuyetService _pdservice;
+        private readonly IPheDuyetRepository _pheDuyetRepo;
 
-        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo)
         {
             _context = context;
             _pdservice = pdservice;
+            _pheDuyetRepo = pheDuyetRepo;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -266,6 +269,49 @@ namespace dataproduct.api.Repositories
                     }
                 }
 
+                else if (item.MaBm == "HRC1_BB_GiaoNhanPhoiNhapKho")
+                {
+                    var start = item.NgaySX.ToDateTime(TimeOnly.MinValue);
+                    var nextDay = start.AddDays(1);
+
+                    var queryPNK = _context.BM_PhoiNhapKho
+                        .Where(x =>
+                            x.NgaySX >= start && x.NgaySX < nextDay &&
+                            x.Ca == item.Ca &&
+                            x.MayDuc == item.MayDuc);
+                    // Check từ BM_PhoiNhapKho table
+                    var hasPendingCap0 = await queryPNK.AnyAsync() &&
+                     await queryPNK.AllAsync(x => x.TinhTrangCap0 == 1);
+
+                    var hasPendingCap1 = await queryPNK.AnyAsync() &&
+                      await queryPNK.AllAsync(x => x.TinhTrangCap1 == 1);
+
+                    var hasPendingCap2 = await queryPNK.AnyAsync() &&
+                     await queryPNK.AllAsync(x => x.TinhTrangCap2 == 1);
+
+                    // CapDuyet = 0: Xuống/Factory
+                    if (hasPendingCap0)
+                    {
+                        var cap0 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 0);
+                        if (cap0 != null) cap0.TinhTrang = 1;
+                        
+                    }
+
+                    // CapDuyet = 1: QLCL/QC
+                    if (hasPendingCap1)
+                    {
+                        var cap1 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 1);
+                        if (cap1 != null) cap1.TinhTrang = 1;
+                    }
+
+                    // CapDuyet = 2: Đúc/Casting
+                    if (hasPendingCap2)
+                    {
+                        var cap2 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 2);
+                        if (cap2 != null) cap2.TinhTrang = 1;
+                    }
+                }
+
                 item.PheDuyet = pheDuyet.ToList();
             }
 
@@ -286,80 +332,80 @@ namespace dataproduct.api.Repositories
             switch (loaiVung)
             {
                 case 1: // Việc tôi bắt đầu — quyền 1 | 4
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
-                    var xulyMaBms = await _context.BmQuyenXls
-                        .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
-                                    (q.QuyenChucNang == 1 || q.QuyenChucNang == 4))
-                        .Select(q => q.MaBm!)
-                        .ToListAsync();
+                        var xulyMaBms = await _context.BmQuyenXls
+                            .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
+                                        (q.QuyenChucNang == 1 || q.QuyenChucNang == 4))
+                            .Select(q => q.MaBm!)
+                            .ToListAsync();
 
-                    if (!xulyMaBms.Any())
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        if (!xulyMaBms.Any())
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    query = query.Where(x =>
-                        x.MaBm != null && xulyMaBms.Contains(x.MaBm) &&
-                        (x.NguoiTaoId == userId || x.TinhTrang == 0)
-                    );
-                    break;
-                }
+                        query = query.Where(x =>
+                            x.MaBm != null && xulyMaBms.Contains(x.MaBm) &&
+                            (x.NguoiTaoId == userId || x.TinhTrang == 0)
+                        );
+                        break;
+                    }
 
                 case 2: // Việc đến tôi — quyền 2 | 4 (BmPheDuyets) + quyền 5 (tất cả)
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
-                    var quyens = await _context.BmQuyenXls
-                        .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
-                                    (q.QuyenChucNang == 2 || q.QuyenChucNang == 4 || q.QuyenChucNang == 5))
-                        .Select(q => new { q.MaBm, q.QuyenChucNang })
-                        .ToListAsync();
+                        var quyens = await _context.BmQuyenXls
+                            .Where(q => q.IdTaiKhoan == userId && q.MaBm != null &&
+                                        (q.QuyenChucNang == 2 || q.QuyenChucNang == 4 || q.QuyenChucNang == 5))
+                            .Select(q => new { q.MaBm, q.QuyenChucNang })
+                            .ToListAsync();
 
-                    if (!quyens.Any())
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        if (!quyens.Any())
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var pheDuyetMaBms = quyens
-                        .Where(q => q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
-                        .Select(q => q.MaBm!)
-                        .ToList();
+                        var pheDuyetMaBms = quyens
+                            .Where(q => q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
+                            .Select(q => q.MaBm!)
+                            .ToList();
 
-                    var xemMaBms = quyens
-                        .Where(q => q.QuyenChucNang == 5)
-                        .Select(q => q.MaBm!)
-                        .ToList();
+                        var xemMaBms = quyens
+                            .Where(q => q.QuyenChucNang == 5)
+                            .Select(q => q.MaBm!)
+                            .ToList();
 
-                    // (XEM || PHÊ_DUYỆT) && TinhTrang != 0 — loại phiếu nháp / chưa gửi (0) cho cả hai nhánh
-                    query = query.Where(x =>
-                        (
-                            // Quyền 5 (XEM): phiếu MaBm đó (đã gửi, không còn 0)
-                            (xemMaBms.Any() && x.MaBm != null && xemMaBms.Contains(x.MaBm))
-                            ||
-                            // Quyền 2|4 (PHÊ DUYỆT): user trong BmPheDuyets, CapDuyet != 0
-                            (pheDuyetMaBms.Any() && x.MaBm != null && pheDuyetMaBms.Contains(x.MaBm) &&
-                                _context.BmPheDuyets.Any(pd =>
-                                    pd.PhieuId == x.Idphieu &&
-                                    pd.CapDuyet != null &&
-                                    pd.CapDuyet != 0 &&
-                                    pd.NguoiDuyetId == userId))
-                        )
-                        && x.TinhTrang != 0
-                    );
-                    break;
-                }
+                        // (XEM || PHÊ_DUYỆT) && TinhTrang != 0 — loại phiếu nháp / chưa gửi (0) cho cả hai nhánh
+                        query = query.Where(x =>
+                            (
+                                // Quyền 5 (XEM): phiếu MaBm đó (đã gửi, không còn 0)
+                                (xemMaBms.Any() && x.MaBm != null && xemMaBms.Contains(x.MaBm))
+                                ||
+                                // Quyền 2|4 (PHÊ DUYỆT): user trong BmPheDuyets, CapDuyet != 0
+                                (pheDuyetMaBms.Any() && x.MaBm != null && pheDuyetMaBms.Contains(x.MaBm) &&
+                                    _context.BmPheDuyets.Any(pd =>
+                                        pd.PhieuId == x.Idphieu &&
+                                        pd.CapDuyet != null &&
+                                        pd.CapDuyet != 0 &&
+                                        pd.NguoiDuyetId == userId))
+                            )
+                            && x.TinhTrang != 0
+                        );
+                        break;
+                    }
 
                 case 3: // Thống kê — chỉ PKH / Admin
-                {
-                    if (request.IsThongKeUser != true)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-                    // Không filter thêm theo user — show tất cả phiếu
-                    break;
-                }
+                    {
+                        if (request.IsThongKeUser != true)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        // Không filter thêm theo user — show tất cả phiếu
+                        break;
+                    }
 
                 default:
                     return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
@@ -400,16 +446,16 @@ namespace dataproduct.api.Repositories
 
             var result = data.Select(x => new SearchPhieuResponseModel
             {
-                Idphieu    = x.Idphieu,
-                SoPhieu    = x.SoPhieu,
-                MaBm       = x.MaBm,
-                NgaySX     = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
-                Ca         = x.Ca,
-                Kip        = x.Kip,
-                Scope      = x.Scope,
-                MayDuc     = x.MayDuc,
-                TinhTrang  = x.TinhTrang,
-                NguoiTao   = x.NguoiTaoId,
+                Idphieu = x.Idphieu,
+                SoPhieu = x.SoPhieu,
+                MaBm = x.MaBm,
+                NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
+                Ca = x.Ca,
+                Kip = x.Kip,
+                Scope = x.Scope,
+                MayDuc = x.MayDuc,
+                TinhTrang = x.TinhTrang,
+                NguoiTao = x.NguoiTaoId,
             }).ToList();
 
             foreach (var item in result)

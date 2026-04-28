@@ -214,6 +214,7 @@ namespace dataproduct.api.Repositories
         Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids);
         Task<List<PhongBan>> GetAllPhongBanAsync();
         Task<List<ViTri>> GetAllViTriAsync();
+        Task<BmPheDuyet> InitializePheDuyetAsync(Guid phieuId, int capDuyet, int idNguoiDuyet);
     }
 
     // End

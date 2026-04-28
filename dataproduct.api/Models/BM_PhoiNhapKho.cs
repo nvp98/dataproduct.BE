@@ -16,7 +16,7 @@ namespace dataproduct.api.Models
         public int Ca { get; set; }
         public int MayDuc { get; set; }
         public string Me { get; set; }
-        public string Mac{ get; set; }
+        public string Mac { get; set; }
         public string KichThuoc { get; set; }
 
         public int? StLoai1 { get; set; }
@@ -49,5 +49,13 @@ namespace dataproduct.api.Models
         public int? NguoiTaoId { get; set; }
         public DateTime ThoiGianTao { get; set; }
         public bool? TTHD { get; set; }
+        public int? TinhTrangCap0 { get; set; }
+        public int? ID_NguoiCap0 { get; set; }
+        public int? TinhTrangCap1 { get; set; }
+        public int? ID_NguoiCap1 { get; set; }
+        public int? TinhTrangCap2 { get; set; }
+        public int? ID_NguoiCap2 { get; set; }
+        public int? TinhTrang { get; set; }
+        public int? ID_Chot { get; set; }
     }
 }
