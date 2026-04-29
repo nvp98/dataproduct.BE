@@ -417,9 +417,22 @@ namespace dataproduct.api.Services
             var allIds = models.Where(m => m.Id > 0).Select(m => m.Id.Value).ToList();
 
             var existingDLNMs = await _context.DLNM_HRC2s
-                .Where(x => allIds.Contains(x.ID)
-                         || (allMeThois.Contains(x.MeThoi) && allBieuMaus.Contains(x.BieuMau)))
+                .Where(x => x.IsDelete != true &&
+                         (allIds.Contains(x.ID)
+                         || (allMeThois.Contains(x.MeThoi) && allBieuMaus.Contains(x.BieuMau))))
                 .ToListAsync();
+
+            // Thu thập MeThoi cũ bị thay đổi trước khi loop ghi đè existing.MeThoi
+            var oldMeThoiChanges = new HashSet<(string MeThoi, string BieuMau)>();
+            foreach (var model in models)
+            {
+                if (model.Id <= 0) continue;
+                var ex = existingDLNMs.FirstOrDefault(x => x.ID == model.Id);
+                if (ex == null || ex.IsNM == true) continue;
+                if (!string.IsNullOrEmpty(ex.MeThoi)
+                    && !string.Equals(ex.MeThoi, model.MeThoi, StringComparison.OrdinalIgnoreCase))
+                    oldMeThoiChanges.Add((ex.MeThoi, ex.BieuMau ?? model.BieuMau));
+            }
 
             // -------------------------------------------------------
             // UPSERT DLNM_HRC2
@@ -511,6 +524,27 @@ namespace dataproduct.api.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // Recheck IsTrungMeThoi cho các MeThoi cũ bị đổi
+            // Nếu còn < 2 record không bị xóa → reset IsTrungMeThoi = false
+            if (oldMeThoiChanges.Any())
+            {
+                foreach (var (oldMeThoi, bieuMau) in oldMeThoiChanges)
+                {
+                    var oldSiblings = await _context.DLNM_HRC2s
+                        .Where(x => x.MeThoi == oldMeThoi
+                                 && x.BieuMau == bieuMau
+                                 && x.IsDelete != true)
+                        .ToListAsync();
+
+                    if (oldSiblings.Count < 2)
+                    {
+                        foreach (var s in oldSiblings.Where(s => s.IsTrungMeThoi == true))
+                            s.IsTrungMeThoi = false;
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
 
             // -------------------------------------------------------
             // UPSERT PhuLieu_HRC2
@@ -710,6 +744,38 @@ namespace dataproduct.api.Services
             }
         }
 
+        public async Task<bool> DeleteRowNMAsync(int id)
+        {
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return false;
+
+            existing.IsDelete = true;
+            _context.DLNM_HRC2s.Update(existing);
+
+            // Đếm số record còn lại sau soft-delete (loại chính nó và record đã xóa)
+            var countAfterDelete = await _context.DLNM_HRC2s
+                .CountAsync(x => x.MeThoi == existing.MeThoi
+                             && x.BieuMau == existing.BieuMau
+                             && x.ID != existing.ID
+                             && x.IsDelete != true);
+
+            // Nếu còn < 2 → reset IsTrungMeThoi = false cho các record còn lại
+            if (countAfterDelete < 2)
+            {
+                var remainItems = await _context.DLNM_HRC2s
+                    .Where(x => x.MeThoi == existing.MeThoi
+                             && x.BieuMau == existing.BieuMau
+                             && x.ID != existing.ID
+                             && x.IsDelete != true)
+                    .ToListAsync();
+
+                foreach (var x in remainItems)
+                    x.IsTrungMeThoi = false;
+            }
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
         public async Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? Ngay, int? Ca, string? BieuMau, int? Scope)
         {
             return  await _repo.GetAllAsync(Ngay,Ca,BieuMau,Scope);

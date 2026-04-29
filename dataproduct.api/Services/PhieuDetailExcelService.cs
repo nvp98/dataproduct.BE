@@ -120,6 +120,7 @@ namespace dataproduct.api.Services
 
             var baseQuery = _context.DLNM_HRC2s
                 .Where(x =>
+                    x.IsDelete != true &&
                     x.Ngay.HasValue &&
                     x.Ngay.Value.Date == ngayDateTime.Date &&
                     x.Ca == ca &&

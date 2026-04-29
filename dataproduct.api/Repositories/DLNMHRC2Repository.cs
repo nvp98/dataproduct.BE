@@ -22,7 +22,7 @@ namespace dataproduct.api.Repositories
         }
         public async Task<IEnumerable<DLNM_HRC2>> GetAllAsync(DateTime? Ngay,int? Ca, string? BieuMau, int? Scope)
         {
-            var query = _context.DLNM_HRC2s.AsQueryable();
+            var query = _context.DLNM_HRC2s.Where(x => x.IsDelete != true).AsQueryable();
 
             if (Ngay.HasValue)
                 query = query.Where(x => x.Ngay == Ngay.Value.Date);
@@ -35,13 +35,15 @@ namespace dataproduct.api.Repositories
 
             if (Scope.HasValue)
                 query = query.Where(x => x.Scope == Scope.Value);
-
+            if(BieuMau != "BOF"){
+                return await query.OrderBy(x => x.NgaySx).ToListAsync();
+            }
             return await query.OrderBy(x => x.MeThoi).ToListAsync();
         }
 
         public async Task<DLNM_HRC2?> GetByIdAsync(long id)
         {
-            return await _context.DLNM_HRC2s.FirstOrDefaultAsync(x => x.ID == id);
+            return await _context.DLNM_HRC2s.FirstOrDefaultAsync(x => x.ID == id && x.IsDelete != true);
         }
 
         public async Task<HRC2DetailByReportNoModel?> GetByReportNoAsync(int reportNo)
@@ -50,7 +52,7 @@ namespace dataproduct.api.Repositories
             {
                 // Lấy 1 record DLNM_HRC2 per REPORT_NO
                 var baseRecord = await _context.DLNM_HRC2s
-                    .Where(x => x.REPORT_NO == reportNo)
+                    .Where(x => x.REPORT_NO == reportNo && x.IsDelete != true)
                     .FirstOrDefaultAsync();
 
                 if (baseRecord == null)
@@ -192,7 +194,7 @@ namespace dataproduct.api.Repositories
             {
                 // Lấy 1 record DLNM_HRC2 per REPORT_NO
                 var baseRecord = await _context.DLNM_HRC2s
-                    .Where(x => x.MeThoi == meThoi)
+                    .Where(x => x.MeThoi == meThoi && x.IsDelete != true)
                     .FirstOrDefaultAsync();
 
                 if (baseRecord == null)
@@ -473,7 +475,7 @@ namespace dataproduct.api.Repositories
             {
                 // Lấy 1 record DLNM_HRC2 per REPORT_NO
                 var baseRecord = await _context.DLNM_HRC2s
-                    .Where(x => x.REPORT_NO == reportNo)
+                    .Where(x => x.REPORT_NO == reportNo && x.IsDelete != true)
                     .FirstOrDefaultAsync();
 
                 if (baseRecord == null)
@@ -756,7 +758,7 @@ namespace dataproduct.api.Repositories
             {
                 // Lấy 1 record DLNM_HRC2 per REPORT_NO
                 var baseRecord = await _context.DLNM_HRC2s
-                    .Where(x => x.ID == id)
+                    .Where(x => x.ID == id && x.IsDelete != true)
                     .FirstOrDefaultAsync();
 
                 if (baseRecord == null)
@@ -1038,7 +1040,7 @@ namespace dataproduct.api.Repositories
         }
         public async Task AddAsync(DLNM_HRC2 entity)
         {
-            var existing = await _context.DLNM_HRC2s.Where(x => x.MeThoi == entity.MeThoi && x.BieuMau == entity.BieuMau).ToListAsync();
+            var existing = await _context.DLNM_HRC2s.Where(x => x.MeThoi == entity.MeThoi && x.BieuMau == entity.BieuMau && x.IsDelete != true).ToListAsync();
             if (existing != null)
             {
                 foreach(var item in existing){
@@ -1077,9 +1079,10 @@ namespace dataproduct.api.Repositories
 
             // Đếm số record còn lại sau khi xóa (loại chính nó ra)
             var countAfterDelete = await _context.DLNM_HRC2s
-                .CountAsync(x => x.MeThoi == item.MeThoi 
+                .CountAsync(x => x.MeThoi == item.MeThoi
                             && x.BieuMau == item.BieuMau
-                            && x.ID != id);
+                            && x.ID != id
+                            && x.IsDelete != true);
 
             // Xóa chính
             _context.DLNM_HRC2s.Remove(item);
@@ -1088,9 +1091,10 @@ namespace dataproduct.api.Repositories
             if (countAfterDelete < 2)
             {
                 var remainItems = await _context.DLNM_HRC2s
-                    .Where(x => x.MeThoi == item.MeThoi 
+                    .Where(x => x.MeThoi == item.MeThoi
                             && x.BieuMau == item.BieuMau
-                            && x.ID != id)
+                            && x.ID != id
+                            && x.IsDelete != true)
                     .ToListAsync();
 
                 foreach (var x in remainItems)
@@ -1116,7 +1120,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize)
         {
-            var query = _context.DLNM_HRC2s.AsQueryable();
+            var query = _context.DLNM_HRC2s.Where(x => x.IsDelete != true).AsQueryable();
 
             if (NgaySX.HasValue)
                 query = query.Where(x => x.Ngay.HasValue && x.Ngay.Value.Date == NgaySX.Value.Date);
@@ -1212,7 +1216,7 @@ namespace dataproduct.api.Repositories
             
             // Cập nhật DLNM_HRC2 records
             var dlnmItems = await _context.DLNM_HRC2s
-                .Where(x => x.MeThoi == request.MeThoi && x.BieuMau == request.BieuMau && x.Scope == request.Scope)
+                .Where(x => x.MeThoi == request.MeThoi && x.BieuMau == request.BieuMau && x.Scope == request.Scope && x.IsDelete != true)
                 .ToListAsync();
 
             if (dlnmItems.Count == 0)
@@ -1547,9 +1551,13 @@ namespace dataproduct.api.Repositories
                         (x.MacThep ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
-            if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value){
+            if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value)
                 query = query.Where(x => x.IsTrungMeThoi == true);
-            }
+
+            if (dto.IsDelete.HasValue && dto.IsDelete.Value)
+                query = query.Where(x => x.IsDelete == true);
+            else
+                query = query.Where(x => x.IsDelete != true);
 
             // === 2. Total count ===
             // - Bản ghi NM: đếm theo REPORT_NO unique
@@ -1962,6 +1970,9 @@ namespace dataproduct.api.Repositories
                         (x.MacThep ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
+
+            if (dto.IsDelete.HasValue && dto.IsDelete.Value)
+                query = query.Where(x => x.IsDelete == true);
 
             // Lấy REPORT_NOs thực tế (de-dup giống SearchThongKeApiAsync: MAX ID per REPORT_NO)
             var filteredReportNos = query

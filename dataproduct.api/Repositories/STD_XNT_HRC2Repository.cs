@@ -694,7 +694,7 @@ namespace dataproduct.api.Repositories
 
                 // ========== BƯỚC 2: Lấy tất cả mẻ trong DLNM_HRC2 theo ngày/ca ==========
                 var dlnmInCa = await _context.DLNM_HRC2s
-                    .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca)
+                    .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca && x.IsDelete != true)
                     .ToListAsync();
 
                 if (!dlnmInCa.Any())
@@ -835,7 +835,8 @@ namespace dataproduct.api.Repositories
                     where pl.ID_HeaderKey == entity.Id_HeaderKey &&
                           pl.IsPhanBo == true &&
                           dlnm.Ngay == entity.NgaySX &&
-                          dlnm.Ca == entity.Ca
+                          dlnm.Ca == entity.Ca &&
+                          dlnm.IsDelete != true
                     select new { PhuLieu = pl, MeThoiId = dlnm.ID }
                 ).ToListAsync();
 
@@ -936,7 +937,8 @@ namespace dataproduct.api.Repositories
                     where pl.ID_HeaderKey == entity.Id_HeaderKey &&
                           pl.IsPhanBo == true &&
                           dlnm.Ngay == entity.NgaySX &&
-                          dlnm.Ca == entity.Ca
+                          dlnm.Ca == entity.Ca &&
+                          dlnm.IsDelete != true
                     select pl
                 ).ToListAsync();
 
