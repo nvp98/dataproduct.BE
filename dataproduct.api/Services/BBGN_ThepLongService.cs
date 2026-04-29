@@ -12,6 +12,7 @@ using System.Text;
 using Microsoft.Data.SqlClient;
 using DinkToPdf;
 using DinkToPdf.Contracts;
+using dataproduct.api.Models.MasterData;
 
 namespace dataproduct.api.Services
 {
@@ -19,6 +20,7 @@ namespace dataproduct.api.Services
     {
         private readonly IBBGN_ThepLongRepository _repo;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
         private readonly SyncPhanLoaiService _syncPhanLoaiService;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IConverter _pdfConverter;
@@ -29,6 +31,7 @@ namespace dataproduct.api.Services
         public BBGN_ThepLongService(
             IBBGN_ThepLongRepository repo,
             ProductFormContext context,
+            ProductDataMasterDbContext masterContext,
             IConfiguration config,
             SyncPhanLoaiService syncPhanLoaiService,
             PheDuyetService pheDuyetService,
@@ -37,6 +40,7 @@ namespace dataproduct.api.Services
         {
             _repo = repo;
             _context = context;
+            _masterContext = masterContext;
             _syncPhanLoaiService = syncPhanLoaiService;
             _pheDuyetService = pheDuyetService;
             _pdfConverter = pdfConverter;
@@ -74,6 +78,7 @@ namespace dataproduct.api.Services
                 var rowId = TryParseInt(row, "id");
                 var me = GetString(row, "me");
 
+                var klLFSauThep = TryParseDecimal(row, "klLFSauThep");
                 var klLan1 = TryParseDecimal(row, "klLan1");
                 var klLan2 = TryParseDecimal(row, "klLan2");
                 var klLan3 = TryParseDecimal(row, "klLan3");
@@ -90,7 +95,7 @@ namespace dataproduct.api.Services
                     existing.IdMacThep = TryParseInt(row, "idMacThep");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
-
+                    existing.KLLFSauThep = klLFSauThep;
                     existing.KlLan1 = klLan1;
                     existing.KlLan2 = klLan2;
                     existing.KlLan3 = klLan3;
@@ -99,6 +104,7 @@ namespace dataproduct.api.Services
                     existing.GhiChu = GetString(row, "ghiChu");
                     existing.TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
                     existing.PhanLoai = GetString(row, "phanLoai");
+                    existing.PhanLoaiNhom = GetString(row, "phanLoaiNhom");
                     existing.MacThepBKMIS = GetString(row, "macThepBKMIS");
                     if (!string.IsNullOrWhiteSpace(bieuMau)) existing.BieuMau = bieuMau;
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
@@ -129,7 +135,7 @@ namespace dataproduct.api.Services
                         Ca = ca,
                         NgaySX = ngaySX,
                         Scope = scope,
-
+                        KLLFSauThep = klLFSauThep,
                         KlLan1 = klLan1,
                         KlLan2 = klLan2,
                         KlLan3 = klLan3,
@@ -138,6 +144,7 @@ namespace dataproduct.api.Services
                         GhiChu = GetString(row, "ghiChu"),
                         TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang"),
                         PhanLoai = GetString(row, "phanLoai"),
+                        PhanLoaiNhom = GetString(row, "phanLoaiNhom"),
                         MacThepBKMIS = GetString(row, "macThepBKMIS"),
                         IdPhieu = idPhieu,
                         IsGhost = false
@@ -243,55 +250,67 @@ namespace dataproduct.api.Services
             return hasValue ? total : null;
         }
 
+        public async Task<List<string>> GetDistinctPhanLoaiNhomAsync(string bieuMau, string? search = null, int limit = 30)
+        {
+            var query = _context.BBGN_ThepLongs
+                .AsNoTracking()
+                .Where(x => x.BieuMau == bieuMau && x.IsGhost != true && x.PhanLoaiNhom != null && x.PhanLoaiNhom != "");
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(x => x.PhanLoaiNhom!.Contains(search.Trim()));
+
+            return await query
+                .Select(x => x.PhanLoaiNhom!)
+                .Distinct()
+                .OrderBy(x => x)
+                .Take(limit)
+                .ToListAsync();
+        }
+
         public async Task<List<string>> FetchMeThoiAsync(FetchMeThoiRequest request)
         {
             return await ExecuteGetMeThoiAsync("usp_GetMeThoi_ByNgayCaNhaMay", request.NgaySX, request.Ca, request.NhaMay);
         }
 
+        public async Task<List<string>> SearchMeThoi(int nhaMay, string? searchStr, List<int>? ID_LoThois)
+        {
+            List<int> toHopLoThoi;
+            if (nhaMay == 1 && ID_LoThois != null && ID_LoThois.Count > 0)
+                toHopLoThoi = ID_LoThois;
+            else
+                toHopLoThoi = nhaMay == 1
+                    ? new List<int> { 1, 2, 3, 4, 5 }
+                    : new List<int> { 6, 7 };
+
+            var query = _masterContext.Tbl_MeThoi
+                .Where(x => x.Is_Delete != true
+                         && toHopLoThoi.Contains(x.ID_LoThoi)
+                         && x.ID_TrangThai != 5);
+
+            if (!string.IsNullOrWhiteSpace(searchStr))
+                query = query.Where(x => x.MaMeThoi.Contains(searchStr.Trim()));
+
+            return await query
+                .OrderByDescending(x => x.ID)
+                .Select(x => x.MaMeThoi)
+                .ToListAsync();
+        }
+
         public async Task<List<BBGN_ThepLong>> LoadAsync(LoadBBGNThepLongRequest request)
         {
-            var (bieuMau, nhaMayInt) = ParseBieuMauForThepLong(request.BieuMau);
-
-            // 1. Lấy danh sách mẻ thổi hiện tại từ SP
-            var meThoiFromSP = await FetchMeThoiAsync(new FetchMeThoiRequest
-            {
-                NgaySX = request.NgaySX,
-                Ca = request.Ca,
-                NhaMay = nhaMayInt
-            });
-            var spSet = new HashSet<string>(
-                meThoiFromSP.Where(s => !string.IsNullOrWhiteSpace(s)),
-                StringComparer.OrdinalIgnoreCase);
-
-            // 2. Lấy toàn bộ BBGN_ThepLongs theo IdPhieu
             var rows = await _context.BBGN_ThepLongs
-                .Where(x => x.IdPhieu == request.IdPhieu)
+                .Where(x => x.IdPhieu == request.IdPhieu && x.IsGhost != true)
                 .ToListAsync();
 
-            // 3. Mẻ không còn trong SP → đánh IsGhost = true
-            bool hasChanges = false;
-            foreach (var row in rows.Where(r => !string.IsNullOrWhiteSpace(r.Me)))
-            {
-                if (!spSet.Contains(row.Me!) && row.IsGhost != true)
-                {
-                    row.IsGhost = true;
-                    _context.BBGN_ThepLongs.Update(row);
-                    hasChanges = true;
-                }
-            }
-
-            if (hasChanges)
-                await _context.SaveChangesAsync();
-
-            // 4. Đồng bộ PhanLoai từ MySQL theo danh sách mẻ của phiếu, rồi đọc lại để trả về đã cập nhật
             var maMes = rows
-                .Where(x => x.IsGhost != true && !string.IsNullOrWhiteSpace(x.Me) && (x.PhanLoai == null || x.MacThepBKMIS == null))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Me) && (x.PhanLoai == null || x.MacThepBKMIS == null))
                 .Select(x => x.Me!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (maMes.Count > 0)
             {
+                var (bieuMau, _) = ParseBieuMauForThepLong(request.BieuMau);
                 await _syncPhanLoaiService.SyncAsync(new SyncPhanLoaiRequest
                 {
                     BieuMau = bieuMau,
@@ -299,13 +318,12 @@ namespace dataproduct.api.Services
                 });
 
                 rows = await _context.BBGN_ThepLongs
-                    .Where(x => x.IdPhieu == request.IdPhieu)
+                    .Where(x => x.IdPhieu == request.IdPhieu && x.IsGhost != true)
                     .ToListAsync();
             }
 
-            var result = rows.Where(x => x.IsGhost != true).ToList();
-            await ResolveMacThepNamesAsync(result);
-            return result;
+            await ResolveMacThepNamesAsync(rows);
+            return rows;
         }
 
         public async Task<bool> DeleteRowAsync(int id)
@@ -497,6 +515,12 @@ namespace dataproduct.api.Services
             {
                 var phanLoai = request.PhanLoai.Trim();
                 query = query.Where(x => (x.PhanLoai ?? string.Empty).Contains(phanLoai));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.PhanLoaiNhom))
+            {
+                var phanLoaiNhom = request.PhanLoaiNhom.Trim();
+                query = query.Where(x => (x.PhanLoaiNhom ?? string.Empty).Contains(phanLoaiNhom));
             }
 
             if (request.IsTrungMeThoi.HasValue)

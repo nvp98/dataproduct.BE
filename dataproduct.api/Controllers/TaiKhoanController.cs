@@ -95,6 +95,14 @@ namespace dataproduct.api.Controllers
                 })
                 .ToListAsync();
 
+            var quyenTheoLo = await (
+                            from l in _context.Tbl_BM_16_LoSanXuat
+                            join tk in _context.Tbl_BM_16_LoSanXuat_TaiKhoan
+                                on l.ID equals tk.ID_LoSanXuat
+                            where tk.ID_TaiKhoan == user.ID_TaiKhoan
+                            select l
+                        ).ToListAsync();
+
             var result = new
             {
                 user.ID_TaiKhoan,
@@ -109,6 +117,7 @@ namespace dataproduct.api.Controllers
                 TenPhongBan = user.PhongBan?.TenPhongBan,
                 user.ID_Quyen,
                 bmQuyenXlList,
+                quyenTheoLo
             };
 
             return Ok(result);
