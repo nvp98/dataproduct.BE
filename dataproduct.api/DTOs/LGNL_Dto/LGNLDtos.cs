@@ -42,7 +42,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
     public class LGNLMappingDto
     {
         public int ID { get; set; }
-        public DateOnly? Ngay { get; set; }
+        public DateTime? Ngay { get; set; }
         public int? IDCa { get; set; }
         public int? IDLoCao { get; set; }
         public int? IDSiLo { get; set; }
@@ -54,7 +54,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public string? NhomHienThi { get; set; }// join từ LG_NL_NVL
         public int? ThuTuNhom { get; set; }     // join từ LG_NL_NVL
         public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca; có giá trị = đổi NVL giữa ca
-        public DateOnly? NgayHetHL { get; set; }
+        public DateTime? NgayHetHL { get; set; }
         public int? IDCaHetHL { get; set; }
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
@@ -75,7 +75,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
 
     public class CreateLGNLMappingDto
     {
-        public string? Ngay { get; set; }  // Format: "YYYY-MM-DD"
+        public DateTime? Ngay { get; set; }
         public int IDCa { get; set; }
         public int IDLoCao { get; set; }
         public int? IDSiLo { get; set; }
@@ -85,7 +85,7 @@ namespace dataproduct.api.DTOs.LGNL_Dto
 
     public class UpdateLGNLMappingDto
     {
-        public string? Ngay { get; set; }  // Format: "YYYY-MM-DD"
+        public DateTime? Ngay { get; set; }
         public int IDCa { get; set; }
         public int IDLoCao { get; set; }
         public int? IDSiLo { get; set; }
@@ -191,14 +191,14 @@ namespace dataproduct.api.DTOs.LGNL_Dto
         public List<LGNLColumnDto> Columns { get; set; } = [];
         public List<Dictionary<string, object?>> Rows { get; set; } = [];
         // Config hiệu lực đang được áp dụng (khác ngay/idCa yêu cầu = đang dùng config cũ)
-        public DateOnly? NgayHieuLuc { get; set; }
+        public DateTime? NgayHieuLuc { get; set; }
         public int? IDCaHieuLuc { get; set; }
     }
 
     public class LGNLChangeSiLoNVLDto
     {
         public int IDLoCao { get; set; }
-        public string Ngay { get; set; } = string.Empty;   // "yyyy-MM-dd"
+        public DateTime Ngay { get; set; }
         public int IDCa { get; set; }
         public int IDSiLo { get; set; }
         public int IDNVLMoi { get; set; }

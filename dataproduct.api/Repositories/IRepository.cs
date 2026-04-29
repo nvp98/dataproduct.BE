@@ -279,7 +279,7 @@ namespace dataproduct.api.Repositories
         Task<bool> DeleteSiLoMasterAsync(int id);
 
         // Mapping
-        Task<List<LGNLMappingDto>> GetMappingListAsync(DateOnly? ngay, int? idCa, int? idLoCao);
+        Task<List<LGNLMappingDto>> GetMappingListAsync(DateTime? ngay, int? idCa, int? idLoCao);
         Task<LG_NL_Mapping?> GetMappingByIdAsync(int id);
         Task<LG_NL_Mapping> AddMappingAsync(LG_NL_Mapping entity);
         Task<LG_NL_Mapping?> UpdateMappingAsync(int id, LG_NL_Mapping entity);
@@ -305,15 +305,15 @@ namespace dataproduct.api.Repositories
 
         // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao)
         Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
-            DateOnly ngay, int idCa, int idLoCao);
+            DateTime ngay, int idCa, int idLoCao);
 
         // Đổi NVL cho một silo tại thời điểm cụ thể trong ca (giữ data cũ đúng NVL)
         Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
-            int idLoCao, DateOnly ngay, int idCa, int idSiLo, int idNVLMoi,
+            int idLoCao, DateTime ngay, int idCa, int idSiLo, int idNVLMoi,
             DateTime thoiDiem, string? ghiChu);
 
         // Snapshot trạng thái hiện tại của từng Silo (NVL đang chứa)
         Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
-            int idLoCao, DateOnly ngay, int idCa);
+            int idLoCao, DateTime ngay, int idCa);
     }
 }

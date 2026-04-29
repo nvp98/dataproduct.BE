@@ -61,7 +61,7 @@ namespace dataproduct.api.Services
 
         // ─── Mapping ─────────────────────────────────────────────────────────
 
-        public Task<List<LGNLMappingDto>> GetMappingListAsync(DateOnly? ngay, int? idCa, int? idLoCao)
+        public Task<List<LGNLMappingDto>> GetMappingListAsync(DateTime? ngay, int? idCa, int? idLoCao)
             => _repo.GetMappingListAsync(ngay, idCa, idLoCao);
 
         public async Task<LGNLMappingDto?> GetMappingByIdAsync(int id)
@@ -72,12 +72,9 @@ namespace dataproduct.api.Services
 
         public async Task<LGNLMappingDto> AddMappingAsync(CreateLGNLMappingDto dto)
         {
-            var ngayParsed = !string.IsNullOrEmpty(dto.Ngay) && DateOnly.TryParse(dto.Ngay, out var parsed)
-                ? parsed : (DateOnly?)null;
-
             var entity = new LG_NL_Mapping
             {
-                Ngay    = ngayParsed,
+                Ngay    = dto.Ngay,
                 IDCa    = dto.IDCa,
                 IDLoCao = dto.IDLoCao,
                 IDSiLo  = dto.IDSiLo,
@@ -90,12 +87,9 @@ namespace dataproduct.api.Services
 
         public async Task<LGNLMappingDto?> UpdateMappingAsync(int id, UpdateLGNLMappingDto dto)
         {
-            var ngayParsed = !string.IsNullOrEmpty(dto.Ngay) && DateOnly.TryParse(dto.Ngay, out var parsed)
-                ? parsed : (DateOnly?)null;
-
             var entity = new LG_NL_Mapping
             {
-                Ngay    = ngayParsed,
+                Ngay    = dto.Ngay,
                 IDCa    = dto.IDCa,
                 IDLoCao = dto.IDLoCao,
                 IDSiLo  = dto.IDSiLo,
@@ -261,7 +255,7 @@ namespace dataproduct.api.Services
         // ─── Pivot dữ liệu nạp liệu theo Silo mapping ───────────────
 
         public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
-            DateOnly ngay, int idCa, int idLoCao)
+            DateTime ngay, int idCa, int idLoCao)
         {
             return await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
         }
@@ -269,13 +263,13 @@ namespace dataproduct.api.Services
         // ─── Snapshot trạng thái Silo ──────────────────────────────
 
         public Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
-            int idLoCao, DateOnly ngay, int idCa)
+            int idLoCao, DateTime ngay, int idCa)
             => _repo.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
 
         // ─── Đổi NVL cho silo tại thời điểm cụ thể trong ca ─────────
 
         public async Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
-            int idLoCao, DateOnly ngay, int idCa, int idSiLo, int idNVLMoi,
+            int idLoCao, DateTime ngay, int idCa, int idSiLo, int idNVLMoi,
             DateTime thoiDiem, string? ghiChu)
         {
             return await _repo.ChangeSiLoNVLAsync(

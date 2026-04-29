@@ -77,7 +77,7 @@ namespace dataproduct.api.Controllers
 
         [HttpGet("mapping")]
         public async Task<IActionResult> GetMappingList(
-            [FromQuery] DateOnly? ngay,
+            [FromQuery] DateTime? ngay,
             [FromQuery] int? idCa,
             [FromQuery] int? idLoCao)
         {
@@ -274,7 +274,7 @@ namespace dataproduct.api.Controllers
         /// </summary>
         [HttpGet("dulieu-silo")]
         public async Task<IActionResult> GetDuLieuSilo(
-            [FromQuery] DateOnly ngay,
+            [FromQuery] DateTime ngay,
             [FromQuery] int idCa,
             [FromQuery] int idLoCao)
         {
@@ -293,7 +293,7 @@ namespace dataproduct.api.Controllers
 
         [HttpGet("snapshot-silo")]
         public async Task<IActionResult> GetSnapshotSilo(
-            [FromQuery] DateOnly ngay,
+            [FromQuery] DateTime ngay,
             [FromQuery] int idCa,
             [FromQuery] int idLoCao)
         {
@@ -312,15 +312,13 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                if (!DateOnly.TryParse(dto.Ngay, out var parsedNgay))
-                    return BadRequest(new { message = "Ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
                 if (dto.IDCa != 1 && dto.IDCa != 2)
                     return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
                 if (dto.IDSiLo <= 0 || dto.IDNVLMoi <= 0)
                     return BadRequest(new { message = "IDSiLo và IDNVLMoi phải lớn hơn 0." });
 
                 var result = await _service.ChangeSiLoNVLAsync(
-                    dto.IDLoCao, parsedNgay, dto.IDCa,
+                    dto.IDLoCao, dto.Ngay, dto.IDCa,
                     dto.IDSiLo, dto.IDNVLMoi, dto.ThoiDiem, dto.GhiChu);
 
                 return Ok(new { message = "Đổi NVL thành công.", id = result.ID });
