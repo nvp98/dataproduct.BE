@@ -15,4 +15,5 @@ public partial class BmQuyenXl
 
     // tinyint trong database => byte? trong model
     public byte? QuyenChucNang { get; set; }
+    public string? KhuVucPhu {get;set;}
 }

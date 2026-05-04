@@ -20,7 +20,8 @@ namespace dataproduct.api.Services
             IdTaiKhoan = x.IdTaiKhoan,
             MaBm = x.MaBm,
             MaKhuVuc = x.MaKhuVuc,
-            QuyenChucNang = x.QuyenChucNang
+            QuyenChucNang = x.QuyenChucNang,
+            KhuVucPhu = x.KhuVucPhu
         };
 
         public async Task<IEnumerable<BmQuyenXlDto>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc)
@@ -97,7 +98,7 @@ namespace dataproduct.api.Services
         public async Task<BmQuyenXl> CreateAsync(BmQuyenXlCreateDto dto)
         {
             // Kiểm tra trùng lặp
-            var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, dto.MaBm, dto.MaKhuVuc, dto.QuyenChucNang);
+            var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, dto.MaBm, dto.MaKhuVuc, dto.QuyenChucNang, dto.KhuVucPhu);
             if (isDuplicate)
             {
                 throw new InvalidOperationException(
@@ -110,7 +111,8 @@ namespace dataproduct.api.Services
                 IdTaiKhoan = dto.IdTaiKhoan,
                 MaBm = dto.MaBm,
                 MaKhuVuc = dto.MaKhuVuc,
-                QuyenChucNang = dto.QuyenChucNang
+                QuyenChucNang = dto.QuyenChucNang,
+                KhuVucPhu = dto.KhuVucPhu
             };
 
             await _repo.AddAsync(entity);
@@ -122,7 +124,7 @@ namespace dataproduct.api.Services
             if (!await _repo.ExistsAsync(id)) return false;
 
             // Kiểm tra trùng lặp (loại trừ bản ghi hiện tại)
-            var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, dto.MaBm, dto.MaKhuVuc, dto.QuyenChucNang, id);
+            var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, dto.MaBm, dto.MaKhuVuc, dto.QuyenChucNang, dto.KhuVucPhu, id);
             if (isDuplicate)
             {
                 throw new InvalidOperationException(
@@ -136,7 +138,8 @@ namespace dataproduct.api.Services
                 IdTaiKhoan = dto.IdTaiKhoan,
                 MaBm = dto.MaBm,
                 MaKhuVuc = dto.MaKhuVuc,
-                QuyenChucNang = dto.QuyenChucNang
+                QuyenChucNang = dto.QuyenChucNang,
+                KhuVucPhu = dto.KhuVucPhu
             };
 
             await _repo.UpdateAsync(entity);
@@ -162,23 +165,32 @@ namespace dataproduct.api.Services
             var entities = new List<BmQuyenXl>();
             foreach (var item in dto.Items)
             {
+                // KhuVucPhu optional: nếu không truyền thì lưu null, nếu có thì tổ hợp theo từng giá trị
+                var khuVucPhuList = item.KhuVucPhus.Count > 0
+                    ? item.KhuVucPhus.Select(k => (string?)k).ToList()
+                    : new List<string?> { null };
+
                 foreach (var maKhuVuc in item.MaKhuVucs)
                 {
                     foreach (var quyen in item.QuyenChucNangs)
                     {
-                        var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, item.MaBm, maKhuVuc, quyen);
-                        if (isDuplicate)
-                            throw new InvalidOperationException(
-                                $"Quyền xử lý đã tồn tại cho Tài khoản ID: {dto.IdTaiKhoan}, Mã BM: '{item.MaBm}', Khu vực: '{maKhuVuc}', Quyền: {quyen}"
-                            );
-
-                        entities.Add(new BmQuyenXl
+                        foreach (var khuVucPhu in khuVucPhuList)
                         {
-                            IdTaiKhoan = dto.IdTaiKhoan,
-                            MaBm = item.MaBm,
-                            MaKhuVuc = maKhuVuc,
-                            QuyenChucNang = quyen
-                        });
+                            var isDuplicate = await _repo.CheckDuplicateAsync(dto.IdTaiKhoan, item.MaBm, maKhuVuc, quyen, khuVucPhu);
+                            if (isDuplicate)
+                                throw new InvalidOperationException(
+                                    $"Quyền xử lý đã tồn tại cho Tài khoản ID: {dto.IdTaiKhoan}, Mã BM: '{item.MaBm}', Khu vực: '{maKhuVuc}', Quyền: {quyen}"
+                                );
+
+                            entities.Add(new BmQuyenXl
+                            {
+                                IdTaiKhoan = dto.IdTaiKhoan,
+                                MaBm = item.MaBm,
+                                MaKhuVuc = maKhuVuc,
+                                QuyenChucNang = quyen,
+                                KhuVucPhu = khuVucPhu
+                            });
+                        }
                     }
                 }
             }

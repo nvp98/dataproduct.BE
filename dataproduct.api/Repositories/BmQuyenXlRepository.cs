@@ -98,11 +98,10 @@ namespace dataproduct.api.Repositories
             return await _context.BmQuyenXls.AnyAsync(e => e.Id == id);
         }
 
-        public async Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, int? excludeId = null)
+        public async Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, string? khuVucPhu = null, int? excludeId = null)
         {
             var query = _context.BmQuyenXls.AsQueryable();
 
-            // Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang
             if (idTaiKhoan.HasValue)
                 query = query.Where(x => x.IdTaiKhoan == idTaiKhoan.Value);
             else
@@ -123,7 +122,11 @@ namespace dataproduct.api.Repositories
             else
                 query = query.Where(x => x.QuyenChucNang == null);
 
-            // Loại trừ ID hiện tại khi update
+            if (!string.IsNullOrEmpty(khuVucPhu))
+                query = query.Where(x => x.KhuVucPhu == khuVucPhu);
+            else
+                query = query.Where(x => x.KhuVucPhu == null || x.KhuVucPhu == "");
+
             if (excludeId.HasValue)
                 query = query.Where(x => x.Id != excludeId.Value);
 

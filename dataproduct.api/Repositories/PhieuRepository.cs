@@ -368,8 +368,7 @@ namespace dataproduct.api.Repositories
                             q.MaBm == x.MaBm &&
                             (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
                             q.QuyenChucNang == 5
-                        ) &&
-                        x.TinhTrang != 0
+                        )
                     );
                     break;
                 }

@@ -1585,21 +1585,76 @@ namespace dataproduct.api.Repositories
                 allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
             bool isBofTk2 = loaiBmKey.Contains("BOF");
-            var headers = (await _context.Header_Keys
+
+            // Load tất cả Header_Key (kể cả children có ID_NhomKey) để fetch đủ data
+            var allHeaderKeysRaw = await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
                     (allowedLoaiThongKe == null ||
                      (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
-                .ToListAsync())
-                .OrderBy(h => isBofTk2 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
-                .ThenBy(h => h.Id)
-                .Select(h => new PhuLieuHeaderTable
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH, h.ID_NhomKey })
+                .ToListAsync();
+
+            // Load Header_Nhom được tham chiếu bởi children
+            var referencedNhomIds = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .Select(h => h.ID_NhomKey!.Value)
+                .ToHashSet();
+            var allNhoms = referencedNhomIds.Count > 0
+                ? await _context.Header_Nhoms
+                    .Where(n => referencedNhomIds.Contains(n.Id))
+                    .ToListAsync()
+                : new List<Header_Nhom>();
+
+            // childToParentMap: Header_Key.Id → -Header_Nhom.Id (âm để phân biệt với Header_Key.Id)
+            var childToParentMap = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .ToDictionary(h => h.Id, h => -h.ID_NhomKey!.Value);
+
+            // Derive LoaiThongKe và thứ tự của mỗi Nhom từ các child Header_Keys
+            var nhomMeta = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .GroupBy(h => h.ID_NhomKey!.Value)
+                .ToDictionary(g => g.Key, g => new
                 {
-                    IDHeaderKey = h.Id,
-                    TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
-                })
+                    LoaiThongKe = g.First().LoaiThongKe,
+                    ThuTu_TK_BOF = g.Min(x => x.ThuTu_TK_BOF),
+                    ThuTu_TK_LFRH = g.Min(x => x.ThuTu_TK_LFRH)
+                });
+
+            // Columns: Nhom groups (IDHeaderKey âm) + Header_Keys độc lập, sắp xếp chung theo ThuTu
+            var nhomEntries = allNhoms.Select(n =>
+            {
+                nhomMeta.TryGetValue(n.Id, out var meta);
+                return new
+                {
+                    SortKey = isBofTk2 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (meta?.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortId = n.Id,
+                    Header = new PhuLieuHeaderTable
+                    {
+                        IDHeaderKey = -n.Id,
+                        TenPhuLieu = n.TenHienThi,
+                        LoaiThongKe = (byte)(meta?.LoaiThongKe ?? 0)
+                    }
+                };
+            });
+            var standaloneEntries = allHeaderKeysRaw
+                .Where(h => !h.ID_NhomKey.HasValue)
+                .Select(h => new
+                {
+                    SortKey = isBofTk2 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortId = h.Id,
+                    Header = new PhuLieuHeaderTable
+                    {
+                        IDHeaderKey = h.Id,
+                        TenPhuLieu = h.TenHienThi,
+                        LoaiThongKe = (byte)(h.LoaiThongKe ?? 0)
+                    }
+                });
+            var headers = nhomEntries.Concat(standaloneEntries)
+                .OrderBy(x => x.SortKey)
+                .ThenBy(x => x.SortId)
+                .Select(x => x.Header)
                 .ToList();
 
             int page = dto.Page ?? 1;
@@ -1616,7 +1671,8 @@ namespace dataproduct.api.Repositories
                     TotalPages = totalPages
                 };
 
-            var usedHeaderKeyIds = headers.Select(x => x.IDHeaderKey).ToHashSet();
+            // usedHeaderKeyIds: tất cả Header_Key IDs (cả child) để JOIN/filter fetch đủ data
+            var usedHeaderKeyIds = allHeaderKeysRaw.Select(x => x.Id).ToHashSet();
 
             // === 4. Paged DLNM records ===
             // - NM có REPORT_NO: lấy 1 bản ghi đại diện/report (ID lớn nhất)
@@ -1704,7 +1760,16 @@ namespace dataproduct.api.Repositories
             mappedRaw.AddRange(manualOnlyRaw);
 
             // Group in-memory: reportNo → headerKeyId → (KLPhuGiaTotal, first KLPhuGia_Manual, first IsManual)
+            // Remap child Header_Key → parent trước khi group (để gộp nhóm theo ID_NhomKey)
             var mappedByReportNo = mappedRaw
+                .Select(x => new
+                {
+                    x.ReportNo,
+                    ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var pid) ? pid : x.ID_HeaderKey,
+                    x.KLPhuGia,
+                    x.KLPhuGia_Manual,
+                    x.IsManual
+                })
                 .GroupBy(x => x.ReportNo)
                 .ToDictionary(
                     g => g.Key,
@@ -1737,7 +1802,16 @@ namespace dataproduct.api.Repositories
                 })
                 .ToListAsync();
 
+            // Remap child Header_Key → parent cho phanBo (gộp nhóm theo ID_NhomKey)
             var phanBoByReportNo = phanBoRaw
+                .Select(x => new
+                {
+                    x.ReportNo,
+                    ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var pid) ? pid : x.ID_HeaderKey,
+                    x.KLPhuGia,
+                    x.KLPhuGia_Manual,
+                    x.IsManual
+                })
                 .GroupBy(x => x.ReportNo)
                 .ToDictionary(
                     g => g.Key,
@@ -1928,20 +2002,72 @@ namespace dataproduct.api.Repositories
                 allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
 
             bool isBofTk3 = loaiBmKey.Contains("BOF");
-            var headers = (await _context.Header_Keys
+
+            // Load tất cả Header_Key (kể cả children có ID_NhomKey)
+            var allHeaderKeysRaw = await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
                     (allowedLoaiThongKe == null ||
                      (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .Select(h => new { h.Id, h.TenHienThi, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH })
-                .ToListAsync())
-                .OrderBy(h => isBofTk3 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue))
-                .ThenBy(h => h.Id)
+                .Select(h => new { h.Id, h.TenHienThi, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH, h.ID_NhomKey })
+                .ToListAsync();
+
+            if (!allHeaderKeysRaw.Any()) return new List<ThongKeSumItem>();
+
+            // Load Header_Nhom được tham chiếu bởi children
+            var referencedNhomIds3 = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .Select(h => h.ID_NhomKey!.Value)
+                .ToHashSet();
+            var allNhoms3 = referencedNhomIds3.Count > 0
+                ? await _context.Header_Nhoms
+                    .Where(n => referencedNhomIds3.Contains(n.Id))
+                    .ToListAsync()
+                : new List<Header_Nhom>();
+
+            // childToParentMap: Header_Key.Id → -Header_Nhom.Id
+            var childToParentMap = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .ToDictionary(h => h.Id, h => -h.ID_NhomKey!.Value);
+
+            // Derive thứ tự của mỗi Nhom từ các child Header_Keys
+            var nhomMeta3 = allHeaderKeysRaw
+                .Where(h => h.ID_NhomKey.HasValue)
+                .GroupBy(h => h.ID_NhomKey!.Value)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    ThuTu_TK_BOF = g.Min(x => x.ThuTu_TK_BOF),
+                    ThuTu_TK_LFRH = g.Min(x => x.ThuTu_TK_LFRH)
+                });
+
+            // Headers: Nhom groups (IDHeaderKey âm) + standalone Header_Keys, sắp xếp chung theo ThuTu
+            var nhomEntries3 = allNhoms3.Select(n =>
+            {
+                nhomMeta3.TryGetValue(n.Id, out var meta);
+                return new
+                {
+                    SortKey = isBofTk3 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (meta?.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortId = n.Id,
+                    IDHeaderKey = -n.Id,
+                    TenHienThi = n.TenHienThi
+                };
+            });
+            var standaloneEntries3 = allHeaderKeysRaw
+                .Where(h => !h.ID_NhomKey.HasValue)
+                .Select(h => new
+                {
+                    SortKey = isBofTk3 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortId = h.Id,
+                    IDHeaderKey = h.Id,
+                    TenHienThi = h.TenHienThi
+                });
+            var headers = nhomEntries3.Concat(standaloneEntries3)
+                .OrderBy(x => x.SortKey)
+                .ThenBy(x => x.SortId)
                 .ToList();
 
-            if (!headers.Any()) return new List<ThongKeSumItem>();
-
-            var usedHeaderKeyIds = headers.Select(x => x.Id).ToHashSet();
+            // usedHeaderKeyIds: tất cả Header_Key IDs để fetch đủ data
+            var usedHeaderKeyIds = allHeaderKeysRaw.Select(x => x.Id).ToHashSet();
 
             // === 2. Base filter (giống hệt SearchThongKeApiAsync) ===
             var query = _context.DLNM_HRC2s.AsQueryable();
@@ -2035,11 +2161,32 @@ namespace dataproduct.api.Repositories
             // effectiveKL = KLPhuGia_Manual ?? Sum(KLPhuGia)
             // TotalKLPhuGia = phanBo.KLPhuGia + effectiveKL  (nếu có phanBo)
             //               = effectiveKL                     (nếu không có phanBo)
-            var phanBoLookup = phanBoRaw
+
+            // Remap child → parent trước khi tính sum (gộp nhóm theo ID_NhomKey)
+            var remappedPhanBoRaw = phanBoRaw
+                .Select(x => new
+                {
+                    x.ReportNo,
+                    ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var pid) ? pid : x.ID_HeaderKey,
+                    x.KLPhuGia
+                })
+                .ToList();
+
+            var remappedMappedRaw = mappedRaw
+                .Select(x => new
+                {
+                    x.ReportNo,
+                    ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var pid) ? pid : x.ID_HeaderKey,
+                    x.KLPhuGia,
+                    x.KLPhuGia_Manual
+                })
+                .ToList();
+
+            var phanBoLookup = remappedPhanBoRaw
                 .GroupBy(x => (x.ReportNo, x.ID_HeaderKey))
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.KLPhuGia ?? 0));
 
-            var mappedGrouped = mappedRaw
+            var mappedGrouped = remappedMappedRaw
                 .GroupBy(x => (x.ReportNo, x.ID_HeaderKey))
                 .Select(g => new
                 {
@@ -2066,7 +2213,7 @@ namespace dataproduct.api.Repositories
             }
 
             // REPORT_NOs chỉ có phanBo, không có mapped record — hiếm
-            foreach (var pb in phanBoRaw)
+            foreach (var pb in remappedPhanBoRaw)
             {
                 if (!mappedGrouped.Any(m => m.ReportNo == pb.ReportNo && m.ID_HeaderKey == pb.ID_HeaderKey))
                 {
@@ -2081,10 +2228,10 @@ namespace dataproduct.api.Repositories
             // === 6. Build flat response ===
             return headers.Select(h =>
             {
-                sumByHeaderKey.TryGetValue(h.Id, out var total);
+                sumByHeaderKey.TryGetValue(h.IDHeaderKey, out var total);
                 return new ThongKeSumItem
                 {
-                    IDHeaderKey = h.Id,
+                    IDHeaderKey = h.IDHeaderKey,
                     TenPhuLieu = h.TenHienThi,
                     TotalKLPhuGia = FormatNumber(total == 0 ? (double?)null : total)
                 };

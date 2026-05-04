@@ -47,6 +47,8 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<Header_Key> Header_Keys { get; set; }
 
+    public virtual DbSet<Header_Nhom> Header_Nhoms { get; set; }
+
     public virtual DbSet<Header_Mapping> Header_Mappings { get; set; }
 
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
@@ -218,6 +220,8 @@ public partial class ProductFormContext : DbContext
                 .HasColumnName("MaBM");
             entity.Property(e => e.MaKhuVuc).HasMaxLength(20);
             entity.Property(e => e.QuyenChucNang).HasColumnName("QuyenChucNang");
+            entity.Property(e => e.KhuVucPhu).HasColumnName("KhuVucPhu");
+            
         });
 
         modelBuilder.Entity<CtdPhoiNguoi>(entity =>
@@ -388,6 +392,14 @@ public partial class ProductFormContext : DbContext
                 .HasPrecision(18, 3);
             entity.Property(e => e.IsUsedThongKe).HasColumnName("IsUsedThongKe");
             entity.Property(e => e.LoaiThongKe).HasColumnName("LoaiThongKe");
+        });
+
+        modelBuilder.Entity<Header_Nhom>(entity =>
+        {
+            entity.ToTable("Header_Nhom");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.TenHienThi).HasColumnName("TenHienThi");
+            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
         });
 
         modelBuilder.Entity<Header_Mapping>(entity =>
