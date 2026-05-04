@@ -121,7 +121,7 @@ namespace dataproduct.api.Repositories
                     TenSiLo = s != null ? s.TenSiLo : null,
                     TagKey = s != null ? s.TagKey : null,
                     IDNVL = m.IDNVL,
-                    TenNVL = n != null ? n.TenNVL_NM : null,
+                    TenNVL = n != null ? (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) : null,
                     NhomHienThi = nh != null ? nh.TenNhom : null,
                     ThuTuNhom = nh != null ? nh.ThuTu : null,
                     ThoiDiemBD = m.ThoiDiemBD,
@@ -168,7 +168,7 @@ namespace dataproduct.api.Repositories
                     IDSiLo = m.IDSiLo,
                     TenSiLo = s != null ? s.TenSiLo : null,
                     IDNVL = n != null ? (int?)n.ID : null,
-                    TenNVL = n != null ? n.TenNVL_NM : null,
+                    TenNVL = n != null ? (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) : null,
                     ThoiDiemBD = m.ThoiDiemBD,
                     ThuTu = s != null ? s.ThuTu : (int?)null,
                 }
@@ -417,7 +417,7 @@ namespace dataproduct.api.Repositories
                     .Where(n => n.IDNhomNVL == nhom.ID)
                     .Select(n => new LGNLColumnDto
                     {
-                        Title = n.TenNVL_NM ?? $"nvl_{n.ID}",
+                        Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
                         DataIndex = $"nvl_{n.ID}",
                     })
                     .ToList();
@@ -433,7 +433,7 @@ namespace dataproduct.api.Repositories
             foreach (var n in allNvl.Where(n => n.IDNhomNVL == null))
                 columns.Add(new LGNLColumnDto
                 {
-                    Title = n.TenNVL_NM ?? $"nvl_{n.ID}",
+                    Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
                     DataIndex = $"nvl_{n.ID}",
                 });
 
@@ -503,7 +503,7 @@ namespace dataproduct.api.Repositories
                          TagKey = s.TagKey,
                          IDNVL = n.ID,
                          ThoiDiemBD = m.ThoiDiemBD,
-                         TenNVL = n.TenNVL_NM,
+                         TenNVL = n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM,
                          TenNhom = nh != null ? nh.TenNhom : null,
                          ThuTuNhom = nh != null ? (nh.ThuTu ?? 999) : 999,
                      }
