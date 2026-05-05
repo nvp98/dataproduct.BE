@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.DTOs
 {
+    public class SearchMeThoiRequest
+    {
+        public int NhaMay { get; set; }
+        public string? TextStr { get; set; }
+        public List<int>? ID_LoThois { get; set; }
+    }
+
     public class FetchMeThoiRequest
     {
         public DateOnly NgaySX { get; set; }
@@ -52,6 +59,7 @@ namespace dataproduct.api.DTOs
         public string? ThungSo { get; set; }
         public string? TinhLuyenLenThang { get; set; }
         public string? PhanLoai { get; set; }
+        public string? PhanLoaiNhom { get; set; }
         public bool? IsTrungMeThoi { get; set; }
         public string? BieuMau { get; set; }
         public int Page { get; set; } = 1;
