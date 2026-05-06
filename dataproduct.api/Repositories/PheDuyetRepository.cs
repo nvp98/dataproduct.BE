@@ -36,5 +36,38 @@ namespace dataproduct.api.Repositories
                 .OrderBy(x => x.CapDuyet)
                 .ToListAsync();
         }
+
+        public async Task<BmPheDuyet> InitializePheDuyetAsync(Guid phieuId, int capDuyet, int idNguoiDuyet)
+        {
+            // Kiểm tra xem đã có record phê duyệt cho cấp này chưa
+            var existingPheDuyet = await _context.BmPheDuyets
+                .FirstOrDefaultAsync(x => x.PhieuId == phieuId && x.CapDuyet == capDuyet && x.NguoiDuyetId == idNguoiDuyet);
+
+            if (existingPheDuyet != null)
+            {
+                // Cập nhật nếu đã tồn tại
+                existingPheDuyet.NguoiDuyetId = idNguoiDuyet;
+                existingPheDuyet.TinhTrang = 0; // 0 = Chờ duyệt
+                existingPheDuyet.NgayDuyet = null; // Reset ngày duyệt
+                _context.BmPheDuyets.Update(existingPheDuyet);
+                await _context.SaveChangesAsync();
+                return existingPheDuyet;
+            }
+
+            // Tạo mới nếu chưa tồn tại
+            var newPheDuyet = new BmPheDuyet
+            {
+                PhieuId = phieuId,
+                CapDuyet = capDuyet,
+                NguoiDuyetId = idNguoiDuyet,
+                TinhTrang = 0, // 0 = Chờ duyệt
+                NgayDuyet = null,
+                GhiChu = null
+            };
+
+            _context.BmPheDuyets.Add(newPheDuyet);
+            await _context.SaveChangesAsync();
+            return newPheDuyet;
+        }
     }
 }

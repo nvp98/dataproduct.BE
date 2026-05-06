@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>BM.18/HD.25.08 – Bảng theo dõi ben phế</title>
+
+    <style>
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
+
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 12pt;
+        color: #000;
+      }
+
+      .header {
+        display: table;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      .header-left {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 11pt;
+      }
+
+      .header-left img {
+        max-width: 250px;
+        max-height: 100px;
+        vertical-align: middle;
+        margin-right: 10px;
+      }
+
+      .header-right {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        text-align: right;
+        font-size: 10pt;
+        line-height: 1.4;
+      }
+
+      .title {
+        text-align: center;
+        font-size: 16pt;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+
+      .sub-title {
+        text-align: center;
+        font-style: italic;
+        margin-bottom: 10px;
+      }
+
+      .info-line {
+        margin: 4px 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+
+      th,
+      td {
+        border: 1px solid #000;
+        padding: 4px;
+        text-align: center;
+        vertical-align: middle;
+      }
+
+      th {
+        font-weight: bold;
+      }
+
+      .text-left {
+        text-align: left;
+      }
+
+      .note {
+        font-size: 11pt;
+        margin-top: 8px;
+      }
+
+      .sign {
+        margin-top: 40px;
+        display: flex;
+        justify-content: space-between;
+        text-align: center;
+      }
+
+      .sign-col {
+        width: 30%;
+      }
+
+      .sign div {
+        width: 30%;
+      }
+      table.sign-table,
+      table.sign-table td {
+        border: none !important;
+        border-collapse: collapse;
+      }
+	  thead {
+		  display: table-header-group;
+		}
+
+		tfoot {
+		  display: table-footer-group;
+		}
+
+		tr {
+		  page-break-inside: avoid;
+		}
+    </style>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-left">
+        <img src="{{LogoUrl}}" alt="Logo" /><br />
+        CÔNG TY CỔ PHẦN THÉP<br />
+        HÒA PHÁT DUNG QUẤT
+      </div>
+      <div class="header-right">
+        BM.18/HD.25.08<br />
+        Ngày hiệu lực: 15/10/2025<br />
+        Lần sửa đổi: 00
+      </div>
+    </div>
+
+    <!-- TITLE -->
+    <div class="title">BẢNG THEO DÕI BEN PHẾ</div>
+
+    <!-- INFO -->
+    <div class="sub-title">
+      Kíp: {{Ca}}{{Kip}} &nbsp; {{NgaySX}}
+    </div>
+
+    <!-- TABLE -->
+    <table>
+      <thead>
+        <tr>
+          <th >STT</th>
+          <th >Ca</th>
+          <th >Ngày</th>
+          <th >Mã BSX</th>
+          <th >Số hiệu ben</th>
+          <th >Khối lượng <br /> tấn/ben</th>
+          <th >Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{Rows}}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td style="font-weight: bold">Tổng</td>
+          <td></td>
+          <td></td>
+          <td></td>
+		  <td></td>
+          <td><b>{{TongKL}}</b></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- SIGN -->
+    <table
+      class="sign-table"
+      style="width: 100%; margin-top: 20px; text-align: center"
+    >
+      <tr>
+        <td style="width: 49%; font-weight: bold">NM.HRC1</td>
+        <td style="width: 49%; font-weight: bold">NM.NL</td>
+      </tr>
+
+      <tr>
+        <td style="height: 70px">{{ChuKyNguoiNhanHRC1}}</td>
+        <td style="height: 70px">{{ChuKyNguoiNhanNL}}</td>
+      </tr>
+
+      <tr>
+        <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanHRC1}}</td>
+        <td style="padding-top: 5px; font-weight: normal">{{NguoiNhanNL}}</td>
+      </tr>
+    </table>
+  </body>
+</html>
