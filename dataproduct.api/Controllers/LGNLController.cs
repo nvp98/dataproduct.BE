@@ -1,4 +1,4 @@
-using dataproduct.api.DTOs.LGNL_Dto;
+using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Mvc;
 

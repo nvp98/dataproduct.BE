@@ -1,6 +1,5 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
-using dataproduct.api.DTOs.LGNL_Dto;
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
@@ -254,13 +253,33 @@ namespace dataproduct.api.Repositories
 
     }
 
-
-    public interface INMLGRepository
+    // ─── LG_TSL: SiLo, NVL, Mapping (Tồn Silo Lò Cao) ──────────────────────────
+    public interface ILGTSLRepository
     {
-        Task<List<SiLoTonDto>> GetSiLoTon(int? idLoCao, int? idCa, DateTime? ngay);
-        Task<List<SiLo_LG>> GetSiLoWithLoCaoAsync(int? idLoCao);
-        Task<SiLo_LG> AddSiLoAsync(SiLo_LG entity);
-        Task<SiLo_LG> UpdateSiLoAsync(int id, SiLo_LG entity);
+        // SiLo
+        Task<List<LGTSSiLoDto>> GetSiLoListAsync(int? idLoCao);
+        Task<LG_TSL_SiLo?> GetSiLoByIdAsync(int id);
+        Task<LG_TSL_SiLo> AddSiLoAsync(LG_TSL_SiLo entity);
+        Task<LG_TSL_SiLo?> UpdateSiLoAsync(int id, LG_TSL_SiLo entity);
+        Task<bool> DeleteSiLoAsync(int id);
+
+        // NVL
+        Task<List<LGTSNvlDto>> GetNvlListAsync(int? idLoCao);
+        Task<LG_TSL_NVL?> GetNvlByIdAsync(int id);
+        Task<LG_TSL_NVL> AddNvlAsync(LG_TSL_NVL entity);
+        Task<LG_TSL_NVL?> UpdateNvlAsync(int id, LG_TSL_NVL entity);
+        Task<bool> DeleteNvlAsync(int id);
+        Task<bool> UpdateXacNhanAsync(int id, bool xacNhan);
+
+        // Mapping
+        Task<List<LGTSMappingDto>> GetMappingListAsync(int? idLoCao, DateTime? ngay, int? ca);
+        Task<LG_TSL_SiLo_Mapping?> GetMappingByIdAsync(int id);
+        Task<LG_TSL_SiLo_Mapping> AddMappingAsync(LG_TSL_SiLo_Mapping entity);
+        Task<LG_TSL_SiLo_Mapping?> UpdateMappingAsync(int id, LG_TSL_SiLo_Mapping entity);
+        Task<bool> DeleteMappingAsync(int id);
+
+        // View: SiLo + NVL theo Ngày/Ca/LoCao (dùng tạo phiếu tồn silo)
+        Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao, DateTime? ngay, int? ca);
     }
 
     public interface ILGNLRepository

@@ -1,4 +1,4 @@
-namespace dataproduct.api.DTOs.LGNL_Dto
+namespace dataproduct.api.DTOs.NMLG_Dto
 {
     // ─── SiLo Master DTOs ─────────────────────────────────────────────────────
 

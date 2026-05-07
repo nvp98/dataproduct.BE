@@ -1,4 +1,4 @@
-using dataproduct.api.DTOs.LGNL_Dto;
+using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -392,164 +392,371 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
             return true;
         }
+        //public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(DateTime ngay, int idCa, int idLoCao)
+        //{
+        //    // 1. Build columns — nhóm NVL làm header tầng 1, NVL thuộc nhóm làm tầng 2
+        //    //    KHÔNG add _empty_ ngay — chờ sau bước fallback mới quyết định
+        //    var allNhom = await _context.LG_NL_NhomNVL
+        //        .OrderBy(nh => nh.ThuTu)
+        //        .AsNoTracking()
+        //        .ToListAsync();
+
+        //    var allNvl = await _context.LG_NL_NVL
+        //        .Where(n => n.IDLoCao == idLoCao)
+        //        .OrderBy(n => n.ThuTu)
+        //        .AsNoTracking()
+        //        .ToListAsync();
+
+        //    var fixedNvlIds = allNvl.Select(n => n.ID).ToHashSet();
+
+        //    var columns = new List<LGNLColumnDto>();
+
+        //    foreach (var nhom in allNhom)
+        //    {
+        //        var children = allNvl
+        //            .Where(n => n.IDNhomNVL == nhom.ID)
+        //            .Select(n => new LGNLColumnDto
+        //            {
+        //                Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
+        //                DataIndex = $"nvl_{n.ID}",
+        //            })
+        //            .ToList();
+
+        //        columns.Add(new LGNLColumnDto
+        //        {
+        //            Title = nhom.TenNhom ?? $"nhom_{nhom.ID}",
+        //            Children = children,
+        //        });
+        //    }
+
+        //    // NVL không thuộc nhóm nào (IDNhomNVL = null)
+        //    foreach (var n in allNvl.Where(n => n.IDNhomNVL == null))
+        //        columns.Add(new LGNLColumnDto
+        //        {
+        //            Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
+        //            DataIndex = $"nvl_{n.ID}",
+        //        });
+
+        //    // 2. Tìm (Ngay, IDCa) có config hiệu lực tại thời điểm yêu cầu
+        //    var configRef = await _context.LG_NL_Mapping
+        //        .Where(m => m.IDLoCao == idLoCao
+        //                 && m.ThoiDiemBD == null
+        //                 && (m.Ngay < ngay || (m.Ngay == ngay && m.IDCa <= idCa))
+        //                 && (m.NgayHetHL == null
+        //                     || m.NgayHetHL > ngay
+        //                     || (m.NgayHetHL == ngay && m.IDCaHetHL > idCa)))
+        //        .OrderByDescending(m => m.Ngay)
+        //        .ThenByDescending(m => m.IDCa)
+        //        .Select(m => new { m.Ngay, m.IDCa })
+        //        .FirstOrDefaultAsync();
+
+        //    if (configRef == null)
+        //    {
+        //        FillEmptyPlaceholders(columns);
+        //        return new LGNLDuLieuSiLoResult { Columns = columns, Rows = new() };
+        //    }
+
+        //    // 3. Tính khung thời gian SCADA theo ngay/idCa gốc
+        //    DateTime timeFrom, timeTo;
+        //    if (idCa == 1)
+        //    {
+        //        timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
+        //        timeTo = ngay.Date.AddHours(19).AddMinutes(30);
+        //    }
+        //    else
+        //    {
+        //        timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
+        //        timeTo = ngay.Date.AddHours(19).AddMinutes(30);
+        //    }
+
+        //    // 4. Lấy TẤT CẢ mapping của config hiệu lực (gồm đổi NVL giữa ca)
+        //    var mappings = await (
+        //             from m in _context.LG_NL_Mapping
+
+        //                 // Silo (bắt buộc đúng lò)
+        //             join s in _context.LG_NL_SiLo
+        //                 on m.IDSiLo equals s.ID
+        //             where s.IDLoCao == idLoCao
+
+        //             // NVL (bắt buộc đúng lò)
+        //             join n in _context.LG_NL_NVL
+        //                 on m.IDNVL equals n.ID
+        //             where n.IDLoCao == idLoCao
+
+        //             // Nhóm NVL (có thể null → dùng left join)
+        //             join nh in _context.LG_NL_NhomNVL
+        //                 on n.IDNhomNVL equals nh.ID into nhg
+        //             from nh in nhg.DefaultIfEmpty()
+
+        //             where m.IDLoCao == idLoCao
+        //                && m.Ngay == configRef.Ngay
+        //                && m.IDCa == configRef.IDCa
+        //                && s.TagKey != null
+
+        //             orderby nh != null ? nh.ThuTu : 999,
+        //                     s.ThuTu,
+        //                     m.ThoiDiemBD == null ? 0 : 1,
+        //                     m.ThoiDiemBD
+
+        //             select new
+        //             {
+        //                 TagKey = s.TagKey,
+        //                 IDNVL = n.ID,
+        //                 ThoiDiemBD = m.ThoiDiemBD,
+        //                 TenNVL = n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM,
+        //                 TenNhom = nh != null ? nh.TenNhom : null,
+        //                 ThuTuNhom = nh != null ? (nh.ThuTu ?? 999) : 999,
+        //             }
+        //         ).AsNoTracking().ToListAsync();
+
+        //    if (mappings.Count == 0)
+        //    {
+        //        FillEmptyPlaceholders(columns);
+        //        return new LGNLDuLieuSiLoResult
+        //        {
+        //            Columns = columns,
+        //            Rows = new(),
+        //            NgayHieuLuc = configRef.Ngay,
+        //            IDCaHieuLuc = configRef.IDCa,
+        //        };
+        //    }
+
+        //    // 5. Xây dựng timeline theo TagKey: [(From, DataIndex)]
+        //    var tagTimeline = mappings
+        //        .GroupBy(m => new { m.TagKey, IDLoCao = idLoCao })
+        //        .ToDictionary(
+        //            g => (g.Key.TagKey, g.Key.IDLoCao),
+        //            g => g.OrderBy(m => m.ThoiDiemBD ?? DateTime.MinValue)
+        //                  .Select(m => (
+        //                      From: m.ThoiDiemBD ?? timeFrom,
+        //                      DataIndex: $"nvl_{m.IDNVL}",
+        //                      m.TenNVL,
+        //                      m.TenNhom,
+        //                      m.ThuTuNhom,
+        //                      m.IDNVL
+        //                  ))
+        //                  .ToList()
+        //        );
+
+        //    // Resolver: (tagKey, time) → DataIndex hiệu lực tại thời điểm đó
+        //    string? ResolveDataIndex(string tagKey, int loCao, DateTime time)
+        //    {
+        //        if (!tagTimeline.TryGetValue((tagKey, loCao), out var tl))
+        //            return null;
+
+        //        var seg = tl.LastOrDefault(t => t.From <= time);
+        //        return seg.DataIndex;
+        //    }
+
+        //    // 6. Query SCADA
+        //    var tagKeys = tagTimeline.Keys.Select(k => k.TagKey).Append("TS0").Distinct().ToList();
+        //    var rawData = await _context.LG1_DuLieuNL
+        //        .Where(d => d.ID_LoCao == idLoCao
+        //                 && d.Time >= timeFrom
+        //                 && d.Time < timeTo
+        //                 && tagKeys.Contains(d.TagKey!))
+        //        .OrderBy(d => d.Time)
+        //        .AsNoTracking()
+        //        .ToListAsync();
+
+        //    // 7. Fallback: NVL xuất hiện trong mapping nhưng không có trong bảng master
+        //    //    Add vào columns TRƯỚC khi fill _empty_ để tránh placeholder lẫn NVL thật
+        //    var mappingSegments = tagTimeline.Values
+        //        .SelectMany(tl => tl)
+        //        .Where(seg => !fixedNvlIds.Contains(seg.IDNVL))
+        //        .GroupBy(seg => seg.DataIndex)
+        //        .Select(g => g.First())
+        //        .ToList();
+
+        //    foreach (var seg in mappingSegments)
+        //    {
+        //        var leaf = new LGNLColumnDto
+        //        {
+        //            Title = seg.TenNVL ?? seg.DataIndex,
+        //            DataIndex = seg.DataIndex,
+        //        };
+
+        //        if (seg.TenNhom == null)
+        //        {
+        //            columns.Add(leaf);
+        //        }
+        //        else
+        //        {
+        //            var grpCol = columns.FirstOrDefault(c => c.Title == seg.TenNhom && c.Children != null);
+        //            if (grpCol != null)
+        //                grpCol.Children!.Add(leaf);
+        //            else
+        //                columns.Add(new LGNLColumnDto { Title = seg.TenNhom, Children = [leaf] });
+        //        }
+        //    }
+
+        //    // 7b. Sau khi fallback xong — chỉ lúc này mới biết nhóm nào thực sự trống
+        //    FillEmptyPlaceholders(columns);
+
+        //    // 8. Pivot: mỗi timestamp → 1 row
+        //    var rows = rawData
+        //        .GroupBy(d => d.Time)
+        //        .OrderBy(g => g.Key)
+        //        .Select((g, idx) =>
+        //        {
+        //            var row = new Dictionary<string, object?>
+        //            {
+        //                ["id"] = idx + 1,
+        //                ["time"] = g.Key?.ToString("yyyy-MM-ddTHH:mm:ss"),
+        //            };
+
+        //            foreach (var d in g)
+        //            {
+        //                if (d.TagKey == "TS0") { row["soMe"] = d.Value; continue; }
+        //                if (d.TagKey == null || d.Time == null) continue;
+
+        //                var di = ResolveDataIndex(d.TagKey, idLoCao, d.Time.Value);
+        //                if (di == null) continue;
+
+        //                row[di] = row.TryGetValue(di, out var cur)
+        //                    ? Convert.ToDecimal(cur) + Convert.ToDecimal(d.Value ?? 0f)
+        //                    : Convert.ToDecimal(d.Value ?? 0f);
+        //            }
+
+        //            return row;
+        //        })
+        //        .ToList();
+
+        //    return new LGNLDuLieuSiLoResult
+        //    {
+        //        Columns = columns,
+        //        Rows = rows,
+        //        NgayHieuLuc = configRef.Ngay,
+        //        IDCaHieuLuc = configRef.IDCa,
+        //    };
+        //}
+
+        // Helper: chỉ add placeholder "—" cho nhóm thực sự không có NVL nào sau tất cả các bước
         public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(DateTime ngay, int idCa, int idLoCao)
         {
-            // 1. Build columns — nhóm NVL làm header tầng 1, NVL thuộc nhóm làm tầng 2
-            //    KHÔNG add _empty_ ngay — chờ sau bước fallback mới quyết định
+            // 1. Lấy danh sách nhóm (LUÔN hiển thị)
             var allNhom = await _context.LG_NL_NhomNVL
                 .OrderBy(nh => nh.ThuTu)
                 .AsNoTracking()
                 .ToListAsync();
 
-            var allNvl = await _context.LG_NL_NVL
-                .Where(n => n.IDLoCao == idLoCao)
-                .OrderBy(n => n.ThuTu)
-                .AsNoTracking()
-                .ToListAsync();
+            // 2. Tìm config hiệu lực (KHÔNG phụ thuộc ca)
+            var configRef = await _context.LG_NL_Mapping
+                .Where(m => m.IDLoCao == idLoCao
+                         && m.ThoiDiemBD == null
+                         && m.Ngay <= ngay
+                         && (m.NgayHetHL == null || m.NgayHetHL >= ngay))
+                .OrderByDescending(m => m.Ngay)
+                .Select(m => new { m.Ngay })
+                .FirstOrDefaultAsync();
 
-            var fixedNvlIds = allNvl.Select(n => n.ID).ToHashSet();
+            if (configRef == null)
+            {
+                return new LGNLDuLieuSiLoResult
+                {
+                    Columns = new(),
+                    Rows = new()
+                };
+            }
 
+            // 3. Lấy mapping (CHUẨN - không theo ca)
+            var mappings = await (
+                from m in _context.LG_NL_Mapping
+
+                join s in _context.LG_NL_SiLo on m.IDSiLo equals s.ID
+                join n in _context.LG_NL_NVL on m.IDNVL equals n.ID
+                join nh in _context.LG_NL_NhomNVL on n.IDNhomNVL equals nh.ID into nhg
+                from nh in nhg.DefaultIfEmpty()
+
+                where m.IDLoCao == idLoCao
+                   && m.Ngay == configRef.Ngay
+                   && s.TagKey != null
+
+                orderby nh != null ? nh.ThuTu : 999,
+                        s.ThuTu,
+                        m.ThoiDiemBD == null ? 0 : 1,
+                        m.ThoiDiemBD
+
+                select new
+                {
+                    TagKey = s.TagKey,
+                    IDNVL = n.ID,
+                    IDNhomNVL = n.IDNhomNVL,
+                    ThoiDiemBD = m.ThoiDiemBD,
+                    TenNVL = n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM,
+                    TenNhom = nh != null ? nh.TenNhom : null,
+                    ThuTuNhom = nh != null ? (nh.ThuTu ?? 999) : 999,
+                }
+            ).AsNoTracking().ToListAsync();
+
+            if (mappings.Count == 0)
+            {
+                return new LGNLDuLieuSiLoResult
+                {
+                    Columns = new(),
+                    Rows = new(),
+                    NgayHieuLuc = configRef.Ngay
+                };
+            }
+
+            // 4. Build NVL từ mapping
+            var mappingNvl = mappings
+                .GroupBy(x => x.IDNVL)
+                .Select(g => g.First())
+                .ToList();
+
+            // 5. Build columns (NHÓM từ master, NVL từ mapping)
             var columns = new List<LGNLColumnDto>();
 
             foreach (var nhom in allNhom)
             {
-                var children = allNvl
-                    .Where(n => n.IDNhomNVL == nhom.ID)
+                var children = mappingNvl
+                    .Where(x => x.IDNhomNVL == nhom.ID)
+                    .OrderBy(x => x.IDNVL)
                     .Select(n => new LGNLColumnDto
                     {
-                        Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
-                        DataIndex = $"nvl_{n.ID}",
+                        Title = n.TenNVL ?? n.IDNVL.ToString(),
+                        DataIndex = n.IDNVL.ToString()
                     })
                     .ToList();
 
                 columns.Add(new LGNLColumnDto
                 {
                     Title = nhom.TenNhom ?? $"nhom_{nhom.ID}",
-                    Children = children,
+                    Children = children.Count > 0 ? children : null
                 });
             }
 
-            // NVL không thuộc nhóm nào (IDNhomNVL = null)
-            foreach (var n in allNvl.Where(n => n.IDNhomNVL == null))
-                columns.Add(new LGNLColumnDto
-                {
-                    Title = (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) ?? $"nvl_{n.ID}",
-                    DataIndex = $"nvl_{n.ID}",
-                });
+            // 6. Thời gian SCADA
+            var timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
+            var timeTo = ngay.Date.AddHours(19).AddMinutes(30);
 
-            // 2. Tìm (Ngay, IDCa) có config hiệu lực tại thời điểm yêu cầu
-            var configRef = await _context.LG_NL_Mapping
-                .Where(m => m.IDLoCao == idLoCao
-                         && m.ThoiDiemBD == null
-                         && (m.Ngay < ngay || (m.Ngay == ngay && m.IDCa <= idCa))
-                         && (m.NgayHetHL == null
-                             || m.NgayHetHL > ngay
-                             || (m.NgayHetHL == ngay && m.IDCaHetHL > idCa)))
-                .OrderByDescending(m => m.Ngay)
-                .ThenByDescending(m => m.IDCa)
-                .Select(m => new { m.Ngay, m.IDCa })
-                .FirstOrDefaultAsync();
-
-            if (configRef == null)
-            {
-                FillEmptyPlaceholders(columns);
-                return new LGNLDuLieuSiLoResult { Columns = columns, Rows = new() };
-            }
-
-            // 3. Tính khung thời gian SCADA theo ngay/idCa gốc
-            DateTime timeFrom, timeTo;
-            if (idCa == 1)
-            {
-                timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
-                timeTo = ngay.Date.AddHours(19).AddMinutes(30);
-            }
-            else
-            {
-                timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
-                timeTo = ngay.Date.AddHours(19).AddMinutes(30);
-            }
-
-            // 4. Lấy TẤT CẢ mapping của config hiệu lực (gồm đổi NVL giữa ca)
-            var mappings = await (
-                     from m in _context.LG_NL_Mapping
-
-                         // Silo (bắt buộc đúng lò)
-                     join s in _context.LG_NL_SiLo
-                         on m.IDSiLo equals s.ID
-                     where s.IDLoCao == idLoCao
-
-                     // NVL (bắt buộc đúng lò)
-                     join n in _context.LG_NL_NVL
-                         on m.IDNVL equals n.ID
-                     where n.IDLoCao == idLoCao
-
-                     // Nhóm NVL (có thể null → dùng left join)
-                     join nh in _context.LG_NL_NhomNVL
-                         on n.IDNhomNVL equals nh.ID into nhg
-                     from nh in nhg.DefaultIfEmpty()
-
-                     where m.IDLoCao == idLoCao
-                        && m.Ngay == configRef.Ngay
-                        && m.IDCa == configRef.IDCa
-                        && s.TagKey != null
-
-                     orderby nh != null ? nh.ThuTu : 999,
-                             s.ThuTu,
-                             m.ThoiDiemBD == null ? 0 : 1,
-                             m.ThoiDiemBD
-
-                     select new
-                     {
-                         TagKey = s.TagKey,
-                         IDNVL = n.ID,
-                         ThoiDiemBD = m.ThoiDiemBD,
-                         TenNVL = n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM,
-                         TenNhom = nh != null ? nh.TenNhom : null,
-                         ThuTuNhom = nh != null ? (nh.ThuTu ?? 999) : 999,
-                     }
-                 ).AsNoTracking().ToListAsync();
-
-            if (mappings.Count == 0)
-            {
-                FillEmptyPlaceholders(columns);
-                return new LGNLDuLieuSiLoResult
-                {
-                    Columns = columns,
-                    Rows = new(),
-                    NgayHieuLuc = configRef.Ngay,
-                    IDCaHieuLuc = configRef.IDCa,
-                };
-            }
-
-            // 5. Xây dựng timeline theo TagKey: [(From, DataIndex)]
+            // 7. Timeline mapping
             var tagTimeline = mappings
-                .GroupBy(m => new { m.TagKey, IDLoCao = idLoCao })
+                .GroupBy(m => m.TagKey)
                 .ToDictionary(
-                    g => (g.Key.TagKey, g.Key.IDLoCao),
+                    g => g.Key,
                     g => g.OrderBy(m => m.ThoiDiemBD ?? DateTime.MinValue)
                           .Select(m => (
                               From: m.ThoiDiemBD ?? timeFrom,
-                              DataIndex: $"nvl_{m.IDNVL}",
-                              m.TenNVL,
-                              m.TenNhom,
-                              m.ThuTuNhom,
+                              DataIndex: m.IDNVL.ToString(),
                               m.IDNVL
                           ))
                           .ToList()
                 );
 
-            // Resolver: (tagKey, time) → DataIndex hiệu lực tại thời điểm đó
-            string? ResolveDataIndex(string tagKey, int loCao, DateTime time)
+            string? ResolveDataIndex(string tagKey, DateTime time)
             {
-                if (!tagTimeline.TryGetValue((tagKey, loCao), out var tl))
+                if (!tagTimeline.TryGetValue(tagKey, out var tl))
                     return null;
 
                 var seg = tl.LastOrDefault(t => t.From <= time);
                 return seg.DataIndex;
             }
 
-            // 6. Query SCADA
-            var tagKeys = tagTimeline.Keys.Select(k => k.TagKey).Append("TS0").Distinct().ToList();
+            // 8. Query SCADA
+            var tagKeys = tagTimeline.Keys.Append("TS0").Distinct().ToList();
+
             var rawData = await _context.LG1_DuLieuNL
                 .Where(d => d.ID_LoCao == idLoCao
                          && d.Time >= timeFrom
@@ -559,41 +766,7 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .ToListAsync();
 
-            // 7. Fallback: NVL xuất hiện trong mapping nhưng không có trong bảng master
-            //    Add vào columns TRƯỚC khi fill _empty_ để tránh placeholder lẫn NVL thật
-            var mappingSegments = tagTimeline.Values
-                .SelectMany(tl => tl)
-                .Where(seg => !fixedNvlIds.Contains(seg.IDNVL))
-                .GroupBy(seg => seg.DataIndex)
-                .Select(g => g.First())
-                .ToList();
-
-            foreach (var seg in mappingSegments)
-            {
-                var leaf = new LGNLColumnDto
-                {
-                    Title = seg.TenNVL ?? seg.DataIndex,
-                    DataIndex = seg.DataIndex,
-                };
-
-                if (seg.TenNhom == null)
-                {
-                    columns.Add(leaf);
-                }
-                else
-                {
-                    var grpCol = columns.FirstOrDefault(c => c.Title == seg.TenNhom && c.Children != null);
-                    if (grpCol != null)
-                        grpCol.Children!.Add(leaf);
-                    else
-                        columns.Add(new LGNLColumnDto { Title = seg.TenNhom, Children = [leaf] });
-                }
-            }
-
-            // 7b. Sau khi fallback xong — chỉ lúc này mới biết nhóm nào thực sự trống
-            FillEmptyPlaceholders(columns);
-
-            // 8. Pivot: mỗi timestamp → 1 row
+            // 9. Pivot
             var rows = rawData
                 .GroupBy(d => d.Time)
                 .OrderBy(g => g.Key)
@@ -602,15 +775,20 @@ namespace dataproduct.api.Repositories
                     var row = new Dictionary<string, object?>
                     {
                         ["id"] = idx + 1,
-                        ["time"] = g.Key?.ToString("yyyy-MM-ddTHH:mm:ss"),
+                        ["time"] = g.Key?.ToString("yyyy-MM-ddTHH:mm:ss")
                     };
 
                     foreach (var d in g)
                     {
-                        if (d.TagKey == "TS0") { row["soMe"] = d.Value; continue; }
+                        if (d.TagKey == "TS0")
+                        {
+                            row["soMe"] = d.Value;
+                            continue;
+                        }
+
                         if (d.TagKey == null || d.Time == null) continue;
 
-                        var di = ResolveDataIndex(d.TagKey, idLoCao, d.Time.Value);
+                        var di = ResolveDataIndex(d.TagKey, d.Time.Value);
                         if (di == null) continue;
 
                         row[di] = row.TryGetValue(di, out var cur)
@@ -626,12 +804,9 @@ namespace dataproduct.api.Repositories
             {
                 Columns = columns,
                 Rows = rows,
-                NgayHieuLuc = configRef.Ngay,
-                IDCaHieuLuc = configRef.IDCa,
+                NgayHieuLuc = configRef.Ngay
             };
         }
-
-        // Helper: chỉ add placeholder "—" cho nhóm thực sự không có NVL nào sau tất cả các bước
         private static void FillEmptyPlaceholders(List<LGNLColumnDto> columns)
         {
             foreach (var col in columns.Where(c => c.Children != null && c.Children.Count == 0))
