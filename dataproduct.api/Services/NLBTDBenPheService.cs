@@ -185,13 +185,25 @@ namespace dataproduct.api.Services
                     <td>{item.NgaySX?.ToString("dd/MM/yyyy")}</td>
                     <td>{item.MaBSX}</td>
                     <td>{item.SoHieuBen}</td>
-                    <td>{(item.KhoiLuong.HasValue ? item.KhoiLuong.Value.ToString("N2") : "")}</td>
+                    <td>{(item.KhoiLuong.HasValue ? item.KhoiLuong.Value.ToString("N3") : "")}</td>
                     <td>{item.GhiChu}</td>
                 </tr>");
             }
 
             // Tính tổng khối lượng
             var tongKL = data.Sum(x => x.KhoiLuong ?? 0);
+
+            // thêm dòng tổng vào cuối bảng
+            rows.Append($@"
+                <tr>
+                    <td style='text-align:right;font-weight:bold'>Tổng</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td style='font-weight:bold'>{tongKL.ToString("N3")}</td>
+                    <td></td>
+                </tr>");
 
             // Load template HTML
             var templatePath = Path.Combine(
@@ -217,7 +229,7 @@ namespace dataproduct.api.Services
                 .Replace("{{Kip}}", kip)
                 .Replace("{{NgaySX}}", ngaySXText)
                 .Replace("{{Rows}}", rows.ToString())
-                .Replace("{{TongKL}}", tongKL.ToString("N2"))
+                // .Replace("{{TongKL}}", tongKL.ToString("N3"))
                 .Replace("{{ChuKyNguoiNhanHRC1}}", signHRC1)
                 .Replace("{{ChuKyNguoiNhanNL}}", signNL)
                 .Replace("{{NguoiNhanHRC1}}", nguoiNhanHRC1?.HoVaTen ?? "")
