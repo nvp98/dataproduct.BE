@@ -23,5 +23,9 @@ namespace dataproduct.api.Services.Exporters
         {
             return _service.ExportPdfAsync(phieuId);
         }
+        public Task<ExportFileResult> ExportPdfAsyncExtra(Guid phieuId, List<string>? filters)
+        {
+            return _service.ExportPdfAsync(phieuId, filters);
+        }
     }
 }

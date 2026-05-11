@@ -115,13 +115,45 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Export PDF cho BM.18-HD.25.08 Bảng theo dõi ben phế
         /// </summary>
-        public async Task<ExportFileResult> ExportPdfAsync(Guid phieuId)
+        public async Task<ExportFileResult> ExportPdfAsync(Guid phieuId, List<string>? filters = null)
         {
             var phieu = await _repoPhieu.GetByIdAsync(phieuId);
             if (phieu == null)
                 throw new Exception("Không tìm thấy phiếu");
 
             var data = (await _repo.GetByPhieuIdAsync(phieuId)).ToList();
+            if (filters != null && filters.Count > 0)
+            {
+                // Áp dụng lọc động nếu có
+                data = data.Where(d =>
+                {
+                    // Lọc theo GhiChu (nếu có filter ghiChu: format là "ghiChu:value1|value2|...")
+                    var ghiChuFilter = filters.FirstOrDefault(f => f.StartsWith("ghiChu:"));
+                    if (ghiChuFilter != null)
+                    {
+                        var selectedValues = ghiChuFilter.Substring(7).Split('|', StringSplitOptions.RemoveEmptyEntries);
+                        if (selectedValues.Length > 0 && !selectedValues.Contains(d.GhiChu ?? ""))
+                            return false;
+                    }
+
+                    // Lọc theo KhoiLuong (min/max)
+                    var minKlFilter = filters.FirstOrDefault(f => f.StartsWith("minKL:"));
+                    if (minKlFilter != null && decimal.TryParse(minKlFilter.Substring(6), out decimal minKl))
+                    {
+                        if ((d.KhoiLuong ?? 0) < minKl)
+                            return false;
+                    }
+
+                    var maxKlFilter = filters.FirstOrDefault(f => f.StartsWith("maxKL:"));
+                    if (maxKlFilter != null && decimal.TryParse(maxKlFilter.Substring(6), out decimal maxKl))
+                    {
+                        if ((d.KhoiLuong ?? 0) > maxKl)
+                            return false;
+                    }
+
+                    return true;
+                }).ToList();
+            }
             if (!data.Any())
                 throw new Exception("Không có dữ liệu bảng theo dõi ben phế để xuất PDF");
 
