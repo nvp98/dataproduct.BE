@@ -104,7 +104,7 @@ namespace dataproduct.api.Services
                     existing.GhiChu = GetString(row, "ghiChu");
                     existing.TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
                     existing.PhanLoai = GetString(row, "phanLoai");
-                    existing.PhanLoaiNhom = GetString(row, "phanLoaiNhom");
+                    existing.IsThuNghiem = TryParseBool(row, "isThuNghiem");
                     existing.MacThepBKMIS = GetString(row, "macThepBKMIS");
                     if (!string.IsNullOrWhiteSpace(bieuMau)) existing.BieuMau = bieuMau;
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
@@ -144,7 +144,7 @@ namespace dataproduct.api.Services
                         GhiChu = GetString(row, "ghiChu"),
                         TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang"),
                         PhanLoai = GetString(row, "phanLoai"),
-                        PhanLoaiNhom = GetString(row, "phanLoaiNhom"),
+                        IsThuNghiem = TryParseBool(row, "isThuNghiem"),
                         MacThepBKMIS = GetString(row, "macThepBKMIS"),
                         IdPhieu = idPhieu,
                         IsGhost = false
@@ -232,6 +232,15 @@ namespace dataproduct.api.Services
             return null;
         }
 
+        private bool? TryParseBool(JsonElement row, string key)
+        {
+            if (!row.TryGetProperty(key, out var val)) return null;
+            if (val.ValueKind == JsonValueKind.True) return true;
+            if (val.ValueKind == JsonValueKind.False) return false;
+            if (val.ValueKind == JsonValueKind.String && bool.TryParse(val.GetString(), out var b)) return b;
+            return null;
+        }
+
         private decimal? Sum(JsonElement row, params string[] keys)
         {
             decimal total = 0;
@@ -252,15 +261,13 @@ namespace dataproduct.api.Services
 
         public async Task<List<string>> GetDistinctPhanLoaiNhomAsync(string bieuMau, string? search = null, int limit = 30)
         {
-            var query = _context.BBGN_ThepLongs
-                .AsNoTracking()
-                .Where(x => x.BieuMau == bieuMau && x.IsGhost != true && x.PhanLoaiNhom != null && x.PhanLoaiNhom != "");
+            var query = _context.NhomPhanLoaiMacTheps.AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(x => x.PhanLoaiNhom!.Contains(search.Trim()));
+                query = query.Where(x => x.TenNhom.Contains(search.Trim()));
 
             return await query
-                .Select(x => x.PhanLoaiNhom!)
+                .Select(x => x.TenNhom)
                 .Distinct()
                 .OrderBy(x => x)
                 .Take(limit)
@@ -520,11 +527,19 @@ namespace dataproduct.api.Services
             if (!string.IsNullOrWhiteSpace(request.PhanLoaiNhom))
             {
                 var phanLoaiNhom = request.PhanLoaiNhom.Trim();
-                query = query.Where(x => (x.PhanLoaiNhom ?? string.Empty).Contains(phanLoaiNhom));
+                var matchingMacThepIds = _context.MacTheps
+                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue &&
+                        _context.NhomPhanLoaiMacTheps
+                            .Any(n => n.Id == m.Id_NhomPhanLoaiMacThep.Value && n.TenNhom.Contains(phanLoaiNhom)))
+                    .Select(m => m.Id);
+                query = query.Where(x => x.IdMacThep.HasValue && matchingMacThepIds.Contains(x.IdMacThep.Value));
             }
 
             if (request.IsTrungMeThoi.HasValue)
                 query = query.Where(x => x.IsTrungMeThoi == request.IsTrungMeThoi.Value);
+
+            if (request.IsThuNghiem.HasValue)
+                query = query.Where(x => x.IsThuNghiem == request.IsThuNghiem.Value);
 
             return query;
         }
@@ -534,14 +549,31 @@ namespace dataproduct.api.Services
             var ids = rows.Where(x => x.IdMacThep.HasValue).Select(x => x.IdMacThep!.Value).Distinct().ToList();
             if (ids.Count == 0) return;
 
-            var map = await _context.MacTheps
+            var macTheps = await _context.MacTheps
                 .Where(x => ids.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.TenMacThep);
+                .ToListAsync();
+
+            var nhomIds = macTheps
+                .Where(x => x.Id_NhomPhanLoaiMacThep.HasValue)
+                .Select(x => x.Id_NhomPhanLoaiMacThep!.Value)
+                .Distinct()
+                .ToList();
+
+            var nhomMap = nhomIds.Count > 0
+                ? await _context.NhomPhanLoaiMacTheps
+                    .Where(x => nhomIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id, x => x.TenNhom)
+                : new Dictionary<int, string>();
+
+            var macThepMap = macTheps.ToDictionary(x => x.Id);
 
             foreach (var row in rows.Where(x => x.IdMacThep.HasValue))
             {
-                if (map.TryGetValue(row.IdMacThep!.Value, out var ten))
-                    row.MacThep = ten;
+                if (!macThepMap.TryGetValue(row.IdMacThep!.Value, out var mt)) continue;
+                row.MacThep = mt.TenMacThep;
+                if (mt.Id_NhomPhanLoaiMacThep.HasValue &&
+                    nhomMap.TryGetValue(mt.Id_NhomPhanLoaiMacThep.Value, out var tenNhom))
+                    row.TenNhomPhanLoaiMacThep = tenNhom;
             }
         }
 

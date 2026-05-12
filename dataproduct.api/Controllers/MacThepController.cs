@@ -114,6 +114,44 @@ namespace dataproduct.api.Controllers
             var ok = await _service.DeleteAsync(id);
             return ok ? NoContent() : NotFound();
         }
+
+        [HttpPost("tao-nhom-mac-thep")]
+        public async Task<IActionResult> TaoNhomMacThep([FromBody] NhomMacThepUpsertDto dto)
+        {
+           try
+           {
+               var created = await _service.CreateNhomMacThepAsync(dto);
+               return Ok(created);
+           }
+           catch (InvalidOperationException ex)
+           {
+               return BadRequest(new { message = ex.Message });
+           }
+        }
+
+        [HttpGet("search-nhom-phan-loai-mac-thep")]
+        public async Task<IActionResult> SearchNhomPhanLoaiMacThep([FromQuery] NhomPhanLoaiMacThepSearchRequestDto dto)
+        {
+            var page     = dto.Page < 1 ? 1 : dto.Page;
+            var pageSize = dto.PageSize < 1 ? 30 : dto.PageSize > 200 ? 200 : dto.PageSize;
+
+            var rows = await _service.SearchNhomPhanLoaiMacThepAsync(dto);
+
+            var totalCount = rows.Count;
+            var data = rows
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize);
+
+            return Ok(new
+            {
+                data,
+                totalRecords = totalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+            });
+        }
+
     }
 }
 

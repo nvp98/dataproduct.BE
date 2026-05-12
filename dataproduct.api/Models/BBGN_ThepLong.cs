@@ -30,9 +30,14 @@ public partial class BBGN_ThepLong
     public bool? IsTrungMeThoi { get; set; }
     public string? MacThepBKMIS { get; set; }
     public int? IdMacThep { get; set; }
-    public string? PhanLoaiNhom {get;set;}
+    // public string? PhanLoaiNhom {get;set;}
     [JsonPropertyName("klLFSauThep")]
     public decimal? KLLFSauThep {get;set;}
+
+    public bool? IsThuNghiem {get;set;}
+
+    [NotMapped]
+    public string? TenNhomPhanLoaiMacThep { get; set; }
 }
 
 

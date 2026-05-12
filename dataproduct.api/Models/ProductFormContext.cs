@@ -72,6 +72,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep> MacTheps { get; set; }
     public virtual DbSet<MayDuc> MayDucs { get; set; }
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
+    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -621,8 +622,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsTrungMeThoi).HasColumnName("IsTrungMeThoi");
             entity.Property(e => e.MacThepBKMIS).HasColumnName("MacThepBKMIS");
             entity.Property(e => e.IdMacThep).HasColumnName("IdMacThep");
-            entity.Property(e => e.PhanLoaiNhom).HasColumnName("PhanLoaiNhom");
             entity.Property(e => e.KLLFSauThep).HasColumnName("KLLFSauThep");
+            entity.Property(e => e.IsThuNghiem).HasColumnName("IsThuNghiem");
         });
 
         modelBuilder.Entity<MacThep>(entity =>
@@ -633,6 +634,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
             entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
+            entity.Property(e => e.Id_NhomPhanLoaiMacThep).HasColumnName("Id_NhomPhanLoaiMacThep");
         });
 
         modelBuilder.Entity<MacThep_MayDuc>(entity =>
@@ -650,6 +652,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TenMayDuc).HasMaxLength(255);
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
+        });
+         modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
+        {
+            entity.ToTable("NhomPhanLoaiMacThep");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
         });
         OnModelCreatingPartial(modelBuilder);
     }

@@ -95,13 +95,19 @@ namespace dataproduct.api.Controllers
                 })
                 .ToListAsync();
 
-            var quyenTheoLo = await (
-                            from l in _context.Tbl_BM_16_LoSanXuat
-                            join tk in _context.Tbl_BM_16_LoSanXuat_TaiKhoan
-                                on l.ID equals tk.ID_LoSanXuat
-                            where tk.ID_TaiKhoan == user.ID_TaiKhoan
-                            select l
-                        ).ToListAsync();
+            // Gom theo MaBm: mỗi biểu mẫu → danh sách KhuVucPhu user được phép
+            var quyenTheoLo = (await _formContext.BmQuyenXls
+                    .AsNoTracking()
+                    .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan && x.KhuVucPhu != null)
+                    .Select(x => new { x.MaBm, x.KhuVucPhu })
+                    .ToListAsync())
+                .GroupBy(x => x.MaBm)
+                .Select(g => new
+                {
+                    maBm = g.Key,
+                    khuVucPhus = g.Select(x => x.KhuVucPhu!).Distinct().ToList()
+                })
+                .ToList();
 
             var result = new
             {

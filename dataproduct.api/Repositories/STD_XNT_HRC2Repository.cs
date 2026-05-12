@@ -788,7 +788,7 @@ namespace dataproduct.api.Repositories
                     if (bofMeIds.Any() && tyLeBOF is decimal tyLeBOFValue && tyLeBOFValue > 0)
                     {
                         var bofAmount = entity.ChenhLech * tyLeBOFValue / 100;
-                        var klPerBof = bofAmount / bofMeIds.Count;
+                        var klPerBof = Math.Round(bofAmount / bofMeIds.Count);
                         klPerBofToPersist = klPerBof;
                         foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = klPerBof;
                     }
@@ -801,7 +801,7 @@ namespace dataproduct.api.Repositories
                     if (tinhLuyenMeIds.Any() && tyLeTinhLuyen is decimal tyLeTinhLuyenValue && tyLeTinhLuyenValue > 0)
                     {
                         var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyenValue / 100;
-                        var klPerTinhLuyen = tinhLuyenAmount / tinhLuyenMeIds.Count;
+                        var klPerTinhLuyen = Math.Round(tinhLuyenAmount / tinhLuyenMeIds.Count);
                         klPerTinhLuyenToPersist = klPerTinhLuyen;
                         foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTinhLuyen;
                     }

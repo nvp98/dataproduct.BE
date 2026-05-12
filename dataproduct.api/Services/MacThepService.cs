@@ -18,6 +18,8 @@ namespace dataproduct.api.Services
         public bool? IsLock { get; set; }
         public bool? IsXacNhan { get; set; }
         public List<MacThepMayDucInfo> MayDucs { get; set; } = new();
+        public int? Id_PhanLoaiNhomMacThep {get;set;}
+        public string? TenNhom {get;set;}
     }
 
     public class MacThepSearchRequestDto
@@ -33,6 +35,13 @@ namespace dataproduct.api.Services
         public int PageSize { get; set; } = 30;
     }
 
+    public class NhomPhanLoaiMacThepSearchRequestDto
+    {
+        public string? searchText { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 30;
+    }
+
     public class MacThepUpsertDto
     {
         public string TenMacThep { get; set; } = null!;
@@ -40,6 +49,12 @@ namespace dataproduct.api.Services
         public bool? IsLock { get; set; }
         public bool? IsXacNhan { get; set; }
         public List<int> IdMayDucs { get; set; } = new();
+        public int Id_NhomPhanLoaiMacThep {get;set;}
+    }
+
+    public class NhomMacThepUpsertDto
+    {
+        public string TenNhom { get; set; } = null!;
     }
 
     public class MacThepService
@@ -112,18 +127,31 @@ namespace dataproduct.api.Services
                 query = query.Where(x => macThepNames.Contains(x.TenMacThep.ToLower()));
             }
 
-            var macTheps = await query
-                .OrderBy(x => x.NhaMay)
-                .ThenBy(x => x.TenMacThep)
-                .Select(x => new MacThepSearchDto
+            var macTheps = await (
+                from x in query
+
+                join n in _context.NhomPhanLoaiMacTheps
+                    on x.Id_NhomPhanLoaiMacThep equals n.Id into gj
+
+                from nhom in gj.DefaultIfEmpty()
+
+                orderby x.NhaMay, x.TenMacThep
+
+                select new MacThepSearchDto
                 {
-                    Id         = x.Id,
+                    Id = x.Id,
                     TenMacThep = x.TenMacThep,
-                    NhaMay     = x.NhaMay,
-                    IsLock     = x.IsLock,
-                    IsXacNhan  = x.IsXacNhan
-                })
-                .ToListAsync();
+                    NhaMay = x.NhaMay,
+                    IsLock = x.IsLock,
+                    IsXacNhan = x.IsXacNhan,
+
+                    Id_PhanLoaiNhomMacThep = x.Id_NhomPhanLoaiMacThep,
+
+                    TenNhom = nhom != null
+                        ? nhom.TenNhom
+                        : null
+                }
+            ).ToListAsync();
 
             if (macTheps.Count == 0) return macTheps;
 
@@ -164,7 +192,8 @@ namespace dataproduct.api.Services
                 TenMacThep = dto.TenMacThep,
                 NhaMay     = dto.NhaMay,
                 IsLock     = dto.IsLock,
-                IsXacNhan  = dto.IsXacNhan
+                IsXacNhan  = dto.IsXacNhan,
+                Id_NhomPhanLoaiMacThep = dto.Id_NhomPhanLoaiMacThep
             };
             await _repo.AddAsync(entity);
 
@@ -185,6 +214,7 @@ namespace dataproduct.api.Services
             existing.TenMacThep = dto.TenMacThep;
             existing.NhaMay     = dto.NhaMay;
             existing.IsLock     = dto.IsLock;
+            existing.Id_NhomPhanLoaiMacThep = dto.Id_NhomPhanLoaiMacThep;
             await _repo.UpdateAsync(existing);
             await _mappingRepo.SetMayDucsAsync(id, dto.IdMayDucs);
             return true;
@@ -230,6 +260,34 @@ namespace dataproduct.api.Services
             if (existing == null) return false;
             await _repo.DeleteAsync(id);
             return true;
+        }
+
+        public async Task<NhomPhanLoaiMacThep> CreateNhomMacThepAsync(NhomMacThepUpsertDto dto)
+        {
+            if (await _context.NhomPhanLoaiMacTheps.AnyAsync(x => x.TenNhom == dto.TenNhom))
+                throw new InvalidOperationException("Tên nhóm phân loạiloại mác thép đã tồn tại");
+
+            var entity = new NhomPhanLoaiMacThep
+            {
+                TenNhom = dto.TenNhom
+            };
+            await _context.NhomPhanLoaiMacTheps.AddAsync(entity);
+            _context.SaveChanges();
+            return entity;
+        }
+
+        public async Task<List<NhomPhanLoaiMacThep>> SearchNhomPhanLoaiMacThepAsync(NhomPhanLoaiMacThepSearchRequestDto dto)
+        {
+            var query = _context.NhomPhanLoaiMacTheps.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(dto.searchText))
+                query.Where(x => x.TenNhom.Contains(dto.searchText));
+
+            var nhomPhanLoai = await query
+                .OrderBy(x => x.TenNhom)
+                .ToListAsync();
+
+            return nhomPhanLoai;
         }
     }
 }
