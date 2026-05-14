@@ -143,6 +143,28 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("so-phieu")]
+        public async Task<IActionResult> GetSoPhieu([FromQuery] string maBm, [FromQuery] DateOnly? ngaySX, [FromQuery] int? ca)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(maBm))
+                    return BadRequest(new { message = "Thiếu tham số maBm" });
+
+                var soPhieus = await _service.GetSoPhieuAsync(maBm, ngaySX, ca);
+                return Ok(new
+                {
+                    success = true,
+                    data = soPhieus,
+                    count = soPhieus.Count()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
         {
