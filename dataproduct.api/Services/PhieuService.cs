@@ -773,6 +773,11 @@ namespace dataproduct.api.Business
             }
         }
 
+        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        {
+            return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
+        }
+
     }
 }
 
