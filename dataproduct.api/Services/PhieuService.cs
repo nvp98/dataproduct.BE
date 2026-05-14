@@ -26,6 +26,7 @@ namespace dataproduct.api.Business
         private readonly IEnumerable<IPhieuJsonInitializer> _jsonInitializers;
         private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
         private readonly IEnumerable<IPhieuExcelExporter> _excelExporters;
+        private readonly PhieuDetailExcelService _detailExcelService;
 
         public PhieuService(
             IPhieuRepository repo,
@@ -37,7 +38,8 @@ namespace dataproduct.api.Business
             DLNMHRC2Service dlnmHrc2Service,
             IEnumerable<IPhieuJsonInitializer> jsonInitializers,
             IEnumerable<IPhieuPdfExporter> pdfExporters,
-            IEnumerable<IPhieuExcelExporter> excelExporters)
+            IEnumerable<IPhieuExcelExporter> excelExporters,
+            PhieuDetailExcelService detailExcelService)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
@@ -49,9 +51,13 @@ namespace dataproduct.api.Business
             _jsonInitializers = jsonInitializers;
             _pdfExporters = pdfExporters;
             _excelExporters = excelExporters;
+            _detailExcelService = detailExcelService;
         }
 
-        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId)
+        /// <summary>
+        /// Export PDF động - nếu có filters sẽ áp dụng, nếu không sẽ export toàn bộ
+        /// </summary>
+        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId, List<string>? filters = null)
         {
             var phieu = await _repo.GetByIdAsync(phieuId);
             if (phieu == null)
@@ -60,6 +66,12 @@ namespace dataproduct.api.Business
             var exporter = _pdfExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
             if (exporter == null)
                 throw new NotSupportedException($"Chưa cấu hình export PDF cho biểu mẫu: {phieu.MaBm}");
+
+            // Nếu có filters, dùng ExportPdfAsyncExtra; ngược lại dùng ExportPdfAsync
+            if (filters != null && filters.Count > 0)
+            {
+                return await exporter.ExportPdfAsyncExtra(phieuId, filters);
+            }
 
             return await exporter.ExportPdfAsync(phieuId);
         }
@@ -74,6 +86,36 @@ namespace dataproduct.api.Business
                 throw new NotSupportedException($"Chưa cấu hình export Excel tổng hợp cho biểu mẫu: {maBm}");
 
             return await exporter.ExportTongHopExcelAsync(fromDate, toDate);
+        }
+
+        public async Task<DTOs.Export.ExportFileResult> ExportDetailExcelDynamicAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            // Thử exporter riêng theo maBm trước
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter != null)
+            {
+                try
+                {
+                    return await exporter.ExportDetailExcelAsync(phieuId);
+                }
+                catch (NotSupportedException)
+                {
+                    // Chưa implement → fallback về generic
+                }
+            }
+
+            // Fallback: render generic từ DataJson
+            var content = await _detailExcelService.ExportAsync(phieuId);
+            return new DTOs.Export.ExportFileResult
+            {
+                Content = content,
+                FileName = $"{phieu.MaBm}_{phieu.SoPhieu}_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
         }
 
         public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
@@ -211,6 +253,9 @@ namespace dataproduct.api.Business
                 await _context.SaveChangesAsync();
                 await tran.CommitAsync();
 
+                // Đồng bộ kíp nếu Ca hoặc NgaySX thay đổi
+                await ResolveAndSaveKipAsync(phieu);
+
                 return phieu;
             }
             catch (Exception)
@@ -229,6 +274,7 @@ namespace dataproduct.api.Business
             // 1. Lấy phiếu hiện tại
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return null;
+            EnsurePhieuOperable(existing);
             // Cho phép update khi ĐangLuu (0), Đã thu hồi (3) hoặc Hiệu chỉnh (7 = phiếu clone đang chỉnh sửa). Lưu ở trạng thái 7 không đổi TinhTrang.
             if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return null;
 
@@ -396,22 +442,26 @@ namespace dataproduct.api.Business
                 // chỉ cho clone khi đang Hoàn thành (2) hoặc Đang phê duyệt (6)
                 var phieuGoc = await _repo.GetByIdAsync(id);
                 if (phieuGoc == null) return null;
-                if (phieuGoc.IsLock == 1)
-                    throw new InvalidOperationException("Đã tồn tại phiếu hiệu chỉnh cho phiếu này. Vui lòng từ chối hoặc hoàn tất phiếu hiệu chỉnh hiện tại trước khi tạo mới.");
+                EnsurePhieuOperable(phieuGoc);
                 PhieuStatusHelper.CheckAllowStatusChange(phieuGoc.TinhTrang ?? 0, 7);
 
                 // 2. Phiếu cha chỉ IsLock = 1 để ẩn khỏi trang, không đổi TinhTrang
                 phieuGoc.IsLock = 1;
                 await _repo.UpdateAsync(phieuGoc);
 
+                await _context.SaveChangesAsync();
+
                 // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
-                var phieu = await _repo.AddAsync(formData);
+                var phieu = await CreateAsync(formData);
                 if (phieu == null) return null;
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
                 var nextVersion = (phieuGoc.VersionClone ?? 0) + 1;
                 var suffix = $"_HC_{nextVersion}";
-                var soPhieuBase = (phieuGoc.SoPhieu ?? "").Trim();
+                // Strip đuôi _HC_{n} cũ (nếu có) để không bị cộng dồn _HC_1_HC_2...
+                var soPhieuBase = System.Text.RegularExpressions.Regex.Replace(
+                    (phieuGoc.SoPhieu ?? "").Trim(),
+                    @"_HC_\d+$", "");
                 if (soPhieuBase.Length + suffix.Length > 50)
                     soPhieuBase = soPhieuBase.Substring(0, 50 - suffix.Length);
                 phieu.SoPhieu = soPhieuBase + suffix;
@@ -419,6 +469,7 @@ namespace dataproduct.api.Business
                 // 5. Clone mang trạng thái Hiệu chỉnh (7), hiện nút Lưu / Lưu và Gửi như Đang lưu
                 phieu.IsClone = true;
                 phieu.VersionClone = nextVersion;
+                phieu.Kip = phieuGoc.Kip;
                 // ID_PhieuGoc luôn trỏ về phiếu cha (phiếu bị bấm clone), hỗ trợ clone nhiều tầng: A -> A1 -> A2...
                 phieu.ID_PhieuGoc = phieuGoc.Idphieu;
                 phieu.TinhTrang = 7;
@@ -436,13 +487,21 @@ namespace dataproduct.api.Business
             }
         }
 
-        public async Task<bool> ChangeStatusAsync(Guid id, int status)
+        public async Task<bool> ChangeStatusAsync(Guid id, int status, int? idUser)
         {
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return false;
+            EnsurePhieuOperable(existing);
             await CheckAllowPheDuyetAsync(existing.TinhTrang ?? 0, status);
             if (status == 1)
             {
+                // Khi "Đã gửi" thì cập nhật NguoiTaoId = người thực hiện gửi.
+                // idUser được FE gửi lên; nếu null/0 thì không ghi đè để tránh phá dữ liệu hiện hữu.
+                if (idUser.HasValue && idUser.Value > 0)
+                {
+                    existing.NguoiTaoId = idUser.Value;
+                }
+
                 var allPheDuyet = await _pheDuyetRepo.GetByIdPhieuAsync(id);
                 if (allPheDuyet == null)
                     return false;
@@ -466,6 +525,50 @@ namespace dataproduct.api.Business
             await _repo.UpdateAsync(existing);
 
             return true;
+        }
+
+        public async Task ChotNhieuPhieuAsync(List<Guid> idPhieus, int? idUser, int status)
+        {
+            if (idPhieus == null || idPhieus.Count == 0)
+                throw new InvalidOperationException("Danh sách phiếu không được để trống.");
+
+            if (status != 5 && status != 2)
+                throw new InvalidOperationException("Status không hợp lệ. Chỉ chấp nhận 5 (chốt) hoặc 2 (hủy chốt).");
+
+            var phieus = new List<BmPhieu>();
+            foreach (var id in idPhieus)
+            {
+                var phieu = await _repo.GetByIdAsync(id);
+                if (phieu == null)
+                    throw new InvalidOperationException($"Không tìm thấy phiếu {id}.");
+                EnsurePhieuOperable(phieu);
+                phieus.Add(phieu);
+            }
+
+            if (status == 5)
+            {
+                var notReady = phieus.Where(p => p.TinhTrang != 2).ToList();
+                if (notReady.Any())
+                {
+                    var soPhieus = string.Join(", ", notReady.Select(p => p.SoPhieu));
+                    throw new InvalidOperationException($"Các phiếu sau chưa ở trạng thái Hoàn thành, không thể chốt: {soPhieus}");
+                }
+            }
+            else // status == 2
+            {
+                var notChot = phieus.Where(p => p.TinhTrang != 5).ToList();
+                if (notChot.Any())
+                {
+                    var soPhieus = string.Join(", ", notChot.Select(p => p.SoPhieu));
+                    throw new InvalidOperationException($"Các phiếu sau chưa ở trạng thái chốt, không thể hủy chốt: {soPhieus}");
+                }
+            }
+
+            foreach (var phieu in phieus)
+            {
+                phieu.TinhTrang = status;
+                await _repo.UpdateAsync(phieu);
+            }
         }
 
         public async Task<bool> UpdateStatusExtendedAsync(Guid id, int? status, int? isLock, int? isDelete)
@@ -493,13 +596,73 @@ namespace dataproduct.api.Business
         public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingAsync(SearchPhieuRequest request)
         {
             var (data, totalCount) = await _repo.SearchWithPagingAsync(request);
+            var dataList = data.ToList();
+
+            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            {
+                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+            }
+
             return new PagedResult<SearchPhieuResponseModel>
             {
-                Data = data.ToList(),
+                Data = dataList,
                 TotalRecords = totalCount,
                 Page = request.page,
                 PageSize = request.pageSize
             };
+        }
+
+        public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request)
+        {
+            var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
+            var dataList = data.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).ThenBy(x => x.Scope).ToList();
+
+            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            {
+                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+            }
+
+            return new PagedResult<SearchPhieuResponseModel>
+            {
+                Data = dataList,
+                TotalRecords = totalCount,
+                Page = request.page,
+                PageSize = request.pageSize
+            };
+        }
+
+        public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
+        {
+            // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
+            var idPhieus = await _context.BmPhieus
+                .Where(p => p.MaBm == "HRC2_STD_NXT"
+                         && p.NgaySX == workDate
+                         && p.Ca == shift
+                         && p.IsDelete != 1)
+                .Select(p => p.Idphieu)
+                .ToListAsync();
+
+            bool phanBoComplete = idPhieus.Any()
+                && !await _context.STD_NXT_TOTAL_HRC2s
+                    .Where(r => idPhieus.Contains(r.Id_Phieu) && r.HasPhanBo == null)
+                    .AnyAsync();
+
+            // Bước 2: kiểm tra trạng thái BOF/LF/RH — relatedComplete = tất cả phiếu có TinhTrang IN (2, 5)
+            var nauLuyenMaBms = new[] { "HRC2_BB_NauLuyen_BOF", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_RH" };
+            var relatedStatuses = await _context.BmPhieus
+                .Where(p => nauLuyenMaBms.Contains(p.MaBm)
+                         && p.NgaySX == workDate
+                         && p.Ca == shift
+                         && p.IsDelete != 1
+                         && p.IsLock != 1)
+                .Select(p => p.TinhTrang)
+                .ToListAsync();
+
+            bool relatedComplete = relatedStatuses.Any()
+                && relatedStatuses.All(t => t == 2 || t == 5);
+
+            // Bước 3: kết hợp — cả 2 điều kiện phải true mới là "Đã hoàn thành"
+            return (phanBoComplete && relatedComplete) ? 2 : 1;
         }
 
 
@@ -602,6 +765,17 @@ namespace dataproduct.api.Business
         public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
         {
             return await _repo.GetAllLoCaoAsync();
+        private static void EnsurePhieuOperable(BmPhieu phieu)
+        {
+            if (phieu.IsDelete == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị xóa hoặc từ chối. Vui lòng quay về danh sách để tải lại dữ liệu mới nhất.");
+            }
+
+            if (phieu.IsLock == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị khóa do đang có bản hiệu chỉnh. Vui lòng quay về danh sách để mở phiếu hợp lệ.");
+            }
         }
 
     }

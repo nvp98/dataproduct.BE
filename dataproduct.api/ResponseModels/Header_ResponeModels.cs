@@ -43,6 +43,14 @@ namespace dataproduct.api.ResponseModels
         public bool? IsUsedThongKe { get; set; }
         public int? ThuTu { get; set; }
         public decimal? TyTrong { get; set; }
+        // ThongKe ordering
+        public int? ThuTu_TK_BOF { get; set; }
+        public int? ThuTu_TK_LFRH { get; set; }
+        // Excel export
+        public bool? IsUsed_Excel { get; set; }
+        public byte? LoaiExcel { get; set; }
+        public int? ThuTu_Excel_BOF { get; set; }
+        public int? ThuTu_Excel_LFRH { get; set; }
         public List<HeaderMapping_ResponseModel> HeaderMappings { get; set; } = new List<HeaderMapping_ResponseModel>();
     }
     public class HeaderMapping_ResponseModel
@@ -72,5 +80,13 @@ namespace dataproduct.api.ResponseModels
         public string? TenPhuLieu { get; set; } // tên phụ liệu NM (từ bảng PhuLieu_NM)
         public bool? IsUsedThongKe { get; set; }
         public byte? LoaiThongKe { get; set; }
+        // ThongKe ordering
+        public int? ThuTu_TK_BOF { get; set; }
+        public int? ThuTu_TK_LFRH { get; set; }
+        // Excel export
+        public bool? IsUsed_Excel { get; set; }
+        public byte? LoaiExcel { get; set; }
+        public int? ThuTu_Excel_BOF { get; set; }
+        public int? ThuTu_Excel_LFRH { get; set; }
     }
 }

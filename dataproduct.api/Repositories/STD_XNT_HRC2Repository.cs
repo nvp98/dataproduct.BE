@@ -65,8 +65,6 @@ namespace dataproduct.api.Repositories
                            existingDetail.TongThucTe = detailDto.TongThucTe;
                            existingDetail.IDSilo = detailDto.IDSilo;
                            existingDetail.LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe;
-                           existingDetail.TyLeBOF = detailDto.TyLeBOF;
-                           existingDetail.TyLeTinhLuyen = detailDto.TyLeTinhLuyen;
 
                            _context.STD_XUAT_NHAP_TON_HRC2s.Update(existingDetail);
                        }
@@ -94,8 +92,6 @@ namespace dataproduct.api.Repositories
                                TongThucTe = detailDto.TongThucTe,
                                IDSilo = detailDto.IDSilo,
                                LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe,
-                               TyLeBOF = detailDto.TyLeBOF,
-                               TyLeTinhLuyen = detailDto.TyLeTinhLuyen
                            };
                            
                            await _context.STD_XUAT_NHAP_TON_HRC2s.AddAsync(newDetail);
@@ -144,6 +140,8 @@ namespace dataproduct.api.Repositories
                            existingSum.TongSuDung = summaryDto.TongSuDung;
                            existingSum.TongSDTrenSoSach = summaryDto.TongSDTrenSoSach;
                            existingSum.ChenhLech = summaryDto.ChenhLech;
+                           if (summaryDto.TyLeBOF != null) existingSum.TyLeBOF = summaryDto.TyLeBOF;
+                           if (summaryDto.TyLeTinhLuyen != null) existingSum.TyLeTinhLuyen = summaryDto.TyLeTinhLuyen;
                            _context.STD_NXT_TOTAL_HRC2s.Update(existingSum);
                        }
                        else
@@ -161,7 +159,9 @@ namespace dataproduct.api.Repositories
                                TongTonCuoiCa = summaryDto.TongTonCuoiCa,
                                TongSuDung = summaryDto.TongSuDung,
                                TongSDTrenSoSach = summaryDto.TongSDTrenSoSach,
-                               ChenhLech = summaryDto.ChenhLech
+                               ChenhLech = summaryDto.ChenhLech,
+                               TyLeBOF = summaryDto.TyLeBOF,
+                               TyLeTinhLuyen = summaryDto.TyLeTinhLuyen
                            };
                            
                            await _context.STD_NXT_TOTAL_HRC2s.AddAsync(newSummary);
@@ -265,7 +265,8 @@ namespace dataproduct.api.Repositories
             var ngaySxOnly = DateOnly.FromDateTime(ngaySx);
 
             List<int> allHeaderKeyIds = new();
-            Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo, decimal? TyLeBOF, decimal? TyLeTinhLuyen)>> sourceByScope = new();
+            Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
+            Dictionary<int, (decimal? TyLeBOF, decimal? TyLeTinhLuyen)> prevTotalTyLeLookup = new();
 
             // -------------------------------------------------------
             // Lấy danh sách nguồn
@@ -292,7 +293,7 @@ namespace dataproduct.api.Repositories
                     throw new Exception("Không có Header Key mặc định nào (IsUsedNXT = true)");
 
                 var defaultItems = defaults
-                    .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null, (decimal?)null, (decimal?)null))
+                    .Select(x => (x.Id, x.TenHienThi, x.TyTrong, (int?)null))
                     .ToList();
 
                 foreach (var tohop in Enum.GetValues<ToHopSTDNXT>())
@@ -314,10 +315,15 @@ namespace dataproduct.api.Repositories
                         x.TyTrong,
                         x.Scope,
                         x.IDSilo,
-                        x.TyLeBOF,
-                        x.TyLeTinhLuyen
                     })
                     .ToListAsync();
+
+                var prevTotalRecords = await _context.STD_NXT_TOTAL_HRC2s
+                    .Where(x => x.Id_Phieu == prevPhieu)
+                    .Select(x => new { x.Id_HeaderKey, x.TyLeBOF, x.TyLeTinhLuyen })
+                    .ToListAsync();
+                prevTotalTyLeLookup = prevTotalRecords
+                    .ToDictionary(x => x.Id_HeaderKey, x => (x.TyLeBOF, x.TyLeTinhLuyen));
 
                 if (!prevRecords.Any())
                     throw new Exception($"Phiếu ca trước không có dữ liệu phụ liệu (IdPhieu: {prevPhieu})");
@@ -330,7 +336,7 @@ namespace dataproduct.api.Repositories
                         g => g
                             .GroupBy(x => x.Id_HeaderKey)
                             .Select(hg => hg.First())
-                            .Select(x => (x.Id_HeaderKey, x.TenNguyenLieu, x.TyTrong, x.IDSilo, x.TyLeBOF, x.TyLeTinhLuyen))
+                            .Select(x => (x.Id_HeaderKey, x.TenNguyenLieu, x.TyTrong, x.IDSilo))
                             .ToList()
                     );
 
@@ -384,8 +390,6 @@ namespace dataproduct.api.Repositories
                         TenNguyenLieu = item.TenNguyenLieu,
                         TyTrong = item.TyTrong,
                         IDSilo = item.IDSilo,
-                        TyLeBOF = item.TyLeBOF,
-                        TyLeTinhLuyen = item.TyLeTinhLuyen,
                         ViTri = 1
                     });
                 }
@@ -419,13 +423,16 @@ namespace dataproduct.api.Repositories
 
             foreach (var item in allSourceItems.Where(x => newTotalKeys.Contains(x.Id_HeaderKey)))
             {
+                var prevTyLe = prevTotalTyLeLookup.TryGetValue(item.Id_HeaderKey, out var tl) ? tl : default;
                 await _context.STD_NXT_TOTAL_HRC2s.AddAsync(new STD_NXT_TOTAL_HRC2
                 {
                     Id_Phieu = phieu.Idphieu,
                     NgaySX = ngaySx,
                     Ca = ca,
                     Id_HeaderKey = item.Id_HeaderKey,
-                    TenNguyenLieu = item.TenNguyenLieu
+                    TenNguyenLieu = item.TenNguyenLieu,
+                    TyLeBOF = prevTyLe.TyLeBOF,
+                    TyLeTinhLuyen = prevTyLe.TyLeTinhLuyen
                 });
             }
 
@@ -522,8 +529,6 @@ namespace dataproduct.api.Repositories
                     TuongQuanCuoiCa = x.TuongQuanCuoiCa,
                     TongThucTe = x.TongThucTe,
                     LuongSuDungKiemKe = x.LuongSuDungKiemKe,
-                    TyLeBOF = x.TyLeBOF,
-                    TyLeTinhLuyen = x.TyLeTinhLuyen
                 }).ToList(),
                 Summary = summary.Select(x => new NXTSummaryResponseModel
                 {
@@ -535,27 +540,135 @@ namespace dataproduct.api.Repositories
                     TongSuDung = x.TongSuDung,
                     TongSDTrenSoSach = x.TongSDTrenSoSach,
                     ChenhLech = x.ChenhLech,
-                    HasPhanBo = x.HasPhanBo
+                    HasPhanBo = x.HasPhanBo,
+                    TyLeBOF = x.TyLeBOF,
+                    TyLeTinhLuyen = x.TyLeTinhLuyen,
+                    KLPB_BOF = x.KLPB_BOF,
+                    KLPB_TL = x.KLPB_TL
                 }).ToList()
             };
+        }
+
+        private static string? NormalizeNauLuyenMaBm(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+            var value = input.Trim();
+
+            if (value.Equals("BOF", StringComparison.OrdinalIgnoreCase)) return "HRC2_BB_NauLuyen_BOF";
+            if (value.Equals("LF", StringComparison.OrdinalIgnoreCase)) return "HRC2_BB_NauLuyen_LF";
+            if (value.Equals("RH", StringComparison.OrdinalIgnoreCase)) return "HRC2_BB_NauLuyen_RH";
+
+            return value;
+        }
+
+        public async Task<STD_NXT_RelatedPhieuStatusResponse> GetRelatedPhieuStatusesAsync(STD_NXT_RelatedPhieuStatusRequest request)
+        {
+            var targets = request.Targets ?? new List<STD_NXT_RelatedPhieuTarget>();
+            var response = new STD_NXT_RelatedPhieuStatusResponse();
+
+            if (!targets.Any())
+            {
+                response.CanPhanBo = true;
+                response.IncompleteCount = 0;
+                return response;
+            }
+
+            var normalizedTargets = targets
+                .Select(t => new
+                {
+                    Target = t,
+                    MaBm = NormalizeNauLuyenMaBm(t.BieuMau),
+                    Scope = t.Scope
+                })
+                .ToList();
+
+            var maBms = normalizedTargets
+                .Select(x => x.MaBm)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+
+            var scopes = normalizedTargets
+                .Where(x => x.Scope.HasValue)
+                .Select(x => x.Scope!.Value)
+                .Distinct()
+                .ToList();
+
+            var ngaySX = DateOnly.FromDateTime(request.NgaySX);
+            var candidates = await _context.BmPhieus
+                .Where(p =>
+                    p.IsDelete != 1 &&
+                    p.IsLock != 1 &&
+                    p.NgaySX == ngaySX &&
+                    p.Ca == request.Ca &&
+                    maBms.Contains(p.MaBm) &&
+                    (!p.Scope.HasValue || scopes.Contains(p.Scope.Value)))
+                .OrderByDescending(p => p.NgayTao)
+                .ThenByDescending(p => p.Idphieu)
+                .ToListAsync();
+
+            foreach (var item in normalizedTargets)
+            {
+                var matched = candidates.FirstOrDefault(p =>
+                    p.MaBm == item.MaBm &&
+                    p.Scope == item.Scope);
+
+                response.Items.Add(new STD_NXT_RelatedPhieuStatusItem
+                {
+                    TabKey = item.Target.TabKey,
+                    Label = item.Target.Label,
+                    BieuMau = item.Target.BieuMau,
+                    Scope = item.Target.Scope,
+                    IdPhieu = matched?.Idphieu,
+                    TinhTrang = matched?.TinhTrang
+                });
+            }
+
+            response.IncompleteCount = response.Items.Count(x => x.TinhTrang.HasValue && x.TinhTrang.Value != 2);
+            response.CanPhanBo = response.IncompleteCount == 0;
+            return response;
+        }
+
+        private async Task CheckPhieuChotAsync(DateTime ngaySX, int ca)
+        {
+            var nauLuyenMaBms = new[] { "HRC2_BB_NauLuyen_BOF", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_RH" };
+            var ngaySXDate = DateOnly.FromDateTime(ngaySX);
+
+            var hasChotPhieu = await _context.BmPhieus
+                .AnyAsync(p =>
+                    nauLuyenMaBms.Contains(p.MaBm) &&
+                    p.NgaySX == ngaySXDate &&
+                    p.Ca == ca &&
+                    p.IsDelete != 1 &&
+                    p.TinhTrang == 5);
+
+            if (hasChotPhieu)
+            {
+                throw new Exception("Đã có phiếu trong ca này được chốt. Không thể thực hiện thao tác này.");
+            }
         }
 
         public async Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity)
         {
             try
             {
-                // ========== BƯỚC 0: Lưu tỷ lệ phân bổ vào DB nếu được truyền vào ==========
-                if (entity.TyLeBOF != null || entity.TyLeTinhLuyen != null)
-                {
-                    var tyLeRows = await _context.STD_XUAT_NHAP_TON_HRC2s
-                        .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
-                        .ToListAsync();
+                await CheckPhieuChotAsync(entity.NgaySX, entity.Ca);
 
-                    foreach (var row in tyLeRows)
-                    {
-                        if (entity.TyLeBOF != null) row.TyLeBOF = entity.TyLeBOF;
-                        if (entity.TyLeTinhLuyen != null) row.TyLeTinhLuyen = entity.TyLeTinhLuyen;
-                    }
+                // ========== BƯỚC 0.5: Kiểm tra phiếu NauLuyen còn đang lưu ==========
+                var maBmNauLuyen = new[] { "HRC2_BB_NauLuyen_RH", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_BOF" };
+                var ngaySXDate = DateOnly.FromDateTime(entity.NgaySX);
+                var hasPhieuDangLuu = await _context.BmPhieus
+                    .AnyAsync(p =>
+                        maBmNauLuyen.Contains(p.MaBm) &&
+                        p.NgaySX == ngaySXDate &&
+                        p.Ca == entity.Ca &&
+                        p.IsLock != 1 &&
+                        p.IsDelete != 1 &&
+                        p.TinhTrang != 2);
+
+                if (hasPhieuDangLuu)
+                {
+                    throw new Exception("Có phiếu Chưa hoàn thành hoặc đã chốt. Vui lòng kiểm tra lại trước khi phân bổ.");
                 }
 
                 // ========== BƯỚC 1: Kiểm tra dữ liệu đã được lưu chưa ==========
@@ -581,7 +694,7 @@ namespace dataproduct.api.Repositories
 
                 // ========== BƯỚC 2: Lấy tất cả mẻ trong DLNM_HRC2 theo ngày/ca ==========
                 var dlnmInCa = await _context.DLNM_HRC2s
-                    .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca)
+                    .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca && x.IsDelete != true)
                     .ToListAsync();
 
                 if (!dlnmInCa.Any())
@@ -621,15 +734,40 @@ namespace dataproduct.api.Repositories
                 var meThoiIds = meThoiIdsWithPhuLieu;
                 var dlnmLookupAll = dlnmInCa.ToDictionary(x => x.ID);
 
+                // ========== BƯỚC 0 (sau validation): Lưu tỷ lệ phân bổ vào DB nếu được truyền vào ==========
+                if (entity.TyLeBOF != null || entity.TyLeTinhLuyen != null)
+                {
+                    var tyLeRow = await _context.STD_NXT_TOTAL_HRC2s
+                        .FirstOrDefaultAsync(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey);
+
+                    if (tyLeRow != null)
+                    {
+                        if (entity.TyLeBOF != null) tyLeRow.TyLeBOF = entity.TyLeBOF;
+                        if (entity.TyLeTinhLuyen != null) tyLeRow.TyLeTinhLuyen = entity.TyLeTinhLuyen;
+                    }
+                }
+
                 // ========== BƯỚC 5: Tính khối lượng phân bổ theo tỷ lệ BOF / Tinh luyện ==========
-                var tyLeRecord = await _context.STD_XUAT_NHAP_TON_HRC2s
-                    .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
-                    .Select(x => new { x.TyLeBOF, x.TyLeTinhLuyen })
-                    .FirstOrDefaultAsync();
+                // Dùng trực tiếp tỷ lệ người dùng gửi (entity.TyLeBOF/tyLeTinhLuyen) để tính phân bổ.
+                // Chỉ truy vấn DB để bù khi thiếu một (null) để tránh lấy lại giá trị cũ chưa SaveChanges.
+                decimal? tyLeBOF = entity.TyLeBOF;
+                decimal? tyLeTinhLuyen = entity.TyLeTinhLuyen;
+                if (tyLeBOF == null || tyLeTinhLuyen == null)
+                {
+                    var tyLeRecord = await _context.STD_NXT_TOTAL_HRC2s
+                        .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
+                        .Select(x => new { x.TyLeBOF, x.TyLeTinhLuyen })
+                        .FirstOrDefaultAsync();
+
+                    if (tyLeBOF == null) tyLeBOF = tyLeRecord?.TyLeBOF;
+                    if (tyLeTinhLuyen == null) tyLeTinhLuyen = tyLeRecord?.TyLeTinhLuyen;
+                }
 
                 Dictionary<long, decimal> klPhanBoByMeThoi;
+                decimal? klPerBofToPersist = null;
+                decimal? klPerTinhLuyenToPersist = null;
 
-                if (tyLeRecord?.TyLeBOF != null || tyLeRecord?.TyLeTinhLuyen != null)
+                if (tyLeBOF != null || tyLeTinhLuyen != null)
                 {
                     // Phân nhóm mẻ theo BieuMau: BOF vs Tinh luyện (LF, RH,...)
                     var bofMeIds = meThoiIds
@@ -639,34 +777,46 @@ namespace dataproduct.api.Repositories
                         .ToList();
                     var tinhLuyenMeIds = meThoiIds.Except(bofMeIds).ToList();
 
+                    // Kiểm tra: không được phân bổ tỷ lệ > 0 cho nhóm không có mẻ
+                    if (bofMeIds.Count == 0 && tyLeBOF is decimal tBof && tBof != 0)
+                        throw new Exception($"Không có mẻ BOF trong ca này nhưng tỷ lệ BOF đang là {tBof}%. Vui lòng điều chỉnh lại tỷ lệ.");
+                    if (tinhLuyenMeIds.Count == 0 && tyLeTinhLuyen is decimal tTL && tTL != 0)
+                        throw new Exception($"Không có mẻ tinh luyện trong ca này nhưng tỷ lệ tinh luyện đang là {tTL}%. Vui lòng điều chỉnh lại tỷ lệ.");
+
                     klPhanBoByMeThoi = new Dictionary<long, decimal>();
 
-                    if (bofMeIds.Any() && tyLeRecord?.TyLeBOF is decimal tyLeBOF && tyLeBOF > 0)
+                    if (bofMeIds.Any() && tyLeBOF is decimal tyLeBOFValue && tyLeBOFValue > 0)
                     {
-                        var bofAmount = entity.ChenhLech * tyLeBOF / 100;
+                        var bofAmount = entity.ChenhLech * tyLeBOFValue / 100;
                         var klPerBof = bofAmount / bofMeIds.Count;
+                        klPerBofToPersist = klPerBof;
                         foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = klPerBof;
                     }
                     else
                     {
                         foreach (var id in bofMeIds) klPhanBoByMeThoi[id] = 0;
+                        if (bofMeIds.Any()) klPerBofToPersist = 0;
                     }
 
-                    if (tinhLuyenMeIds.Any() && tyLeRecord?.TyLeTinhLuyen is decimal tyLeTinhLuyen && tyLeTinhLuyen > 0)
+                    if (tinhLuyenMeIds.Any() && tyLeTinhLuyen is decimal tyLeTinhLuyenValue && tyLeTinhLuyenValue > 0)
                     {
-                        var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyen / 100;
+                        var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyenValue / 100;
                         var klPerTinhLuyen = tinhLuyenAmount / tinhLuyenMeIds.Count;
+                        klPerTinhLuyenToPersist = klPerTinhLuyen;
                         foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTinhLuyen;
                     }
                     else
                     {
                         foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = 0;
+                        if (tinhLuyenMeIds.Any()) klPerTinhLuyenToPersist = 0;
                     }
                 }
                 else
                 {
                     // Fallback: chia đều cho tất cả mẻ (hành vi cũ)
                     var klEqual = entity.ChenhLech / meThoiIds.Count;
+                    klPerBofToPersist = null;
+                    klPerTinhLuyenToPersist = null;
                     klPhanBoByMeThoi = meThoiIds.ToDictionary(id => id, _ => klEqual);
                 }
 
@@ -685,7 +835,8 @@ namespace dataproduct.api.Repositories
                     where pl.ID_HeaderKey == entity.Id_HeaderKey &&
                           pl.IsPhanBo == true &&
                           dlnm.Ngay == entity.NgaySX &&
-                          dlnm.Ca == entity.Ca
+                          dlnm.Ca == entity.Ca &&
+                          dlnm.IsDelete != true
                     select new { PhuLieu = pl, MeThoiId = dlnm.ID }
                 ).ToListAsync();
 
@@ -744,6 +895,8 @@ namespace dataproduct.api.Repositories
                 }
 
                 details.HasPhanBo = true;
+                details.KLPB_BOF = klPerBofToPersist;
+                details.KLPB_TL = klPerTinhLuyenToPersist;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -757,6 +910,8 @@ namespace dataproduct.api.Repositories
         {
             try
             {
+                await CheckPhieuChotAsync(entity.NgaySX, entity.Ca);
+
                 // B1: Kiểm tra row tổng hợp tồn tại (đúng phiếu đang thao tác)
                 var summary = await _context.STD_NXT_TOTAL_HRC2s
                     .FirstOrDefaultAsync(x =>
@@ -782,7 +937,8 @@ namespace dataproduct.api.Repositories
                     where pl.ID_HeaderKey == entity.Id_HeaderKey &&
                           pl.IsPhanBo == true &&
                           dlnm.Ngay == entity.NgaySX &&
-                          dlnm.Ca == entity.Ca
+                          dlnm.Ca == entity.Ca &&
+                          dlnm.IsDelete != true
                     select pl
                 ).ToListAsync();
 
@@ -792,8 +948,41 @@ namespace dataproduct.api.Repositories
                 }
 
                 // B3: Reset cờ HasPhanBo
-                summary.HasPhanBo = false;
+                summary.HasPhanBo = null;
+                summary.TyLeBOF = null;
+                summary.TyLeTinhLuyen = null;
+                summary.KLPB_BOF = null;
+                summary.KLPB_TL = null;
 
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<bool> KhongPhanBoAsync(STD_NXT_HRC2_KhongPhanBoDto entity)
+        {
+            try
+            {
+                await CheckPhieuChotAsync(entity.NgaySX, entity.Ca);
+
+                var summary = await _context.STD_NXT_TOTAL_HRC2s
+                    .FirstOrDefaultAsync(x =>
+                        x.Id_HeaderKey == entity.Id_HeaderKey &&
+                        x.Id_Phieu == entity.IdPhieu);
+
+                if (summary == null)
+                {
+                    throw new Exception("Không tìm thấy dữ liệu tổng hợp. Vui lòng lưu trước.");
+                }
+                if(summary.HasPhanBo == false){
+                    summary.HasPhanBo = null;
+                } else{
+                    summary.HasPhanBo = false;
+                }
                 await _context.SaveChangesAsync();
                 return true;
             }

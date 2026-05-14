@@ -202,7 +202,7 @@ namespace dataproduct.api.Services
                     dienBienRows.Append("<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>");
             }
 
-            // Load template
+            // Load body template
             var templatePath = Path.Combine(
                 _env.WebRootPath,
                 "template_html",
@@ -210,13 +210,23 @@ namespace dataproduct.api.Services
             );
             var html = await File.ReadAllTextAsync(templatePath);
 
-            html = html
+            // Load header template and render dynamic values.
+            var headerTemplatePath = Path.Combine(
+                _env.WebRootPath,
+                "template_html",
+                "BM.09-QT.05.13_So_theo_doi_san_xuat_hang_ngay_header.html"
+            );
+            var headerHtml = await File.ReadAllTextAsync(headerTemplatePath);
+
+            headerHtml = headerHtml
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{KipCa}}", kipCa)
                 .Replace("{{TuGio}}", tuGio)
                 .Replace("{{TuNgay}}", tuNgay)
                 .Replace("{{DenGio}}", denGio)
-                .Replace("{{DenNgay}}", denNgay)
+                .Replace("{{DenNgay}}", denNgay);
+
+            html = html
                 // Loại I
                 .Replace("{{LoaiI_MacPhoi}}", loaiI.TenMacPhoi + (loaiI.LoaiPhoi == 1 ? "- Phôi nóng" : loaiI.LoaiPhoi == 2 ? "- Phôi nguội" : "") ?? "")
                 .Replace("{{LoaiI_KichThuoc}}", loaiI.KichThuoc ?? "")
@@ -258,42 +268,67 @@ namespace dataproduct.api.Services
                 .Replace("{{ChuKyNvVanHanh}}", signNvVanHanh)
                 .Replace("{{TenNvVanHanh}}", nvVanHanh?.HoVaTen ?? "");
 
-            var doc = new HtmlToPdfDocument
+            var tempHeaderPath = Path.Combine(Path.GetTempPath(), $"BM09_header_{Guid.NewGuid():N}.html");
+            await File.WriteAllTextAsync(tempHeaderPath, headerHtml, Encoding.UTF8);
+
+            var headerUri = new Uri(tempHeaderPath).AbsoluteUri;
+
+            try
             {
-                GlobalSettings =
+                var doc = new HtmlToPdfDocument
                 {
-                    PaperSize = PaperKind.A4,
-                    Orientation = Orientation.Portrait
-                },
-                Objects =
-                {
-                    new ObjectSettings
+                    GlobalSettings =
                     {
-                        HtmlContent = html,
-                        WebSettings =
+                        PaperSize = PaperKind.A4,
+                        Orientation = Orientation.Portrait,
+                        Margins = new MarginSettings
                         {
-                            DefaultEncoding = "utf-8",
-                            LoadImages = true,
-                            EnableJavascript = false,
-                            PrintMediaType = true
-                        },
-                        LoadSettings =
+                            Top = 52,
+                            Bottom = 15,
+                            Left = 15,
+                            Right = 15
+                        }
+                    },
+                    Objects =
+                    {
+                        new ObjectSettings
                         {
-                            BlockLocalFileAccess = false,
-                            LoadErrorHandling = ContentErrorHandling.Ignore
+                            HtmlContent = html,
+                            HeaderSettings = new HeaderSettings
+                            {
+                                HtmUrl = headerUri,
+                                Spacing = 4
+                            },
+                            WebSettings =
+                            {
+                                DefaultEncoding = "utf-8",
+                                LoadImages = true,
+                                EnableJavascript = false,
+                                PrintMediaType = true
+                            },
+                            LoadSettings =
+                            {
+                                BlockLocalFileAccess = false,
+                                LoadErrorHandling = ContentErrorHandling.Ignore
+                            }
                         }
                     }
-                }
-            };
+                };
 
-            var pdfBytes = _pdfConverter.Convert(doc);
+                var pdfBytes = _pdfConverter.Convert(doc);
 
-            return new ExportFileResult
+                return new ExportFileResult
+                {
+                    Content = pdfBytes,
+                    FileName = $"BM.09-QT.05.13_So_theo_doi_{ngaySX:yyyyMMdd}_Ca{ca}{kip}_{DateTime.Now:HHmmss}.pdf",
+                    ContentType = "application/pdf"
+                };
+            }
+            finally
             {
-                Content = pdfBytes,
-                FileName = $"BM.09-QT.05.13_So_theo_doi_{ngaySX:yyyyMMdd}_Ca{ca}{kip}_{DateTime.Now:HHmmss}.pdf",
-                ContentType = "application/pdf"
-            };
+                if (File.Exists(tempHeaderPath))
+                    File.Delete(tempHeaderPath);
+            }
         }
 
         public async Task<ExportFileResult> ExportTongHopExcelAsync(DateOnly? fromDate, DateOnly? toDate)
@@ -358,7 +393,7 @@ namespace dataproduct.api.Services
                 ws1.Cell(r, 2).Value = row.p.Ca;
                 ws1.Cell(r, 3).Value = row.p.Kip;
                 ws1.Cell(r, 4).Value = row.d.LoaiMacPhoi switch { 1 => "I", 2 => "II", 3 => "III", _ => row.d.LoaiMacPhoi?.ToString() }; ;
-                ws1.Cell(r, 5).Value = row.d.LoaiMacPhoi switch { 1 => "I", 2 => "II", 3 => "III", _ => row.d.LoaiMacPhoi?.ToString() };
+                ws1.Cell(r, 5).Value = row.d.TenMacPhoi;
                 ws1.Cell(r, 6).Value = row.d.LoaiPhoi switch
                 {
                     1 => "loại I",
@@ -367,14 +402,13 @@ namespace dataproduct.api.Services
                     _ => row.d.LoaiPhoi?.ToString()
                 };
                 ws1.Cell(r, 7).Value = row.d.KichThuoc;
-                ws1.Cell(r, 8).Value = row.d.PhoiHoiLo;
-                ws1.Cell(r, 9).Value = row.d.PhoiRaLo;
-                ws1.Cell(r, 10).Value = row.d.PhoiHoiLo;
-                ws1.Cell(r, 11).Value = row.d.PhoiRaSan;
-                ws1.Cell(r, 12).Value = row.d.PhoiPheCn;
-                ws1.Cell(r, 13).Value = row.d.LoaiSp;
-                ws1.Cell(r, 14).Value = row.d.MacThep;
-                ws1.Cell(r, 15).Value = row.d.LenhSanXuat;
+                ws1.Cell(r, 8).Value = row.d.PhoiRaLo;
+                ws1.Cell(r, 9).Value = row.d.PhoiHoiLo;
+                ws1.Cell(r, 10).Value = row.d.PhoiRaSan;
+                ws1.Cell(r, 11).Value = row.d.PhoiPheCn;
+                ws1.Cell(r, 12).Value = row.d.LoaiSp;
+                ws1.Cell(r, 13).Value = row.d.MacThep;
+                ws1.Cell(r, 14).Value = row.d.LenhSanXuat;
                 ws1.Cell(r, 15).Value = row.p.SoPhieu;
                 ws1.Cell(r, 16).Value = TinhTrangToText(row.p.TinhTrang);
             }
@@ -535,15 +569,16 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 sb.Append($@"
-                    <hr style=""border:0;border-top:1px dashed #999;margin:6px 0;"" />
-                    <div class=""info-row""><b>- Mác phôi loại {Encode(loai)} :</b> {Encode(row.TenMacPhoi)} {Encode(row.LoaiPhoi == 1 ? " - Phôi nóng" : row.LoaiPhoi == 2 ? " - Phôi nguội" : "")}</div>
-                    <div class=""info-row"">- Kích thước: {Encode(row.KichThuoc)} mm</div>
-                    <div class=""info-row"">- Số phôi ra khỏi lò: &nbsp;<b>{Encode(row.PhoiRaLo)}</b></div>
-                    <div class=""info-row"">- Số phôi hồi lò: &nbsp;<b>{Encode(row.PhoiHoiLo)}</b></div>
-                    <div class=""info-row"">- Số phôi cần ra sản (T/P): {Encode(row.PhoiRaSan)}</div>
-                    <div class=""info-row"">- Số phôi phế công nghệ: &nbsp;<b>{Encode(row.PhoiPheCn)}</b></div>
-                    <div class=""info-row"">- Loại sản phẩm: <b>{Encode(row.LoaiSp)}</b> Mác thép: <b>{Encode(row.MacThep)}</b></div>
-                    <div class=""info-row"">- Lệnh sản xuất: <b>{Encode(row.LenhSanXuat)}</b></div>");
+                    <div class=""item-block extra-item"">
+                        <div class=""info-row""><b>- Mác phôi loại {Encode(loai)} :</b> {Encode(row.TenMacPhoi)} {Encode(row.LoaiPhoi == 1 ? " - Phôi nóng" : row.LoaiPhoi == 2 ? " - Phôi nguội" : "")}</div>
+                        <div class=""info-row"">- Kích thước: {Encode(row.KichThuoc)} mm</div>
+                        <div class=""info-row"">- Số phôi ra khỏi lò: &nbsp;<b>{Encode(row.PhoiRaLo)}</b></div>
+                        <div class=""info-row"">- Số phôi hồi lò: &nbsp;<b>{Encode(row.PhoiHoiLo)}</b></div>
+                        <div class=""info-row"">- Số phôi cần ra sản (T/P): {Encode(row.PhoiRaSan)}</div>
+                        <div class=""info-row"">- Số phôi phế công nghệ: &nbsp;<b>{Encode(row.PhoiPheCn)}</b></div>
+                        <div class=""info-row"">- Loại sản phẩm: <b>{Encode(row.LoaiSp)}</b> Mác thép: <b>{Encode(row.MacThep)}</b></div>
+                        <div class=""info-row"">- Lệnh sản xuất: <b>{Encode(row.LenhSanXuat)}</b></div>
+                    </div>");
 
                 index++;
             }

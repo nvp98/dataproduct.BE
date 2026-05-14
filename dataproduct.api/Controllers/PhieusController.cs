@@ -57,8 +57,15 @@ namespace dataproduct.api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] JsonElement formData)
         {
-            var ok = await _service.UpdateAsync(id, formData);
-            return ok != null ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.UpdateAsync(id, formData);
+                return ok != null ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{id}")]
@@ -87,7 +94,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var ok = await _service.ChangeStatusAsync(id, request.Status);
+                var ok = await _service.ChangeStatusAsync(id, request.Status, request.IdUser);
                 return ok ? NoContent() : NotFound();
             }
             catch (Exception ex)
@@ -122,10 +129,24 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        [HttpGet("{id:guid}/export-pdf")]
-        public async Task<IActionResult> ExportPdf(Guid id)
+        [HttpPost("search-by-user")]
+        public async Task<IActionResult> SearchByUser([FromBody] SearchPhieuByUserRequest request)
         {
-            var file = await _service.ExportPdfDynamicAsync(id);
+            try
+            {
+                var result = await _service.SearchWithPagingByUserAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpGet("{id:guid}/export-pdf")]
+        public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
+        {
+            var file = await _service.ExportPdfDynamicAsync(id, filters);
             return File(file.Content, file.ContentType, file.FileName);
         }
 
@@ -140,8 +161,40 @@ namespace dataproduct.api.Controllers
         [HttpPut("{id}/status-extended")]
         public async Task<IActionResult> UpdateStatusExtended(Guid id, [FromBody] UpdatePhieuStatusRequest request)
         {
-            var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("chot-nhieu-phieu")]
+        public async Task<IActionResult> ChotNhieuPhieu([FromBody] ChotNhieuPhieuRequest request)
+        {
+            try
+            {
+                await _service.ChotNhieuPhieuAsync(request.IdPhieus, request.IdUser, request.Status);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("hrc2-std-nxt/status")]
+        public async Task<IActionResult> GetStatusHRC2StdNxt([FromQuery] DateOnly ngaySX, [FromQuery] int ca)
+        {
+            var status = await _service.GetStatusHRC2_STD_NXT(ngaySX, ca);
+            return Ok(new { tinhTrang = status });
         }
 
         [HttpPut("{id}/sync-nguoi-tao")]
@@ -173,6 +226,7 @@ namespace dataproduct.api.Controllers
     public class ChangeStatusRequest
     {
         public int Status { get; set; }
+        public int? IdUser { get; set; }
     }
 
     public class UpdatePhieuStatusRequest
@@ -180,5 +234,12 @@ namespace dataproduct.api.Controllers
         public int? Status { get; set; }
         public int? IsLock { get; set; }
         public int? IsDelete { get; set; }
+    }
+
+    public class ChotNhieuPhieuRequest
+    {
+        public List<Guid> IdPhieus { get; set; } = new();
+        public int? IdUser { get; set; }
+        public int Status { get; set; }
     }
 }

@@ -25,6 +25,7 @@ public partial class PhuLieu_HRC2
 
     public bool? IsManual { get; set; } = false;
     public double? KLPhuGia_Manual { get; set; }
+    public bool? IsAddManual { get; set; } = false;
     
 }
 

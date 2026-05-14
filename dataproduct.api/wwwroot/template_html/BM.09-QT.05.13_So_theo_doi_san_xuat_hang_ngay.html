@@ -100,11 +100,78 @@
         font-weight: bold;
       }
 
+      .nguyen-lieu-col .item-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .nguyen-lieu-col .extra-item {
+        border-top: 1px dashed #999;
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+
+      /* Bảng nguyên liệu */
+      table.nguyen-lieu {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+      }
+
+      table.nguyen-lieu thead {
+        display: table-header-group;
+      }
+
+      table.nguyen-lieu th {
+        font-weight: bold;
+        font-size: 11pt;
+        text-align: left;
+        padding: 4px 0;
+        border: none;
+      }
+
+      table.nguyen-lieu td {
+        border: none;
+        vertical-align: top;
+        padding: 4px 6px;
+        font-size: 10pt;
+        line-height: 1.55;
+      }
+
+      table.nguyen-lieu .col-title {
+        font-weight: bold;
+        margin-bottom: 2px;
+        font-size: 10pt;
+      }
+
+      table.nguyen-lieu .info-row {
+        margin: 1px 0;
+      }
+
+      table.nguyen-lieu .info-row b {
+        font-weight: bold;
+      }
+
+      table.nguyen-lieu .item-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      table.nguyen-lieu .extra-item {
+        border-top: 1px dashed #999;
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+
       /* Bảng diễn biến */
       table.dien-bien {
         width: 100%;
         border-collapse: collapse;
         margin-top: 4px;
+      }
+
+      table.dien-bien thead {
+        display: table-header-group;
       }
 
       table.dien-bien th,
@@ -123,6 +190,14 @@
 
       table.dien-bien td.text-left {
         text-align: left;
+      }
+
+      table.dien-bien .section-repeat th {
+        background-color: #fff;
+        border: none;
+        padding: 4px 0 3px 0;
+        text-align: left;
+        font-size: 11pt;
       }
 
       .note {
@@ -162,114 +237,100 @@
     </style>
   </head>
   <body>
-    <!-- HEADER -->
-    <div class="header">
-      <div class="header-left">
-        <img src="{{LogoUrl}}" alt="Logo Hoa Phat" /><br />
-        CÔNG TY CỔ PHẦN THÉP<br />
-        HÒA PHÁT DUNG QUẤT
-      </div>
-      <div class="header-right">
-        BM.09/QT.05.13<br />
-        Ngày hiệu lực: 15/04/2025<br />
-        Lần sửa đổi: 01
-      </div>
-    </div>
-
-    <!-- TITLE -->
-    <div class="title">Sổ theo dõi</div>
-    <div class="title">Sản xuất hàng ngày</div>
-    <div class="sub-title">
-      Kíp {{KipCa}} từ {{TuGio}} ngày {{TuNgay}} đến {{DenGio}} ngày {{DenNgay}}
-    </div>
-    <div class="sub-title">(Do nhân viên vận hành pupit 1 theo dõi)</div>
-
     <!-- SECTION 1: NGUYÊN LIỆU VÀ SẢN PHẨM -->
     <div class="section-title">1. Nguyên liệu và sản phẩm:</div>
     <div class="nguyen-lieu-table">
       <!-- Loại I -->
       <div class="nguyen-lieu-col">
-        <div class="col-title">a. Mác phôi loại I: {{LoaiI_MacPhoi}}</div>
-        <div class="info-row">- Kích thước: {{LoaiI_KichThuoc}} mm</div>
-        <div class="info-row">
-          - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiI_PhoiRaLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi hồi lò: &nbsp;<b>{{LoaiI_PhoiHoiLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi cần ra sản (T/P): {{LoaiI_PhoiRaSan}}
-        </div>
-        <div class="info-row">
-          - Số phôi phế công nghệ: &nbsp;<b>{{LoaiI_PhoiPheCn}}</b>
-        </div>
-        <div class="info-row">
-          - Loại sản phẩm: <b>{{LoaiI_LoaiSp}}</b> Mác thép:
-          <b>{{LoaiI_MacThep}}</b>
-        </div>
-        <div class="info-row">
-          - Lệnh sản xuất: <b>{{LoaiI_LenhSanXuat}}</b>
+        <div class="item-block">
+          <div class="col-title">a. Mác phôi loại I: {{LoaiI_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiI_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiI_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiI_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiI_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiI_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiI_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiI_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiI_LenhSanXuat}}</b>
+          </div>
         </div>
         {{LoaiI_ExtraRows}}
       </div>
 
       <!-- Loại II -->
       <div class="nguyen-lieu-col">
-        <div class="col-title">b. Mác phôi loại II: {{LoaiII_MacPhoi}}</div>
-        <div class="info-row">- Kích thước: {{LoaiII_KichThuoc}} mm</div>
-        <div class="info-row">
-          - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiII_PhoiRaLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi hồi lò: &nbsp;<b>{{LoaiII_PhoiHoiLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi cần ra sản (T/P): {{LoaiII_PhoiRaSan}}
-        </div>
-        <div class="info-row">
-          - Số phôi phế công nghệ: &nbsp;<b>{{LoaiII_PhoiPheCn}}</b>
-        </div>
-        <div class="info-row">
-          - Loại sản phẩm: <b>{{LoaiII_LoaiSp}}</b> Mác thép:
-          <b>{{LoaiII_MacThep}}</b>
-        </div>
-        <div class="info-row">
-          - Lệnh sản xuất: <b>{{LoaiII_LenhSanXuat}}</b>
+        <div class="item-block">
+          <div class="col-title">b. Mác phôi loại II: {{LoaiII_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiII_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiII_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiII_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiII_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiII_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiII_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiII_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiII_LenhSanXuat}}</b>
+          </div>
         </div>
         {{LoaiII_ExtraRows}}
       </div>
 
       <!-- Loại III -->
       <div class="nguyen-lieu-col">
-        <div class="col-title">c. Mác phôi loại III: {{LoaiIII_MacPhoi}}</div>
-        <div class="info-row">- Kích thước: {{LoaiIII_KichThuoc}} mm</div>
-        <div class="info-row">
-          - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiIII_PhoiRaLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi hồi lò: &nbsp;<b>{{LoaiIII_PhoiHoiLo}}</b>
-        </div>
-        <div class="info-row">
-          - Số phôi cần ra sản (T/P): {{LoaiIII_PhoiRaSan}}
-        </div>
-        <div class="info-row">
-          - Số phôi phế công nghệ: &nbsp;<b>{{LoaiIII_PhoiPheCn}}</b>
-        </div>
-        <div class="info-row">
-          - Loại sản phẩm: <b>{{LoaiIII_LoaiSp}}</b> Mác thép:
-          <b>{{LoaiIII_MacThep}}</b>
-        </div>
-        <div class="info-row">
-          - Lệnh sản xuất: <b>{{LoaiIII_LenhSanXuat}}</b>
+        <div class="item-block">
+          <div class="col-title">c. Mác phôi loại III: {{LoaiIII_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiIII_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiIII_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiIII_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiIII_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiIII_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiIII_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiIII_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiIII_LenhSanXuat}}</b>
+          </div>
         </div>
         {{LoaiIII_ExtraRows}}
       </div>
     </div>
 
     <!-- SECTION 2: DIỄN BIẾN -->
-    <div class="section-title">2. Diễn biến</div>
     <table class="dien-bien">
       <thead>
+        <tr class="section-repeat">
+          <th colspan="6">2. Diễn biến</th>
+        </tr>
         <tr>
           <th colspan="2">Thời gian đình trễ</th>
           <th rowspan="2">Thiết bị</th>

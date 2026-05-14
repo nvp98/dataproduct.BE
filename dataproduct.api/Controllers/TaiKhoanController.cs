@@ -1,8 +1,7 @@
-﻿using Azure.Core;
+using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Utils;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,10 +12,12 @@ namespace dataproduct.api.Controllers
     public class TaiKhoanController : ControllerBase
     {
         private readonly ProductDataMasterDbContext _context;
+        private readonly ProductFormContext _formContext;
 
-        public TaiKhoanController(ProductDataMasterDbContext context)
+        public TaiKhoanController(ProductDataMasterDbContext context, ProductFormContext formContext)
         {
             _context = context;
+            _formContext = formContext;
         }
 
         [HttpGet("nguoiky")]
@@ -82,6 +83,17 @@ namespace dataproduct.api.Controllers
             //HttpContext.Session.SetString("UserName", user.HoVaTen ?? "");
             //HttpContext.Session.SetString("PhongBan", user.PhongBan?.TenPhongBan ?? "");
             //HttpContext.Session.SetString("Xuong", user.Xuong_API ?? "");
+            // Phân quyền theo biểu mẫu: mỗi dòng = (MaBm, QuyenChucNang) — lấy từ DB biểu mẫu (ProductFormContext)
+            var bmQuyenXlList = await _formContext.BmQuyenXls
+                .AsNoTracking()
+                .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan)
+                .OrderBy(x => x.MaBm)
+                .Select(x => new
+                {
+                    maBm = x.MaBm,
+                    quyenChucNang = x.QuyenChucNang,
+                })
+                .ToListAsync();
 
             var result = new
             {
@@ -95,7 +107,8 @@ namespace dataproduct.api.Controllers
                 user.ID_PhongBan,
                 user.Xuong_API,
                 TenPhongBan = user.PhongBan?.TenPhongBan,
-                user.ID_Quyen
+                user.ID_Quyen,
+                bmQuyenXlList,
             };
 
             return Ok(result);
@@ -148,6 +161,17 @@ namespace dataproduct.api.Controllers
             if (user == null)
                 return NotFound(new { message = $"Không tìm thấy tài khoản: {tenTaiKhoan}" });
 
+            var bmQuyenXlList = await _formContext.BmQuyenXls
+                .AsNoTracking()
+                .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan)
+                .OrderBy(x => x.MaBm)
+                .Select(x => new
+                {
+                    maBm = x.MaBm,
+                    quyenChucNang = x.QuyenChucNang,
+                })
+                .ToListAsync();
+
             var result = new
             {
                 user.ID_TaiKhoan,
@@ -160,7 +184,8 @@ namespace dataproduct.api.Controllers
                 user.ID_PhongBan,
                 user.Xuong_API,
                 TenPhongBan = user.PhongBan?.TenPhongBan,
-                user.ID_Quyen
+                user.ID_Quyen,
+                bmQuyenXlList,
             };
 
             return Ok(result);

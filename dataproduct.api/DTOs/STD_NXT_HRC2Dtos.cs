@@ -35,8 +35,6 @@ namespace dataproduct.api.DTOs
         public decimal? TongThucTe { get; set; }
         public int? IDSilo { get; set; }
         public decimal? LuongSuDungKiemKe { get; set; }
-        public decimal? TyLeBOF { get; set; }
-        public decimal? TyLeTinhLuyen { get; set; }
     }
 
 
@@ -52,6 +50,8 @@ namespace dataproduct.api.DTOs
         public decimal? TongSuDung { get; set; }
         public decimal? TongSDTrenSoSach { get; set; }
         public decimal? ChenhLech { get; set; }
+        public decimal? TyLeBOF { get; set; }
+        public decimal? TyLeTinhLuyen { get; set; }
     }
 
     public enum ToHopSTDNXT
@@ -87,6 +87,46 @@ namespace dataproduct.api.DTOs
         public Guid IdPhieu { get; set; }
         public decimal? TyLeBOF { get; set; }
         public decimal? TyLeTinhLuyen { get; set; }
+    }
+
+    public class STD_NXT_HRC2_KhongPhanBoDto
+    {
+        public Guid IdPhieu { get; set; }
+        public int Id_HeaderKey { get; set; }
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusRequest
+    {
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+        public List<STD_NXT_RelatedPhieuTarget> Targets { get; set; } = new();
+    }
+
+    public class STD_NXT_RelatedPhieuTarget
+    {
+        public string? TabKey { get; set; }
+        public string? Label { get; set; }
+        public string? BieuMau { get; set; } // BOF/LF/RH hoặc full mã BM
+        public int? Scope { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusItem
+    {
+        public string? TabKey { get; set; }
+        public string? Label { get; set; }
+        public string? BieuMau { get; set; }
+        public int? Scope { get; set; }
+        public Guid? IdPhieu { get; set; }
+        public int? TinhTrang { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusResponse
+    {
+        public List<STD_NXT_RelatedPhieuStatusItem> Items { get; set; } = new();
+        public bool CanPhanBo { get; set; }
+        public int IncompleteCount { get; set; }
     }
 
     public class SaveKiemKeRequest

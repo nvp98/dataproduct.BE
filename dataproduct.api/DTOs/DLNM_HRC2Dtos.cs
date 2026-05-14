@@ -91,6 +91,7 @@ namespace dataproduct.api.DTOs
         public bool? IsPhanBo { get; set; } = false; // ⭐ Đánh dấu là phân bổ
         public bool? IsManual { get; set; } = false;
         public double? KLPhuGia_Manual { get; set; }
+        public bool? IsAddManual { get; set; } = false;
     }
 
     public class FilterSTD_NXTRequest
@@ -116,7 +117,8 @@ namespace dataproduct.api.DTOs
         public int? Scope { get; set; }
 
         public string? SearchText { get; set; }
-
+        public bool? IsTrungMeThoi { get; set; } = false;
+        public bool? IsDelete { get; set; }
         public int? Page { get; set; } = 1;
 
         public int? PageSize { get; set; } = 20;

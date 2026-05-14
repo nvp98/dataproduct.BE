@@ -21,19 +21,106 @@ namespace dataproduct.api.Controllers
 
         }
         [HttpGet("sanluongphoithep")]
-        public async Task<IActionResult> GetSanLuongPhoi([FromQuery] string ca,[FromQuery] string kip,[FromQuery] DateTime ngaySX)
+        public async Task<IActionResult> GetSanLuongPhoi([FromQuery] string ca, [FromQuery] string kip, [FromQuery] DateTime ngaySX)
         {
-            var data = await _service.GetByKipNgayAsync(ca,kip, ngaySX);
+            var data = await _service.GetByKipNgayAsync(ca, kip, ngaySX);
             return Ok(data);
         }
         [HttpGet("Getphoinhapkho")]
         public async Task<IActionResult> GetPhoiNhapKho([FromQuery] string ca, [FromQuery] string kip, [FromQuery] DateTime ngaySX, [FromQuery] int mayduc)
         {
-            var data = await _service.GetPhoiNhapKhoAsync(ca, kip, ngaySX,mayduc);
+            var data = await _service.GetPhoiNhapKhoAsync(ca, kip, ngaySX, mayduc);
             return Ok(data);
         }
+
+        [HttpPost("InsertPhoiNhapKho")]
+        public async Task<IActionResult> InsertPhoiNhapKho([FromBody] InsertPhoiNhapKhoRequest request)
+        {
+            if (request == null)
+                return BadRequest("Payload không hợp lệ");
+
+            var affected = await _service.UpsertPhoiNhapKhoFromAsync(request);
+
+            return Ok(new
+            {
+                success = true,
+                affected
+            });
+        }
+
+        [HttpPost("XacNhanPhoiNhapKho")]
+        public async Task<IActionResult> XacNhanPhoiNhapKho([FromBody] XacNhanPhoiNhapKhoRequest request)
+        {
+            if (request == null)
+                return BadRequest("Payload không hợp lệ");
+
+            var affected = await _service.XacNhanPhoiNhapKhoRowsAsync(request.Ids, request.NguoiXacNhanId, request.CapXacNhan, request.TinhTrangCap, request.PhieuId);
+
+            return Ok(new
+            {
+                success = true,
+                affected
+            });
+        }
+
+        [HttpGet("PhoiNhapKhoNhanPhoi")]
+        public async Task<IActionResult> GetPhoiNhapKhoList(
+            [FromQuery] Guid? idPhieu,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate,
+            [FromQuery] string? kip,
+            [FromQuery] int? ca,
+            [FromQuery] int? mayDuc,
+            [FromQuery] string? soPhieu,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 200)
+        {
+            var (data, total) = await _service.GetPhoiNhapKhoListAsync(
+                idPhieu,
+                fromDate,
+                toDate,
+                kip,
+                ca,
+                mayDuc,
+                soPhieu,
+                page,
+                pageSize);
+
+            return Ok(new { data, total });
+        }
+
+        [HttpPost("ChotPhoiNhapKho")]
+        public async Task<IActionResult> ChotPhoiNhapKho([FromBody] ChotPhoiNhapKhoRequest request)
+        {
+            if (request == null || request.IdPhieu == Guid.Empty)
+                return BadRequest("IdPhieu không hợp lệ");
+
+            var affected = await _service.ChotPhoiNhapKhoRowsAsync(request.IdPhieu, request.TinhTrangChot);
+
+            return Ok(new
+            {
+                success = true,
+                affected,
+                message = request.TinhTrangChot == 1 ? "Chốt phôi nhập kho thành công" : "Hủy chốt phôi nhập kho thành công"
+            });
+        }
+
+        [HttpPost("ThuHoiPhoiNhapKho")]
+        public async Task<IActionResult> ThuHoiPhoiNhapKho([FromBody] ThuHoiPhoiNhapKhoRequest request)
+        {
+            if (request == null || request.Ids == null || request.Ids.Count == 0)
+                return BadRequest("Danh sách dòng thu hồi không hợp lệ");
+
+            var affected = await _service.ThuHoiPhoiNhapKhoRowsAsync(request.Ids);
+
+            return Ok(new
+            {
+                success = true,
+                affected
+            });
+        }
         [HttpGet("export-sanluong-pdf")]
-        public async Task<IActionResult> ExportSanLuongPdf(DateOnly? NgaySX,int? Ca, string? Kip, Guid? idPhieu)
+        public async Task<IActionResult> ExportSanLuongPdf(DateOnly? NgaySX, int? Ca, string? Kip, Guid? idPhieu)
         {
             if (idPhieu == null)
                 return BadRequest("Thiếu idPhiếu");
@@ -53,13 +140,6 @@ namespace dataproduct.api.Controllers
             return File(file.Content, file.ContentType, file.FileName);
         }
 
-        [HttpPost("InsertSanLuongPhoi")]
-        public async Task<IActionResult> InsertSanLuongPhoi([FromBody] SaveSanLuongPhoiDto dto)
-        {
-            await _service.InsertSanLuongPhoiAsync(dto);
-            return Ok();
-        }
-
         [HttpDelete("DeleteSanLuongPhoi/{idPhieu}")]
         public async Task<IActionResult> DeleteSaLuongPhoiByPhieu(Guid idPhieu)
         {
@@ -75,28 +155,6 @@ namespace dataproduct.api.Controllers
             });
         }
 
-        [HttpPatch("HideSanLuongPhoi/{idPhieu}")]
-        public async Task<IActionResult> HideSanLuongPhoiByPhieu(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
-            await _service.HideSanLuongPhoiByPhieuAsync(idPhieu);
-            return Ok(new { success = true, message = "Đã ẩn dữ liệu sản lượng phôi" });
-        }
-
-        [HttpPatch("RestoreSanLuongPhoi/{idPhieu}")]
-        public async Task<IActionResult> RestoreSanLuongPhoiByPhieu(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
-            await _service.RestoreSanLuongPhoiByPhieuAsync(idPhieu);
-            return Ok(new { success = true, message = "Đã khôi phục dữ liệu sản lượng phôi" });
-        }
-
-        [HttpPost("InsertPhoiNhapKho")]
-        public async Task<IActionResult> InsertPhoiNhapKho([FromBody] SavePhoiNhapKhoDto dto)
-        {
-            await _service.InsertPhoiNhapKhoAsync(dto);
-            return Ok();
-        }
         [HttpDelete("DeletePhoiNhapKho/{idPhieu}")]
         public async Task<IActionResult> DeletePhoiNhapKhoByPhieu(Guid idPhieu)
         {
@@ -137,22 +195,6 @@ namespace dataproduct.api.Controllers
             return File(file.Content, file.ContentType, file.FileName);
         }
 
-        [HttpPatch("HidePhoiNhapKho/{idPhieu}")]
-        public async Task<IActionResult> HidePhoiNhapKhoByPhieu(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
-            await _service.HidePhoiNhapKhoByPhieuAsync(idPhieu);
-            return Ok(new { success = true, message = "Đã ẩn dữ liệu sản lượng phôi" });
-        }
-
-        [HttpPatch("RestorePhoiNhapKho/{idPhieu}")]
-        public async Task<IActionResult> RestorePhoiNhapKhoByPhieu(Guid idPhieu)
-        {
-            if (idPhieu == Guid.Empty) return BadRequest("IdPhieu không hợp lệ");
-            await _service.RestorePhoiNhapKhoByPhieuAsync(idPhieu);
-            return Ok(new { success = true, message = "Đã khôi phục dữ liệu sản lượng phôi" });
-        }
-
         [HttpGet("export-excelPhoiNhapKho")]
         public async Task<IActionResult> ExportExcel(DateOnly? fromDate, DateOnly? toDate)
         {
@@ -162,6 +204,18 @@ namespace dataproduct.api.Controllers
                 fileBytes,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 $"TongHopPhoiNhapKho_{DateTime.Now:yyyyMMddHHmmss}.xlsx"
+            );
+        }
+
+        [HttpGet("export-excelPhoiNhapKhoPKH")]
+        public async Task<IActionResult> ExportExcelPKH(DateOnly? fromDate, DateOnly? toDate)
+        {
+            var fileBytes = await _service.ExportExcelByBmPhieuPKHAsync(fromDate, toDate);
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"TongHopPhoiNhapKhoPKH_{DateTime.Now:yyyyMMddHHmmss}.xlsx"
             );
         }
 

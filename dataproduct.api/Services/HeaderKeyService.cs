@@ -50,10 +50,15 @@ namespace dataproduct.api.Services
             existing.LoaiPhieu = entity.LoaiPhieu;
             existing.Mota = entity.Mota;
             existing.IsActive = entity.IsActive;
-            existing.ThuTu = entity.ThuTu;
             existing.IsUsedNXT = entity.IsUsedNXT;
             existing.IsUsedThongKe = entity.IsUsedThongKe;
             existing.LoaiThongKe = entity.LoaiThongKe;
+            existing.ThuTu_TK_BOF = entity.ThuTu_TK_BOF;
+            existing.ThuTu_TK_LFRH = entity.ThuTu_TK_LFRH;
+            existing.IsUsed_Excel = entity.IsUsed_Excel;
+            existing.LoaiExcel = entity.LoaiExcel;
+            existing.ThuTu_Excel_BOF = entity.ThuTu_Excel_BOF;
+            existing.ThuTu_Excel_LFRH = entity.ThuTu_Excel_LFRH;
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;

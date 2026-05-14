@@ -26,18 +26,6 @@ namespace dataproduct.api.DTOs.CTD_Dto
         public int TongSoThanh { get; set; }
         public double TongKhoiLuong { get; set; }
     }
-    public class SaveSanLuongPhoiDto
-    {
-        public Guid IdPhieu { get; set; }
-        public string SoPhieu { get; set; }
-
-        public DateTime NgaySX { get; set; }
-        public string Kip { get; set; }
-        public int Ca { get; set; }
-        public int MayDuc { get; set; }
-
-        public List<InsertSanLuongPhoiDto> Table1 { get; set; }
-    }
     public class InsertSanLuongPhoiDto
     {
         public string? KipNgay { get; set; }
