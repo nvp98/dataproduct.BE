@@ -214,6 +214,12 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
             }
         }
+        [HttpGet("DsLoCao")]
+        public async Task<IActionResult> GetDsLoCao()
+        {
+            var data = await _service.GetAllLoCaoAsync();
+            return Ok(data);
+        }
     }
 
 

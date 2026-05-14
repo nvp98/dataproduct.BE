@@ -74,9 +74,21 @@ public partial class ProductFormContext : DbContext
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
-
+    public virtual DbSet<LG_NL_SiLo> LG_NL_SiLo { get; set; }
+    public virtual DbSet<LG_NL_Mapping> LG_NL_Mapping { get; set; }
+    public virtual DbSet<LG_NL_NVL> LG_NL_NVL { get; set; }
+    public virtual DbSet<LG_NL_NhomNVL> LG_NL_NhomNVL { get; set; }
+    public virtual DbSet<LG1_NL_TS_Mapping> LG1_NL_TS_Mapping { get; set; }
+    public virtual DbSet<LG1_DuLieuNL> LG1_DuLieuNL { get; set; }
+    public virtual DbSet<LG_TSL_NVL> LG_TSL_NVL { get; set; }
+    public virtual DbSet<LG_TSL_SiLo> LG_TSL_SiLo { get; set; }
+    public virtual DbSet<LG_TSL_SiLo_Mapping> LG_TSL_SiLo_Mapping { get; set; }
+    public virtual DbSet<LG_TSL_ChiTiet> LG_TSL_ChiTiet { get; set; }
+    public virtual DbSet<SiLoTon> SiLoTon { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+
+
         modelBuilder.Entity<BkNguyenLieu>(entity =>
         {
             entity.ToTable("BK_NguyenLieu");
@@ -640,7 +652,6 @@ public partial class ProductFormContext : DbContext
         });
         OnModelCreatingPartial(modelBuilder);
     }
-
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 
 }

@@ -9,6 +9,7 @@ using dataproduct.api.Services.Initializers;
 using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
+using NuGet.Protocol.Core.Types;
 using System.Text.Json;
 
 namespace dataproduct.api.Business
@@ -760,6 +761,10 @@ namespace dataproduct.api.Business
             }
         }
 
+
+        public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
+        {
+            return await _repo.GetAllLoCaoAsync();
         private static void EnsurePhieuOperable(BmPhieu phieu)
         {
             if (phieu.IsDelete == 1)

@@ -1,6 +1,7 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Utils;
@@ -515,5 +516,9 @@ namespace dataproduct.api.Repositories
             return (result, totalCount);
         }
 
+        public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
+        {
+            return await _mastercontext.Tbl_LoCao.AsNoTracking().ToListAsync();
+        }
     }
 }
