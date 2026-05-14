@@ -1,6 +1,7 @@
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
+using System.Text.Json;
 
 namespace dataproduct.api.Services
 {
@@ -142,6 +143,74 @@ namespace dataproduct.api.Services
 
         public Task<bool> DeleteMappingAsync(int id) => _repo.DeleteMappingAsync(id);
 
+        // ─── Chi tiết tồn silo theo phiếu ────────────────────────────────────────
+
+        public Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto) => _repo.UpsertChiTietAsync(dto);
+
+        public Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu) => _repo.GetChiTietByPhieuAsync(idPhieu);
+
+
+        // ─── InsertFromPhieu ──────────────────────────────────────────────────────
+
+        public async Task<int> InsertFromPhieuJsonAsync(BmPhieu phieu)
+        {
+            if (phieu == null || string.IsNullOrWhiteSpace(phieu.DataJson))
+                return 0;
+
+            using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+            var root = jsonDoc.RootElement;
+
+            var ngayStr = TryGetString(root, "NgaySX", "ngaySX", "ngay");
+            var idLoCao = TryGetInt(root, "scope", "Scope", "idLoCao", "IDLoCao") ?? 0;
+            var ca = TryGetInt(root, "ca", "Ca") ?? 0;
+
+            if (idLoCao == 0 || ca == 0 || string.IsNullOrWhiteSpace(ngayStr))
+                return 0;
+
+            if (!DateTime.TryParse(ngayStr, out var ngay))
+                return 0;
+
+            if (!TryGetArray(root, "table1", out var table1))
+                return 0;
+
+            var items = new List<UpsertLGTSChiTietItemDto>();
+            foreach (var row in table1.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var idSiLo = TryGetInt(row, "idSiLo", "IDSiLo");
+                if (idSiLo == null || idSiLo == 0)
+                    continue;
+
+                items.Add(new UpsertLGTSChiTietItemDto
+                {
+                    IDSiLo = idSiLo.Value,
+                    IDMapping = TryGetInt(row, "idMapping", "IDMapping"),
+                    IDNVL = TryGetInt(row, "idNVL", "IDNVL"),
+                    TenSiLo = TryGetString(row, "silo", "tenSiLo", "TenSiLo"),
+                    TenNVL = TryGetString(row, "loaiNguyenNhienLieu", "tenNVL", "TenNVL"),
+                    KLTonCuoiKip = TryGetDecimal(row, "klTonCuoiKip", "KLTonCuoiKip", "ton"),
+                    GhiChu = TryGetString(row, "ghiChu", "GhiChu"),
+                    ThuTu = TryGetInt(row, "thuTu", "ThuTu", "stt"),
+                });
+            }
+
+            // Replace mode: luôn xóa dữ liệu cũ của phiếu trước khi ghi mới.
+            await _repo.DeleteByPhieuIdAsync(phieu.Idphieu);
+
+            await _repo.UpsertChiTietAsync(new UpsertLGTSChiTietDto
+            {
+                IDPhieu = phieu.Idphieu,
+                IDLoCao = idLoCao,
+                Ngay = ngay,
+                Ca = ca,
+                Items = items,
+            });
+
+            return items.Count;
+        }
+
         // ─── Mappers ─────────────────────────────────────────────────────────────
 
         private static LGTSSiLoDto MapSiLo(LG_TSL_SiLo e) => new()
@@ -177,5 +246,58 @@ namespace dataproduct.api.Services
             NgayTao = e.NgayTao,
             NguoiTao = e.NguoiTao,
         };
+
+        private static bool TryGetArray(JsonElement obj, string key, out JsonElement array)
+        {
+            array = default;
+            if (obj.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.Array)
+            {
+                array = el;
+                return true;
+            }
+            return false;
+        }
+
+        private static string? TryGetString(JsonElement obj, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (obj.TryGetProperty(key, out var val) && val.ValueKind != JsonValueKind.Null)
+                    return val.ValueKind == JsonValueKind.String ? val.GetString() : val.ToString();
+            }
+            return null;
+        }
+
+        private static int? TryGetInt(JsonElement obj, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!obj.TryGetProperty(key, out var val) || val.ValueKind == JsonValueKind.Null)
+                    continue;
+
+                if (val.ValueKind == JsonValueKind.Number && val.TryGetInt32(out var n))
+                    return n;
+
+                if (val.ValueKind == JsonValueKind.String && int.TryParse(val.GetString(), out var s))
+                    return s;
+            }
+            return null;
+        }
+
+        private static decimal? TryGetDecimal(JsonElement obj, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!obj.TryGetProperty(key, out var val) || val.ValueKind == JsonValueKind.Null)
+                    continue;
+
+                if (val.ValueKind == JsonValueKind.Number && val.TryGetDecimal(out var d))
+                    return d;
+
+                if (val.ValueKind == JsonValueKind.String && decimal.TryParse(val.GetString(), out var s))
+                    return s;
+            }
+            return null;
+        }
     }
 }

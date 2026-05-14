@@ -21,10 +21,6 @@ namespace dataproduct.api.Controllers
 
         // ─── SiLo + NVL view theo Ngày/Ca/LoCao (dùng trong tạo phiếu tồn silo) ──
 
-        /// <summary>
-        /// Lấy danh sách Silo kèm NVL đang được mapping theo Ngày/Ca/LoCao.
-        /// Dùng để load dữ liệu khi tạo phiếu tồn silo lò cao.
-        /// </summary>
         [HttpGet("tonsilo-silo-mapping")]
         public async Task<IActionResult> GetSiLoByMapping(
             [FromQuery] int? idLoCao,
@@ -231,6 +227,36 @@ namespace dataproduct.api.Controllers
             {
                 var ok = await _service.DeleteMappingAsync(id);
                 return ok ? Ok(new { message = "Đã xóa thành công." }) : NotFound(new { message = $"Không tìm thấy Mapping ID={id}" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Chi tiết tồn silo theo phiếu ────────────────────────────────────────
+
+        /// <summary>
+        /// Lưu chi tiết tồn silo theo phiếu (xóa cũ, insert mới theo IDPhieu).
+        /// Gọi sau khi lưu phiếu thành công.
+        /// </summary>
+        [HttpPost("chitiet/upsert")]
+        public async Task<IActionResult> UpsertChiTiet([FromBody] UpsertLGTSChiTietDto dto)
+        {
+            try
+            {
+                await _service.UpsertChiTietAsync(dto);
+                return Ok(new { message = "Lưu chi tiết tồn silo thành công." });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Lấy chi tiết tồn silo theo IDPhieu.
+        /// </summary>
+        [HttpGet("chitiet/{idPhieu}")]
+        public async Task<IActionResult> GetChiTietByPhieu(Guid idPhieu)
+        {
+            try
+            {
+                return Ok(await _service.GetChiTietByPhieuAsync(idPhieu));
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

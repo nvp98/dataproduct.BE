@@ -259,118 +259,201 @@ namespace dataproduct.api.Repositories
             return true;
         }
 
-        public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(
-            int? idLoCao,
-            DateTime? ngay,
-            int? ca)
+        public async Task DeleteByPhieuIdAsync(Guid idPhieu)
         {
-            var ngayDate = ngay?.Date;
+            var existing = _context.LG_TSL_ChiTiet.Where(c => c.IDPhieu == idPhieu);
+            _context.LG_TSL_ChiTiet.RemoveRange(existing);
+            await _context.SaveChangesAsync();
+        }
 
-            return await (
-                from m in _context.LG_TSL_SiLo_Mapping
+        public async Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto)
+        {
+            var existing = _context.LG_TSL_ChiTiet
+                .Where(c => c.IDPhieu == dto.IDPhieu);
+            _context.LG_TSL_ChiTiet.RemoveRange(existing);
 
-                    // =====================================================
+            var now = DateTime.Now;
+            var newRecords = dto.Items.Select(item => new LG_TSL_ChiTiet
+            {
+                IDPhieu = dto.IDPhieu,
+                IDLoCao = dto.IDLoCao,
+                Ngay = dto.Ngay.Date,
+                Ca = dto.Ca,
+                IDSiLo = item.IDSiLo,
+                IDMapping = item.IDMapping,
+                IDNVL = item.IDNVL,
+                TenSiLo = item.TenSiLo,
+                TenNVL = item.TenNVL,
+                KLTonCuoiKip = item.KLTonCuoiKip,
+                GhiChu = item.GhiChu,
+                ThuTu = item.ThuTu,
+            });
+            await _context.LG_TSL_ChiTiet.AddRangeAsync(newRecords);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
+        {
+            return await _context.LG_TSL_ChiTiet
+                .Where(c => c.IDPhieu == idPhieu)
+                .OrderBy(c => c.ThuTu)
+                .Select(c => new LGTSChiTietDto
+                {
+                    ID = c.ID,
+                    IDPhieu = c.IDPhieu,
+                    IDLoCao = c.IDLoCao,
+                    Ngay = c.Ngay,
+                    Ca = c.Ca,
+                    IDSiLo = c.IDSiLo,
+                    IDMapping = c.IDMapping,
+                    IDNVL = c.IDNVL,
+                    TenSiLo = c.TenSiLo,
+                    TenNVL = c.TenNVL,
+                    KLTonCuoiKip = c.KLTonCuoiKip,
+                    GhiChu = c.GhiChu,
+                    ThuTu = c.ThuTu,
+                })
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(
+     int? idLoCao,
+     DateTime? ngay,
+     int? ca)
+        {
+            // =====================================================
+            // BASE QUERY
+            // =====================================================
+
+            IQueryable<LG_TSL_SiLo_Mapping> mappingQuery =
+                _context.LG_TSL_SiLo_Mapping
+                    .AsNoTracking();
+
+            // =====================================================
+            // FILTER: LÒ CAO
+            // =====================================================
+
+            if (idLoCao.HasValue)
+            {
+                mappingQuery = mappingQuery
+                    .Where(x => x.IDLoCao == idLoCao.Value);
+            }
+
+            // =====================================================
+            // FILTER: CA
+            // =====================================================
+
+            if (ca.HasValue)
+            {
+                mappingQuery = mappingQuery
+                    .Where(x => x.Ca == ca.Value);
+            }
+
+            // =====================================================
+            // FILTER: NGÀY
+            // =====================================================
+
+            if (ngay.HasValue)
+            {
+                var fromDate = ngay.Value.Date;
+                var toDate = fromDate.AddDays(1);
+
+                mappingQuery = mappingQuery
+                    .Where(x =>
+                        x.Ngay >= fromDate &&
+                        x.Ngay < toDate);
+            }
+
+            // =====================================================
+            // QUERY
+            // =====================================================
+
+            var result = await (
+                from m in mappingQuery
+
+                    // ================================================
                     // SILO
-                    // =====================================================
+                    // ================================================
 
-                join s in _context.LG_TSL_SiLo
+                join s in _context.LG_TSL_SiLo.AsNoTracking()
                     on m.IDSiLo equals s.ID into siloGroup
 
                 from s in siloGroup.DefaultIfEmpty()
 
-                    // =====================================================
+                    // ================================================
                     // NVL
-                    // =====================================================
+                    // ================================================
 
-                join nvl in _context.LG_TSL_NVL
+                join nvl in _context.LG_TSL_NVL.AsNoTracking()
                     on m.IDNVL equals nvl.ID into nvlGroup
 
                 from nvl in nvlGroup.DefaultIfEmpty()
 
-                    // =====================================================
-                    // TON
-                    // =====================================================
+                    // ================================================
+                    // DTO
+                    // ================================================
 
-                join ton in _context.SiLoTon
-                    on new
-                    {
-                        IDSiLo = m.IDSiLo,
-                        IDLoCao = m.IDLoCao,
-                        Ngay = m.Ngay.Date
-                    }
-                    equals new
-                    {
-                        IDSiLo = ton.IDSiLo,
-                        IDLoCao = ton.IdLoCao,
-                        Ngay = ton.Ngay.Date
-                    }
-                    into tonGroup
-
-                from ton in tonGroup.DefaultIfEmpty()
-
-                    // =====================================================
-                    // FILTER
-                    // =====================================================
-
-                where
-                    (idLoCao == null || m.IDLoCao == idLoCao)
-                    && (ngayDate == null || m.Ngay.Date == ngayDate)
-                    && (ca == null || m.Ca == ca)
-
-                // =====================================================
-                // ORDER
-                // =====================================================
-
-                orderby
-                    m.Ngay descending,
-                    m.Ca,
-                    s != null ? s.ThuTu : 999
-
-                // =====================================================
-                // DTO
-                // =====================================================
-
-                select new LGTSSiLoMappingViewDto
+                select new
                 {
-                    IDMapping = m.ID,
+                    Mapping = m,
+                    SiLo = s,
+                    NVL = nvl,
 
-                    IDSiLo = m.IDSiLo,
-
-                    IDLoCao = m.IDLoCao,
-
-                    IDNVL = m.IDNVL,
-
-                    TenSiLo = s != null
-                        ? s.TenSiLo
-                        : null,
-
-                    ThuTu = s != null
-                        ? s.ThuTu
-                        : null,
-
-                    TenNVL = nvl != null
-                        ? nvl.TenNVL
-                        : null,
-
-                    TenNVL_TK = nvl != null
-                        ? nvl.TenNVL_Tk
-                        : null,
-
-                    Ngay = m.Ngay,
-
-                    Ca = m.Ca,
-
-                    GhiChu = m.GhiChu,
-
-                    Ton = ton != null
-                        ? ton.Ton
-                        : 0
+                    Ton = _context.SiLoTon
+                        .Where(t =>
+                            t.IDSiLo == m.IDSiLo &&
+                            t.IdLoCao == m.IDLoCao &&
+                            t.Ngay >= m.Ngay.Date &&
+                            t.Ngay < m.Ngay.Date.AddDays(1))
+                        .Select(t => (decimal?)t.Ton)
+                        .FirstOrDefault()
                 }
 
             )
-            .AsNoTracking()
-            .ToListAsync();
-        }
-    }
+            .OrderByDescending(x => x.Mapping.Ngay)
+            .ThenBy(x => x.Mapping.Ca)
+            .ThenBy(x => x.SiLo != null ? x.SiLo.ThuTu : 999)
 
+            .Select(x => new LGTSSiLoMappingViewDto
+            {
+                IDMapping = x.Mapping.ID,
+
+                IDSiLo = x.Mapping.IDSiLo,
+
+                IDLoCao = x.Mapping.IDLoCao,
+
+                IDNVL = x.Mapping.IDNVL,
+
+                TenSiLo = x.SiLo != null
+                    ? x.SiLo.TenSiLo
+                    : null,
+
+                ThuTu = x.SiLo != null
+                    ? x.SiLo.ThuTu
+                    : null,
+
+                TenNVL = x.NVL != null
+                    ? x.NVL.TenNVL
+                    : null,
+
+                TenNVL_TK = x.NVL != null
+                    ? x.NVL.TenNVL_Tk
+                    : null,
+
+                Ngay = x.Mapping.Ngay,
+
+                Ca = x.Mapping.Ca,
+
+                GhiChu = x.Mapping.GhiChu,
+
+                Ton = x.Ton ?? 0
+            })
+
+            .ToListAsync();
+
+            return result;
+        }
+
+    }
 }

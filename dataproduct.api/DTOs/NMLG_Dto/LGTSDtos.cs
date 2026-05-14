@@ -121,4 +121,44 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? GhiChu { get; set; }
         public decimal Ton { get; set; }
     }
+
+    // ─── LG_TSL_ChiTiet (chi tiết tồn silo theo phiếu/ngày/ca/lò cao) ─────────────
+
+    public class LGTSChiTietDto
+    {
+        public int ID { get; set; }
+        public Guid IDPhieu { get; set; }
+        public int IDLoCao { get; set; }
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+        public int IDSiLo { get; set; }
+        public int? IDMapping { get; set; }
+        public int? IDNVL { get; set; }
+        public string? TenSiLo { get; set; }
+        public string? TenNVL { get; set; }
+        public decimal? KLTonCuoiKip { get; set; }
+        public string? GhiChu { get; set; }
+        public int? ThuTu { get; set; }
+    }
+
+    public class UpsertLGTSChiTietItemDto
+    {
+        public int IDSiLo { get; set; }
+        public int? IDMapping { get; set; }
+        public int? IDNVL { get; set; }
+        public string? TenSiLo { get; set; }
+        public string? TenNVL { get; set; }
+        public decimal? KLTonCuoiKip { get; set; }
+        public string? GhiChu { get; set; }
+        public int? ThuTu { get; set; }
+    }
+
+    public class UpsertLGTSChiTietDto
+    {
+        public Guid IDPhieu { get; set; }
+        public int IDLoCao { get; set; }
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+        public List<UpsertLGTSChiTietItemDto> Items { get; set; } = new();
+    }
 }

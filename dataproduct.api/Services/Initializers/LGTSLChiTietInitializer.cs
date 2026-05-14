@@ -1,0 +1,27 @@
+using dataproduct.api.Models;
+
+namespace dataproduct.api.Services.Initializers
+{
+    public class LGTSLChiTietInitializer : IPhieuJsonInitializer
+    {
+        private readonly LGTSLService _service;
+
+        public LGTSLChiTietInitializer(LGTSLService service)
+        {
+            _service = service;
+        }
+
+        public bool CanHandle(string? maBm)
+        {
+            if (string.IsNullOrWhiteSpace(maBm))
+                return false;
+
+            return maBm.Equals("NMLG_BM_TonSiLoLoCao", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public async Task InitializeAsync(BmPhieu phieu)
+        {
+            await _service.InsertFromPhieuJsonAsync(phieu);
+        }
+    }
+}

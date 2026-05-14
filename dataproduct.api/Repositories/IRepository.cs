@@ -280,6 +280,11 @@ namespace dataproduct.api.Repositories
 
         // View: SiLo + NVL theo Ngày/Ca/LoCao (dùng tạo phiếu tồn silo)
         Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao, DateTime? ngay, int? ca);
+
+        // Chi tiết tồn silo theo phiếu
+        Task DeleteByPhieuIdAsync(Guid idPhieu);
+        Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto);
+        Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
     }
 
     public interface ILGNLRepository
