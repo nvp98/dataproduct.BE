@@ -91,11 +91,31 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("phan-loai-nhom-options")]
+        public async Task<IActionResult> GetPhanLoaiNhomOptions([FromQuery] string bieuMau, [FromQuery] string? search = null)
+        {
+            var result = await _service.GetDistinctPhanLoaiNhomAsync(bieuMau, search, limit: 30);
+            return Ok(result);
+        }
+
         [HttpPost("fetch")]
         public async Task<IActionResult> Fetch([FromBody] FetchMeThoiRequest request)
         {
             var result = await _service.FetchMeThoiAsync(request);
             return Ok(result);
+        }
+        
+        [HttpPost("search-me-thoi")]
+        public async Task<IActionResult> SearchMeThoi([FromBody] SearchMeThoiRequest request){
+            try
+            {
+                var result = await _service.SearchMeThoi(request.NhaMay, request.TextStr, request.ID_LoThois);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("load")]

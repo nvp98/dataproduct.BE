@@ -268,14 +268,14 @@ namespace dataproduct.api.Business
             }
         }
 
-        public async Task<BmPhieu?> UpdateAsync(Guid id, JsonElement formData)
+        public async Task<(BmPhieu? Phieu, List<string> Warnings)> UpdateAsync(Guid id, JsonElement formData)
         {
             // 1. Lấy phiếu hiện tại
             var existing = await _repo.GetByIdAsync(id);
-            if (existing == null) return null;
+            if (existing == null) return (null, new List<string>());
             EnsurePhieuOperable(existing);
             // Cho phép update khi ĐangLuu (0), Đã thu hồi (3) hoặc Hiệu chỉnh (7 = phiếu clone đang chỉnh sửa). Lưu ở trạng thái 7 không đổi TinhTrang.
-            if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return null;
+            if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return (null, new List<string>());
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
             if (formData.TryGetProperty("NgaySX", out var ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null)
@@ -312,7 +312,7 @@ namespace dataproduct.api.Business
             await ResolveAndSaveKipAsync(existing);
 
             // 4.2 Đồng bộ lại dữ liệu bảng chi tiết từ DataJson.
-            await RunJsonInitializersAsync(existing);
+            var warnings = await RunJsonInitializersAsync(existing);
 
             // Cập nhật thông tin phê duyệt
             // Lưu thông tin phê duyệt
@@ -344,7 +344,7 @@ namespace dataproduct.api.Business
             }
 
 
-            return existing;
+            return (existing, warnings);
         }
 
         public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
@@ -746,18 +746,23 @@ namespace dataproduct.api.Business
             await _repo.UpdateAsync(phieu);
         }
 
-        private async Task RunJsonInitializersAsync(BmPhieu? phieu)
+        private async Task<List<string>> RunJsonInitializersAsync(BmPhieu? phieu)
         {
+            var warnings = new List<string>();
             if (phieu == null)
-                return;
+                return warnings;
 
             foreach (var initializer in _jsonInitializers)
             {
                 if (initializer.CanHandle(phieu.MaBm))
                 {
-                    await initializer.InitializeAsync(phieu);
+                    var w = await initializer.InitializeAsync(phieu);
+                    if (w?.Count > 0)
+                        warnings.AddRange(w);
                 }
             }
+
+            return warnings;
         }
 
         private static void EnsurePhieuOperable(BmPhieu phieu)

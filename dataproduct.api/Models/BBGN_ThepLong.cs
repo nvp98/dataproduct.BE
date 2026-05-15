@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace dataproduct.api.Models;
 
@@ -29,6 +30,19 @@ public partial class BBGN_ThepLong
     public bool? IsTrungMeThoi { get; set; }
     public string? MacThepBKMIS { get; set; }
     public int? IdMacThep { get; set; }
+    // public string? PhanLoaiNhom {get;set;}
+    [JsonPropertyName("klLFSauThep")]
+    public decimal? KLLFSauThep {get;set;}
+
+    public bool? IsThuNghiem {get;set;}
+
+    [NotMapped]
+    public string? TenNhomPhanLoaiMacThep { get; set; }
+
+    public decimal? klcau1 { get; set; }
+    public decimal? klcau2 { get; set; }
+    public int? LastIdUserEdit { get; set; }
+    public string? LastNameUserEdit { get; set; }
 }
 
 

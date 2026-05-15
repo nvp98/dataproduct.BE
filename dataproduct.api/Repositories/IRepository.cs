@@ -114,6 +114,7 @@ namespace dataproduct.api.Repositories
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
+            int? IdNhom,
             int page,
             int pageSize
         );
@@ -197,14 +198,17 @@ namespace dataproduct.api.Repositories
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
         Task<BmQuyenXl?> GetByIdAsync(int id);
         Task AddAsync(BmQuyenXl entity);
+        Task AddRangeAsync(List<BmQuyenXl> entities);
         Task UpdateAsync(BmQuyenXl entity);
         Task DeleteAsync(int id);
+        Task DeleteRangeAsync(List<int> ids);
+        Task DeleteByTaiKhoanAsync(int idTaiKhoan);
         Task<bool> ExistsAsync(int id);
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
         /// <summary>
-        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang.
+        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang + KhuVucPhu.
         /// </summary>
-        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, int? excludeId = null);
+        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, string? khuVucPhu = null, int? excludeId = null);
     }
 
     //  Begin láy thông tin người và chữ ký 

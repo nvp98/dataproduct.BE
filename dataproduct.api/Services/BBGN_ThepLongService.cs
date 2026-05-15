@@ -12,6 +12,7 @@ using System.Text;
 using Microsoft.Data.SqlClient;
 using DinkToPdf;
 using DinkToPdf.Contracts;
+using dataproduct.api.Models.MasterData;
 
 namespace dataproduct.api.Services
 {
@@ -19,6 +20,7 @@ namespace dataproduct.api.Services
     {
         private readonly IBBGN_ThepLongRepository _repo;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
         private readonly SyncPhanLoaiService _syncPhanLoaiService;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IConverter _pdfConverter;
@@ -29,6 +31,7 @@ namespace dataproduct.api.Services
         public BBGN_ThepLongService(
             IBBGN_ThepLongRepository repo,
             ProductFormContext context,
+            ProductDataMasterDbContext masterContext,
             IConfiguration config,
             SyncPhanLoaiService syncPhanLoaiService,
             PheDuyetService pheDuyetService,
@@ -37,6 +40,7 @@ namespace dataproduct.api.Services
         {
             _repo = repo;
             _context = context;
+            _masterContext = masterContext;
             _syncPhanLoaiService = syncPhanLoaiService;
             _pheDuyetService = pheDuyetService;
             _pdfConverter = pdfConverter;
@@ -48,10 +52,12 @@ namespace dataproduct.api.Services
                 ?? throw new InvalidOperationException("GangLongDbConnection/MasterDbConnection connection string is not configured");
         }
 
-        public async Task SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
+        public async Task<List<string>> SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
         {
-             if (!formData.TryGetProperty("table1", out var table))
-                return;
+            var warnings = new List<string>();
+
+            if (!formData.TryGetProperty("table1", out var table))
+                return warnings;
             var bieuMau = GetString(formData, "maBm");
             var ngaySX = TryParseDateTime(formData, "NgaySX");
             var ca = TryParseInt(formData, "ca");
@@ -62,7 +68,6 @@ namespace dataproduct.api.Services
                 .Where(x => x.IdPhieu == idPhieu)
                 .ToListAsync();
 
-            // map để lookup nhanh theo Id dòng (ưu tiên theo yêu cầu FE)
             var mapById = existingData.ToDictionary(x => x.Id);
 
             var toInsert = new List<BBGN_ThepLong>();
@@ -74,15 +79,38 @@ namespace dataproduct.api.Services
                 var rowId = TryParseInt(row, "id");
                 var me = GetString(row, "me");
 
+                var klLFSauThep = TryParseDecimal(row, "klLFSauThep");
                 var klLan1 = TryParseDecimal(row, "klLan1");
                 var klLan2 = TryParseDecimal(row, "klLan2");
                 var klLan3 = TryParseDecimal(row, "klLan3");
-
-                var klThepLong = TryParseDecimal(row, "klThepLong")
-                                ?? SumValues(klLan1, klLan2, klLan3);
+                var klcau1 = TryParseDecimal(row, "klcau1");
+                var klcau2 = TryParseDecimal(row, "klcau2");
+                var lastIdUserEdit = TryParseInt(row, "lastIdUserEdit");
+                var lastNameUserEdit = GetString(row, "lastNameUserEdit");
+                var tinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
+                var isIncomingLenThang = string.Equals(tinhLuyenLenThang?.Trim(), "Lên thẳng", StringComparison.OrdinalIgnoreCase);
 
                 if (rowId.HasValue && mapById.TryGetValue(rowId.Value, out var existing))
                 {
+                    // ===== CHECK SERVER STATE: "Lên thẳng" và klLan1 loại trừ nhau =====
+                    var serverHasKlLan1 = existing.KlLan1.HasValue;
+                    var serverIsLenThang = string.Equals(existing.TinhLuyenLenThang?.Trim(), "Lên thẳng", StringComparison.OrdinalIgnoreCase);
+
+                    if (isIncomingLenThang && serverHasKlLan1)
+                    {
+                        // Case 1: FE gửi "Lên thẳng" nhưng server đang có KL lần 1 → giữ giá trị server
+                        tinhLuyenLenThang = existing.TinhLuyenLenThang;
+                        warnings.Add($"Mẻ {me}: Không thể chọn Lên thẳng vì KL lần 1 đã được nhập");
+                    }
+                    else if (klLan1.HasValue && serverIsLenThang)
+                    {
+                        // Case 2: FE gửi KL lần 1 nhưng server đang có "Lên thẳng" → bỏ KL lần 1
+                        klLan1 = null;
+                        warnings.Add($"Mẻ {me}: Không thể nhập KL lần 1 vì mẻ đã được chọn Lên thẳng");
+                    }
+
+                     var klThepLong = TryParseDecimal(row, "klThepLong");
+
                     // ===== UPDATE =====
                     var oldMe = existing.Me;
                     existing.Me = me;
@@ -90,16 +118,20 @@ namespace dataproduct.api.Services
                     existing.IdMacThep = TryParseInt(row, "idMacThep");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
-
+                    existing.KLLFSauThep = klLFSauThep;
                     existing.KlLan1 = klLan1;
                     existing.KlLan2 = klLan2;
                     existing.KlLan3 = klLan3;
                     existing.KlThepLong = klThepLong;
-
                     existing.GhiChu = GetString(row, "ghiChu");
-                    existing.TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
+                    existing.TinhLuyenLenThang = tinhLuyenLenThang;
                     existing.PhanLoai = GetString(row, "phanLoai");
+                    existing.IsThuNghiem = TryParseBool(row, "isThuNghiem");
                     existing.MacThepBKMIS = GetString(row, "macThepBKMIS");
+                    existing.klcau1 = klcau1;
+                    existing.klcau2 = klcau2;
+                    if (lastIdUserEdit.HasValue) existing.LastIdUserEdit = lastIdUserEdit;
+                    if (!string.IsNullOrWhiteSpace(lastNameUserEdit)) existing.LastNameUserEdit = lastNameUserEdit;
                     if (!string.IsNullOrWhiteSpace(bieuMau)) existing.BieuMau = bieuMau;
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
                     if (ca.HasValue) existing.Ca = ca.Value;
@@ -117,6 +149,12 @@ namespace dataproduct.api.Services
                     // Dòng mới chưa có id: chỉ insert khi có mẻ
                     if (string.IsNullOrWhiteSpace(me)) continue;
 
+                    // INSERT: payload-level check (không có server state để so sánh)
+                    if (isIncomingLenThang)
+                        klLan1 = null;
+
+                    var klThepLong = TryParseDecimal(row, "klThepLong") ;
+
                     // ===== INSERT =====
                     var entity = new BBGN_ThepLong
                     {
@@ -129,16 +167,20 @@ namespace dataproduct.api.Services
                         Ca = ca,
                         NgaySX = ngaySX,
                         Scope = scope,
-
+                        KLLFSauThep = klLFSauThep,
                         KlLan1 = klLan1,
                         KlLan2 = klLan2,
                         KlLan3 = klLan3,
                         KlThepLong = klThepLong,
-
                         GhiChu = GetString(row, "ghiChu"),
-                        TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang"),
+                        TinhLuyenLenThang = tinhLuyenLenThang,
                         PhanLoai = GetString(row, "phanLoai"),
+                        IsThuNghiem = TryParseBool(row, "isThuNghiem"),
                         MacThepBKMIS = GetString(row, "macThepBKMIS"),
+                        klcau1 = klcau1,
+                        klcau2 = klcau2,
+                        LastIdUserEdit = lastIdUserEdit,
+                        LastNameUserEdit = lastNameUserEdit,
                         IdPhieu = idPhieu,
                         IsGhost = false
                     };
@@ -155,6 +197,8 @@ namespace dataproduct.api.Services
             await _context.SaveChangesAsync();
 
             await UpdateDuplicateFlagsForMesAsync(affectedMes);
+
+            return warnings;
         }
     
 
@@ -225,6 +269,15 @@ namespace dataproduct.api.Services
             return null;
         }
 
+        private bool? TryParseBool(JsonElement row, string key)
+        {
+            if (!row.TryGetProperty(key, out var val)) return null;
+            if (val.ValueKind == JsonValueKind.True) return true;
+            if (val.ValueKind == JsonValueKind.False) return false;
+            if (val.ValueKind == JsonValueKind.String && bool.TryParse(val.GetString(), out var b)) return b;
+            return null;
+        }
+
         private decimal? Sum(JsonElement row, params string[] keys)
         {
             decimal total = 0;
@@ -243,55 +296,65 @@ namespace dataproduct.api.Services
             return hasValue ? total : null;
         }
 
+        public async Task<List<string>> GetDistinctPhanLoaiNhomAsync(string bieuMau, string? search = null, int limit = 30)
+        {
+            var query = _context.NhomPhanLoaiMacTheps.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(x => x.TenNhom.Contains(search.Trim()));
+
+            return await query
+                .Select(x => x.TenNhom)
+                .Distinct()
+                .OrderBy(x => x)
+                .Take(limit)
+                .ToListAsync();
+        }
+
         public async Task<List<string>> FetchMeThoiAsync(FetchMeThoiRequest request)
         {
             return await ExecuteGetMeThoiAsync("usp_GetMeThoi_ByNgayCaNhaMay", request.NgaySX, request.Ca, request.NhaMay);
         }
 
+        public async Task<List<string>> SearchMeThoi(int nhaMay, string? searchStr, List<int>? ID_LoThois)
+        {
+            List<int> toHopLoThoi;
+            if (nhaMay == 1 && ID_LoThois != null && ID_LoThois.Count > 0)
+                toHopLoThoi = ID_LoThois;
+            else
+                toHopLoThoi = nhaMay == 1
+                    ? new List<int> { 1, 2, 3, 4, 5 }
+                    : new List<int> { 6, 7 };
+
+            var query = _masterContext.Tbl_MeThoi
+                .Where(x => x.Is_Delete != true
+                         && toHopLoThoi.Contains(x.ID_LoThoi)
+                         && x.ID_TrangThai != 5);
+
+            if (!string.IsNullOrWhiteSpace(searchStr))
+                query = query.Where(x => x.MaMeThoi.Contains(searchStr.Trim()));
+
+            return await query
+                .OrderByDescending(x => x.ID)
+                .Select(x => x.MaMeThoi)
+                .ToListAsync();
+        }
+
         public async Task<List<BBGN_ThepLong>> LoadAsync(LoadBBGNThepLongRequest request)
         {
-            var (bieuMau, nhaMayInt) = ParseBieuMauForThepLong(request.BieuMau);
-
-            // 1. Lấy danh sách mẻ thổi hiện tại từ SP
-            var meThoiFromSP = await FetchMeThoiAsync(new FetchMeThoiRequest
-            {
-                NgaySX = request.NgaySX,
-                Ca = request.Ca,
-                NhaMay = nhaMayInt
-            });
-            var spSet = new HashSet<string>(
-                meThoiFromSP.Where(s => !string.IsNullOrWhiteSpace(s)),
-                StringComparer.OrdinalIgnoreCase);
-
-            // 2. Lấy toàn bộ BBGN_ThepLongs theo IdPhieu
             var rows = await _context.BBGN_ThepLongs
-                .Where(x => x.IdPhieu == request.IdPhieu)
+                .Where(x => x.IdPhieu == request.IdPhieu && x.IsGhost != true)
                 .ToListAsync();
 
-            // 3. Mẻ không còn trong SP → đánh IsGhost = true
-            bool hasChanges = false;
-            foreach (var row in rows.Where(r => !string.IsNullOrWhiteSpace(r.Me)))
-            {
-                if (!spSet.Contains(row.Me!) && row.IsGhost != true)
-                {
-                    row.IsGhost = true;
-                    _context.BBGN_ThepLongs.Update(row);
-                    hasChanges = true;
-                }
-            }
-
-            if (hasChanges)
-                await _context.SaveChangesAsync();
-
-            // 4. Đồng bộ PhanLoai từ MySQL theo danh sách mẻ của phiếu, rồi đọc lại để trả về đã cập nhật
             var maMes = rows
-                .Where(x => x.IsGhost != true && !string.IsNullOrWhiteSpace(x.Me) && (x.PhanLoai == null || x.MacThepBKMIS == null))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Me) && (x.PhanLoai == null || x.MacThepBKMIS == null))
                 .Select(x => x.Me!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (maMes.Count > 0)
             {
+                var (bieuMau, _) = ParseBieuMauForThepLong(request.BieuMau);
                 await _syncPhanLoaiService.SyncAsync(new SyncPhanLoaiRequest
                 {
                     BieuMau = bieuMau,
@@ -299,13 +362,12 @@ namespace dataproduct.api.Services
                 });
 
                 rows = await _context.BBGN_ThepLongs
-                    .Where(x => x.IdPhieu == request.IdPhieu)
+                    .Where(x => x.IdPhieu == request.IdPhieu && x.IsGhost != true)
                     .ToListAsync();
             }
 
-            var result = rows.Where(x => x.IsGhost != true).ToList();
-            await ResolveMacThepNamesAsync(result);
-            return result;
+            await ResolveMacThepNamesAsync(rows);
+            return rows;
         }
 
         public async Task<bool> DeleteRowAsync(int id)
@@ -499,8 +561,22 @@ namespace dataproduct.api.Services
                 query = query.Where(x => (x.PhanLoai ?? string.Empty).Contains(phanLoai));
             }
 
+            if (!string.IsNullOrWhiteSpace(request.PhanLoaiNhom))
+            {
+                var phanLoaiNhom = request.PhanLoaiNhom.Trim();
+                var matchingMacThepIds = _context.MacTheps
+                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue &&
+                        _context.NhomPhanLoaiMacTheps
+                            .Any(n => n.Id == m.Id_NhomPhanLoaiMacThep.Value && n.TenNhom.Contains(phanLoaiNhom)))
+                    .Select(m => m.Id);
+                query = query.Where(x => x.IdMacThep.HasValue && matchingMacThepIds.Contains(x.IdMacThep.Value));
+            }
+
             if (request.IsTrungMeThoi.HasValue)
                 query = query.Where(x => x.IsTrungMeThoi == request.IsTrungMeThoi.Value);
+
+            if (request.IsThuNghiem.HasValue)
+                query = query.Where(x => x.IsThuNghiem == request.IsThuNghiem.Value);
 
             return query;
         }
@@ -510,14 +586,31 @@ namespace dataproduct.api.Services
             var ids = rows.Where(x => x.IdMacThep.HasValue).Select(x => x.IdMacThep!.Value).Distinct().ToList();
             if (ids.Count == 0) return;
 
-            var map = await _context.MacTheps
+            var macTheps = await _context.MacTheps
                 .Where(x => ids.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.TenMacThep);
+                .ToListAsync();
+
+            var nhomIds = macTheps
+                .Where(x => x.Id_NhomPhanLoaiMacThep.HasValue)
+                .Select(x => x.Id_NhomPhanLoaiMacThep!.Value)
+                .Distinct()
+                .ToList();
+
+            var nhomMap = nhomIds.Count > 0
+                ? await _context.NhomPhanLoaiMacTheps
+                    .Where(x => nhomIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id, x => x.TenNhom)
+                : new Dictionary<int, string>();
+
+            var macThepMap = macTheps.ToDictionary(x => x.Id);
 
             foreach (var row in rows.Where(x => x.IdMacThep.HasValue))
             {
-                if (map.TryGetValue(row.IdMacThep!.Value, out var ten))
-                    row.MacThep = ten;
+                if (!macThepMap.TryGetValue(row.IdMacThep!.Value, out var mt)) continue;
+                row.MacThep = mt.TenMacThep;
+                if (mt.Id_NhomPhanLoaiMacThep.HasValue &&
+                    nhomMap.TryGetValue(mt.Id_NhomPhanLoaiMacThep.Value, out var tenNhom))
+                    row.TenNhomPhanLoaiMacThep = tenNhom;
             }
         }
 

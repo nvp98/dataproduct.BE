@@ -22,9 +22,10 @@ namespace dataproduct.api.Services.Initializers
                 || maBm.Contains("KPH", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             await _service.InsertFromPhieuJsonAsync(phieu);
+            return new List<string>();
         }
     }
 }

@@ -147,6 +147,7 @@ namespace dataproduct.api.Repositories
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
+            int? IdNhom,
             int page,
             int pageSize
         )
@@ -182,7 +183,8 @@ namespace dataproduct.api.Repositories
                     IsUsed_Excel = hk != null ? hk.IsUsed_Excel : null,
                     LoaiExcel = hk != null ? hk.LoaiExcel : null,
                     ThuTu_Excel_BOF = hk != null ? hk.ThuTu_Excel_BOF : null,
-                    ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null
+                    ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null,
+                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null
                 };
 
             // (2) HeaderKey chưa được móc nối
@@ -213,7 +215,8 @@ namespace dataproduct.api.Repositories
                     IsUsed_Excel = hk.IsUsed_Excel,
                     LoaiExcel = hk.LoaiExcel,
                     ThuTu_Excel_BOF = hk.ThuTu_Excel_BOF,
-                    ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH
+                    ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH,
+                    ID_NhomKey = hk.ID_NhomKey
                 };
 
             // (3) PhuLieu_NM chưa được móc nối
@@ -244,7 +247,8 @@ namespace dataproduct.api.Repositories
                     IsUsed_Excel = null,
                     LoaiExcel = null,
                     ThuTu_Excel_BOF = null,
-                    ThuTu_Excel_LFRH = null
+                    ThuTu_Excel_LFRH = null,
+                    ID_NhomKey = null
                 };
 
             // Union 3 tập dữ liệu thành 1 query
@@ -338,6 +342,10 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => (x.NgayTaoPhuLieu ?? x.NgayTao) != null && (x.NgayTaoPhuLieu ?? x.NgayTao) <= to);
             }
 
+            // Filter theo nhóm
+            if (IdNhom.HasValue)
+                query = query.Where(x => x.ID_NhomKey == IdNhom.Value);
+
             // Đếm tổng số records
             var totalCount = await query.CountAsync();
 
@@ -353,6 +361,19 @@ namespace dataproduct.api.Repositories
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+
+            // Enrich TenNhom từ Header_Nhom
+            var nhomIds = data.Where(d => d.ID_NhomKey.HasValue)
+                              .Select(d => d.ID_NhomKey!.Value).ToHashSet();
+            if (nhomIds.Count > 0)
+            {
+                var nhomNames = await _context.Header_Nhoms
+                    .Where(n => nhomIds.Contains(n.Id))
+                    .ToDictionaryAsync(n => n.Id, n => n.TenHienThi);
+                foreach (var d in data)
+                    if (d.ID_NhomKey.HasValue && nhomNames.TryGetValue(d.ID_NhomKey.Value, out var name))
+                        d.TenNhom = name;
+            }
 
             return (data, totalCount);
         }

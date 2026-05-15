@@ -139,7 +139,7 @@ namespace dataproduct.api.Services
                 .ToListAsync();
 
             var needMeThoi = rows
-                .Where(x => x.KLGangLongCCT == null)
+                .Where(x => x.KLGangLongCCT == null || x.KLGangLongCCT == 0)
                 .Select(x => x.MeThoi!)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -153,7 +153,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 if (string.IsNullOrWhiteSpace(row.MeThoi)) continue;
-                if (row.KLGangLongCCT != null) continue;
+                if (row.KLGangLongCCT != null && row.KLGangLongCCT != 0) continue;
                 if (!cache.TryGetValue(row.MeThoi, out var kl)) continue;
 
                 row.KLGangLongCCT = kl;

@@ -95,6 +95,20 @@ namespace dataproduct.api.Controllers
                 })
                 .ToListAsync();
 
+            // Gom theo MaBm: mỗi biểu mẫu → danh sách KhuVucPhu user được phép
+            var quyenTheoLo = (await _formContext.BmQuyenXls
+                    .AsNoTracking()
+                    .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan && x.KhuVucPhu != null)
+                    .Select(x => new { x.MaBm, x.KhuVucPhu })
+                    .ToListAsync())
+                .GroupBy(x => x.MaBm)
+                .Select(g => new
+                {
+                    maBm = g.Key,
+                    khuVucPhus = g.Select(x => x.KhuVucPhu!).Distinct().ToList()
+                })
+                .ToList();
+
             var result = new
             {
                 user.ID_TaiKhoan,
@@ -109,6 +123,7 @@ namespace dataproduct.api.Controllers
                 TenPhongBan = user.PhongBan?.TenPhongBan,
                 user.ID_Quyen,
                 bmQuyenXlList,
+                quyenTheoLo
             };
 
             return Ok(result);
@@ -191,6 +206,42 @@ namespace dataproduct.api.Controllers
             return Ok(result);
         }
 
+        [HttpGet("list-ky-duyet")]
+        public async Task<IActionResult> ListkyDuyet([FromQuery] string maBm, int loaiQuyen)
+        {
+            var quyenChucNangList = loaiQuyen == (int)LoaiQuyenChucNangEnum.NguoiTao
+                ? new List<byte> { 1, 4 }
+                : new List<byte> { 2, 4 };
+
+            var idTaiKhoans = await _formContext.BmQuyenXls
+                .Where(x => x.MaBm == maBm
+                    && x.QuyenChucNang != null
+                    && quyenChucNangList.Contains(x.QuyenChucNang.Value))
+                .Select(x => x.IdTaiKhoan)
+                .Where(id => id != null)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            var taiKhoanList = await _context.Tbl_TaiKhoan
+                .Include(x => x.PhongBan)
+                .Where(x => idTaiKhoans.Contains(x.ID_TaiKhoan))
+                .Select(x => new
+                {
+                    x.ID_TaiKhoan,
+                    x.HoVaTen,
+                    x.TenTaiKhoan,
+                    x.PhongBan_API,
+                    x.Xuong_API,
+                    x.PhongBan.TenNgan,
+                    x.ChuKy,
+                    TenPhongBan = x.PhongBan != null ? x.PhongBan.TenPhongBan : null
+                })
+                .ToListAsync();
+
+            return Ok(taiKhoanList);
+        }
+
     }
 
 }
@@ -199,5 +250,10 @@ public class LoginRequest
 {
     public string username { get; set; } = "";
     public string password { get; set; } = "";
+}
+
+public enum LoaiQuyenChucNangEnum{
+    NguoiTao = 1,
+    NguoiDuyet = 2
 }
 

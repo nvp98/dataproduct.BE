@@ -88,5 +88,7 @@ namespace dataproduct.api.ResponseModels
         public byte? LoaiExcel { get; set; }
         public int? ThuTu_Excel_BOF { get; set; }
         public int? ThuTu_Excel_LFRH { get; set; }
+        public int? ID_NhomKey { get; set; }
+        public string? TenNhom { get; set; }
     }
 }

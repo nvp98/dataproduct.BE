@@ -93,6 +93,28 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
+        /// Lưu hàng loạt: mỗi tổ hợp (MaBm × MaKhuVuc) thành 1 dòng.
+        /// Truyền IdToDelete để xóa bản ghi cũ trước khi tạo mới (dùng khi cập nhật).
+        /// </summary>
+        [HttpPost("save")]
+        public async Task<IActionResult> BulkSave([FromBody] BmQuyenXlBulkSaveDto dto)
+        {
+            try
+            {
+                var created = await _service.BulkSaveAsync(dto);
+                return Ok(new { count = created.Count });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Tạo mới quyền xử lý
         /// </summary>
         /// <param name="dto">Dữ liệu tạo mới</param>
@@ -132,10 +154,8 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
-        /// Xóa quyền xử lý
+        /// Xóa quyền xử lý theo ID
         /// </summary>
-        /// <param name="id">ID quyền xử lý</param>
-        /// <returns>NoContent nếu thành công</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -143,6 +163,23 @@ namespace dataproduct.api.Controllers
             {
                 var ok = await _service.DeleteAsync(id);
                 return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Xóa toàn bộ quyền xử lý của một tài khoản
+        /// </summary>
+        [HttpDelete("tai-khoan/{idTaiKhoan:int}")]
+        public async Task<IActionResult> DeleteByTaiKhoan(int idTaiKhoan)
+        {
+            try
+            {
+                await _service.DeleteByTaiKhoanAsync(idTaiKhoan);
+                return NoContent();
             }
             catch (Exception ex)
             {

@@ -20,9 +20,10 @@ namespace dataproduct.api.Services.Initializers
             return maBm.Equals("HRC2_STD_NXT", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             await _stdNxtHrc2Repo.InitializeHRC2_STD_NXTAsync(phieu);
+            return new List<string>();
         }
     }
 }

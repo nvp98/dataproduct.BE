@@ -24,9 +24,10 @@ namespace dataproduct.api.Services.Initializers
                 || maBm.Equals("BM11/QT.05.11", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             await _service.InsertSanLuongPhoiFromPhieuJsonAsync(phieu);
+            return new List<string>();
         }
     }
 }
