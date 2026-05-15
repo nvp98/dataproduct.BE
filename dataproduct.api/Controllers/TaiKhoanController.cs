@@ -83,32 +83,6 @@ namespace dataproduct.api.Controllers
             //HttpContext.Session.SetString("UserName", user.HoVaTen ?? "");
             //HttpContext.Session.SetString("PhongBan", user.PhongBan?.TenPhongBan ?? "");
             //HttpContext.Session.SetString("Xuong", user.Xuong_API ?? "");
-            // Phân quyền theo biểu mẫu: mỗi dòng = (MaBm, QuyenChucNang) — lấy từ DB biểu mẫu (ProductFormContext)
-            var bmQuyenXlList = await _formContext.BmQuyenXls
-                .AsNoTracking()
-                .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan)
-                .OrderBy(x => x.MaBm)
-                .Select(x => new
-                {
-                    maBm = x.MaBm,
-                    quyenChucNang = x.QuyenChucNang,
-                })
-                .ToListAsync();
-
-            // Gom theo MaBm: mỗi biểu mẫu → danh sách KhuVucPhu user được phép
-            var quyenTheoLo = (await _formContext.BmQuyenXls
-                    .AsNoTracking()
-                    .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan && x.KhuVucPhu != null)
-                    .Select(x => new { x.MaBm, x.KhuVucPhu })
-                    .ToListAsync())
-                .GroupBy(x => x.MaBm)
-                .Select(g => new
-                {
-                    maBm = g.Key,
-                    khuVucPhus = g.Select(x => x.KhuVucPhu!).Distinct().ToList()
-                })
-                .ToList();
-
             var result = new
             {
                 user.ID_TaiKhoan,
@@ -122,8 +96,6 @@ namespace dataproduct.api.Controllers
                 user.Xuong_API,
                 TenPhongBan = user.PhongBan?.TenPhongBan,
                 user.ID_Quyen,
-                bmQuyenXlList,
-                quyenTheoLo
             };
 
             return Ok(result);
@@ -204,6 +176,45 @@ namespace dataproduct.api.Controllers
             };
 
             return Ok(result);
+        }
+
+        [HttpGet("quyen/{tenTaiKhoan}")]
+        public async Task<IActionResult> GetQuyen(string tenTaiKhoan)
+        {
+            if (string.IsNullOrEmpty(tenTaiKhoan))
+                return BadRequest(new { message = "Tên tài khoản không được để trống" });
+
+            var user = await _context.Tbl_TaiKhoan
+                .FirstOrDefaultAsync(x => x.TenTaiKhoan == tenTaiKhoan);
+
+            if (user == null)
+                return NotFound(new { message = $"Không tìm thấy tài khoản: {tenTaiKhoan}" });
+
+            var bmQuyenXlList = await _formContext.BmQuyenXls
+                .AsNoTracking()
+                .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan)
+                .OrderBy(x => x.MaBm)
+                .Select(x => new
+                {
+                    maBm = x.MaBm,
+                    quyenChucNang = x.QuyenChucNang,
+                })
+                .ToListAsync();
+
+            var quyenTheoLo = (await _formContext.BmQuyenXls
+                    .AsNoTracking()
+                    .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan && x.KhuVucPhu != null)
+                    .Select(x => new { x.MaBm, x.KhuVucPhu })
+                    .ToListAsync())
+                .GroupBy(x => x.MaBm)
+                .Select(g => new
+                {
+                    maBm = g.Key,
+                    khuVucPhus = g.Select(x => x.KhuVucPhu!).Distinct().ToList()
+                })
+                .ToList();
+
+            return Ok(new { bmQuyenXlList, quyenTheoLo });
         }
 
         [HttpGet("list-ky-duyet")]
