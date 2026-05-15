@@ -1,4 +1,5 @@
 using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
@@ -14,11 +15,13 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly PheDuyetService _pdservice;
+        private readonly IPheDuyetRepository _pheDuyetRepo;
 
-        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo)
         {
             _context = context;
             _pdservice = pdservice;
+            _pheDuyetRepo = pheDuyetRepo;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -279,6 +282,49 @@ namespace dataproduct.api.Repositories
                     }
                 }
 
+                else if (item.MaBm == "HRC1_BB_GiaoNhanPhoiNhapKho")
+                {
+                    var start = item.NgaySX.ToDateTime(TimeOnly.MinValue);
+                    var nextDay = start.AddDays(1);
+
+                    var queryPNK = _context.BM_PhoiNhapKho
+                        .Where(x =>
+                            x.NgaySX >= start && x.NgaySX < nextDay &&
+                            x.Ca == item.Ca &&
+                            x.MayDuc == item.MayDuc);
+                    // Check từ BM_PhoiNhapKho table
+                    var hasPendingCap0 = await queryPNK.AnyAsync() &&
+                     await queryPNK.AllAsync(x => x.TinhTrangCap0 == 1);
+
+                    var hasPendingCap1 = await queryPNK.AnyAsync() &&
+                      await queryPNK.AllAsync(x => x.TinhTrangCap1 == 1);
+
+                    var hasPendingCap2 = await queryPNK.AnyAsync() &&
+                     await queryPNK.AllAsync(x => x.TinhTrangCap2 == 1);
+
+                    // CapDuyet = 0: Xuống/Factory
+                    if (hasPendingCap0)
+                    {
+                        var cap0 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 0);
+                        if (cap0 != null) cap0.TinhTrang = 1;
+
+                    }
+
+                    // CapDuyet = 1: QLCL/QC
+                    if (hasPendingCap1)
+                    {
+                        var cap1 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 1);
+                        if (cap1 != null) cap1.TinhTrang = 1;
+                    }
+
+                    // CapDuyet = 2: Đúc/Casting
+                    if (hasPendingCap2)
+                    {
+                        var cap2 = pheDuyet.FirstOrDefault(x => x.CapDuyet == 2);
+                        if (cap2 != null) cap2.TinhTrang = 1;
+                    }
+                }
+
                 item.PheDuyet = pheDuyet.ToList();
             }
 
@@ -460,6 +506,27 @@ namespace dataproduct.api.Repositories
             }
 
             return (result, totalCount);
+        }
+
+        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        {
+            var query = _context.BmPhieus
+                .Where(x => x.IsDelete != 1 && x.IsLock != 1 && x.MaBm == maBm)
+                .AsQueryable();
+
+            if (ngaySX.HasValue)
+                query = query.Where(x => x.NgaySX == ngaySX.Value);
+
+            if (ca.HasValue)
+                query = query.Where(x => x.Ca == ca.Value);
+
+            var result = await query
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.Ca)
+                .Select(x => x.SoPhieu)
+                .ToListAsync();
+
+            return result;
         }
 
     }

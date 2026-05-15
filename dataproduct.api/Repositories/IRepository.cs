@@ -52,6 +52,7 @@ namespace dataproduct.api.Repositories
         Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc);
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request);
+        Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
     }
     public interface IBMPheDuyetRepository
     {
@@ -218,6 +219,7 @@ namespace dataproduct.api.Repositories
         Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids);
         Task<List<PhongBan>> GetAllPhongBanAsync();
         Task<List<ViTri>> GetAllViTriAsync();
+        Task<BmPheDuyet> InitializePheDuyetAsync(Guid phieuId, int capDuyet, int idNguoiDuyet);
     }
 
     // End

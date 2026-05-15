@@ -356,7 +356,15 @@ namespace dataproduct.api.Services
                     TongKhoiLuong = x.TongKhoiLuong,
                     TTHD = x.TTHD,
                     ThoiGianTao = x.ThoiGianTao,
-                    NgayGiao = x.NgaySX
+                    NgayGiao = x.NgaySX,
+                    ID_Chot = x.ID_Chot,
+                    ID_NguoiCap0 = x.ID_NguoiCap0,
+                    ID_NguoiCap1 = x.ID_NguoiCap1,
+                    ID_NguoiCap2 = x.ID_NguoiCap2,
+                    TinhTrangCap0 = x.TinhTrangCap0,
+                    TinhTrangCap1 = x.TinhTrangCap1,
+                    TinhTrangCap2 = x.TinhTrangCap2,
+                    TinhTrang = x.TinhTrang
                 })
                 .ToListAsync();
 
@@ -384,7 +392,7 @@ namespace dataproduct.api.Services
                     .ToListAsync();
 
                 var bkLookup = bkRows
-                    .GroupBy(x => ( x.Me, x.Mac, x.KichThuoc))
+                    .GroupBy(x => (x.Me, x.Mac, x.KichThuoc))
                     .ToDictionary(g => g.Key, g => g.Max(v => v.NgaySx));
 
                 foreach (var item in data)
@@ -738,6 +746,17 @@ namespace dataproduct.api.Services
 
             if (request.NgaySX == default || request.Ca <= 0)
                 throw new ArgumentException("Thiếu thông tin NgàySX/Ca");
+            var ngay = DateOnly.FromDateTime(request.NgaySX);
+
+            // ★ Tìm phiếu theo Ngày sx, ca sx, máy đúc nếu phiếu đã chốt k cho chuyển thanh vào nữa
+            var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x =>
+                x.NgaySX == ngay &&
+                x.Ca == request.Ca &&
+                x.MayDuc == request.MayDuc);
+
+            // ★ Kiểm tra nếu phiếu đã chốt (TinhTrang = 5) thì không cho phép chuyển thanh
+            if (phieu != null && phieu.TinhTrang == 5)
+                throw new Exception($"Phiếu đã chốt! Không thể chuyển thanh vào phiếu ngày {request.NgaySX:dd/MM/yyyy}, ca {request.Ca}, máy đúc {request.MayDuc}.");
 
             var incomingRows = (request.Table1 ?? new List<InsertPhoiNhapKhoDto>())
                 .Where(x => !string.IsNullOrWhiteSpace(x.Me) && !string.IsNullOrWhiteSpace(x.Mac))
@@ -801,7 +820,9 @@ namespace dataproduct.api.Services
                             TongKhoiLuong = row.TongKhoiLuong,
                             NguoiTaoId = request.NguoiTaoId,
                             ThoiGianTao = DateTime.Now,
-                            TTHD = true
+                            TTHD = true,
+                            TinhTrangCap0 = 1, // da giao
+                            ID_NguoiCap0 = request.NguoiTaoId,  // ID nguoi giao
                         };
 
                         await _context.BM_PhoiNhapKho.AddAsync(entity);
@@ -831,6 +852,8 @@ namespace dataproduct.api.Services
                     match.NguoiTaoId = request.NguoiTaoId;
                     match.ThoiGianTao = DateTime.Now;
                     match.TTHD = true;
+                    match.TinhTrangCap0 = 1; // da giao
+                    match.ID_NguoiCap0 = request.NguoiTaoId;  // ID nguoi giao
 
                     updated++;
                 }
@@ -884,6 +907,135 @@ namespace dataproduct.api.Services
                 throw new ArgumentException("IdPhieu không hợp lệ");
 
             await _repo.DeletePhoiNhapKhoByPhieuAsync(idPhieu);
+        }
+
+        public async Task<int> XacNhanPhoiNhapKhoRowsAsync(List<int> ids, int nguoiXacNhanId, int? CapXacNhan, int? TinhTrangCap, Guid idPhieu)
+        {
+            // logic: cấp xác nhận nào thì cập nhật trường tương ứng (TinhTrangCap0, TinhTrangCap1, TinhTrangCap2) và ID_Cap0, ID_Cap1, ID_Cap2
+            if (ids == null || ids.Count == 0)
+                throw new ArgumentException("Danh sách dòng xác nhận không hợp lệ");
+
+            if (nguoiXacNhanId <= 0)
+                throw new ArgumentException("ID người xác nhận không hợp lệ");
+
+            if (!CapXacNhan.HasValue || CapXacNhan < 0 || CapXacNhan > 2)
+                throw new ArgumentException("Cấp xác nhận không hợp lệ");
+
+            try
+            {
+                // update BM_PhoiNhapKho set TinhTrangCap{CapXacNhan} = 1, ID_Cap{Cap
+                //XacNhan} = @nguoiXacNhanId where Id in (@ids)
+                // chạy qua BM_PhoiNhapKho update qua từng dòng code chứ k qua store để đảm bảo trigger hoạt động
+                var rowsToUpdate = await _context.BM_PhoiNhapKho.Where(x => ids.Contains(x.Id)).ToListAsync();
+                foreach (var row in rowsToUpdate)
+                {
+                    switch (CapXacNhan.Value)
+                    {
+                        case 0:
+                            row.TinhTrangCap0 = TinhTrangCap;
+                            row.ID_NguoiCap0 = nguoiXacNhanId;
+                            break;
+                        case 1:
+                            row.TinhTrangCap1 = TinhTrangCap;
+                            row.ID_NguoiCap1 = nguoiXacNhanId;
+                            break;
+                        case 2:
+                            row.TinhTrangCap2 = TinhTrangCap;
+                            row.ID_NguoiCap2 = nguoiXacNhanId;
+                            break;
+                    }
+                }
+                await _context.SaveChangesAsync();
+                var checkpheduyet = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
+                if (checkpheduyet.Count == 0)
+                {
+                    // Khoi tao cap duyet = 0
+                    var IDNguoiTao = rowsToUpdate.Where(x => x.NguoiTaoId != null).Select(x => x.NguoiTaoId.Value).Distinct().FirstOrDefault();
+                    if (IDNguoiTao != 0)
+                    {
+                        // call đến khơi tạo PheDuyet
+                        await _pheDuyetService.InitializePheDuyetAsync(idPhieu, 0, IDNguoiTao);
+                    }
+                }
+                // call đến khơi tạo PheDuyet
+                await _pheDuyetService.InitializePheDuyetAsync(idPhieu, CapXacNhan.Value, nguoiXacNhanId);
+
+                // Update BM_Phieu TinhTrang -> Dang phe duyet
+                var phieu = _context.BmPhieus.FirstOrDefault(x => x.Idphieu == idPhieu);
+                if (phieu.TinhTrang == 0)
+                {
+                    phieu.TinhTrang = 1; // đã gửi
+                    await _context.SaveChangesAsync();
+                }
+
+
+                return rowsToUpdate.Count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                throw;
+            }
+        }
+        public async Task<int> ChotPhoiNhapKhoRowsAsync(Guid idPhieu, int? tinhTrangChot)
+        {
+            try
+            {
+                // Bước 1: Tìm BM_Phieu theo idPhieu
+                var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == idPhieu);
+                if (phieu == null)
+                    throw new Exception($"Không tìm thấy phiếu với ID: {idPhieu}");
+
+                // Bước 2: Lấy thông tin ngày sản xuất, ca từ phiếu
+                if (!phieu.NgaySX.HasValue || phieu.Ca <= 0)
+                    throw new ArgumentException("Phiếu thiếu thông tin Ngày SX hoặc Ca");
+
+                // Bước 3: Tìm tất cả rows trong BM_PhoiNhapKho theo IdPhieu và ngày/ca
+                var rowsToChot = await _context.BM_PhoiNhapKho
+                    .Where(x =>
+                                x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date &&
+                                x.Ca == phieu.Ca.Value && x.MayDuc == phieu.MayDuc)
+                    .ToListAsync();
+
+                if (rowsToChot.Count == 0)
+                    throw new Exception("Không tìm thấy dữ liệu phôi nhập kho để chốt");
+
+                // Bước 4: Kiểm tra xem tất cả cấp đã duyệt chưa
+                var allCapsApproved = rowsToChot.All(x =>
+                    x.TinhTrangCap0 == 1 &&
+                    x.TinhTrangCap1 == 1 &&
+                    x.TinhTrangCap2 == 1
+                );
+
+                if (!allCapsApproved)
+                    throw new Exception("Không thể chốt! Vui lòng đảm bảo tất cả cấp đều đã duyệt");
+
+                // Bước 5: Khi chốt, cập nhật tình trạng rows = 1
+                foreach (var row in rowsToChot)
+                {
+                    row.TinhTrang = tinhTrangChot; // Đã chốt
+                }
+                if (tinhTrangChot == 1)
+                {
+                    // Bước 6: Cập nhật TinhTrang của BM_Phieu = 5 (Chốt)
+                    phieu.TinhTrang = 5;
+                }
+                else // thu hồi
+                {
+                    // Bước 6: Cập nhật TinhTrang của BM_Phieu = 1( hủy Chốt)
+                    phieu.TinhTrang = 1;
+                }
+
+
+                await _context.SaveChangesAsync();
+
+                return rowsToChot.Count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ChotPhoiNhapKhoRowsAsync Error: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<int> ThuHoiPhoiNhapKhoRowsAsync(List<int> ids)
@@ -1248,22 +1400,26 @@ namespace dataproduct.api.Services
         }
         public async Task<List<BmPhieuExportRow>> GetDataExportExcelByBmPhieuPKHAsync(DateOnly? fromDate, DateOnly? toDate)
         {
-            var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
+            // ★ Nguồn BKMis (dữ liệu gốc sản xuất)
+            var dataBKMis = await _repo.GetPhoiNhapKhoExportRangeAsync(fromDate, toDate);
 
+            // ★ Dữ liệu nhập kho từ query (để so sánh với BKMis)
+            var query = _context.BM_PhoiNhapKho.AsNoTracking().AsQueryable();
 
             if (fromDate.HasValue)
                 query = query.Where(x => x.NgaySX.Date >= fromDate.Value.ToDateTime(TimeOnly.MinValue).Date);
 
             if (toDate.HasValue)
-                query = query.Where(x => x.NgaySX.Date <= toDate.Value.ToDateTime(TimeOnly.MinValue).Date);
+                query = query.Where(x => x.NgaySX.Date <= toDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue).Date);
 
-            var dataBKMis = await _repo.GetPhoiNhapKhoExportRangeAsync(fromDate, toDate);
+            var queryData = await query.ToListAsync();
 
-            var dataBKMisLookup = dataBKMis
+            // ★ Lần 1 Lookup: Nhập kho cùng ngày ca - so sánh dựa trên (NgaySX, Ca, Me, Mac, KichThuoc)
+            var lan1Lookup = queryData
                 .GroupBy(x => new
                 {
-                    x.NgaySX,
-                    x.Ca,
+                    NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                    Ca = x.Ca,
                     Me = NormalizeKeyValue(x.Me),
                     Mac = NormalizeKeyValue(x.Mac),
                     KichThuoc = NormalizeKeyValue(x.KichThuoc),
@@ -1276,8 +1432,8 @@ namespace dataproduct.api.Services
                         KlLoai1 = g.Sum(x => Convert.ToDecimal(x.KlLoai1)),
                         StLoai2 = g.Sum(x => x.StLoai2),
                         KlLoai2 = g.Sum(x => Convert.ToDecimal(x.KlLoai2)),
-                        StLoai2tp = g.Sum(x => x.stLoai2tp),
-                        KlLoai2tp = g.Sum(x => Convert.ToDecimal(x.klLoai2tp)),
+                        StLoai2tp = g.Sum(x => x.StLoai2TP),
+                        KlLoai2tp = g.Sum(x => Convert.ToDecimal(x.KlLoai2TP)),
                         StPhoiNgan = g.Sum(x => x.StPhoiNgan),
                         CdPhoiNgan = g.Sum(x => Convert.ToDecimal(x.CdPhoiNgan)),
                         KlPhoiNgan = g.Sum(x => Convert.ToDecimal(x.KlPhoiNgan)),
@@ -1285,83 +1441,140 @@ namespace dataproduct.api.Services
                         KlLoai3 = g.Sum(x => Convert.ToDecimal(x.KlLoai3)),
                         TongSoThanh = g.Sum(x => x.TongSoThanh),
                         TongKhoiLuong = g.Sum(x => Convert.ToDecimal(x.TongKhoiLuong)),
+                        // 🔥 FIX trạng thái
+                        TinhTrangHRC = g.All(x => x.TinhTrangCap2 == 1) ? 1 : 0,
+                        TinhTrangQLCL = g.All(x => x.TinhTrangCap1 == 1) ? 1 : 0,
+                        TinhTrangChot = g.All(x => x.TinhTrang == 1) ? 1 : 0,
+                        SoPhieu = g.Select(x => x.SoPhieu).FirstOrDefault(),
                     });
 
-            var rows = await (
-                from x in query
-                join p in _context.BmPhieus
-                    .AsNoTracking()
-                    .Select(phieu => new { phieu.Idphieu, phieu.TinhTrang })
-                    on x.IdPhieu equals p.Idphieu into phieuJoin
-                from p in phieuJoin.DefaultIfEmpty()
-                orderby x.NgaySX descending, x.ThoiGianTao descending
-                select new
+            // ★ Lần 2 Lookup: Nhập kho ca tiếp theo - lookup bình thường, tìm kiếm bằng shifted key
+            var lan2Lookup = queryData
+                .GroupBy(x => new
+                {
+                    NgaySX = DateOnly.FromDateTime(x.NgaySX),
+                    Ca = x.Ca,
+                    Me = NormalizeKeyValue(x.Me),
+                    Mac = NormalizeKeyValue(x.Mac),
+                    KichThuoc = NormalizeKeyValue(x.KichThuoc),
+                })
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        StLoai1 = g.Sum(x => x.StLoai1),
+                        KlLoai1 = g.Sum(x => Convert.ToDecimal(x.KlLoai1)),
+                        StLoai2 = g.Sum(x => x.StLoai2),
+                        KlLoai2 = g.Sum(x => Convert.ToDecimal(x.KlLoai2)),
+                        StLoai2tp = g.Sum(x => x.StLoai2TP),
+                        KlLoai2tp = g.Sum(x => Convert.ToDecimal(x.KlLoai2TP)),
+                        StPhoiNgan = g.Sum(x => x.StPhoiNgan),
+                        CdPhoiNgan = g.Sum(x => Convert.ToDecimal(x.CdPhoiNgan)),
+                        KlPhoiNgan = g.Sum(x => Convert.ToDecimal(x.KlPhoiNgan)),
+                        StLoai3 = g.Sum(x => x.StLoai3),
+                        KlLoai3 = g.Sum(x => Convert.ToDecimal(x.KlLoai3)),
+                        TongSoThanh = g.Sum(x => x.TongSoThanh),
+                        TongKhoiLuong = g.Sum(x => Convert.ToDecimal(x.TongKhoiLuong)),
+                        // 🔥 FIX trạng thái
+                        TinhTrangHRC = g.All(x => x.TinhTrangCap2 == 1) ? 1 : 0,
+                        TinhTrangQLCL = g.All(x => x.TinhTrangCap1 == 1) ? 1 : 0,
+                        TinhTrangChot = g.All(x => x.TinhTrang == 1) ? 1 : 0,
+                    });
+
+            // ★ Tạo rows từ BKMis (nguồn gốc sản xuất) - so sánh dựa trên số mẻ (Me, Mac, KichThuoc)
+            var rows = dataBKMis
+                .GroupBy(x => new
+                {
+                    x.NgaySX,
+                    x.Ca,
+                    Me = NormalizeKeyValue(x.Me),
+                    Mac = NormalizeKeyValue(x.Mac),
+                    KichThuoc = NormalizeKeyValue(x.KichThuoc),
+                })
+                .Select(g => new
                 {
                     Row = new BmPhieuExportRow
                     {
-                        SoPhieu = x.SoPhieu,
-                        NgaySX = DateOnly.FromDateTime(x.NgaySX),
-                        MayDuc = x.MayDuc,
-                        Kip = x.Kip,
-                        Ca = x.Ca,
+                        NgaySX = g.Key.NgaySX,
+                        Ca = g.Key.Ca,
+                        Me = g.FirstOrDefault()?.Me ?? "",
+                        Mac = g.FirstOrDefault()?.Mac ?? "",
+                        KichThuoc = g.FirstOrDefault()?.KichThuoc ?? "",
 
-                        Me = x.Me,
-                        Mac = x.Mac,
-                        KichThuoc = x.KichThuoc,
 
-                        StLoai1 = x.StLoai1,
-                        KlLoai1 = x.KlLoai1,
-
-                        StLoai2 = x.StLoai2,
-                        KlLoai2 = x.KlLoai2,
-
-                        StLoai2tp = x.StLoai2TP,
-                        KlLoai2tp = x.KlLoai2TP,
-
-                        StPhoiNgan = x.StPhoiNgan,
-                        CdPhoiNgan = x.CdPhoiNgan,
-                        KlPhoiNgan = x.KlPhoiNgan,
-
-                        StLoai3 = x.StLoai3,
-                        KlLoai3 = x.KlLoai3,
-
-                        TongSoThanh = x.TongSoThanh,
-                        TongKhoiLuong = x.TongKhoiLuong,
-                        TinhTrang = p.TinhTrang ?? (x.TTHD == true ? 2 : 0),
+                        // BK: dữ liệu gốc sản xuất từ BKMis
+                        StLoai1_BK = g.Sum(x => x.StLoai1),
+                        KlLoai1_BK = g.Sum(x => Convert.ToDecimal(x.KlLoai1)),
+                        StLoai2_BK = g.Sum(x => x.StLoai2),
+                        KlLoai2_BK = g.Sum(x => Convert.ToDecimal(x.KlLoai2)),
+                        StLoai2tp_BK = g.Sum(x => x.stLoai2tp),
+                        KlLoai2tp_BK = g.Sum(x => Convert.ToDecimal(x.klLoai2tp)),
+                        StPhoiNgan_BK = g.Sum(x => x.StPhoiNgan),
+                        CdPhoiNgan_BK = g.Sum(x => Convert.ToDecimal(x.CdPhoiNgan)),
+                        KlPhoiNgan_BK = g.Sum(x => Convert.ToDecimal(x.KlPhoiNgan)),
+                        StLoai3_BK = g.Sum(x => x.StLoai3),
+                        KlLoai3_BK = g.Sum(x => Convert.ToDecimal(x.KlLoai3)),
+                        TongSoThanh_BK = g.Sum(x => x.TongSoThanh),
+                        TongKhoiLuong_BK = g.Sum(x => Convert.ToDecimal(x.TongKhoiLuong)),
                     },
-                    Key = new
-                    {
-                        NgaySX = DateOnly.FromDateTime(x.NgaySX),
-                        x.Ca,
-                        Me = NormalizeKeyValue(x.Me),
-                        Mac = NormalizeKeyValue(x.Mac),
-                        KichThuoc = NormalizeKeyValue(x.KichThuoc),
-                    }
+                    Key = g.Key
                 })
-                .ToListAsync();
+                .OrderByDescending(x => x.Key.NgaySX)
+                .ThenBy(x => x.Key.Ca)
+                .ToList();
 
+            // ★ Populate dữ liệu nhập kho lần 1 và lần 2 dựa trên trùng số mẻ (Me, Mac, KichThuoc)
             foreach (var item in rows)
             {
-                if (dataBKMisLookup.TryGetValue(item.Key, out var bk))
+                // ★ Lần 1: Nhập kho cùng ngày ca - nếu cùng mẻ thì hiển thị
+                if (lan1Lookup.TryGetValue(item.Key, out var lan1))
                 {
-                    item.Row.StLoai1_BK = bk.StLoai1;
-                    item.Row.KlLoai1_BK = bk.KlLoai1;
+                    item.Row.SoPhieu = lan1.SoPhieu;
+                    item.Row.StLoai1 = lan1.StLoai1;
+                    item.Row.KlLoai1 = lan1.KlLoai1;
+                    item.Row.StLoai2 = lan1.StLoai2;
+                    item.Row.KlLoai2 = lan1.KlLoai2;
+                    item.Row.StLoai2tp = lan1.StLoai2tp;
+                    item.Row.KlLoai2tp = lan1.KlLoai2tp;
+                    item.Row.StPhoiNgan = lan1.StPhoiNgan;
+                    item.Row.CdPhoiNgan = lan1.CdPhoiNgan;
+                    item.Row.KlPhoiNgan = lan1.KlPhoiNgan;
+                    item.Row.StLoai3 = lan1.StLoai3;
+                    item.Row.KlLoai3 = lan1.KlLoai3;
+                    item.Row.TongSoThanh = lan1.TongSoThanh;
+                    item.Row.TongKhoiLuong = lan1.TongKhoiLuong;
+                    item.Row.TinhTrang_HRC = lan1.TinhTrangHRC;
+                    item.Row.TinhTrang_QLCL = lan1.TinhTrangQLCL;
+                    item.Row.TinhTrang_Chot = lan1.TinhTrangChot;
+                }
 
-                    item.Row.StLoai2_BK = bk.StLoai2;
-                    item.Row.KlLoai2_BK = bk.KlLoai2;
-
-                    item.Row.StLoai2tp_BK = bk.StLoai2tp;
-                    item.Row.KlLoai2tp_BK = bk.KlLoai2tp;
-
-                    item.Row.StPhoiNgan_BK = bk.StPhoiNgan;
-                    item.Row.CdPhoiNgan_BK = bk.CdPhoiNgan;
-                    item.Row.KlPhoiNgan_BK = bk.KlPhoiNgan;
-
-                    item.Row.StLoai3_BK = bk.StLoai3;
-                    item.Row.KlLoai3_BK = bk.KlLoai3;
-
-                    item.Row.TongSoThanh_BK = bk.TongSoThanh;
-                    item.Row.TongKhoiLuong_BK = bk.TongKhoiLuong;
+                // ★ Lần 2: Nhập kho ngày ca tiếp theo - nếu cùng mẻ thì hiển thị
+                var key2 = new
+                {
+                    NgaySX = item.Key.Ca == 2 ? item.Key.NgaySX.AddDays(1) : item.Key.NgaySX,
+                    Ca = item.Key.Ca == 1 ? 2 : 1,
+                    Me = item.Key.Me,
+                    Mac = item.Key.Mac,
+                    KichThuoc = item.Key.KichThuoc,
+                };
+                if (lan2Lookup.TryGetValue(key2, out var lan2))
+                {
+                    item.Row.StLoai1_Lan2 = lan2.StLoai1;
+                    item.Row.KlLoai1_Lan2 = lan2.KlLoai1;
+                    item.Row.StLoai2_Lan2 = lan2.StLoai2;
+                    item.Row.KlLoai2_Lan2 = lan2.KlLoai2;
+                    item.Row.StLoai2tp_Lan2 = lan2.StLoai2tp;
+                    item.Row.KlLoai2tp_Lan2 = lan2.KlLoai2tp;
+                    item.Row.StPhoiNgan_Lan2 = lan2.StPhoiNgan;
+                    item.Row.CdPhoiNgan_Lan2 = lan2.CdPhoiNgan;
+                    item.Row.KlPhoiNgan_Lan2 = lan2.KlPhoiNgan;
+                    item.Row.StLoai3_Lan2 = lan2.StLoai3;
+                    item.Row.KlLoai3_Lan2 = lan2.KlLoai3;
+                    item.Row.TongSoThanh_Lan2 = lan2.TongSoThanh;
+                    item.Row.TongKhoiLuong_Lan2 = lan2.TongKhoiLuong;
+                    item.Row.TinhTrang_HRC2 = lan2.TinhTrangHRC;
+                    item.Row.TinhTrang_QLCL2 = lan2.TinhTrangQLCL;
+                    item.Row.TinhTrang_Chot2 = lan2.TinhTrangChot;
                 }
             }
 
@@ -1530,54 +1743,72 @@ namespace dataproduct.api.Services
                 ws.Cell(row, 7).Value = item.Mac;
                 ws.Cell(row, 8).Value = item.KichThuoc;
 
-                ws.Cell(row, 9).Value = item.StLoai1;
-                ws.Cell(row, 10).Value = item.KlLoai1;
+                // Số liệu BK mis
 
-                ws.Cell(row, 11).Value = item.StLoai2;
-                ws.Cell(row, 12).Value = item.KlLoai2;
+                ws.Cell(row, 9).Value = item.StLoai1_BK;
+                ws.Cell(row, 10).Value = item.KlLoai1_BK;
 
-                ws.Cell(row, 13).Value = item.StLoai2tp;
-                ws.Cell(row, 14).Value = item.KlLoai2tp;
+                ws.Cell(row, 11).Value = item.StLoai2_BK;
+                ws.Cell(row, 12).Value = item.KlLoai2_BK;
 
-                ws.Cell(row, 15).Value = item.StPhoiNgan;
-                ws.Cell(row, 16).Value = item.CdPhoiNgan;
-                ws.Cell(row, 17).Value = item.KlPhoiNgan;
+                ws.Cell(row, 13).Value = item.StLoai2tp_BK;
+                ws.Cell(row, 14).Value = item.KlLoai2tp_BK;
 
-                ws.Cell(row, 18).Value = item.StLoai3;
-                ws.Cell(row, 19).Value = item.KlLoai3;
+                ws.Cell(row, 15).Value = item.StPhoiNgan_BK;
+                ws.Cell(row, 16).Value = item.CdPhoiNgan_BK;
+                ws.Cell(row, 17).Value = item.KlPhoiNgan_BK;
+
+                ws.Cell(row, 18).Value = item.StLoai3_BK;
+                ws.Cell(row, 19).Value = item.KlLoai3_BK;
 
                 ws.Cell(row, 20).Value = item.TongKhoiLuong;
 
                 ws.Cell(row, 21).Value = "";
                 ws.Cell(row, 22).Value = item.SoPhieu;
 
-                // Vùng BK Mis (X -> AI)
-                ws.Cell(row, 24).Value = item.StLoai1_BK;
-                ws.Cell(row, 25).Value = item.KlLoai1_BK;
-                ws.Cell(row, 26).Value = item.StLoai2_BK;
-                ws.Cell(row, 27).Value = item.KlLoai2_BK;
-                ws.Cell(row, 28).Value = item.StLoai2tp_BK;
-                ws.Cell(row, 29).Value = item.KlLoai2tp_BK;
-                ws.Cell(row, 30).Value = item.StPhoiNgan_BK;
-                ws.Cell(row, 31).Value = item.CdPhoiNgan_BK;
-                ws.Cell(row, 32).Value = item.KlPhoiNgan_BK;
-                ws.Cell(row, 33).Value = item.StLoai3_BK;
-                ws.Cell(row, 34).Value = item.KlLoai3_BK;
-                ws.Cell(row, 35).Value = item.TongKhoiLuong_BK;
+                // Vùng chuyển lần 1 (X -> AI)
+                ws.Cell(row, 24).Value = item.StLoai1;
+                ws.Cell(row, 25).Value = item.KlLoai1;
+                ws.Cell(row, 26).Value = item.StLoai2;
+                ws.Cell(row, 27).Value = item.KlLoai2;
+                ws.Cell(row, 28).Value = item.StLoai2tp;
+                ws.Cell(row, 29).Value = item.KlLoai2tp;
+                ws.Cell(row, 30).Value = item.StPhoiNgan;
+                ws.Cell(row, 31).Value = item.CdPhoiNgan;
+                ws.Cell(row, 32).Value = item.KlPhoiNgan;
+                ws.Cell(row, 33).Value = item.StLoai3;
+                ws.Cell(row, 34).Value = item.KlLoai3;
+                // Bổ sung thêm 3 tình trạng HRC, QLCL, Chốt để dễ theo dõi
+                // Thêm màu sắc cho dễ nhìn
+                ws.Cell(row, 35).Value = item.TinhTrang_HRC == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 35).Style.Fill.BackgroundColor = item.TinhTrang_HRC == 1 ? XLColor.LightGreen : XLColor.Yellow;
+                ws.Cell(row, 36).Value = item.TinhTrang_QLCL == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 36).Style.Fill.BackgroundColor = item.TinhTrang_QLCL == 1 ? XLColor.LightGreen : XLColor.Yellow;
+                ws.Cell(row, 37).Value = item.TinhTrang_Chot == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 37).Style.Fill.BackgroundColor = item.TinhTrang_Chot == 1 ? XLColor.LightGreen : XLColor.Yellow;
 
-                // Vùng Chênh lệch = BM - BK Mis (AJ -> AU)
-                ws.Cell(row, 36).Value = ToInt(item.StLoai1) - ToInt(item.StLoai1_BK);
-                ws.Cell(row, 37).Value = ToDecimal(item.KlLoai1) - ToDecimal(item.KlLoai1_BK);
-                ws.Cell(row, 38).Value = ToInt(item.StLoai2) - ToInt(item.StLoai2_BK);
-                ws.Cell(row, 39).Value = ToDecimal(item.KlLoai2) - ToDecimal(item.KlLoai2_BK);
-                ws.Cell(row, 40).Value = ToInt(item.StLoai2tp) - ToInt(item.StLoai2tp_BK);
-                ws.Cell(row, 41).Value = ToDecimal(item.KlLoai2tp) - ToDecimal(item.KlLoai2tp_BK);
-                ws.Cell(row, 42).Value = ToInt(item.StPhoiNgan) - ToInt(item.StPhoiNgan_BK);
-                ws.Cell(row, 43).Value = ToDecimal(item.CdPhoiNgan) - ToDecimal(item.CdPhoiNgan_BK);
-                ws.Cell(row, 44).Value = ToDecimal(item.KlPhoiNgan) - ToDecimal(item.KlPhoiNgan_BK);
-                ws.Cell(row, 45).Value = ToInt(item.StLoai3) - ToInt(item.StLoai3_BK);
-                ws.Cell(row, 46).Value = ToDecimal(item.KlLoai3) - ToDecimal(item.KlLoai3_BK);
-                ws.Cell(row, 47).Value = ToDecimal(item.TongKhoiLuong) - ToDecimal(item.TongKhoiLuong_BK);
+                //ws.Cell(row, 35).Value = item.Ti;
+
+                // Vùng Chuyển lần 2
+                ws.Cell(row, 38).Value = item.StLoai1_Lan2;
+                ws.Cell(row, 39).Value = item.KlLoai1_Lan2;
+                ws.Cell(row, 40).Value = item.StLoai2_Lan2;
+                ws.Cell(row, 41).Value = item.KlLoai2_Lan2;
+                ws.Cell(row, 42).Value = item.StLoai2tp_Lan2;
+                ws.Cell(row, 43).Value = item.KlLoai2tp_Lan2;
+                ws.Cell(row, 44).Value = item.StPhoiNgan_Lan2;
+                ws.Cell(row, 45).Value = item.CdPhoiNgan_Lan2;
+                ws.Cell(row, 46).Value = item.KlPhoiNgan_Lan2;
+                ws.Cell(row, 47).Value = item.StLoai3_Lan2;
+                ws.Cell(row, 48).Value = item.KlLoai3_Lan2;
+                // Bổ sung thêm 3 tình trạng HRC, QLCL, Chốt để dễ theo dõi
+                // Thêm màu sắc cho dễ nhìn
+                ws.Cell(row, 49).Value = item.TinhTrang_HRC2 == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 49).Style.Fill.BackgroundColor = item.TinhTrang_HRC2 == 1 ? XLColor.LightGreen : XLColor.Yellow;
+                ws.Cell(row, 50).Value = item.TinhTrang_QLCL2 == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 50).Style.Fill.BackgroundColor = item.TinhTrang_QLCL2 == 1 ? XLColor.LightGreen : XLColor.Yellow;
+                ws.Cell(row, 51).Value = item.TinhTrang_Chot2 == 1 ? "Đã xác nhận" : "";
+                ws.Cell(row, 51).Style.Fill.BackgroundColor = item.TinhTrang_Chot2 == 1 ? XLColor.LightGreen : XLColor.Yellow;
 
                 var cell = ws.Cell(row, 23);
                 switch (item.TinhTrang)
