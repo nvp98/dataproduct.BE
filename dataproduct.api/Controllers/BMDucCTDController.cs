@@ -48,6 +48,21 @@ namespace dataproduct.api.Controllers
             });
         }
 
+        [HttpPost("XacNhanPhoiNhapKho")]
+        public async Task<IActionResult> XacNhanPhoiNhapKho([FromBody] XacNhanPhoiNhapKhoRequest request)
+        {
+            if (request == null)
+                return BadRequest("Payload không hợp lệ");
+
+            var affected = await _service.XacNhanPhoiNhapKhoRowsAsync(request.Ids, request.NguoiXacNhanId, request.CapXacNhan, request.TinhTrangCap, request.PhieuId);
+
+            return Ok(new
+            {
+                success = true,
+                affected
+            });
+        }
+
         [HttpGet("PhoiNhapKhoNhanPhoi")]
         public async Task<IActionResult> GetPhoiNhapKhoList(
             [FromQuery] Guid? idPhieu,
@@ -72,6 +87,22 @@ namespace dataproduct.api.Controllers
                 pageSize);
 
             return Ok(new { data, total });
+        }
+
+        [HttpPost("ChotPhoiNhapKho")]
+        public async Task<IActionResult> ChotPhoiNhapKho([FromBody] ChotPhoiNhapKhoRequest request)
+        {
+            if (request == null || request.IdPhieu == Guid.Empty)
+                return BadRequest("IdPhieu không hợp lệ");
+
+            var affected = await _service.ChotPhoiNhapKhoRowsAsync(request.IdPhieu, request.TinhTrangChot);
+
+            return Ok(new
+            {
+                success = true,
+                affected,
+                message = request.TinhTrangChot == 1 ? "Chốt phôi nhập kho thành công" : "Hủy chốt phôi nhập kho thành công"
+            });
         }
 
         [HttpPost("ThuHoiPhoiNhapKho")]

@@ -53,7 +53,10 @@ namespace dataproduct.api.Business
             _detailExcelService = detailExcelService;
         }
 
-        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId)
+        /// <summary>
+        /// Export PDF động - nếu có filters sẽ áp dụng, nếu không sẽ export toàn bộ
+        /// </summary>
+        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId, List<string>? filters = null)
         {
             var phieu = await _repo.GetByIdAsync(phieuId);
             if (phieu == null)
@@ -62,6 +65,12 @@ namespace dataproduct.api.Business
             var exporter = _pdfExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
             if (exporter == null)
                 throw new NotSupportedException($"Chưa cấu hình export PDF cho biểu mẫu: {phieu.MaBm}");
+
+            // Nếu có filters, dùng ExportPdfAsyncExtra; ngược lại dùng ExportPdfAsync
+            if (filters != null && filters.Count > 0)
+            {
+                return await exporter.ExportPdfAsyncExtra(phieuId, filters);
+            }
 
             return await exporter.ExportPdfAsync(phieuId);
         }
@@ -767,6 +776,11 @@ namespace dataproduct.api.Business
             {
                 throw new InvalidOperationException("Phiếu đã bị khóa do đang có bản hiệu chỉnh. Vui lòng quay về danh sách để mở phiếu hợp lệ.");
             }
+        }
+
+        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        {
+            return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
         }
 
     }
