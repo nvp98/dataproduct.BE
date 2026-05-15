@@ -26,13 +26,13 @@ namespace dataproduct.api.Services.Initializers
                 || maBm.Contains("SanLuong", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             if (phieu == null)
-                return;
+                return new List<string>();
 
             if (string.IsNullOrWhiteSpace(phieu.DataJson))
-                return;
+                return new List<string>();
 
             try
             {
@@ -54,6 +54,8 @@ namespace dataproduct.api.Services.Initializers
                 Console.WriteLine($"Lỗi khi initialize BkKcsBbxnSanLuong: {ex.Message}");
                 // Không throw exception, cho phép phiếu được tạo, nhưng log lỗi
             }
+
+            return new List<string>();
         }
 
         /// <summary>

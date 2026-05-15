@@ -59,8 +59,9 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var ok = await _service.UpdateAsync(id, formData);
-                return ok != null ? NoContent() : NotFound();
+                var (phieu, warnings) = await _service.UpdateAsync(id, formData);
+                if (phieu == null) return NotFound();
+                return Ok(new { success = true, warnings });
             }
             catch (InvalidOperationException ex)
             {

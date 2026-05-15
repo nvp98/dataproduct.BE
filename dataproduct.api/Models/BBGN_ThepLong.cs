@@ -38,6 +38,11 @@ public partial class BBGN_ThepLong
 
     [NotMapped]
     public string? TenNhomPhanLoaiMacThep { get; set; }
+
+    public decimal? klcau1 { get; set; }
+    public decimal? klcau2 { get; set; }
+    public int? LastIdUserEdit { get; set; }
+    public string? LastNameUserEdit { get; set; }
 }
 
 

@@ -777,6 +777,8 @@ namespace dataproduct.api.Repositories
                         ID_PhuLieu = x.ID_PhuLieu!.Value,
                         x.TenPhuLieu,
                         x.KLPhuGia,
+                        x.IsManual,
+                        x.KLPhuGia_Manual,
                     })
                     .ToListAsync();
 
@@ -853,10 +855,18 @@ namespace dataproduct.api.Repositories
                                         TenPhuLieu = phuLieuItem.TenPhuLieu,
                                         KLPhuGia = formattedValue,
                                         KLPhuGiaTotal = 0,
+                                        IsManual = phuLieuItem.IsManual,
+                                        KLPhuGia_Manual = phuLieuItem.KLPhuGia_Manual,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
                                         ThuTu = null
                                     };
+                                }
+                                else if (phuLieuItem.IsManual == true)
+                                {
+                                    // Nếu bất kỳ phụ liệu nào trong nhóm có manual, nhóm được đánh dấu manual
+                                    groupedMappedPhuLieus[headerKeyId].IsManual = true;
+                                    groupedMappedPhuLieus[headerKeyId].KLPhuGia_Manual = phuLieuItem.KLPhuGia_Manual;
                                 }
                                 // Sum KLPhuGia
                                 groupedMappedPhuLieus[headerKeyId].KLPhuGiaTotal = (groupedMappedPhuLieus[headerKeyId].KLPhuGiaTotal ?? 0) + (formattedValue ?? 0);
@@ -1855,7 +1865,8 @@ namespace dataproduct.api.Repositories
 
                                 var klPhuGia = FormatNumber(mapped?.KLPhuGia);
                                 var klPhuGiaManual = FormatNumber(mapped?.KLPhuGia_Manual);
-                                var effectiveKL = klPhuGiaManual ?? klPhuGia;
+                                // IsManual=true nhưng KLPhuGia_Manual=null → user đã xóa → effectiveKL = null (0), không dùng KLPhuGia
+                                var effectiveKL = (mapped?.IsManual == true) ? klPhuGiaManual : klPhuGia;
                                 var klPhanBo = FormatNumber(phanBo?.KLPhuGia);
                                 var totalKL = klPhanBo.HasValue
                                     ? FormatNumber((klPhanBo ?? 0) + (effectiveKL ?? 0))
@@ -1912,7 +1923,8 @@ namespace dataproduct.api.Repositories
                         isManual = mapped.IsManual;
                     }
 
-                    var effectiveKL = klPhuGia_Manual ?? klPhuGia;
+                    // IsManual=true nhưng KLPhuGia_Manual=null → user đã xóa → effectiveKL = null (0), không dùng KLPhuGia
+                    var effectiveKL = (isManual == true) ? klPhuGia_Manual : klPhuGia;
                     double? klPhanBo = null;
                     double? totalKLPhuGia;
 
@@ -2120,7 +2132,8 @@ namespace dataproduct.api.Repositories
                     ReportNo = pl.REPORT_NO.Value,
                     ID_HeaderKey = hk.Id,
                     pl.KLPhuGia,
-                    pl.KLPhuGia_Manual
+                    pl.KLPhuGia_Manual,
+                    pl.IsManual
                 }
             ).ToListAsync();
 
@@ -2137,7 +2150,8 @@ namespace dataproduct.api.Repositories
                     ReportNo = pl.REPORT_NO!.Value,
                     ID_HeaderKey = pl.ID_HeaderKey!.Value,
                     KLPhuGia = (double?)0,
-                    KLPhuGia_Manual = pl.KLPhuGia_Manual
+                    KLPhuGia_Manual = pl.KLPhuGia_Manual,
+                    pl.IsManual
                 })
                 .ToListAsync();
 
@@ -2178,7 +2192,8 @@ namespace dataproduct.api.Repositories
                     x.ReportNo,
                     ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var pid) ? pid : x.ID_HeaderKey,
                     x.KLPhuGia,
-                    x.KLPhuGia_Manual
+                    x.KLPhuGia_Manual,
+                    x.IsManual
                 })
                 .ToList();
 
@@ -2192,8 +2207,10 @@ namespace dataproduct.api.Repositories
                 {
                     g.Key.ReportNo,
                     g.Key.ID_HeaderKey,
-                    KLPhuGia = g.Sum(x => x.KLPhuGia ?? 0),
-                    KLPhuGia_Manual = g.FirstOrDefault(x => x.KLPhuGia_Manual.HasValue)?.KLPhuGia_Manual
+                    // Sum riêng NM (IsManual != true) và Manual (IsManual == true) để tính effectiveKL đúng per record.
+                    // IsManual=true, KLPhuGia_Manual=null → user xóa → đóng góp 0 vào KLManualSum (không dùng KLPhuGia).
+                    KLPhuGiaNMSum = g.Sum(x => x.IsManual != true ? (x.KLPhuGia ?? 0) : 0),
+                    KLManualSum   = g.Sum(x => x.IsManual == true  ? (x.KLPhuGia_Manual ?? 0) : 0)
                 })
                 .ToList();
 
@@ -2201,7 +2218,10 @@ namespace dataproduct.api.Repositories
 
             foreach (var item in mappedGrouped)
             {
-                var effectiveKL = item.KLPhuGia_Manual ?? (item.ID_HeaderKey == 5 ? Math.Round(item.KLPhuGia / 0.055, 0, MidpointRounding.AwayFromZero) : item.KLPhuGia);
+                // ID_HeaderKey==5: NM values cần ÷ 0.055; manual values đã đúng đơn vị, không convert.
+                var effectiveKL = item.ID_HeaderKey == 5
+                    ? Math.Round(item.KLPhuGiaNMSum / 0.055, 0, MidpointRounding.AwayFromZero) + item.KLManualSum
+                    : item.KLPhuGiaNMSum + item.KLManualSum;
                 var total = phanBoLookup.TryGetValue((item.ReportNo, item.ID_HeaderKey), out var phanBoKL)
                     ? phanBoKL + effectiveKL
                     : effectiveKL;

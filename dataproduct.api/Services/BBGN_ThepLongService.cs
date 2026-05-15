@@ -52,10 +52,12 @@ namespace dataproduct.api.Services
                 ?? throw new InvalidOperationException("GangLongDbConnection/MasterDbConnection connection string is not configured");
         }
 
-        public async Task SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
+        public async Task<List<string>> SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
         {
-             if (!formData.TryGetProperty("table1", out var table))
-                return;
+            var warnings = new List<string>();
+
+            if (!formData.TryGetProperty("table1", out var table))
+                return warnings;
             var bieuMau = GetString(formData, "maBm");
             var ngaySX = TryParseDateTime(formData, "NgaySX");
             var ca = TryParseInt(formData, "ca");
@@ -66,7 +68,6 @@ namespace dataproduct.api.Services
                 .Where(x => x.IdPhieu == idPhieu)
                 .ToListAsync();
 
-            // map để lookup nhanh theo Id dòng (ưu tiên theo yêu cầu FE)
             var mapById = existingData.ToDictionary(x => x.Id);
 
             var toInsert = new List<BBGN_ThepLong>();
@@ -82,12 +83,34 @@ namespace dataproduct.api.Services
                 var klLan1 = TryParseDecimal(row, "klLan1");
                 var klLan2 = TryParseDecimal(row, "klLan2");
                 var klLan3 = TryParseDecimal(row, "klLan3");
-
-                var klThepLong = TryParseDecimal(row, "klThepLong")
-                                ?? SumValues(klLan1, klLan2, klLan3);
+                var klcau1 = TryParseDecimal(row, "klcau1");
+                var klcau2 = TryParseDecimal(row, "klcau2");
+                var lastIdUserEdit = TryParseInt(row, "lastIdUserEdit");
+                var lastNameUserEdit = GetString(row, "lastNameUserEdit");
+                var tinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
+                var isIncomingLenThang = string.Equals(tinhLuyenLenThang?.Trim(), "Lên thẳng", StringComparison.OrdinalIgnoreCase);
 
                 if (rowId.HasValue && mapById.TryGetValue(rowId.Value, out var existing))
                 {
+                    // ===== CHECK SERVER STATE: "Lên thẳng" và klLan1 loại trừ nhau =====
+                    var serverHasKlLan1 = existing.KlLan1.HasValue;
+                    var serverIsLenThang = string.Equals(existing.TinhLuyenLenThang?.Trim(), "Lên thẳng", StringComparison.OrdinalIgnoreCase);
+
+                    if (isIncomingLenThang && serverHasKlLan1)
+                    {
+                        // Case 1: FE gửi "Lên thẳng" nhưng server đang có KL lần 1 → giữ giá trị server
+                        tinhLuyenLenThang = existing.TinhLuyenLenThang;
+                        warnings.Add($"Mẻ {me}: Không thể chọn Lên thẳng vì KL lần 1 đã được nhập");
+                    }
+                    else if (klLan1.HasValue && serverIsLenThang)
+                    {
+                        // Case 2: FE gửi KL lần 1 nhưng server đang có "Lên thẳng" → bỏ KL lần 1
+                        klLan1 = null;
+                        warnings.Add($"Mẻ {me}: Không thể nhập KL lần 1 vì mẻ đã được chọn Lên thẳng");
+                    }
+
+                     var klThepLong = TryParseDecimal(row, "klThepLong");
+
                     // ===== UPDATE =====
                     var oldMe = existing.Me;
                     existing.Me = me;
@@ -100,12 +123,15 @@ namespace dataproduct.api.Services
                     existing.KlLan2 = klLan2;
                     existing.KlLan3 = klLan3;
                     existing.KlThepLong = klThepLong;
-
                     existing.GhiChu = GetString(row, "ghiChu");
-                    existing.TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang");
+                    existing.TinhLuyenLenThang = tinhLuyenLenThang;
                     existing.PhanLoai = GetString(row, "phanLoai");
                     existing.IsThuNghiem = TryParseBool(row, "isThuNghiem");
                     existing.MacThepBKMIS = GetString(row, "macThepBKMIS");
+                    existing.klcau1 = klcau1;
+                    existing.klcau2 = klcau2;
+                    if (lastIdUserEdit.HasValue) existing.LastIdUserEdit = lastIdUserEdit;
+                    if (!string.IsNullOrWhiteSpace(lastNameUserEdit)) existing.LastNameUserEdit = lastNameUserEdit;
                     if (!string.IsNullOrWhiteSpace(bieuMau)) existing.BieuMau = bieuMau;
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
                     if (ca.HasValue) existing.Ca = ca.Value;
@@ -122,6 +148,12 @@ namespace dataproduct.api.Services
                 {
                     // Dòng mới chưa có id: chỉ insert khi có mẻ
                     if (string.IsNullOrWhiteSpace(me)) continue;
+
+                    // INSERT: payload-level check (không có server state để so sánh)
+                    if (isIncomingLenThang)
+                        klLan1 = null;
+
+                    var klThepLong = TryParseDecimal(row, "klThepLong") ;
 
                     // ===== INSERT =====
                     var entity = new BBGN_ThepLong
@@ -140,12 +172,15 @@ namespace dataproduct.api.Services
                         KlLan2 = klLan2,
                         KlLan3 = klLan3,
                         KlThepLong = klThepLong,
-
                         GhiChu = GetString(row, "ghiChu"),
-                        TinhLuyenLenThang = GetString(row, "tinhLuyenLenThang"),
+                        TinhLuyenLenThang = tinhLuyenLenThang,
                         PhanLoai = GetString(row, "phanLoai"),
                         IsThuNghiem = TryParseBool(row, "isThuNghiem"),
                         MacThepBKMIS = GetString(row, "macThepBKMIS"),
+                        klcau1 = klcau1,
+                        klcau2 = klcau2,
+                        LastIdUserEdit = lastIdUserEdit,
+                        LastNameUserEdit = lastNameUserEdit,
                         IdPhieu = idPhieu,
                         IsGhost = false
                     };
@@ -162,6 +197,8 @@ namespace dataproduct.api.Services
             await _context.SaveChangesAsync();
 
             await UpdateDuplicateFlagsForMesAsync(affectedMes);
+
+            return warnings;
         }
     
 

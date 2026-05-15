@@ -25,13 +25,13 @@ namespace dataproduct.api.Services.Initializers
                 || maBm.Equals("BBGN_ThepLong", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             if (string.IsNullOrWhiteSpace(phieu.DataJson))
-                return;
+                return new List<string>();
 
             using var doc = JsonDocument.Parse(phieu.DataJson);
-            await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement, phieu.Idphieu);
+            return await _bbgnThepLongService.SaveHRC2BBGNThepLongAsync(doc.RootElement, phieu.Idphieu);
         }
     }
 }
