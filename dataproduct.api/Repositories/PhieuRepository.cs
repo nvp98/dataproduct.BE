@@ -17,12 +17,14 @@ namespace dataproduct.api.Repositories
         private readonly ProductFormContext _context;
         private readonly PheDuyetService _pdservice;
         private readonly IPheDuyetRepository _pheDuyetRepo;
+        private readonly ProductDataMasterDbContext _mastercontext;
 
-        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo, ProductDataMasterDbContext mastercontext)
         {
             _context = context;
-            _pdservice = pdservice;
+            _pdservice = pdservice; 
             _pheDuyetRepo = pheDuyetRepo;
+            _mastercontext = mastercontext;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)

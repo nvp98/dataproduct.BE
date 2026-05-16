@@ -113,14 +113,18 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto> AddMappingAsync(CreateLGTSMappingDto dto)
         {
+            // IDSiLo trong Mapping lưu ThuTu (không phải ID) → tra cứu ThuTu từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuAsync(dto.IDSiLo, dto.IDLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTu.");
+
             var entity = new LG_TSL_SiLo_Mapping
             {
                 IDLoCao = dto.IDLoCao,
-                IDSiLo = dto.IDSiLo,
-                IDNVL = dto.IDNVL,
-                Ngay = dto.Ngay,
-                Ca = dto.Ca,
-                GhiChu = dto.GhiChu,
+                IDSiLo  = thuTu,
+                IDNVL   = dto.IDNVL,
+                Ngay    = dto.Ngay,
+                Ca      = dto.Ca,
+                GhiChu  = dto.GhiChu,
             };
             var result = await _repo.AddMappingAsync(entity);
             return MapMapping(result);
@@ -128,14 +132,18 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto)
         {
+            // IDSiLo trong Mapping lưu ThuTu → tra cứu ThuTu từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuAsync(dto.IDSiLo, dto.IDLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTu.");
+
             var entity = new LG_TSL_SiLo_Mapping
             {
                 IDLoCao = dto.IDLoCao,
-                IDSiLo = dto.IDSiLo,
-                IDNVL = dto.IDNVL,
-                Ngay = dto.Ngay,
-                Ca = dto.Ca,
-                GhiChu = dto.GhiChu,
+                IDSiLo  = thuTu,
+                IDNVL   = dto.IDNVL,
+                Ngay    = dto.Ngay,
+                Ca      = dto.Ca,
+                GhiChu  = dto.GhiChu,
             };
             var result = await _repo.UpdateMappingAsync(id, entity);
             return result == null ? null : MapMapping(result);

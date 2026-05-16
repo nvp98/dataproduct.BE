@@ -298,6 +298,9 @@ namespace dataproduct.api.Repositories
         Task<LG_TSL_SiLo_Mapping?> UpdateMappingAsync(int id, LG_TSL_SiLo_Mapping entity);
         Task<bool> DeleteMappingAsync(int id);
 
+        // Lấy ThuTu của silo theo ID + IDLoCao (dùng để lưu ThuTu vào IDSiLo của Mapping)
+        Task<int?> GetSiLoThuTuAsync(int siloId, int idLoCao);
+
         // View: SiLo + NVL theo Ngày/Ca/LoCao (dùng tạo phiếu tồn silo)
         Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao, DateTime? ngay, int? ca);
 
