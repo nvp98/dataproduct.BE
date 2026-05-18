@@ -765,6 +765,7 @@ namespace dataproduct.api.Business
         public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
         {
             return await _repo.GetAllLoCaoAsync();
+        }
         private static void EnsurePhieuOperable(BmPhieu phieu)
         {
             if (phieu.IsDelete == 1)

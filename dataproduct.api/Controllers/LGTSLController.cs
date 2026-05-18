@@ -13,10 +13,12 @@ namespace dataproduct.api.Controllers
     public class LGTSLController : ControllerBase
     {
         private readonly LGTSLService _service;
+        private readonly PheDuyetService _pdservice;
 
-        public LGTSLController(LGTSLService service)
+        public LGTSLController(LGTSLService service, PheDuyetService pdservice)
         {
             _service = service;
+            _pdservice = pdservice;
         }
 
         // ─── SiLo + NVL view theo Ngày/Ca/LoCao (dùng trong tạo phiếu tồn silo) ──
@@ -257,6 +259,20 @@ namespace dataproduct.api.Controllers
             try
             {
                 return Ok(await _service.GetChiTietByPhieuAsync(idPhieu));
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Export PDF ───────────────────────────────────────────────────────────
+
+        [HttpGet("export-pdf/{idPhieu}")]
+        public async Task<IActionResult> ExportPdf(Guid idPhieu)
+        {
+            try
+            {
+                var pheDuyets = await _pdservice.GetPheDuyetPhieuAsync(idPhieu);
+                var file = await _service.ExportTonSiloPdfAsync(idPhieu, pheDuyets);
+                return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

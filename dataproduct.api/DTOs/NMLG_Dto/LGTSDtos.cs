@@ -21,14 +21,16 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     }
 
     // ─── LG_TSL_NVL ──────────────────────────────────────────────────────────────
-    // DB columns: TenNVL → TenNVL_NM, TenNVL_Tk → TenNVL_TK (khớp với camelCase FE)
+    // DB columns: TenNVL → TenNVL_NM, TenNVL_Tk → TenNVLTk (khớp với camelCase FE)
 
     public class LGTSNvlDto
     {
         public int ID { get; set; }
         public int IDLoCao { get; set; }
         public string? TenNVL { get; set; }
-        public string? TenNVL_TK { get; set; }
+        public string? TenNVLTk { get; set; }
+        /// <summary>Tên hiển thị: TenNVLTk nếu đã xác nhận, ngược lại TenNVL.</summary>
+        public string? TenHienThi { get; set; }
         public string? GhiChu { get; set; }
         public DateTime NgayTao { get; set; }
         public bool XacNhan { get; set; }
@@ -40,7 +42,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public int IDLoCao { get; set; }
         public string TenNVL { get; set; } = string.Empty;
-        public string? TenNVL_TK { get; set; }
+        public string? TenNVLTk { get; set; }
         public string? GhiChu { get; set; }
         public bool XacNhan { get; set; }
     }
@@ -90,7 +92,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenSiLo { get; set; }
         public int? ThuTuSiLo { get; set; }
         public string? TenNVL { get; set; }    // DB: TenNVL
-        public string? TenNVL_TK { get; set; } // DB: TenNVL_Tk
+        public string? TenNVLTk { get; set; } // DB: TenNVL_Tk
     }
 
     public class CreateLGTSMappingDto
@@ -115,7 +117,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
         public string? TenNVL { get; set; }
-        public string? TenNVL_TK { get; set; }
+        public string? TenNVLTk { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
         public string? GhiChu { get; set; }
@@ -137,6 +139,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
         public decimal? KLTonCuoiKip { get; set; }
+        public bool ManualKL { get; set; }
+        public decimal? KLGoc { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTu { get; set; }
     }
@@ -149,6 +153,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
         public decimal? KLTonCuoiKip { get; set; }
+        public bool ManualKL { get; set; }
+        public decimal? KLGoc { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTu { get; set; }
     }

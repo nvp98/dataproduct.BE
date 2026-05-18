@@ -5,6 +5,7 @@ using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Utils;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -44,7 +45,10 @@ namespace dataproduct.api.Repositories
         {
             return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id && x.IsDelete != 1 && x.IsLock != 1);
         }
-
+        public async Task<BmPhieu?> GetPhieuByIdAsync(Guid id)
+        {
+            return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id && x.IsDelete != 1);
+        }
         public async Task<BmPhieu> AddAsync([FromBody] JsonElement formData)
         {
             try

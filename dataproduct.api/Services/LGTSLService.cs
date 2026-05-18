@@ -1,6 +1,11 @@
+using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.DTOs.Export;
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Repositories;
+using DinkToPdf;
+using DinkToPdf.Contracts;
+using System.Text;
 using System.Text.Json;
 
 namespace dataproduct.api.Services
@@ -8,10 +13,20 @@ namespace dataproduct.api.Services
     public class LGTSLService
     {
         private readonly ILGTSLRepository _repo;
+        private readonly IConverter _pdfConverter;
+        private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _configuration;
 
-        public LGTSLService(ILGTSLRepository repo)
+        public LGTSLService(
+            ILGTSLRepository repo,
+            IConverter pdfConverter,
+            IWebHostEnvironment env,
+            IConfiguration configuration)
         {
             _repo = repo;
+            _pdfConverter = pdfConverter;
+            _env = env;
+            _configuration = configuration;
         }
 
         // ─── SiLo ────────────────────────────────────────────────────────────────
@@ -71,7 +86,7 @@ namespace dataproduct.api.Services
             {
                 IDLoCao = dto.IDLoCao,
                 TenNVL = dto.TenNVL?.Trim(),
-                TenNVL_Tk = dto.TenNVL_TK,
+                TenNVL_Tk = dto.TenNVLTk,
                 GhiChu = dto.GhiChu,
                 XacNhan = dto.XacNhan,
             };
@@ -87,7 +102,7 @@ namespace dataproduct.api.Services
             {
                 IDLoCao = dto.IDLoCao,
                 TenNVL = dto.TenNVL.Trim(),
-                TenNVL_Tk = dto.TenNVL_TK,
+                TenNVL_Tk = dto.TenNVLTk,
                 GhiChu = dto.GhiChu,
                 XacNhan = dto.XacNhan,
             };
@@ -199,6 +214,8 @@ namespace dataproduct.api.Services
                     TenSiLo = TryGetString(row, "silo", "tenSiLo", "TenSiLo"),
                     TenNVL = TryGetString(row, "loaiNguyenNhienLieu", "tenNVL", "TenNVL"),
                     KLTonCuoiKip = TryGetDecimal(row, "klTonCuoiKip", "KLTonCuoiKip", "ton"),
+                    ManualKL = TryGetBool(row, "_manualKL", "manualKL"),
+                    KLGoc = TryGetDecimal(row, "_klGoc", "klGoc", "KLGoc"),
                     GhiChu = TryGetString(row, "ghiChu", "GhiChu"),
                     ThuTu = TryGetInt(row, "thuTu", "ThuTu", "stt"),
                 });
@@ -234,7 +251,7 @@ namespace dataproduct.api.Services
             ID = e.ID,
             IDLoCao = e.IDLoCao,
             TenNVL = e.TenNVL,
-            TenNVL_TK = e.TenNVL_Tk,
+            TenNVLTk = e.TenNVL_Tk,
             GhiChu = e.GhiChu,
             NgayTao = e.NgayTao,
             XacNhan = e.XacNhan,
@@ -254,6 +271,187 @@ namespace dataproduct.api.Services
             NgayTao = e.NgayTao,
             NguoiTao = e.NguoiTao,
         };
+
+        // ─── Export PDF ──────────────────────────────────────────────────────────
+
+        public async Task<ExportFileResult> ExportTonSiloPdfAsync(Guid idPhieu, List<PheDuyetDto> pheDuyets)
+        {
+            var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
+                ?? throw new Exception("Không tìm thấy phiếu.");
+
+            if (string.IsNullOrWhiteSpace(phieu.DataJson))
+                throw new Exception("Phiếu không có dữ liệu JSON.");
+
+            using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+            var root = jsonDoc.RootElement;
+
+            var ngayStr = TryGetString(root, "NgaySX", "ngaySX", "ngay");
+            var ca = TryGetInt(root, "ca", "Ca") ?? 0;
+            var scope = TryGetInt(root, "scope", "Scope", "idLoCao") ?? 0;
+
+            DateTime.TryParse(ngayStr, out var ngay);
+            var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
+            var caLabel = ca == 1 ? "Ca Ngày" : ca == 2 ? "Ca Đêm" : $"Ca {ca}";
+            var loCao = scope > 0 ? scope.ToString() : "";
+
+            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+
+            var rows = new StringBuilder();
+            decimal tongKL = 0;
+            int stt = 0;
+            foreach (var c in chiTiet)
+            {
+                stt++;
+                tongKL += c.KLTonCuoiKip ?? 0;
+
+                rows.Append($@"
+                    <tr>
+                        <td class=""text-center"">{stt}</td>
+                        <td class=""text-center"">{c.TenSiLo ?? ""}</td>
+                        <td class=""text-center"">{c.TenNVL ?? ""}</td>
+                        <td class=""text-center"">
+                            {(c.KLTonCuoiKip.HasValue ? c.KLTonCuoiKip.Value.ToString("N3") : "")}
+                        </td>
+                        <td class=""text-center"">{c.GhiChu ?? ""}</td>
+                    </tr>");
+            }
+
+            var nguoiGiao = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
+            var nguoiNhan = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+
+            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
+                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+
+            var signGiao = await FormatChuKyBase64Async(nguoiGiao?.ChuKy, nguoiGiao?.TinhTrang == 1);
+            var signNhan = await FormatChuKyBase64Async(nguoiNhan?.ChuKy, nguoiNhan?.TinhTrang == 1);
+
+            var templatePath = Path.Combine(
+                _env.WebRootPath,
+                "template_html",
+                "BM.07-QT.05.09_So_giao_nhan_ton_silo_lo_cao.html");
+
+            var html = await File.ReadAllTextAsync(templatePath);
+
+            html = html
+                .Replace("{{LogoUrl}}", logoBase64)
+                .Replace("{{LoCao}}", loCao)
+                .Replace("{{CaLabel}}", caLabel)
+                .Replace("{{NgaySX}}", ngayDisplay)
+                .Replace("{{Rows}}", rows.ToString())
+                .Replace("{{TongKhoiLuong}}", tongKL.ToString("N3"))
+                .Replace("{{Sign_NguoiGiao}}", signGiao)
+                .Replace("{{Ten_NguoiGiao}}", nguoiGiao?.HoVaTen ?? "")
+                .Replace("{{Sign_NguoiNhan}}", signNhan)
+                .Replace("{{Ten_NguoiNhan}}", nguoiNhan?.HoVaTen ?? "");
+
+            var doc = new HtmlToPdfDocument
+            {
+                GlobalSettings =
+                {
+                    PaperSize = PaperKind.A4,
+                    Orientation = Orientation.Portrait,
+                },
+                Objects =
+                {
+                    new ObjectSettings
+                    {
+                        HtmlContent = html,
+                        WebSettings =
+                        {
+                            DefaultEncoding = "utf-8",
+                            LoadImages = true,
+                            EnableJavascript = false,
+                            PrintMediaType = true,
+                        },
+                        LoadSettings =
+                        {
+                            BlockLocalFileAccess = false,
+                            LoadErrorHandling = ContentErrorHandling.Ignore,
+                        }
+                    }
+                }
+            };
+
+            var pdfBytes = _pdfConverter.Convert(doc);
+            var fileName = $"TonSiLoLoCao_{phieu.SoPhieu ?? idPhieu.ToString("N")}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+
+            return new ExportFileResult
+            {
+                Content = pdfBytes,
+                FileName = fileName,
+                ContentType = "application/pdf",
+            };
+        }
+
+        private async Task<string> ConvertImageUrlToBase64Async(string imageUrl)
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(10);
+                var bytes = await client.GetByteArrayAsync(imageUrl);
+                var ext = Path.GetExtension(imageUrl).TrimStart('.').ToLower();
+                var mime = ext == "png" ? "image/png" : "image/jpeg";
+                return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+            }
+            catch
+            {
+                return imageUrl;
+            }
+        }
+
+        private async Task<string> FormatChuKyBase64Async(string? chuKy, bool daKy = false)
+        {
+            // Nếu chưa có chữ ký
+            if (string.IsNullOrWhiteSpace(chuKy))
+            {
+                // Nếu đã ký nhưng chưa có ảnh chữ ký
+                if (daKy)
+                {
+                    return @"
+                        <div style='text-align:center'>
+                            <div style='font-style:italic;color:red'>Đã ký</div>
+                            <div style='font-size:11px;color:red'>(Chưa cập nhật chữ ký)</div>
+                        </div>";
+                }
+
+                return "";
+            }
+
+            // Nếu đã là base64 image
+            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"<img src=\"{chuKy}\" style=\"max-width:150px;max-height:80px;\" />";
+            }
+
+            // Nếu là URL
+            if (chuKy.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                var base64 = await ConvertImageUrlToBase64Async(chuKy);
+                if (!string.IsNullOrEmpty(base64))
+                {
+                    return $"<img src=\"{base64}\" style=\"max-width:150px;max-height:80px;\" />";
+                }
+            }
+            else if (chuKy.StartsWith("/"))
+            {
+                var domain = _configuration.GetValue<string>("AppSettings:Domain") ?? "https://report.hoaphatdungquat.vn";
+                var fullUrl = domain.TrimEnd('/') + chuKy;
+
+                var base64 = await ConvertImageUrlToBase64Async(fullUrl);
+                if (!string.IsNullOrEmpty(base64))
+                {
+                    return $"<img src=\"{base64}\" style=\"max-width:150px;max-height:80px;\" />";
+                }
+            }
+
+            return @"
+                    <div style='text-align:center'>
+                        <div style='font-style:italic;color:red'>Đã ký</div>
+                        <div style='font-size:11px;color:red'>(Chưa cập nhật chữ ký)</div>
+                    </div>";
+        }
 
         private static bool TryGetArray(JsonElement obj, string key, out JsonElement array)
         {
@@ -290,6 +488,20 @@ namespace dataproduct.api.Services
                     return s;
             }
             return null;
+        }
+
+        private static bool TryGetBool(JsonElement obj, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!obj.TryGetProperty(key, out var val) || val.ValueKind == JsonValueKind.Null)
+                    continue;
+
+                if (val.ValueKind == JsonValueKind.True) return true;
+                if (val.ValueKind == JsonValueKind.False) return false;
+                if (val.ValueKind == JsonValueKind.String && bool.TryParse(val.GetString(), out var b)) return b;
+            }
+            return false;
         }
 
         private static decimal? TryGetDecimal(JsonElement obj, params string[] keys)

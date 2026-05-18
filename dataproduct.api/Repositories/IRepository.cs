@@ -45,6 +45,7 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID);
         Task<BmPhieu?> GetByIdAsync(Guid id);
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid id);
         Task<BmPhieu> AddAsync([FromBody] JsonElement formData);
         Task UpdateAsync(BmPhieu entity);
         Task DeleteAsync(Guid id);
@@ -308,6 +309,9 @@ namespace dataproduct.api.Repositories
         Task DeleteByPhieuIdAsync(Guid idPhieu);
         Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto);
         Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+
+        // Lấy thông tin phiếu (để export PDF)
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
     }
 
     public interface ILGNLRepository

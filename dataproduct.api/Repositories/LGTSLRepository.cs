@@ -130,7 +130,8 @@ namespace dataproduct.api.Repositories
                     ID = n.ID,
                     IDLoCao = n.IDLoCao,
                     TenNVL = n.TenNVL,
-                    TenNVL_TK = n.TenNVL_Tk,
+                    TenNVLTk = n.TenNVL_Tk,
+                    TenHienThi = n.XacNhan && n.TenNVL_Tk != null ? n.TenNVL_Tk : n.TenNVL,
                     GhiChu = n.GhiChu,
                     NgayTao = n.NgayTao,
                     XacNhan = n.XacNhan,
@@ -220,7 +221,7 @@ namespace dataproduct.api.Repositories
                     TenSiLo = s != null ? s.TenSiLo : null,
                     ThuTuSiLo = m.IDSiLo,   // IDSiLo chính là ThuTu
                     TenNVL = n != null ? n.TenNVL : null,
-                    TenNVL_TK = n != null ? n.TenNVL_Tk : null,
+                    TenNVLTk = n != null ? n.TenNVL_Tk : null,
                 }
             ).AsNoTracking().ToListAsync();
         }
@@ -293,6 +294,8 @@ namespace dataproduct.api.Repositories
                 TenSiLo = item.TenSiLo,
                 TenNVL = item.TenNVL,
                 KLTonCuoiKip = item.KLTonCuoiKip,
+                ManualKL = item.ManualKL,
+                KLGoc = item.KLGoc,
                 GhiChu = item.GhiChu,
                 ThuTu = item.ThuTu,
             });
@@ -302,10 +305,14 @@ namespace dataproduct.api.Repositories
 
         public async Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
         {
-            return await _context.LG_TSL_ChiTiet
-                .Where(c => c.IDPhieu == idPhieu)
-                .OrderBy(c => c.ThuTu)
-                .Select(c => new LGTSChiTietDto
+            return await (
+                from c in _context.LG_TSL_ChiTiet.AsNoTracking()
+                where c.IDPhieu == idPhieu
+                join nvl in _context.LG_TSL_NVL.AsNoTracking()
+                    on c.IDNVL equals nvl.ID into nvlGroup
+                from nvl in nvlGroup.DefaultIfEmpty()
+                orderby c.ThuTu
+                select new LGTSChiTietDto
                 {
                     ID = c.ID,
                     IDPhieu = c.IDPhieu,
@@ -316,13 +323,16 @@ namespace dataproduct.api.Repositories
                     IDMapping = c.IDMapping,
                     IDNVL = c.IDNVL,
                     TenSiLo = c.TenSiLo,
-                    TenNVL = c.TenNVL,
+                    TenNVL = nvl != null
+                        ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
+                        : c.TenNVL,
                     KLTonCuoiKip = c.KLTonCuoiKip,
+                    ManualKL = c.ManualKL,
+                    KLGoc = c.KLGoc,
                     GhiChu = c.GhiChu,
                     ThuTu = c.ThuTu,
-                })
-                .AsNoTracking()
-                .ToListAsync();
+                }
+            ).ToListAsync();
         }
 
         public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(
@@ -371,8 +381,10 @@ namespace dataproduct.api.Repositories
                     IDNVL     = m.IDNVL,
                     TenSiLo   = s != null ? s.TenSiLo : null,
                     ThuTu     = m.IDSiLo,
-                    TenNVL    = nvl != null ? nvl.TenNVL : null,
-                    TenNVL_TK = nvl != null ? nvl.TenNVL_Tk : null,
+                    TenNVL    = nvl != null
+                                  ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
+                                  : null,
+                    TenNVLTk = nvl != null ? nvl.TenNVL_Tk : null,
                     Ngay      = m.Ngay,
                     Ca        = m.Ca,
                     GhiChu    = m.GhiChu,
@@ -392,5 +404,7 @@ namespace dataproduct.api.Repositories
             return result;
         }
 
+        public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
+            => await _context.BmPhieus.AsNoTracking().FirstOrDefaultAsync(p => p.Idphieu == idPhieu);
     }
 }

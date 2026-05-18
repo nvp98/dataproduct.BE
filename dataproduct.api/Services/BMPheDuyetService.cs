@@ -3,6 +3,8 @@ using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using dataproduct.api.Utils;
+using DocumentFormat.OpenXml.InkML;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.EntityFrameworkCore;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -142,7 +144,9 @@ namespace dataproduct.api.Services
                 {
                     // Phiếu này là bản clone: xóa hẳn khỏi table, mở khóa phiếu cha (ID_PhieuGoc) để hiển thị lại.
                     // Hỗ trợ chuỗi clone nhiều tầng: nếu reject A2 thì mở A1; reject A1 thì mở A...
-                    var phieuCha = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
+                    //var phieuCha = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
+                    var phieuCha = await _phieuRepo.GetPhieuByIdAsync(phieu.ID_PhieuGoc.Value);
+
                     if (phieuCha != null)
                     {
                         phieuCha.IsLock = 0;

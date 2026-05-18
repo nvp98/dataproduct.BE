@@ -16,6 +16,8 @@ namespace dataproduct.api.Models
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
         public decimal? KLTonCuoiKip { get; set; }
+        public bool ManualKL { get; set; }
+        public decimal? KLGoc { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTu { get; set; }
     }
