@@ -1221,7 +1221,7 @@ namespace dataproduct.api.Repositories
 
             if(phieu == null)
                 throw new ApplicationException("Phiếu chưa được tạo");
-            if(phieu.TinhTrang != 0)
+            if(phieu.TinhTrang != 0 && phieu.TinhTrang != 3 && phieu.TinhTrang != 7)
                 throw new ApplicationException("Phiếu đã được gửi đi nên không nhận mẻ chuyển");
             
             // Cập nhật DLNM_HRC2 records
