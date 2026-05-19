@@ -18,8 +18,9 @@ namespace dataproduct.api.Services
         public bool? IsLock { get; set; }
         public bool? IsXacNhan { get; set; }
         public List<MacThepMayDucInfo> MayDucs { get; set; } = new();
-        public int? Id_PhanLoaiNhomMacThep {get;set;}
+        public int? Id_NhomPhanLoaiMacThep {get;set;}
         public string? TenNhom {get;set;}
+        public DateTime? NgayTao {get;set;}
     }
 
     public class MacThepSearchRequestDto
@@ -28,6 +29,7 @@ namespace dataproduct.api.Services
         public byte? NhaMay { get; set; }
         public bool? IsLock { get; set; }
         public List<int>? IdMayDucs { get; set; }
+        public bool? IsXacNhan { get; set; }
         public int? Ca { get; set; }
         public string? Kip { get; set; }
         public string? MaBm { get; set; }
@@ -78,6 +80,7 @@ namespace dataproduct.api.Services
             bool? isLock,
             string? tenMacThep,
             List<int>? idMayDucs,
+            bool? isXacNhan = null,
             int? ca = null,
             string? kip = null,
             string? maBm = null)
@@ -86,6 +89,9 @@ namespace dataproduct.api.Services
 
             if (nhaMay.HasValue)        query = query.Where(x => x.NhaMay == nhaMay.Value);
             if (isLock.HasValue)        query = query.Where(x => x.IsLock == isLock.Value);
+            if (isXacNhan.HasValue)     query = isXacNhan.Value
+                ? query.Where(x => x.IsXacNhan == true)
+                : query.Where(x => x.IsXacNhan == false || x.IsXacNhan == null);
             if (!string.IsNullOrWhiteSpace(tenMacThep)) query = query.Where(x => x.TenMacThep.Contains(tenMacThep));
             if (idMayDucs != null && idMayDucs.Count > 0)
                 query = query.Where(x => _context.MacThep_MayDucs.Any(m => m.IdMacThep == x.Id && idMayDucs.Contains(m.IdMayDuc)));
@@ -135,7 +141,7 @@ namespace dataproduct.api.Services
 
                 from nhom in gj.DefaultIfEmpty()
 
-                orderby x.NhaMay, x.TenMacThep
+                orderby x.NgayTao descending
 
                 select new MacThepSearchDto
                 {
@@ -145,11 +151,9 @@ namespace dataproduct.api.Services
                     IsLock = x.IsLock,
                     IsXacNhan = x.IsXacNhan,
 
-                    Id_PhanLoaiNhomMacThep = x.Id_NhomPhanLoaiMacThep,
-
-                    TenNhom = nhom != null
-                        ? nhom.TenNhom
-                        : null
+                    Id_NhomPhanLoaiMacThep = x.Id_NhomPhanLoaiMacThep,
+                    TenNhom = nhom != null ? nhom.TenNhom : null,
+                    NgayTao = x.NgayTao
                 }
             ).ToListAsync();
 
@@ -193,7 +197,8 @@ namespace dataproduct.api.Services
                 NhaMay     = dto.NhaMay,
                 IsLock     = dto.IsLock,
                 IsXacNhan  = dto.IsXacNhan,
-                Id_NhomPhanLoaiMacThep = dto.Id_NhomPhanLoaiMacThep
+                Id_NhomPhanLoaiMacThep = dto.Id_NhomPhanLoaiMacThep,
+                NgayTao    = DateTime.Now
             };
             await _repo.AddAsync(entity);
 
@@ -281,7 +286,7 @@ namespace dataproduct.api.Services
             var query = _context.NhomPhanLoaiMacTheps.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(dto.searchText))
-                query.Where(x => x.TenNhom.Contains(dto.searchText));
+                query = query.Where(x => x.TenNhom.Contains(dto.searchText));
 
             var nhomPhanLoai = await query
                 .OrderBy(x => x.TenNhom)

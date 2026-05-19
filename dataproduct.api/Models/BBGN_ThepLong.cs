@@ -43,6 +43,7 @@ public partial class BBGN_ThepLong
     public decimal? klcau2 { get; set; }
     public int? LastIdUserEdit { get; set; }
     public string? LastNameUserEdit { get; set; }
+    public string? Kip { get; set; }
 }
 
 

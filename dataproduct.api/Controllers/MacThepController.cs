@@ -27,7 +27,7 @@ namespace dataproduct.api.Controllers
             var page     = dto.Page < 1 ? 1 : dto.Page;
             var pageSize = dto.PageSize < 1 ? 30 : dto.PageSize > 200 ? 200 : dto.PageSize;
 
-            var rows = await _service.SearchWithMayDucAsync(dto.NhaMay, dto.IsLock, dto.SearchKey, dto.IdMayDucs, dto.Ca, dto.Kip, dto.MaBm);
+            var rows = await _service.SearchWithMayDucAsync(dto.NhaMay, dto.IsLock, dto.SearchKey, dto.IdMayDucs, dto.IsXacNhan, dto.Ca, dto.Kip, dto.MaBm);
 
             var totalCount = rows.Count;
             var data = rows
