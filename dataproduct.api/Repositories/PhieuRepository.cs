@@ -359,7 +359,7 @@ namespace dataproduct.api.Repositories
                             (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
                             (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
                         ) &&
-                        (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7)
+                        (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3)
                     );
                     break;
                 }
