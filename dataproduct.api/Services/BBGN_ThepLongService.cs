@@ -59,9 +59,10 @@ namespace dataproduct.api.Services
             if (!formData.TryGetProperty("table1", out var table))
                 return warnings;
             var bieuMau = GetString(formData, "maBm");
-            var ngaySX = TryParseDateTime(formData, "NgaySX");
-            var ca = TryParseInt(formData, "ca");
-            var scope = TryParseInt(formData, "scope");
+            var ngaySX  = TryParseDateTime(formData, "NgaySX");
+            var ca      = TryParseInt(formData, "ca");
+            var scope   = TryParseInt(formData, "scope");
+            var kip     = GetString(formData, "kip");
 
             // ===== PRELOAD DATA theo IdPhieu =====
             var existingData = await _context.BBGN_ThepLongs
@@ -136,6 +137,7 @@ namespace dataproduct.api.Services
                     if (ngaySX.HasValue) existing.NgaySX = ngaySX.Value;
                     if (ca.HasValue) existing.Ca = ca.Value;
                     if (scope.HasValue) existing.Scope = scope.Value;
+                    if (!string.IsNullOrWhiteSpace(kip)) existing.Kip = kip;
 
                     _context.BBGN_ThepLongs.Update(existing);
 
@@ -164,9 +166,10 @@ namespace dataproduct.api.Services
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
-                        Ca = ca,
-                        NgaySX = ngaySX,
-                        Scope = scope,
+                        Ca      = ca,
+                        NgaySX  = ngaySX,
+                        Scope   = scope,
+                        Kip     = kip,
                         KLLFSauThep = klLFSauThep,
                         KlLan1 = klLan1,
                         KlLan2 = klLan2,
@@ -488,6 +491,186 @@ namespace dataproduct.api.Services
             {
                 TotalRows = totalRows,
                 TotalKlThepLong = totalKl
+            };
+        }
+
+        public async Task<TongHopBBGNThepLongResponse> TongHopAsync(SearchThongKeBBGNThepLongRequest request)
+        {
+            var baseQuery = BuildThongKeQuery(request);
+
+            var phanLoai = await baseQuery
+                .Where(x => !string.IsNullOrEmpty(x.PhanLoai))
+                .GroupBy(x => x.PhanLoai!)
+                .Select(g => new TongHopItem { Label = g.Key, SoMe = g.Count() })
+                .OrderBy(x => x.Label)
+                .ToListAsync();
+
+            var caRaw = await baseQuery
+                .Where(x => x.Ca.HasValue)
+                .GroupBy(x => x.Ca!.Value)
+                .Select(g => new { Ca = g.Key, SoMe = g.Count() })
+                .OrderBy(x => x.Ca)
+                .ToListAsync();
+            var ca = caRaw.Select(x => new TongHopItem
+            {
+                Label = x.Ca == 1 ? "Ca ngày" : x.Ca == 2 ? "Ca đêm" : $"Ca {x.Ca}",
+                SoMe  = x.SoMe
+            }).ToList();
+
+            var kip = await baseQuery
+                .Where(x => !string.IsNullOrEmpty(x.Kip))
+                .GroupBy(x => x.Kip!)
+                .Select(g => new TongHopItem { Label = g.Key, SoMe = g.Count() })
+                .OrderBy(x => x.Label)
+                .ToListAsync();
+
+            var tinhLuyen = await baseQuery
+                .Where(x => !string.IsNullOrEmpty(x.TinhLuyenLenThang))
+                .GroupBy(x => x.TinhLuyenLenThang!)
+                .Select(g => new TongHopItem { Label = g.Key, SoMe = g.Count() })
+                .OrderBy(x => x.Label)
+                .ToListAsync();
+
+            var ducVuong = await (
+                from row in baseQuery
+                where row.Scope.HasValue && !string.IsNullOrEmpty(row.MayDuc)
+                join md in _context.MayDucs on row.Scope.Value equals md.Id
+                where md.LoaiMayDuc == "DV"
+                group row by row.MayDuc! into g
+                orderby g.Key
+                select new TongHopItem { Label = g.Key, SoMe = g.Count() }
+            ).ToListAsync();
+
+            var ducTam = await (
+                from row in baseQuery
+                where row.Scope.HasValue && !string.IsNullOrEmpty(row.MayDuc)
+                join md in _context.MayDucs on row.Scope.Value equals md.Id
+                where md.LoaiMayDuc == "DT"
+                group row by row.MayDuc! into g
+                orderby g.Key
+                select new TongHopItem { Label = g.Key, SoMe = g.Count() }
+            ).ToListAsync();
+
+            var nhomPhanLoai = await (
+                from row in baseQuery
+                where row.IdMacThep.HasValue
+                join mt in _context.MacTheps on row.IdMacThep!.Value equals mt.Id
+                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                join nhom in _context.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
+                group row by nhom.TenNhom into g
+                orderby g.Key
+                select new TongHopItem { Label = g.Key, SoMe = g.Count() }
+            ).ToListAsync();
+
+            return new TongHopBBGNThepLongResponse
+            {
+                PhanLoai            = phanLoai,
+                Ca                  = ca,
+                Kip                 = kip,
+                TinhLuyenLenThang   = tinhLuyen,
+                DucVuong            = ducVuong,
+                DucTam              = ducTam,
+                NhomPhanLoaiMacThep = nhomPhanLoai
+            };
+        }
+
+        public async Task<ExportFileResult> ExportThongKeExcelAsync(SearchThongKeBBGNThepLongRequest request, string templatePath)
+        {
+            var query = BuildThongKeQuery(request);
+            var data = await query
+                .OrderByDescending(x => x.NgaySX)
+                .ThenByDescending(x => x.Ca)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+
+            await ResolveMacThepNamesAsync(data);
+
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var fs = new FileStream(templatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var workbook = new XLWorkbook(fs);
+            var ws = workbook.Worksheet(1);
+
+            bool isHRC2 = (request.BieuMau ?? "") == "HRC2_BBGN_ThepLong";
+
+            // Column positions (1-based)
+            int colKLLF       = isHRC2 ? 0  : 10; // 0 = not present
+            int colLan1       = isHRC2 ? 10 : 11;
+            int colLan2       = isHRC2 ? 11 : 12;
+            int colLan3       = isHRC2 ? 12 : 13;
+            int colKlThepLong = isHRC2 ? 13 : 14;
+            int colCau1       = isHRC2 ? 19 : 20;
+            int colCau2       = isHRC2 ? 20 : 21;
+            int totalCols     = isHRC2 ? 20 : 21;
+
+            int startRow = 5;
+            int stt = 1;
+
+            foreach (var row in data)
+            {
+                int col = 1;
+                ws.Cell(startRow, col++).Value = stt++;
+                ws.Cell(startRow, col++).Value = row.NgaySX.HasValue ? row.NgaySX.Value.ToString("dd/MM/yyyy") : "";
+                ws.Cell(startRow, col++).Value = row.Ca.HasValue ? (XLCellValue)row.Ca.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.MayDuc ?? "";
+                var colMeThoi = ws.Cell(startRow, col++);
+                colMeThoi.Value = row.Me ?? "";
+                if (row.IsTrungMeThoi == true)
+                    colMeThoi.Style.Fill.BackgroundColor = XLColor.Red;
+                ws.Cell(startRow, col++).Value = row.MacThep ?? "";
+                ws.Cell(startRow, col++).Value = row.TenNhomPhanLoaiMacThep ?? "";
+                ws.Cell(startRow, col++).Value = row.ThungSo ?? "";
+                ws.Cell(startRow, col++).Value = row.ThoiGian ?? "";
+                if (!isHRC2)
+                    ws.Cell(startRow, col++).Value = row.KLLFSauThep.HasValue ? (XLCellValue)row.KLLFSauThep.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.KlLan1.HasValue ? (XLCellValue)row.KlLan1.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.KlLan2.HasValue ? (XLCellValue)row.KlLan2.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.KlLan3.HasValue ? (XLCellValue)row.KlLan3.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.KlThepLong.HasValue ? (XLCellValue)row.KlThepLong.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.GhiChu ?? "";
+                ws.Cell(startRow, col++).Value = row.TinhLuyenLenThang ?? "";
+                ws.Cell(startRow, col++).Value = row.PhanLoai ?? "";
+                ws.Cell(startRow, col++).Value = row.MacThepBKMIS ?? "";
+                ws.Cell(startRow, col++).Value = row.IsThuNghiem == true ? "X" : "";
+                ws.Cell(startRow, col++).Value = row.klcau1.HasValue ? (XLCellValue)row.klcau1.Value : Blank.Value;
+                ws.Cell(startRow, col++).Value = row.klcau2.HasValue ? (XLCellValue)row.klcau2.Value : Blank.Value;
+
+                startRow++;
+            }
+
+            // ===== TOTALS ROW =====
+            int totalRow = startRow;
+
+            var labelRange = ws.Range(totalRow, 1, totalRow, 9);
+            labelRange.Merge();
+            labelRange.Value = "Tổng";
+            labelRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            labelRange.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+            labelRange.Style.Font.Bold = true;
+
+            if (colKLLF > 0)
+                ws.Cell(totalRow, colKLLF).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KLLFSauThep ?? 0));
+            ws.Cell(totalRow, colLan1).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan1 ?? 0));
+            ws.Cell(totalRow, colLan2).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan2 ?? 0));
+            ws.Cell(totalRow, colLan3).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan3 ?? 0));
+            ws.Cell(totalRow, colKlThepLong).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KlThepLong ?? 0));
+            ws.Cell(totalRow, colCau1).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.klcau1 ?? 0));
+            ws.Cell(totalRow, colCau2).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.klcau2 ?? 0));
+
+            // ===== BORDER =====
+            var tableRange = ws.Range(5, 1, totalRow, totalCols);
+            tableRange.Style.Border.InsideBorder  = XLBorderStyleValues.Thin;
+            tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+            using var ms = new MemoryStream();
+            workbook.SaveAs(ms);
+            var fileName = $"ThongKe_BBGN_ThepLong_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return new ExportFileResult
+            {
+                Content     = ms.ToArray(),
+                FileName    = fileName,
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
 

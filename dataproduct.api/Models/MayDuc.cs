@@ -6,5 +6,6 @@ public partial class MayDuc
     public string TenMayDuc { get; set; } = null!;
     public byte NhaMay { get; set; }
     public bool? IsLock { get; set; }
+    public string? LoaiMayDuc { get; set; }
 }
 

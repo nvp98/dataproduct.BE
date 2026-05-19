@@ -625,6 +625,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IdMacThep).HasColumnName("IdMacThep");
             entity.Property(e => e.KLLFSauThep).HasColumnName("KLLFSauThep");
             entity.Property(e => e.IsThuNghiem).HasColumnName("IsThuNghiem");
+            entity.Property(e => e.Kip).HasColumnName("Kip");
         });
 
         modelBuilder.Entity<MacThep>(entity =>
@@ -636,6 +637,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
             entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
             entity.Property(e => e.Id_NhomPhanLoaiMacThep).HasColumnName("Id_NhomPhanLoaiMacThep");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
         });
 
         modelBuilder.Entity<MacThep_MayDuc>(entity =>

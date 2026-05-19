@@ -168,6 +168,46 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpPost("tong-hop")]
+        public async Task<IActionResult> TongHop([FromBody] SearchThongKeBBGNThepLongRequest request)
+        {
+            try
+            {
+                var result = await _service.TongHopAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("export-thongke")]
+        public async Task<IActionResult> ExportThongKe([FromBody] SearchThongKeBBGNThepLongRequest request)
+        {
+            try
+            {
+                var templateFile = (request.BieuMau ?? "") == "HRC2_BBGN_ThepLong"
+                    ? "PKH_HRC2_BBGN_ThepLong.xlsx"
+                    : "PKH_HRC1_BBGN_ThepLong.xlsx";
+                var templatePath = Path.Combine(_env.WebRootPath, "templates", templateFile);
+                if (!System.IO.File.Exists(templatePath))
+                    return StatusCode(StatusCodes.Status500InternalServerError,
+                        $"Chưa có template Excel. Đặt file tại: wwwroot/templates/{templateFile}");
+
+                var file = await _service.ExportThongKeExcelAsync(request, templatePath);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
         [HttpGet("export-pdf")]
         public async Task<IActionResult> ExportPdf([FromQuery] Guid idPhieu)
         {
