@@ -86,12 +86,20 @@ namespace dataproduct.api.Services
                 .Where(x => !string.IsNullOrEmpty(x))
                 .Distinct()
                 .ToList();
+            // quyền chốt phiếu QuyenChucNang = 3 (CHỐT)
+            var chotPhieu = data
+                .Where(x => x.QuyenChucNang == (byte)QuyenChucNangEnum.CHOT)
+                .Select(x => x.MaBm != null ? x.MaBm.Trim() : null)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct()
+                .ToList();
 
             return new MenuPermissionsDto
             {
                 ProcessingForms = processing,
                 ApprovingForms = approving,
-                ViewingForms = viewing
+                ViewingForms = viewing,
+                ChotPhieuForms = chotPhieu
             };
         }
 

@@ -8,7 +8,7 @@ namespace dataproduct.api.DTOs
         public string? MaKhuVuc { get; set; }
         /// <summary>1=XULY, 2=PHEDUYET, 3=CHOT, 4=XULY_VA_PHEDUYET, 5=XEM</summary>
         public byte? QuyenChucNang { get; set; }
-        public string? KhuVucPhu {get;set;}
+        public string? KhuVucPhu { get; set; }
     }
 
     /// <summary>Dùng cho menu: Việc tôi bắt đầu, Việc đến tôi và Danh sách chỉ xem.</summary>
@@ -17,6 +17,7 @@ namespace dataproduct.api.DTOs
         public IReadOnlyList<string> ProcessingForms { get; set; } = new List<string>();
         public IReadOnlyList<string> ApprovingForms { get; set; } = new List<string>();
         public IReadOnlyList<string> ViewingForms { get; set; } = new List<string>();
+        public IReadOnlyList<string> ChotPhieuForms { get; set; } = new List<string>();
     }
 
     public class BmQuyenXlCreateDto
@@ -43,7 +44,7 @@ namespace dataproduct.api.DTOs
         public List<string> MaKhuVucs { get; set; } = new();
         /// <summary>Danh sách quyền. Tích Descartes với MaKhuVucs → mỗi tổ hợp = 1 dòng.</summary>
         public List<byte> QuyenChucNangs { get; set; } = new();
-        public List<string> KhuVucPhus {get;set;} = new();
+        public List<string> KhuVucPhus { get; set; } = new();
     }
 
     /// <summary>
