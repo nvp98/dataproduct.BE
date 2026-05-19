@@ -1790,8 +1790,11 @@ namespace dataproduct.api.Repositories
                                   KLPhuGiaTotal: hg.Any(x => x.KLPhuGia.HasValue)
                                       ? (double?)hg.Sum(x => x.KLPhuGia ?? 0)
                                       : null,
-                                  KLPhuGia_Manual: hg.First().KLPhuGia_Manual,
-                                  IsManual: hg.First().IsManual
+                                  // Nếu bất kỳ phụ liệu nào trong nhóm có IsManual=true → đại diện manual là phụ liệu A (tìm thấy đầu tiên có IsManual=true)
+                                  KLPhuGia_Manual: hg.Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue)
+                                                     .Select(x => x.KLPhuGia_Manual)
+                                                     .FirstOrDefault(),
+                                  IsManual: (bool?)hg.Any(x => x.IsManual == true)
                               )
                           )
                 );
@@ -1850,13 +1853,47 @@ namespace dataproduct.api.Repositories
                         var detailById = await GetByIdGroupedAsync((int)x.ID);
                         if (detailById != null)
                         {
+                            // Remap child HeaderKey → parent (-NhomId) giống regular path, rồi merge IsManual
                             var mappedById = (detailById.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
                                 .Where(p => p.ID_HeaderKey.HasValue)
-                                .ToDictionary(p => p.ID_HeaderKey!.Value, p => p);
+                                .GroupBy(p => childToParentMap.TryGetValue(p.ID_HeaderKey!.Value, out var pid) ? pid : p.ID_HeaderKey!.Value)
+                                .ToDictionary(
+                                    g => g.Key,
+                                    g =>
+                                    {
+                                        var hasManual   = g.Any(x => x.IsManual == true);
+                                        var manualEntry = g.FirstOrDefault(x => x.IsManual == true);
+                                        var first       = g.First();
+                                        return new HeaderKeyGroupedByReportNoModel
+                                        {
+                                            ID_HeaderKey    = g.Key,
+                                            KLPhuGia        = hasManual ? null : (double?)g.Sum(x => x.KLPhuGiaTotal ?? 0),
+                                            KLPhuGiaTotal   = hasManual ? manualEntry?.KLPhuGia_Manual : g.Sum(x => x.KLPhuGiaTotal ?? 0),
+                                            IsManual        = hasManual ? true : null,
+                                            KLPhuGia_Manual = manualEntry?.KLPhuGia_Manual,
+                                            KeyGuid         = first.KeyGuid,
+                                            TenHienThi      = first.TenHienThi,
+                                            TenNguonDuLieu  = first.TenNguonDuLieu,
+                                            ID_PhuLieu      = first.ID_PhuLieu,
+                                            TenPhuLieu      = first.TenPhuLieu,
+                                            LoaiPhuLieu     = first.LoaiPhuLieu,
+                                            MappingId       = first.MappingId
+                                        };
+                                    }
+                                );
 
                             var phanBoById = (detailById.phanBoPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
                                 .Where(p => p.ID_HeaderKey.HasValue)
-                                .ToDictionary(p => p.ID_HeaderKey!.Value, p => p);
+                                .GroupBy(p => childToParentMap.TryGetValue(p.ID_HeaderKey!.Value, out var pid) ? pid : p.ID_HeaderKey!.Value)
+                                .ToDictionary(
+                                    g => g.Key,
+                                    g => new HeaderKeyGroupedByReportNoModel
+                                    {
+                                        ID_HeaderKey  = g.Key,
+                                        KLPhuGia      = (double?)g.Sum(x => x.KLPhuGiaTotal ?? 0),
+                                        KLPhuGiaTotal = g.Sum(x => x.KLPhuGiaTotal ?? 0)
+                                    }
+                                );
 
                             var valuesById = headers.Select(h =>
                             {
@@ -2109,8 +2146,13 @@ namespace dataproduct.api.Repositories
                         (x.MeThoi ?? "").Contains(search));
             }
 
+            if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value)
+                query = query.Where(x => x.IsTrungMeThoi == true);
+
             if (dto.IsDelete.HasValue && dto.IsDelete.Value)
                 query = query.Where(x => x.IsDelete == true);
+            else
+                query = query.Where(x => x.IsDelete != true);
 
             // Lấy REPORT_NOs thực tế (de-dup giống SearchThongKeApiAsync: MAX ID per REPORT_NO)
             var filteredReportNos = query
@@ -2207,10 +2249,12 @@ namespace dataproduct.api.Repositories
                 {
                     g.Key.ReportNo,
                     g.Key.ID_HeaderKey,
-                    // Sum riêng NM (IsManual != true) và Manual (IsManual == true) để tính effectiveKL đúng per record.
-                    // IsManual=true, KLPhuGia_Manual=null → user xóa → đóng góp 0 vào KLManualSum (không dùng KLPhuGia).
-                    KLPhuGiaNMSum = g.Sum(x => x.IsManual != true ? (x.KLPhuGia ?? 0) : 0),
-                    KLManualSum   = g.Sum(x => x.IsManual == true  ? (x.KLPhuGia_Manual ?? 0) : 0)
+                    // Nếu bất kỳ phụ liệu nào trong nhóm có IsManual=true → dùng ManualValue đại diện, bỏ toàn bộ AutoValue
+                    HasManual   = g.Any(x => x.IsManual == true),
+                    ManualValue = g.Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue)
+                                   .Select(x => x.KLPhuGia_Manual!.Value)
+                                   .DefaultIfEmpty(0).First(),
+                    AutoValue   = g.Sum(x => x.KLPhuGia ?? 0)
                 })
                 .ToList();
 
@@ -2218,10 +2262,21 @@ namespace dataproduct.api.Repositories
 
             foreach (var item in mappedGrouped)
             {
-                // ID_HeaderKey==5: NM values cần ÷ 0.055; manual values đã đúng đơn vị, không convert.
-                var effectiveKL = item.ID_HeaderKey == 5
-                    ? Math.Round(item.KLPhuGiaNMSum / 0.055, 0, MidpointRounding.AwayFromZero) + item.KLManualSum
-                    : item.KLPhuGiaNMSum + item.KLManualSum;
+                double effectiveKL;
+                if (item.HasManual)
+                {
+                    // ManualValue đã đúng đơn vị (kể cả IDHeaderKey==5), không convert
+                    effectiveKL = item.ManualValue;
+                }
+                else if (item.ID_HeaderKey == 5)
+                {
+                    effectiveKL = Math.Round(item.AutoValue / 0.055, 0, MidpointRounding.AwayFromZero);
+                }
+                else
+                {
+                    effectiveKL = item.AutoValue;
+                }
+
                 var total = phanBoLookup.TryGetValue((item.ReportNo, item.ID_HeaderKey), out var phanBoKL)
                     ? phanBoKL + effectiveKL
                     : effectiveKL;
@@ -2245,7 +2300,82 @@ namespace dataproduct.api.Repositories
                 }
             }
 
-            // === 6. Build flat response ===
+            // === 6. Manual records (IsNM=false, REPORT_NO=null) — linked via ID_MeThoi ===
+            var manualDlnmIds = await query
+                .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+                .Select(x => x.ID)
+                .ToListAsync();
+
+            if (manualDlnmIds.Count > 0)
+            {
+                // 6a. Phụ liệu mapped (ID_PhuLieu → Header_Mappings → Header_Keys)
+                var manualMapped = await (
+                    from pl in _context.PhuLieu_HRC2s
+                    where manualDlnmIds.Contains(pl.ID_MeThoi) &&
+                          (pl.IsPhanBo != true) && pl.ID_PhuLieu.HasValue
+                    join hm in _context.Header_Mappings on pl.ID_PhuLieu.Value equals hm.ID_PhuLieu
+                    join hk in _context.Header_Keys on hm.ID_HeaderKey equals hk.Id
+                    where hk.IsActive && usedHeaderKeyIds.Contains(hk.Id)
+                    select new { RowKey = pl.ID_MeThoi, ID_HeaderKey = hk.Id, pl.KLPhuGia, pl.KLPhuGia_Manual, pl.IsManual }
+                ).ToListAsync();
+
+                // 6b. Manual-only (không có ID_PhuLieu, chỉ có ID_HeaderKey)
+                var manualOnly2 = await _context.PhuLieu_HRC2s
+                    .Where(pl =>
+                        manualDlnmIds.Contains(pl.ID_MeThoi) &&
+                        (pl.IsPhanBo != true) && !pl.ID_PhuLieu.HasValue &&
+                        pl.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(pl.ID_HeaderKey.Value))
+                    .Select(pl => new { RowKey = pl.ID_MeThoi, ID_HeaderKey = pl.ID_HeaderKey!.Value, KLPhuGia = (double?)0, pl.KLPhuGia_Manual, pl.IsManual })
+                    .ToListAsync();
+
+                // Remap child→parent, group by (RowKey, HeaderKey), áp IsManual logic
+                var allManual = manualMapped
+                    .Select(x => new { x.RowKey, ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var p1) ? p1 : x.ID_HeaderKey, x.KLPhuGia, x.KLPhuGia_Manual, x.IsManual })
+                    .Concat(manualOnly2.Select(x => new { x.RowKey, ID_HeaderKey = childToParentMap.TryGetValue(x.ID_HeaderKey, out var p2) ? p2 : x.ID_HeaderKey, x.KLPhuGia, x.KLPhuGia_Manual, x.IsManual }))
+                    .GroupBy(x => (x.RowKey, x.ID_HeaderKey))
+                    .Select(g => new
+                    {
+                        g.Key.ID_HeaderKey,
+                        HasManual   = g.Any(x => x.IsManual == true),
+                        ManualValue = g.Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue).Select(x => x.KLPhuGia_Manual!.Value).DefaultIfEmpty(0).First(),
+                        AutoValue   = g.Sum(x => x.KLPhuGia ?? 0)
+                    });
+
+                foreach (var item in allManual)
+                {
+                    double effectiveKL = item.HasManual
+                        ? item.ManualValue
+                        : item.ID_HeaderKey == 5
+                            ? Math.Round(item.AutoValue / 0.055, 0, MidpointRounding.AwayFromZero)
+                            : item.AutoValue;
+
+                    if (sumByHeaderKey.ContainsKey(item.ID_HeaderKey))
+                        sumByHeaderKey[item.ID_HeaderKey] += effectiveKL;
+                    else
+                        sumByHeaderKey[item.ID_HeaderKey] = effectiveKL;
+                }
+
+                // 6c. PhanBo của manual records
+                var manualPhanBo = await _context.PhuLieu_HRC2s
+                    .Where(x =>
+                        manualDlnmIds.Contains(x.ID_MeThoi) &&
+                        x.IsPhanBo == true &&
+                        x.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(x.ID_HeaderKey.Value))
+                    .Select(x => new { ID_HeaderKey = x.ID_HeaderKey!.Value, x.KLPhuGia })
+                    .ToListAsync();
+
+                foreach (var pb in manualPhanBo)
+                {
+                    var hkId = childToParentMap.TryGetValue(pb.ID_HeaderKey, out var pid) ? pid : pb.ID_HeaderKey;
+                    var val = pb.KLPhuGia ?? 0;
+                    if (sumByHeaderKey.ContainsKey(hkId))
+                        sumByHeaderKey[hkId] += val;
+                    else
+                        sumByHeaderKey[hkId] = val;
+                }
+            }
+
+            // === 7. Build flat response ===
             return headers.Select(h =>
             {
                 sumByHeaderKey.TryGetValue(h.IDHeaderKey, out var total);

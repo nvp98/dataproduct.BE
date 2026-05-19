@@ -72,5 +72,22 @@ namespace dataproduct.api.DTOs
         public int TotalRows { get; set; }
         public decimal? TotalKlThepLong { get; set; }
     }
+
+    public class TongHopItem
+    {
+        public string Label { get; set; } = null!;
+        public int SoMe { get; set; }
+    }
+
+    public class TongHopBBGNThepLongResponse
+    {
+        public List<TongHopItem> PhanLoai { get; set; } = new();
+        public List<TongHopItem> Ca { get; set; } = new();
+        public List<TongHopItem> Kip { get; set; } = new();
+        public List<TongHopItem> TinhLuyenLenThang { get; set; } = new();
+        public List<TongHopItem> DucVuong { get; set; } = new();
+        public List<TongHopItem> DucTam { get; set; } = new();
+        public List<TongHopItem> NhomPhanLoaiMacThep { get; set; } = new();
+    }
 }
 
