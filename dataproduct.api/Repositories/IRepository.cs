@@ -44,6 +44,7 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID);
         Task<BmPhieu?> GetByIdAsync(Guid id);
+        Task<BmPhieu?> GetByIdPhieuChaAsync(Guid id);
         Task<BmPhieu> AddAsync([FromBody] JsonElement formData);
         Task UpdateAsync(BmPhieu entity);
         Task DeleteAsync(Guid id);

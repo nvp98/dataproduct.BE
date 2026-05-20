@@ -42,6 +42,11 @@ namespace dataproduct.api.Repositories
             return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id && x.IsDelete != 1 && x.IsLock != 1);
         }
 
+        public async Task<BmPhieu?> GetByIdPhieuChaAsync(Guid id)
+        {
+            return await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == id && x.IsDelete != 1);
+        }
+
         public async Task<BmPhieu> AddAsync([FromBody] JsonElement formData)
         {
             try
