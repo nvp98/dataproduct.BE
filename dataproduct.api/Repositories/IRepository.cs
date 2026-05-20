@@ -366,6 +366,14 @@ namespace dataproduct.api.Repositories
         // Snapshot trạng thái hiện tại của từng Silo (NVL đang chứa)
         Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
             int idLoCao, DateTime ngay, int idCa);
+
+        // Chi tiết nạp liệu theo phiếu
+        Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
+        Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);
+        Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+
+        // Phiếu
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
     }
 
     public interface IBBGN_ThepLongRepository

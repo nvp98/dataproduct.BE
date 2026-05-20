@@ -291,7 +291,7 @@ namespace dataproduct.api.Services
 
             DateTime.TryParse(ngayStr, out var ngay);
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
-            var caLabel = ca == 1 ? "Ca Ngày" : ca == 2 ? "Ca Đêm" : $"Ca {ca}";
+            var caLabel = ca == 1 ? "1" : ca == 2 ? "2" : $"Ca {ca}";
             var loCao = scope > 0 ? scope.ToString() : "";
 
             var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);

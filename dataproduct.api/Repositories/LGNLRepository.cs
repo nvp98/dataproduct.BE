@@ -632,6 +632,13 @@ namespace dataproduct.api.Repositories
         //}
 
         // Helper: chỉ add placeholder "—" cho nhóm thực sự không có NVL nào sau tất cả các bước
+
+        (DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
+        {
+            1 => (ngay.Date.AddHours(7).AddMinutes(30), ngay.Date.AddHours(19).AddMinutes(30)),
+            2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
+            _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
+        };
         public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(DateTime ngay, int idCa, int idLoCao)
         {
             // 1. Lấy danh sách nhóm (LUÔN hiển thị)
@@ -728,8 +735,7 @@ namespace dataproduct.api.Repositories
             }
 
             // 6. Thời gian SCADA
-            var timeFrom = ngay.Date.AddHours(7).AddMinutes(30);
-            var timeTo = ngay.Date.AddHours(19).AddMinutes(30);
+            var (timeFrom, timeTo) = GetTimeRangeByCa(ngay, idCa);
 
             // 7. Timeline mapping
             var tagTimeline = mappings
@@ -816,6 +822,57 @@ namespace dataproduct.api.Repositories
                     DataIndex = $"_empty_{col.Title}",
                 });
         }
+
+        // ─── Chi tiết nạp liệu theo phiếu ────────────────────────────────────────
+
+        public async Task DeleteChiTietByPhieuIdAsync(Guid idPhieu)
+        {
+            await _context.LG_NL_ChiTiet
+                .Where(x => x.IDPhieu == idPhieu)
+                .ExecuteDeleteAsync();
+        }
+
+        public async Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities)
+        {
+            await _context.LG_NL_ChiTiet.AddRangeAsync(entities);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
+        {
+            return await _context.LG_NL_ChiTiet
+                .Where(x => x.IDPhieu == idPhieu)
+                .OrderBy(x => x.ThuTu)
+                .ThenBy(x => x.IDNVL)
+                .Select(x => new LGNLChiTietDto
+                {
+                    ID = x.ID,
+                    IDPhieu = x.IDPhieu,
+                    IDLoCao = x.IDLoCao,
+                    Ngay = x.Ngay,
+                    IDCa = x.IDCa,
+                    ThoiGianNapLieu = x.ThoiGianNapLieu,
+                    SoMe = x.SoMe,
+                    MeGio = x.MeGio,
+                    CheDo = x.CheDo,
+                    ThuocThamLieu1 = x.ThuocThamLieu1,
+                    ThuocThamLieu2 = x.ThuocThamLieu2,
+                    GhiChu = x.GhiChu,
+                    IDNVL = x.IDNVL,
+                    GiaTri = x.GiaTri,
+                    ThuTu = x.ThuTu,
+                    DoAm = x.DoAm,
+                    QuyKho = x.QuyKho,
+                    ManualGiaTri = x.ManualGiaTri,
+                    GiaTri_Goc = x.GiaTri_Goc,
+                })
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
+            => await _context.BmPhieus.FindAsync(idPhieu);
+
         public async Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
              int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc)
         {

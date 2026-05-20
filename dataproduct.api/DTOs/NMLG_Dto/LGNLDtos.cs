@@ -222,9 +222,34 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     /// </summary>
     public class GetLGNLDataByFilterDto
     {
-        public string? TagKey { get; set; }       
-        public int? IDLoCao { get; set; }          
-        public DateTime? NgayBatDau { get; set; }    
-        public DateTime? NgayKetThuc { get; set; }   
+        public string? TagKey { get; set; }
+        public int? IDLoCao { get; set; }
+        public DateTime? NgayBatDau { get; set; }
+        public DateTime? NgayKetThuc { get; set; }
+    }
+
+    // ─── Chi tiết nạp liệu theo phiếu ────────────────────────────────────────
+
+    public class LGNLChiTietDto
+    {
+        public int ID { get; set; }
+        public Guid IDPhieu { get; set; }
+        public int? IDLoCao { get; set; }
+        public DateTime? Ngay { get; set; }
+        public int? IDCa { get; set; }
+        public string? ThoiGianNapLieu { get; set; }
+        public decimal? SoMe { get; set; }
+        public string? MeGio { get; set; }
+        public string? CheDo { get; set; }
+        public decimal? ThuocThamLieu1 { get; set; }
+        public decimal? ThuocThamLieu2 { get; set; }
+        public string? GhiChu { get; set; }
+        public int IDNVL { get; set; }
+        public decimal? GiaTri { get; set; }
+        public int? ThuTu { get; set; }
+        public decimal? DoAm { get; set; }
+        public decimal? QuyKho { get; set; }
+        public bool ManualGiaTri { get; set; }
+        public decimal? GiaTri_Goc { get; set; }
     }
 }

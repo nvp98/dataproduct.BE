@@ -10,9 +10,12 @@ namespace dataproduct.api.Controllers
     public class LGNLController : ControllerBase
     {
         private readonly LGNLService _service;
-        public LGNLController(LGNLService service)
+        private readonly PheDuyetService _pdservice;
+
+        public LGNLController(LGNLService service, PheDuyetService pdservice)
         {
-            _service = service;
+            _service   = service;
+            _pdservice = pdservice;
         }
 
 
@@ -303,6 +306,27 @@ namespace dataproduct.api.Controllers
                     return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
                 var result = await _service.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
                 return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("chitiet/{idPhieu}")]
+        public async Task<IActionResult> GetChiTietByPhieu(Guid idPhieu)
+        {
+            try { return Ok(await _service.GetChiTietByPhieuAsync(idPhieu)); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Export PDF ───────────────────────────────────────────────────────────
+
+        [HttpGet("export-pdf/{idPhieu}")]
+        public async Task<IActionResult> ExportPdf(Guid idPhieu)
+        {
+            try
+            {
+                var pheDuyets = await _pdservice.GetPheDuyetPhieuAsync(idPhieu);
+                var file = await _service.ExportNapLieuPdfAsync(idPhieu, pheDuyets);
+                return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

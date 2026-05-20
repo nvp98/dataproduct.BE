@@ -78,6 +78,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_NL_Mapping> LG_NL_Mapping { get; set; }
     public virtual DbSet<LG_NL_NVL> LG_NL_NVL { get; set; }
     public virtual DbSet<LG_NL_NhomNVL> LG_NL_NhomNVL { get; set; }
+    public virtual DbSet<LG_NL_ChiTiet> LG_NL_ChiTiet { get; set; }
     public virtual DbSet<LG1_NL_TS_Mapping> LG1_NL_TS_Mapping { get; set; }
     public virtual DbSet<LG1_DuLieuNL> LG1_DuLieuNL { get; set; }
     public virtual DbSet<LG_TSL_NVL> LG_TSL_NVL { get; set; }
