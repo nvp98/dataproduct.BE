@@ -52,6 +52,7 @@ namespace dataproduct.api.DTOs
         public decimal? ChenhLech { get; set; }
         public decimal? TyLeBOF { get; set; }
         public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
     }
 
     public enum ToHopSTDNXT
@@ -87,6 +88,7 @@ namespace dataproduct.api.DTOs
         public Guid IdPhieu { get; set; }
         public decimal? TyLeBOF { get; set; }
         public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
     }
 
     public class STD_NXT_HRC2_KhongPhanBoDto

@@ -142,6 +142,7 @@ namespace dataproduct.api.Repositories
                            existingSum.ChenhLech = summaryDto.ChenhLech;
                            if (summaryDto.TyLeBOF != null) existingSum.TyLeBOF = summaryDto.TyLeBOF;
                            if (summaryDto.TyLeTinhLuyen != null) existingSum.TyLeTinhLuyen = summaryDto.TyLeTinhLuyen;
+                           if (summaryDto.TyLeRH != null) existingSum.TyLeRH = summaryDto.TyLeRH;
                            _context.STD_NXT_TOTAL_HRC2s.Update(existingSum);
                        }
                        else
@@ -161,7 +162,8 @@ namespace dataproduct.api.Repositories
                                TongSDTrenSoSach = summaryDto.TongSDTrenSoSach,
                                ChenhLech = summaryDto.ChenhLech,
                                TyLeBOF = summaryDto.TyLeBOF,
-                               TyLeTinhLuyen = summaryDto.TyLeTinhLuyen
+                               TyLeTinhLuyen = summaryDto.TyLeTinhLuyen,
+                               TyLeRH = summaryDto.TyLeRH
                            };
                            
                            await _context.STD_NXT_TOTAL_HRC2s.AddAsync(newSummary);
@@ -266,7 +268,7 @@ namespace dataproduct.api.Repositories
 
             List<int> allHeaderKeyIds = new();
             Dictionary<int, List<(int Id_HeaderKey, string TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
-            Dictionary<int, (decimal? TyLeBOF, decimal? TyLeTinhLuyen)> prevTotalTyLeLookup = new();
+            Dictionary<int, (decimal? TyLeBOF, decimal? TyLeTinhLuyen, decimal? TyLeRH)> prevTotalTyLeLookup = new();
 
             // -------------------------------------------------------
             // Lấy danh sách nguồn
@@ -320,10 +322,10 @@ namespace dataproduct.api.Repositories
 
                 var prevTotalRecords = await _context.STD_NXT_TOTAL_HRC2s
                     .Where(x => x.Id_Phieu == prevPhieu)
-                    .Select(x => new { x.Id_HeaderKey, x.TyLeBOF, x.TyLeTinhLuyen })
+                    .Select(x => new { x.Id_HeaderKey, x.TyLeBOF, x.TyLeTinhLuyen, x.TyLeRH })
                     .ToListAsync();
                 prevTotalTyLeLookup = prevTotalRecords
-                    .ToDictionary(x => x.Id_HeaderKey, x => (x.TyLeBOF, x.TyLeTinhLuyen));
+                    .ToDictionary(x => x.Id_HeaderKey, x => (x.TyLeBOF, x.TyLeTinhLuyen, x.TyLeRH));
 
                 if (!prevRecords.Any())
                     throw new Exception($"Phiếu ca trước không có dữ liệu phụ liệu (IdPhieu: {prevPhieu})");
@@ -432,7 +434,8 @@ namespace dataproduct.api.Repositories
                     Id_HeaderKey = item.Id_HeaderKey,
                     TenNguyenLieu = item.TenNguyenLieu,
                     TyLeBOF = prevTyLe.TyLeBOF,
-                    TyLeTinhLuyen = prevTyLe.TyLeTinhLuyen
+                    TyLeTinhLuyen = prevTyLe.TyLeTinhLuyen,
+                    TyLeRH = prevTyLe.TyLeRH
                 });
             }
 
@@ -543,8 +546,10 @@ namespace dataproduct.api.Repositories
                     HasPhanBo = x.HasPhanBo,
                     TyLeBOF = x.TyLeBOF,
                     TyLeTinhLuyen = x.TyLeTinhLuyen,
+                    TyLeRH = x.TyLeRH,
                     KLPB_BOF = x.KLPB_BOF,
-                    KLPB_TL = x.KLPB_TL
+                    KLPB_TL = x.KLPB_TL,
+                    KLPB_RH = x.KLPB_RH
                 }).ToList()
             };
         }
@@ -735,7 +740,7 @@ namespace dataproduct.api.Repositories
                 var dlnmLookupAll = dlnmInCa.ToDictionary(x => x.ID);
 
                 // ========== BƯỚC 0 (sau validation): Lưu tỷ lệ phân bổ vào DB nếu được truyền vào ==========
-                if (entity.TyLeBOF != null || entity.TyLeTinhLuyen != null)
+                if (entity.TyLeBOF != null || entity.TyLeTinhLuyen != null || entity.TyLeRH != null)
                 {
                     var tyLeRow = await _context.STD_NXT_TOTAL_HRC2s
                         .FirstOrDefaultAsync(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey);
@@ -744,6 +749,7 @@ namespace dataproduct.api.Repositories
                     {
                         if (entity.TyLeBOF != null) tyLeRow.TyLeBOF = entity.TyLeBOF;
                         if (entity.TyLeTinhLuyen != null) tyLeRow.TyLeTinhLuyen = entity.TyLeTinhLuyen;
+                        if (entity.TyLeRH != null) tyLeRow.TyLeRH = entity.TyLeRH;
                     }
                 }
 
@@ -752,36 +758,47 @@ namespace dataproduct.api.Repositories
                 // Chỉ truy vấn DB để bù khi thiếu một (null) để tránh lấy lại giá trị cũ chưa SaveChanges.
                 decimal? tyLeBOF = entity.TyLeBOF;
                 decimal? tyLeTinhLuyen = entity.TyLeTinhLuyen;
-                if (tyLeBOF == null || tyLeTinhLuyen == null)
+                decimal? tyLeRH = entity.TyLeRH;
+                if (tyLeBOF == null || tyLeTinhLuyen == null || tyLeRH == null)
                 {
                     var tyLeRecord = await _context.STD_NXT_TOTAL_HRC2s
                         .Where(x => x.Id_Phieu == entity.IdPhieu && x.Id_HeaderKey == entity.Id_HeaderKey)
-                        .Select(x => new { x.TyLeBOF, x.TyLeTinhLuyen })
+                        .Select(x => new { x.TyLeBOF, x.TyLeTinhLuyen, x.TyLeRH })
                         .FirstOrDefaultAsync();
 
                     if (tyLeBOF == null) tyLeBOF = tyLeRecord?.TyLeBOF;
                     if (tyLeTinhLuyen == null) tyLeTinhLuyen = tyLeRecord?.TyLeTinhLuyen;
+                    if (tyLeRH == null) tyLeRH = tyLeRecord?.TyLeRH;
                 }
 
                 Dictionary<long, decimal> klPhanBoByMeThoi;
                 decimal? klPerBofToPersist = null;
                 decimal? klPerTinhLuyenToPersist = null;
+                decimal? klPerRHToPersist = null;
 
-                if (tyLeBOF != null || tyLeTinhLuyen != null)
+                if (tyLeBOF != null || tyLeTinhLuyen != null || tyLeRH != null)
                 {
-                    // Phân nhóm mẻ theo BieuMau: BOF vs Tinh luyện (LF, RH,...)
+                    // Phân nhóm mẻ theo BieuMau: BOF / LF / RH
                     var bofMeIds = meThoiIds
                         .Where(id => dlnmLookupAll.TryGetValue(id, out var d) &&
                                      d.BieuMau != null &&
                                      d.BieuMau.StartsWith("BOF", StringComparison.OrdinalIgnoreCase))
                         .ToList();
-                    var tinhLuyenMeIds = meThoiIds.Except(bofMeIds).ToList();
+                    var lfMeIds = meThoiIds
+                        .Where(id => dlnmLookupAll.TryGetValue(id, out var d) &&
+                                     d.BieuMau != null &&
+                                     d.BieuMau.StartsWith("LF", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    var rhMeIds = meThoiIds
+                        .Where(id => dlnmLookupAll.TryGetValue(id, out var d) &&
+                                     d.BieuMau != null &&
+                                     d.BieuMau.StartsWith("RH", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
 
                     // Kiểm tra: không được phân bổ tỷ lệ > 0 cho nhóm không có mẻ
                     if (bofMeIds.Count == 0 && tyLeBOF is decimal tBof && tBof != 0)
                         throw new Exception($"Không có mẻ BOF trong ca này nhưng tỷ lệ BOF đang là {tBof}%. Vui lòng điều chỉnh lại tỷ lệ.");
-                    if (tinhLuyenMeIds.Count == 0 && tyLeTinhLuyen is decimal tTL && tTL != 0)
-                        throw new Exception($"Không có mẻ tinh luyện trong ca này nhưng tỷ lệ tinh luyện đang là {tTL}%. Vui lòng điều chỉnh lại tỷ lệ.");
+                    // Validation LF/RH được xử lý bên trong nhánh tách/gộp bên dưới
 
                     klPhanBoByMeThoi = new Dictionary<long, decimal>();
 
@@ -798,25 +815,60 @@ namespace dataproduct.api.Repositories
                         if (bofMeIds.Any()) klPerBofToPersist = 0;
                     }
 
-                    if (tinhLuyenMeIds.Any() && tyLeTinhLuyen is decimal tyLeTinhLuyenValue && tyLeTinhLuyenValue > 0)
+                    // TyLeRH = null → dữ liệu cũ chưa tách LF/RH: dùng TyLeTinhLuyen cho cả LF+RH gộp lại (backward compat)
+                    // TyLeRH có giá trị → dữ liệu mới: tách riêng LF dùng TyLeTinhLuyen, RH dùng TyLeRH
+                    if (tyLeRH == null)
                     {
-                        var tinhLuyenAmount = entity.ChenhLech * tyLeTinhLuyenValue / 100;
-                        var klPerTinhLuyen = Math.Round(tinhLuyenAmount / tinhLuyenMeIds.Count);
-                        klPerTinhLuyenToPersist = klPerTinhLuyen;
-                        foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTinhLuyen;
+                        var tinhLuyenMeIds = lfMeIds.Concat(rhMeIds).ToList();
+                        if (tinhLuyenMeIds.Count == 0 && tyLeTinhLuyen is decimal tTL && tTL != 0)
+                            throw new Exception($"Không có mẻ tinh luyện trong ca này nhưng tỷ lệ tinh luyện đang là {tTL}%. Vui lòng điều chỉnh lại tỷ lệ.");
+
+                        if (tinhLuyenMeIds.Any() && tyLeTinhLuyen is decimal tyLeTLValue && tyLeTLValue > 0)
+                        {
+                            var tlAmount = entity.ChenhLech * tyLeTLValue / 100;
+                            var klPerTL = Math.Round(tlAmount / tinhLuyenMeIds.Count);
+                            klPerTinhLuyenToPersist = klPerTL;
+                            foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = klPerTL;
+                        }
+                        else
+                        {
+                            foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = 0;
+                            if (tinhLuyenMeIds.Any()) klPerTinhLuyenToPersist = 0;
+                        }
                     }
                     else
                     {
-                        foreach (var id in tinhLuyenMeIds) klPhanBoByMeThoi[id] = 0;
-                        if (tinhLuyenMeIds.Any()) klPerTinhLuyenToPersist = 0;
+                        if (lfMeIds.Any() && tyLeTinhLuyen is decimal tyLeLFValue && tyLeLFValue > 0)
+                        {
+                            var lfAmount = entity.ChenhLech * tyLeLFValue / 100;
+                            var klPerLF = Math.Round(lfAmount / lfMeIds.Count);
+                            klPerTinhLuyenToPersist = klPerLF;
+                            foreach (var id in lfMeIds) klPhanBoByMeThoi[id] = klPerLF;
+                        }
+                        else
+                        {
+                            foreach (var id in lfMeIds) klPhanBoByMeThoi[id] = 0;
+                            if (lfMeIds.Any()) klPerTinhLuyenToPersist = 0;
+                        }
+
+                        if (rhMeIds.Any() && tyLeRH is decimal tyLeRHValue && tyLeRHValue > 0)
+                        {
+                            var rhAmount = entity.ChenhLech * tyLeRHValue / 100;
+                            var klPerRH = Math.Round(rhAmount / rhMeIds.Count);
+                            klPerRHToPersist = klPerRH;
+                            foreach (var id in rhMeIds) klPhanBoByMeThoi[id] = klPerRH;
+                        }
+                        else
+                        {
+                            foreach (var id in rhMeIds) klPhanBoByMeThoi[id] = 0;
+                            if (rhMeIds.Any()) klPerRHToPersist = 0;
+                        }
                     }
                 }
                 else
                 {
                     // Fallback: chia đều cho tất cả mẻ (hành vi cũ)
                     var klEqual = entity.ChenhLech / meThoiIds.Count;
-                    klPerBofToPersist = null;
-                    klPerTinhLuyenToPersist = null;
                     klPhanBoByMeThoi = meThoiIds.ToDictionary(id => id, _ => klEqual);
                 }
 
@@ -897,6 +949,7 @@ namespace dataproduct.api.Repositories
                 details.HasPhanBo = true;
                 details.KLPB_BOF = klPerBofToPersist;
                 details.KLPB_TL = klPerTinhLuyenToPersist;
+                details.KLPB_RH = klPerRHToPersist;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -951,8 +1004,10 @@ namespace dataproduct.api.Repositories
                 summary.HasPhanBo = null;
                 summary.TyLeBOF = null;
                 summary.TyLeTinhLuyen = null;
+                summary.TyLeRH = null;
                 summary.KLPB_BOF = null;
                 summary.KLPB_TL = null;
+                summary.KLPB_RH = null;
 
                 await _context.SaveChangesAsync();
                 return true;
