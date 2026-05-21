@@ -20,13 +20,13 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.ProcessProductionDate == ngaySX.Value);
 
             if (!string.IsNullOrWhiteSpace(ca))
-                query = query.Where(x => x.ProcessShiftName == ca);
+                query = query.Where(x => x.ProcessShiftName != null && x.ProcessShiftName.Contains(ca));
 
             if (ngayXL.HasValue)
                 query = query.Where(x => x.NgayXL == ngayXL.Value || x.NgayXL == null);
 
             if (!string.IsNullOrWhiteSpace(caXL))
-                query = query.Where(x => x.CaXL == caXL);
+                query = query.Where(x => x.CaXL != null && x.CaXL.Contains(caXL));
 
             if (!string.IsNullOrWhiteSpace(order))
                 query = query.Where(x => x.Order == order);
