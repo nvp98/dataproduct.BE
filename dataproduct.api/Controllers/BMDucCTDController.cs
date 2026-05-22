@@ -183,7 +183,7 @@ namespace dataproduct.api.Controllers
             var request = new PhoiNhapKhoPdfDTOReq
             {
                 IdPhieu = idPhieu.Value,
-                NgaySX = NgaySX?.ToDateTime(TimeOnly.MinValue) ?? default,
+                NgaySX = NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now,
                 Ca = Ca ?? 0,
                 Kip = Kip ?? "",
                 listNguoiPheDuyet = pheDuyets
