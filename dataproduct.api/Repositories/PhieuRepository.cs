@@ -522,8 +522,8 @@ namespace dataproduct.api.Repositories
             if (ngaySX.HasValue)
                 query = query.Where(x => x.NgaySX == ngaySX.Value);
 
-            if (ca.HasValue)
-                query = query.Where(x => x.Ca == ca.Value);
+            // if (ca.HasValue)
+            //     query = query.Where(x => x.Ca == ca.Value);
 
             var result = await query
                 .OrderByDescending(x => x.NgaySX)
