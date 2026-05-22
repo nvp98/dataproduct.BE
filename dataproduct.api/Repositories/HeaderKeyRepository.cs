@@ -71,8 +71,7 @@ namespace dataproduct.api.Repositories
             var totalCount = await query.CountAsync();
 
             var headerKeys = await query
-                .OrderBy(x => x.ThuTu.HasValue ? 0 : 1) // Có ThuTu = 0, null = 1 (đặt null ở sau)
-                .ThenBy(x => x.ThuTu) // Sau đó sắp xếp theo giá trị ThuTu tăng dần
+                .OrderBy(x => x.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -101,7 +100,15 @@ namespace dataproduct.api.Repositories
                 IsActive = h.IsActive,
                 NgayTao = h.NgayTao,
                 IsUsedNXT = h.IsUsedNXT,
-                ThuTu = h.ThuTu.HasValue ? (int?)h.ThuTu.Value : null,
+                IsUsedThongKe = h.IsUsedThongKe,
+                ThuTu = null,
+                TyTrong = h.TyTrong.HasValue ? (decimal?)h.TyTrong.Value : null,
+                ThuTu_TK_BOF = h.ThuTu_TK_BOF,
+                ThuTu_TK_LFRH = h.ThuTu_TK_LFRH,
+                IsUsed_Excel = h.IsUsed_Excel,
+                LoaiExcel = h.LoaiExcel,
+                ThuTu_Excel_BOF = h.ThuTu_Excel_BOF,
+                ThuTu_Excel_LFRH = h.ThuTu_Excel_LFRH,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
                     : new List<HeaderMapping_ResponseModel>()
@@ -136,9 +143,11 @@ namespace dataproduct.api.Repositories
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
+            int? IdNhom,
             int page,
             int pageSize
         )
@@ -162,10 +171,20 @@ namespace dataproduct.api.Repositories
                     NgayTao = hk != null ? hk.NgayTao : null,
                     NgayTaoPhuLieu = pl != null ? pl.NgayTao : null,
                     IsUsedNXT = hk != null ? hk.IsUsedNXT : null,
-                    ThuTu = hk != null && hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    IsUsedThongKe = hk != null ? hk.IsUsedThongKe : null,
+                    ThuTu = null,
+                    TyTrong = hk != null && hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = m.ID_PhuLieu,
                     TenNguonDuLieu = m.TenNguonDuLieu,
-                    TenPhuLieu = pl != null ? pl.TenPhuLieu : null
+                    TenPhuLieu = pl != null ? pl.TenPhuLieu : null,
+                    LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
+                    ThuTu_TK_BOF = hk != null ? hk.ThuTu_TK_BOF : null,
+                    ThuTu_TK_LFRH = hk != null ? hk.ThuTu_TK_LFRH : null,
+                    IsUsed_Excel = hk != null ? hk.IsUsed_Excel : null,
+                    LoaiExcel = hk != null ? hk.LoaiExcel : null,
+                    ThuTu_Excel_BOF = hk != null ? hk.ThuTu_Excel_BOF : null,
+                    ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null,
+                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null
                 };
 
             // (2) HeaderKey chưa được móc nối
@@ -184,10 +203,20 @@ namespace dataproduct.api.Repositories
                     NgayTao = hk.NgayTao,
                     NgayTaoPhuLieu = null,
                     IsUsedNXT = hk.IsUsedNXT,
-                    ThuTu = hk.ThuTu.HasValue ? (int?)hk.ThuTu.Value : null,
+                    IsUsedThongKe = hk != null ? hk.IsUsedThongKe : null,
+                    ThuTu = null,
+                    TyTrong = hk.TyTrong.HasValue ? (decimal?)hk.TyTrong.Value : null,
                     ID_PhuLieu = null,
                     TenNguonDuLieu = null,
-                    TenPhuLieu = null
+                    TenPhuLieu = null,
+                    LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
+                    ThuTu_TK_BOF = hk.ThuTu_TK_BOF,
+                    ThuTu_TK_LFRH = hk.ThuTu_TK_LFRH,
+                    IsUsed_Excel = hk.IsUsed_Excel,
+                    LoaiExcel = hk.LoaiExcel,
+                    ThuTu_Excel_BOF = hk.ThuTu_Excel_BOF,
+                    ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH,
+                    ID_NhomKey = hk.ID_NhomKey
                 };
 
             // (3) PhuLieu_NM chưa được móc nối
@@ -206,10 +235,20 @@ namespace dataproduct.api.Repositories
                     NgayTao = null,
                     NgayTaoPhuLieu = pl.NgayTao,
                     IsUsedNXT = null,
+                    IsUsedThongKe = null,
                     ThuTu = null,
+                    TyTrong = null,
                     ID_PhuLieu = pl.ID_PhuLieu,
                     TenNguonDuLieu = null,
-                    TenPhuLieu = pl.TenPhuLieu
+                    TenPhuLieu = pl.TenPhuLieu,
+                    LoaiThongKe = null,
+                    ThuTu_TK_BOF = null,
+                    ThuTu_TK_LFRH = null,
+                    IsUsed_Excel = null,
+                    LoaiExcel = null,
+                    ThuTu_Excel_BOF = null,
+                    ThuTu_Excel_LFRH = null,
+                    ID_NhomKey = null
                 };
 
             // Union 3 tập dữ liệu thành 1 query
@@ -278,7 +317,18 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.IsUsedNXT != true);
                 }
             }
-
+            
+            if (IsUsedThongKe.HasValue)
+            {
+                if (IsUsedThongKe.Value)
+                {
+                    query = query.Where(x => x.IsUsedThongKe == true);
+                }
+                else
+                {
+                    query = query.Where(x => x.IsUsedThongKe != true);
+                }
+            }
             // Filter theo khoảng ngày (áp dụng trên "Ngày tạo hiệu lực": ưu tiên NgayTaoPhuLieu, fallback NgayTao)
             if (FromDate.HasValue)
             {
@@ -292,36 +342,17 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => (x.NgayTaoPhuLieu ?? x.NgayTao) != null && (x.NgayTaoPhuLieu ?? x.NgayTao) <= to);
             }
 
+            // Filter theo nhóm
+            if (IdNhom.HasValue)
+                query = query.Where(x => x.ID_NhomKey == IdNhom.Value);
+
             // Đếm tổng số records
             var totalCount = await query.CountAsync();
 
-            // Lấy dữ liệu với pagination:
-            // - mặc định: phụ liệu mới trước (NgayTaoPhuLieu DESC) rồi header key mới (NgayTao DESC)
-            // - nếu SortThuTu được truyền: sort theo ThuTu (asc/desc) làm tiêu chí chính
-            IOrderedQueryable<HeaderKeyMapping_ResponseModel> ordered;
-            var sortThuTu = SortThuTu?.Trim().ToLowerInvariant();
-            if (sortThuTu == "asc" || sortThuTu == "1" || sortThuTu == "tang")
-            {
-                ordered = query
-                    .OrderBy(x => x.ThuTu.HasValue ? 0 : 1)
-                    .ThenBy(x => x.ThuTu)
-                    .ThenByDescending(x => x.NgayTaoPhuLieu)
-                    .ThenByDescending(x => x.NgayTao);
-            }
-            else if (sortThuTu == "desc" || sortThuTu == "-1" || sortThuTu == "giam")
-            {
-                ordered = query
-                    .OrderBy(x => x.ThuTu.HasValue ? 0 : 1)
-                    .ThenByDescending(x => x.ThuTu)
-                    .ThenByDescending(x => x.NgayTaoPhuLieu)
-                    .ThenByDescending(x => x.NgayTao);
-            }
-            else
-            {
-                ordered = query
-                    .OrderByDescending(x => x.NgayTaoPhuLieu)
-                    .ThenByDescending(x => x.NgayTao);
-            }
+            // Lấy dữ liệu với pagination: phụ liệu mới trước (NgayTaoPhuLieu DESC) rồi header key mới (NgayTao DESC)
+            var ordered = query.OrderByDescending(x => x.NgayTao);
+                //.OrderByDescending(x => x.NgayTaoPhuLieu)
+                //.ThenByDescending(x => x.NgayTao);
 
             var data = await ordered
                 .ThenBy(x => x.MappingId == null ? 1 : 0)
@@ -330,6 +361,19 @@ namespace dataproduct.api.Repositories
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+
+            // Enrich TenNhom từ Header_Nhom
+            var nhomIds = data.Where(d => d.ID_NhomKey.HasValue)
+                              .Select(d => d.ID_NhomKey!.Value).ToHashSet();
+            if (nhomIds.Count > 0)
+            {
+                var nhomNames = await _context.Header_Nhoms
+                    .Where(n => nhomIds.Contains(n.Id))
+                    .ToDictionaryAsync(n => n.Id, n => n.TenHienThi);
+                foreach (var d in data)
+                    if (d.ID_NhomKey.HasValue && nhomNames.TryGetValue(d.ID_NhomKey.Value, out var name))
+                        d.TenNhom = name;
+            }
 
             return (data, totalCount);
         }

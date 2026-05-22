@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 10pt;
+        color: #000;
+        margin: 0;
+      }
+
+      .header {
+        display: table;
+        width: 100%;
+        /* border-bottom: 1px solid #000; */
+        padding-bottom: 4px;
+      }
+
+      .header-left {
+        display: table-cell;
+        width: 55%;
+        vertical-align: middle;
+        font-weight: bold;
+        font-size: 10pt;
+        line-height: 1.35;
+      }
+
+      .header-left img {
+        max-width: 180px;
+        max-height: 54px;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+
+      .header-right {
+        display: table-cell;
+        width: 45%;
+        vertical-align: top;
+        text-align: right;
+        font-size: 9.5pt;
+        line-height: 1.35;
+      }
+
+      .title {
+        text-align: center;
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 3px 0 0 0;
+        text-transform: uppercase;
+      }
+
+      .sub-title {
+        text-align: center;
+        font-style: italic;
+        font-size: 9.5pt;
+        margin: 1px 0;
+      }
+
+      .header-divider {
+        /* border-bottom: 1px solid #000; */
+        margin-top: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-left">
+        <img src="{{LogoUrl}}" alt="Logo Hoa Phat" /><br />
+        CÔNG TY CỔ PHẦN THÉP<br />
+        HÒA PHÁT DUNG QUẤT
+      </div>
+      <div class="header-right">
+        BM.09/QT.05.13<br />
+        Ngày hiệu lực: 15/04/2025<br />
+        Lần sửa đổi: 01
+      </div>
+    </div>
+
+    <div class="title">Sổ theo dõi</div>
+    <div class="title">Sản xuất hàng ngày</div>
+    <div class="sub-title">
+      Kíp {{KipCa}} từ {{TuGio}} ngày {{TuNgay}} đến {{DenGio}} ngày {{DenNgay}}
+    </div>
+    <div class="sub-title">(Do nhân viên vận hành pupit 1 theo dõi)</div>
+
+    <div class="header-divider"></div>
+  </body>
+</html>

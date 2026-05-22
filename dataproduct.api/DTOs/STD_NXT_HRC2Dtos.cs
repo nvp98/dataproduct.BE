@@ -12,6 +12,8 @@ namespace dataproduct.api.DTOs
         public List<NXTDetailDto> Details { get; set; } = new();
         // Danh sách tổng hợp
         public List<NXTSummaryDto> Summary { get; set; } = new();
+        // Danh sách kiểm kê (snapshot)
+        public List<SaveKiemKeRequest>? KiemKe { get; set; }
     }
 
     public class NXTDetailDto
@@ -31,6 +33,8 @@ namespace dataproduct.api.DTOs
         public decimal? TonCuoiCa { get; set; }
         public string? TuongQuanCuoiCa { get; set; }
         public decimal? TongThucTe { get; set; }
+        public int? IDSilo { get; set; }
+        public decimal? LuongSuDungKiemKe { get; set; }
     }
 
 
@@ -46,6 +50,9 @@ namespace dataproduct.api.DTOs
         public decimal? TongSuDung { get; set; }
         public decimal? TongSDTrenSoSach { get; set; }
         public decimal? ChenhLech { get; set; }
+        public decimal? TyLeBOF { get; set; }
+        public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
     }
 
     public enum ToHopSTDNXT
@@ -78,6 +85,62 @@ namespace dataproduct.api.DTOs
         public int Ca { get; set; }
         public int Id_HeaderKey { get; set; }
         public decimal ChenhLech { get; set; }
+        public Guid IdPhieu { get; set; }
+        public decimal? TyLeBOF { get; set; }
+        public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
+    }
+
+    public class STD_NXT_HRC2_KhongPhanBoDto
+    {
+        public Guid IdPhieu { get; set; }
+        public int Id_HeaderKey { get; set; }
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusRequest
+    {
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+        public List<STD_NXT_RelatedPhieuTarget> Targets { get; set; } = new();
+    }
+
+    public class STD_NXT_RelatedPhieuTarget
+    {
+        public string? TabKey { get; set; }
+        public string? Label { get; set; }
+        public string? BieuMau { get; set; } // BOF/LF/RH hoặc full mã BM
+        public int? Scope { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusItem
+    {
+        public string? TabKey { get; set; }
+        public string? Label { get; set; }
+        public string? BieuMau { get; set; }
+        public int? Scope { get; set; }
+        public Guid? IdPhieu { get; set; }
+        public int? TinhTrang { get; set; }
+    }
+
+    public class STD_NXT_RelatedPhieuStatusResponse
+    {
+        public List<STD_NXT_RelatedPhieuStatusItem> Items { get; set; } = new();
+        public bool CanPhanBo { get; set; }
+        public int IncompleteCount { get; set; }
+    }
+
+    public class SaveKiemKeRequest
+    {
+        public DateTime NgaySX { get; set; }
+        public string Ca { get; set; } = null!;
+        public int HeaderKeyId { get; set; }
+        public int SiloId { get; set; }
+        public int PhuLieuNMId { get; set; }
+        public decimal? TheTich { get; set; }
+        public decimal? TyTrong { get; set; }
+        public int? Scope { get; set; }
     }
 }
 

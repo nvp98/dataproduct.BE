@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>BM.09/QT.05.13 – Sổ theo dõi sản xuất hàng ngày</title>
+
+    <style>
+      @page {
+        size: A4;
+        margin: 15mm 15mm 15mm 15mm;
+      }
+
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 11pt;
+        color: #000;
+      }
+
+      .header {
+        display: table;
+        width: 100%;
+        margin-bottom: 6px;
+      }
+
+      .header-left {
+        display: table-cell;
+        width: 55%;
+        vertical-align: middle;
+        font-weight: bold;
+        font-size: 10pt;
+        line-height: 1.4;
+      }
+
+      .header-left img {
+        max-width: 200px;
+        max-height: 70px;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+
+      .header-right {
+        display: table-cell;
+        width: 45%;
+        vertical-align: top;
+        text-align: right;
+        font-size: 10pt;
+        line-height: 1.5;
+      }
+
+      .title {
+        text-align: center;
+        font-size: 15pt;
+        font-weight: bold;
+        margin: 4px 0;
+        text-transform: uppercase;
+      }
+
+      .sub-title {
+        text-align: center;
+        font-style: italic;
+        font-size: 10pt;
+        margin: 2px 0;
+      }
+
+      .section-title {
+        font-weight: bold;
+        margin: 8px 0 4px 0;
+        font-size: 11pt;
+      }
+
+      /* Nguyên liệu 3 cột */
+      .nguyen-lieu-table {
+        display: table;
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+      }
+
+      .nguyen-lieu-col {
+        display: table-cell;
+        width: 33.33%;
+        vertical-align: top;
+        padding: 4px 6px;
+        border: none;
+        font-size: 10pt;
+        line-height: 1.55;
+      }
+
+      .nguyen-lieu-col .col-title {
+        font-weight: bold;
+        margin-bottom: 2px;
+        font-size: 10pt;
+      }
+
+      .nguyen-lieu-col .info-row {
+        margin: 1px 0;
+      }
+
+      .nguyen-lieu-col .info-row b {
+        font-weight: bold;
+      }
+
+      .nguyen-lieu-col .item-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .nguyen-lieu-col .extra-item {
+        border-top: 1px dashed #999;
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+
+      /* Bảng nguyên liệu */
+      table.nguyen-lieu {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+      }
+
+      table.nguyen-lieu thead {
+        display: table-header-group;
+      }
+
+      table.nguyen-lieu th {
+        font-weight: bold;
+        font-size: 11pt;
+        text-align: left;
+        padding: 4px 0;
+        border: none;
+      }
+
+      table.nguyen-lieu td {
+        border: none;
+        vertical-align: top;
+        padding: 4px 6px;
+        font-size: 10pt;
+        line-height: 1.55;
+      }
+
+      table.nguyen-lieu .col-title {
+        font-weight: bold;
+        margin-bottom: 2px;
+        font-size: 10pt;
+      }
+
+      table.nguyen-lieu .info-row {
+        margin: 1px 0;
+      }
+
+      table.nguyen-lieu .info-row b {
+        font-weight: bold;
+      }
+
+      table.nguyen-lieu .item-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      table.nguyen-lieu .extra-item {
+        border-top: 1px dashed #999;
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+
+      /* Bảng diễn biến */
+      table.dien-bien {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4px;
+      }
+
+      table.dien-bien thead {
+        display: table-header-group;
+      }
+
+      table.dien-bien th,
+      table.dien-bien td {
+        border: 1px solid #000;
+        padding: 3px 4px;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 10pt;
+      }
+
+      table.dien-bien th {
+        font-weight: bold;
+        background-color: #f0f0f0;
+      }
+
+      table.dien-bien td.text-left {
+        text-align: left;
+      }
+
+      table.dien-bien .section-repeat th {
+        background-color: #fff;
+        border: none;
+        padding: 4px 0 3px 0;
+        text-align: left;
+        font-size: 11pt;
+      }
+
+      .note {
+        font-size: 9.5pt;
+        margin-top: 6px;
+        font-style: italic;
+        line-height: 1.4;
+      }
+
+      /* Chữ ký */
+      table.sign-table,
+      table.sign-table td {
+        border: none !important;
+      }
+
+      table.sign-table {
+        width: 100%;
+        margin-top: 16px;
+        text-align: center;
+      }
+
+      table.sign-table td {
+        width: 50%;
+        vertical-align: top;
+        padding: 4px;
+      }
+
+      .sign-title {
+        font-weight: bold;
+        font-size: 11pt;
+      }
+
+      .sign-name {
+        font-size: 11pt;
+        padding-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SECTION 1: NGUYÊN LIỆU VÀ SẢN PHẨM -->
+    <div class="section-title">1. Nguyên liệu và sản phẩm:</div>
+    <div class="nguyen-lieu-table">
+      <!-- Loại I -->
+      <div class="nguyen-lieu-col">
+        <div class="item-block">
+          <div class="col-title">a. Mác phôi loại I: {{LoaiI_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiI_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiI_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiI_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiI_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiI_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiI_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiI_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiI_LenhSanXuat}}</b>
+          </div>
+        </div>
+        {{LoaiI_ExtraRows}}
+      </div>
+
+      <!-- Loại II -->
+      <div class="nguyen-lieu-col">
+        <div class="item-block">
+          <div class="col-title">b. Mác phôi loại II: {{LoaiII_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiII_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiII_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiII_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiII_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiII_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiII_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiII_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiII_LenhSanXuat}}</b>
+          </div>
+        </div>
+        {{LoaiII_ExtraRows}}
+      </div>
+
+      <!-- Loại III -->
+      <div class="nguyen-lieu-col">
+        <div class="item-block">
+          <div class="col-title">c. Mác phôi loại III: {{LoaiIII_MacPhoi}}</div>
+          <div class="info-row">- Kích thước: {{LoaiIII_KichThuoc}} mm</div>
+          <div class="info-row">
+            - Số phôi ra khỏi lò: &nbsp;<b>{{LoaiIII_PhoiRaLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi hồi lò: &nbsp;<b>{{LoaiIII_PhoiHoiLo}}</b>
+          </div>
+          <div class="info-row">
+            - Số phôi cần ra sản (T/P): {{LoaiIII_PhoiRaSan}}
+          </div>
+          <div class="info-row">
+            - Số phôi phế công nghệ: &nbsp;<b>{{LoaiIII_PhoiPheCn}}</b>
+          </div>
+          <div class="info-row">
+            - Loại sản phẩm: <b>{{LoaiIII_LoaiSp}}</b> Mác thép:
+            <b>{{LoaiIII_MacThep}}</b>
+          </div>
+          <div class="info-row">
+            - Lệnh sản xuất: <b>{{LoaiIII_LenhSanXuat}}</b>
+          </div>
+        </div>
+        {{LoaiIII_ExtraRows}}
+      </div>
+    </div>
+
+    <!-- SECTION 2: DIỄN BIẾN -->
+    <table class="dien-bien">
+      <thead>
+        <tr class="section-repeat">
+          <th colspan="6">2. Diễn biến</th>
+        </tr>
+        <tr>
+          <th colspan="2">Thời gian đình trễ</th>
+          <th rowspan="2">Thiết bị</th>
+          <th rowspan="2">Mô tả sự cố/<br />dừng sản xuất</th>
+          <th rowspan="2">Loại sự cố</th>
+          <th rowspan="2">Phế công nghệ</th>
+        </tr>
+        <tr>
+          <th>Từ giờ</th>
+          <th>Đến giờ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{DienBienRows}}
+      </tbody>
+    </table>
+
+    <!-- GHI CHÚ -->
+    <div class="note">
+      <i
+        >Ghi chú: - Loại sự cố ghi rõ: Cơ khí/điện/công nghệ/nguyên liệu/con
+        người hoặc khách quan.</i
+      ><br />
+      <i
+        >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- Phế công
+        nghệ: Khi xảy ra sự cố ở vị trí nào thì ghi cụ thể bao nhiêu cây thép
+        trong lần sự cố đó.</i
+      >
+    </div>
+
+    <!-- CHỮ KÝ -->
+    <table class="sign-table">
+      <tr>
+        <td><div class="sign-title">Trưởng kíp</div></td>
+        <td><div class="sign-title">NV vận hành</div></td>
+      </tr>
+      <tr>
+        <td style="height: 70px; vertical-align: middle">{{ChuKyTruongKip}}</td>
+        <td style="height: 70px; vertical-align: middle">{{ChuKyNvVanHanh}}</td>
+      </tr>
+      <tr>
+        <td><div class="sign-name">{{TenTruongKip}}</div></td>
+        <td><div class="sign-name">{{TenNvVanHanh}}</div></td>
+      </tr>
+    </table>
+  </body>
+</html>

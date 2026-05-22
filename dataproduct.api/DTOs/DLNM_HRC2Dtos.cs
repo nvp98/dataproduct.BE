@@ -31,6 +31,9 @@ namespace dataproduct.api.DTOs
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
         public double? KlThepLong { get; set; }
+        public int? QueLayMau { get; set; }
+        public int? QueDoNhiet { get; set; }
+        public string? GhiChu { get; set; }
     }
 
     public class ChuyenMeThoiRequest
@@ -46,7 +49,7 @@ namespace dataproduct.api.DTOs
 
     public class HRC2InsertModel
     {
-        public int? Id { get; set; }
+        public long? Id { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
         public string BieuMau { get; set; }
@@ -64,6 +67,9 @@ namespace dataproduct.api.DTOs
         public double? KLGangLong { get; set; }
         public double? KLThepPhe { get; set; }
         public double? KlThepLong { get; set; }
+        public int? QueLayMau { get; set; }
+        public int? QueDoNhiet { get; set; }
+        public string? GhiChu { get; set; }
 
         public bool IsNM { get; set; }
         public bool IsChuyenCa { get; set; }
@@ -82,12 +88,40 @@ namespace dataproduct.api.DTOs
 
         public int? ID_HeaderKey { get; set; }
         public string TenHienThi { get; set; }
+        public bool? IsPhanBo { get; set; } = false; // ⭐ Đánh dấu là phân bổ
+        public bool? IsManual { get; set; } = false;
+        public double? KLPhuGia_Manual { get; set; }
+        public bool? IsAddManual { get; set; } = false;
     }
 
     public class FilterSTD_NXTRequest
     {
         public DateTime NgaySX { get; set; }
         public int Ca { get; set; }
+        /// <summary>Nếu có: sau khi filter sẽ gọi sp_Init_XuatNhapTon_HRC2 để cập nhật dữ liệu phiếu hiện tại.</summary>
+        public Guid? IdPhieu { get; set; }
+        /// <summary>Danh sách Id_HeaderKey đang hiển thị trên FE (kể cả dòng mới chưa lưu). Dùng cho Init khi có IdPhieu.</summary>
+        public List<int>? HeaderKeyIds { get; set; }
+    }
+
+    public class SearchThongKe
+    {
+        public DateTime? TuNgay { get; set; }
+
+        public DateTime? DenNgay { get; set; }
+
+        public int? Ca { get; set; }
+
+        public string? LoaiBM { get; set; }
+
+        public int? Scope { get; set; }
+
+        public string? SearchText { get; set; }
+        public bool? IsTrungMeThoi { get; set; } = false;
+        public bool? IsDelete { get; set; }
+        public int? Page { get; set; } = 1;
+
+        public int? PageSize { get; set; } = 20;
     }
 }
 

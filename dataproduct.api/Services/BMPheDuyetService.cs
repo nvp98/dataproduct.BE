@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
@@ -133,19 +133,27 @@ namespace dataproduct.api.Services
                 return await _repo.UpdateTinhTrangAsync(phieuId, nguoiDuyetId, tinhTrang);
             }
 
-            // Trường hợp người duyệt chọn Reject: nếu phiếu là bản clone thì mở khóa phiếu gốc
-            // và set trạng thái phiếu hiện tại sang "Không xác nhận" (4)
+            EnsurePhieuOperable(phieu);
+
+            // Trường hợp người duyệt chọn Reject (Không xác nhận)
             if (tinhTrang == RejectedStatus)
             {
                 if (phieu.ID_PhieuGoc != null)
                 {
-                    var phieuGoc = await _phieuRepo.GetByIdAsync(phieu.ID_PhieuGoc.Value);
-                    if (phieuGoc == null) return false;
-                    phieuGoc.IsLock = 0;
-                    phieuGoc.TinhTrang = 2;
-                    await _phieuRepo.UpdateAsync(phieuGoc);
+                    // Phiếu này là bản clone: xóa hẳn khỏi table, mở khóa phiếu cha (ID_PhieuGoc) để hiển thị lại.
+                    // Hỗ trợ chuỗi clone nhiều tầng: nếu reject A2 thì mở A1; reject A1 thì mở A...
+                    var phieuCha = await _phieuRepo.GetByIdPhieuChaAsync(phieu.ID_PhieuGoc.Value);
+                    if (phieuCha != null)
+                    {
+                        phieuCha.IsLock = 0;
+                        await _phieuRepo.UpdateAsync(phieuCha);
+                    }
+                    await _repo.DeleteByPhieuIdAsync(phieuId);
+                    await _phieuRepo.DeleteAsync(phieuId);
+                    return true;
                 }
 
+                // Phiếu không phải clone: đánh dấu Không xác nhận như cũ
                 phieu.IsDelete = 1;
                 phieu.TinhTrang = 4;
                 await _phieuRepo.UpdateAsync(phieu);
@@ -214,6 +222,19 @@ namespace dataproduct.api.Services
             }
 
             return true;
+        }
+
+        private static void EnsurePhieuOperable(BmPhieu phieu)
+        {
+            if (phieu.IsDelete == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị xóa hoặc từ chối. Vui lòng quay về danh sách để tải lại dữ liệu mới nhất.");
+            }
+
+            if (phieu.IsLock == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị khóa do đang có bản hiệu chỉnh. Vui lòng quay về danh sách để mở phiếu hợp lệ.");
+            }
         }
     }
 }

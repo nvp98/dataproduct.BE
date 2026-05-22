@@ -38,11 +38,47 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
+        /// Lấy quyền menu theo tài khoản: Việc tôi bắt đầu (processingForms) và Việc đến tôi (approvingForms).
+        /// </summary>
+        [HttpGet("menu-permissions")]
+        public async Task<IActionResult> GetMenuPermissions([FromQuery] int idTaiKhoan)
+        {
+            try
+            {
+                if (idTaiKhoan <= 0)
+                    return BadRequest("idTaiKhoan phải lớn hơn 0.");
+                var data = await _service.GetMenuPermissionsAsync(idTaiKhoan);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách quyền theo ID tài khoản
+        /// </summary>
+        [HttpGet("tai-khoan/{idTaiKhoan:int}")]
+        public async Task<IActionResult> GetByTaiKhoanId(int idTaiKhoan)
+        {
+            try
+            {
+                var data = await _service.GetByTaiKhoanIdAsync(idTaiKhoan);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Lấy quyền xử lý theo ID
         /// </summary>
         /// <param name="id">ID quyền xử lý</param>
         /// <returns>Chi tiết quyền xử lý</returns>
-        [HttpGet("{id}")]
+        [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
             try
@@ -57,17 +93,20 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách quyền theo ID tài khoản
+        /// Lưu hàng loạt: mỗi tổ hợp (MaBm × MaKhuVuc) thành 1 dòng.
+        /// Truyền IdToDelete để xóa bản ghi cũ trước khi tạo mới (dùng khi cập nhật).
         /// </summary>
-        /// <param name="idTaiKhoan">ID tài khoản</param>
-        /// <returns>Danh sách quyền của tài khoản</returns>
-        [HttpGet("tai-khoan/{idTaiKhoan}")]
-        public async Task<IActionResult> GetByTaiKhoanId(int idTaiKhoan)
+        [HttpPost("save")]
+        public async Task<IActionResult> BulkSave([FromBody] BmQuyenXlBulkSaveDto dto)
         {
             try
             {
-                var data = await _service.GetByTaiKhoanIdAsync(idTaiKhoan);
-                return Ok(data);
+                var created = await _service.BulkSaveAsync(dto);
+                return Ok(new { count = created.Count });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
             }
             catch (Exception ex)
             {
@@ -115,10 +154,8 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
-        /// Xóa quyền xử lý
+        /// Xóa quyền xử lý theo ID
         /// </summary>
-        /// <param name="id">ID quyền xử lý</param>
-        /// <returns>NoContent nếu thành công</returns>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -126,6 +163,23 @@ namespace dataproduct.api.Controllers
             {
                 var ok = await _service.DeleteAsync(id);
                 return ok ? NoContent() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Xóa toàn bộ quyền xử lý của một tài khoản
+        /// </summary>
+        [HttpDelete("tai-khoan/{idTaiKhoan:int}")]
+        public async Task<IActionResult> DeleteByTaiKhoan(int idTaiKhoan)
+        {
+            try
+            {
+                await _service.DeleteByTaiKhoanAsync(idTaiKhoan);
+                return NoContent();
             }
             catch (Exception ex)
             {

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using dataproduct.api.ResponseModels;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,8 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<BkNguyenLieu> BkNguyenLieus { get; set; }
 
+    public virtual DbSet<BkKcscanBbxlSanxuat> BkKcscanBbxlSanxuats { get; set; }
+
     public virtual DbSet<BkPhoiThep> BkPhoiThep { get; set; }
 
     public virtual DbSet<BmPheDuyet> BmPheDuyets { get; set; }
@@ -32,9 +35,19 @@ public partial class ProductFormContext : DbContext
 
     public virtual DbSet<CtdPhoiNong> CtdPhoiNongs { get; set; }
 
+    public virtual DbSet<CtdPhieuXuLyKph> CtdPhieuXuLyKphs { get; set; }
+
+    public virtual DbSet<CtdSoTheoDoi> CtdSoTheoDois { get; set; }
+
+    public virtual DbSet<CtdStdDienBien> CtdStdDienBiens { get; set; }
+
+    public virtual DbSet<CtdGiaoNhanPhoi> CtdGiaoNhanPhois { get; set; }
+
     public virtual DbSet<DLNM_HRC2> DLNM_HRC2s { get; set; }
 
     public virtual DbSet<Header_Key> Header_Keys { get; set; }
+
+    public virtual DbSet<Header_Nhom> Header_Nhoms { get; set; }
 
     public virtual DbSet<Header_Mapping> Header_Mappings { get; set; }
 
@@ -45,6 +58,22 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
     public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
+
+    public virtual DbSet<BM_SanLuongPhoi> BM_SanLuongPhoi { get; set; }
+    public virtual DbSet<BM_PhoiNhapKho> BM_PhoiNhapKho { get; set; }
+    public virtual DbSet<BkKcsBbxnSanLuong> BkKcsBbxnSanLuongs { get; set; }
+    public virtual DbSet<NL_BTDBenPhe> NL_BTDBenPhes { get; set; }
+    //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+    //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
+    public virtual DbSet<Silo> Silos { get; set; }
+    public virtual DbSet<BmKiemKePhuLieu> BmKiemKePhuLieus { get; set; }
+    public virtual DbSet<MapSiloPhuLieuNM> MapSiloPhuLieuNMs { get; set; }
+    public virtual DbSet<BBGN_ThepLong> BBGN_ThepLongs { get; set; }
+    public virtual DbSet<MacThep> MacTheps { get; set; }
+    public virtual DbSet<MayDuc> MayDucs { get; set; }
+    public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
+    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -71,6 +100,38 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(150)
                 .HasColumnName("TenNVL");
             entity.Property(e => e.TronId).HasColumnName("Tron_ID");
+        });
+
+        modelBuilder.Entity<BkKcscanBbxlSanxuat>(entity =>
+        {
+            entity.ToTable("BK_KCSCAN_BBXL_SANXUAT");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.WorkshopName).HasMaxLength(100).HasColumnName("WorkshopName");
+            entity.Property(e => e.Order).HasMaxLength(100).HasColumnName("Order");
+            entity.Property(e => e.ProcessProductionDate).HasColumnName("ProcessProductionDate");
+            entity.Property(e => e.ProcessShiftName).HasMaxLength(20).HasColumnName("ProcessShiftName");
+            entity.Property(e => e.NewProductName).HasMaxLength(100).HasColumnName("NewProductName");
+            entity.Property(e => e.Product).HasMaxLength(100).HasColumnName("Product");
+            entity.Property(e => e.NewGradeCode).HasMaxLength(50).HasColumnName("NewGradeCode");
+            entity.Property(e => e.NewLength).HasColumnType("float").HasColumnName("NewLength");
+            entity.Property(e => e.NewNumOfBar).HasColumnName("NewNumOfBar");
+            entity.Property(e => e.NewWeight).HasColumnType("float").HasColumnName("NewWeight");
+            entity.Property(e => e.NewClassifyCode).HasMaxLength(50).HasColumnName("NewClassifyCode");
+            entity.Property(e => e.Reason).HasMaxLength(255).HasColumnName("Reason");
+            entity.Property(e => e.Measures).HasMaxLength(255).HasColumnName("Measures");
+            entity.Property(e => e.InProductName).HasMaxLength(100).HasColumnName("InProductName");
+            entity.Property(e => e.InProduct).HasMaxLength(100).HasColumnName("InProduct");
+            entity.Property(e => e.InGradeCode).HasMaxLength(50).HasColumnName("InGradeCode");
+            entity.Property(e => e.InLength).HasColumnType("float").HasColumnName("InLength");
+            entity.Property(e => e.InNumOfBar).HasColumnName("InNumOfBar");
+            entity.Property(e => e.InWeight).HasColumnType("float").HasColumnName("InWeight");
+            entity.Property(e => e.InClassifyCode).HasMaxLength(10).HasColumnName("InClassifyCode");
+            entity.Property(e => e.InShiftName).HasMaxLength(50).HasColumnName("InShiftName");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("CreatedAt");
+            entity.Property(e => e.NgayXL).HasColumnName("NgayXL");
+            entity.Property(e => e.CaXL).HasMaxLength(20).HasColumnName("CaXL");
+            entity.Property(e => e.XuongCan).HasColumnName("XuongCan");
         });
 
         modelBuilder.Entity<BkPhoiThep>(entity =>
@@ -160,6 +221,9 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("MaBM");
             entity.Property(e => e.MaKhuVuc).HasMaxLength(20);
+            entity.Property(e => e.QuyenChucNang).HasColumnName("QuyenChucNang");
+            entity.Property(e => e.KhuVucPhu).HasColumnName("KhuVucPhu");
+            
         });
 
         modelBuilder.Entity<CtdPhoiNguoi>(entity =>
@@ -207,6 +271,92 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TongSt).HasColumnName("TongST");
         });
 
+        modelBuilder.Entity<CtdPhieuXuLyKph>(entity =>
+        {
+            entity.ToTable("CTD_Phieu_XuLyKPH");
+
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.IdPhieu).HasColumnName("IdPhieu");
+            entity.Property(e => e.InSanPham).HasMaxLength(100);
+            entity.Property(e => e.InMacThep).HasMaxLength(50);
+            entity.Property(e => e.InChieuDai).HasMaxLength(50);
+            entity.Property(e => e.InSoMe).HasMaxLength(100);
+            entity.Property(e => e.InSoThanh);
+            entity.Property(e => e.InKhoiLuong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.InCaNgaySx)
+                .HasMaxLength(100)
+                .HasColumnName("InCaNgaySX");
+            entity.Property(e => e.InLoai).HasMaxLength(50);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.Measures).HasMaxLength(500);
+            entity.Property(e => e.NewSanPham).HasMaxLength(100);
+            entity.Property(e => e.NewMacThep).HasMaxLength(50);
+            entity.Property(e => e.NewChieuDai).HasMaxLength(50);
+            entity.Property(e => e.NewSoMe).HasMaxLength(100);
+            entity.Property(e => e.NewSoThanh);
+            entity.Property(e => e.NewKhoiLuong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.NewLoai).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("datetime")
+                .HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.NgayXL).HasColumnName("NgayXL");
+            entity.Property(e => e.CaXL).HasColumnName("CaXL");
+            entity.Property(e => e.KipXL).HasMaxLength(50).HasColumnName("KipXL");
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(50).HasColumnName("LenhSanXuat");
+        });
+
+        modelBuilder.Entity<CtdSoTheoDoi>(entity =>
+        {
+            entity.ToTable("CTD_SoTheoDoi");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Idphieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.LoaiMacPhoi).HasColumnName("LoaiMacPhoi");
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.PhoiRaLo).HasColumnName("PhoiRaLo");
+            entity.Property(e => e.PhoiHoiLo).HasColumnName("PhoiHoiLo");
+            entity.Property(e => e.PhoiRaSan).HasColumnName("PhoiRaSan");
+            entity.Property(e => e.PhoiPheCn).HasColumnName("PhoiPheCN");
+            entity.Property(e => e.LoaiSp)
+                .HasMaxLength(20)
+                .HasColumnName("LoaiSP");
+            entity.Property(e => e.LoaiPhoi).HasColumnName("LoaiPhoi");
+            entity.Property(e => e.MacThep)
+                .HasMaxLength(20)
+                .HasColumnName("MacThep");
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<CtdStdDienBien>(entity =>
+        {
+            entity.ToTable("CTD_STD_DienBien");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Idphieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.TuGio).HasColumnName("TuGio");
+            entity.Property(e => e.DenGio).HasColumnName("DenGio");
+            entity.Property(e => e.ThietBi).HasMaxLength(50);
+            entity.Property(e => e.MoTa)
+                .HasMaxLength(250)
+                .HasColumnName("MoTa");
+            entity.Property(e => e.LoaiSuCo).HasMaxLength(50);
+            entity.Property(e => e.PheCongNghe).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<CtdGiaoNhanPhoi>(entity =>
+        {
+            entity.ToTable("CTD_GiaoNhanPhoi");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MaViTri).HasMaxLength(50);
+            entity.Property(e => e.ViTri).HasMaxLength(200);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.SoCay).HasColumnName("SoCay");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.IdPhieu).HasColumnName("IDPhieu");
+        });
+
         modelBuilder.Entity<DLNM_HRC2>(entity =>
         {
             entity.ToTable("DLNM_HRC2");
@@ -238,8 +388,20 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.LoaiPhieu).HasColumnName("LoaiPhieu");
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
-            entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
             entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
+            entity.Property(e => e.TyTrong)
+                .HasColumnName("TyTrong")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.IsUsedThongKe).HasColumnName("IsUsedThongKe");
+            entity.Property(e => e.LoaiThongKe).HasColumnName("LoaiThongKe");
+        });
+
+        modelBuilder.Entity<Header_Nhom>(entity =>
+        {
+            entity.ToTable("Header_Nhom");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.TenHienThi).HasColumnName("TenHienThi");
+            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
         });
 
         modelBuilder.Entity<Header_Mapping>(entity =>
@@ -270,11 +432,19 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.N2).HasColumnName("N2");
             entity.Property(e => e.AR_BOF).HasColumnName("AR_BOF");
             entity.Property(e => e.AR_LF).HasColumnName("AR_LF");
-            entity.Property(e => e.MATERIAL_NO).HasColumnName("MATERIAL_NO");
+            entity.Property(e => e.MATERIAL_NO)
+                .HasColumnName("MATERIAL_NO")
+                .HasPrecision(18, 0);
             entity.Property(e => e.DESCRIPTION_EN).HasColumnName("DESCRIPTION_EN");
             entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia");
             entity.Property(e => e.KLGangLong).HasColumnName("KLGangLong");
             entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe");
+            entity.Property(e => e.PLANT_NO)
+                .HasColumnName("PLANT_NO")
+                .HasPrecision(18, 0);
+            entity.Property(e => e.REPORT_NO)
+                .HasColumnName("REPORT_NO")
+                .HasPrecision(18, 0);
         });
         modelBuilder.Entity<PhuLieu_HRC2>(entity =>
         {
@@ -288,9 +458,213 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia");
             entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
             entity.Property(e => e.TenHienThi).HasColumnName("TenHienThi");
+            entity.Property(e => e.IsManual).HasColumnName("IsManual");
+            entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
+        });
+        modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC2>(entity =>
+        {
+            entity.ToTable("STD_XUAT_NHAP_TON_HRC2");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.ViTri).HasColumnName("ViTri");
+            entity.Property(e => e.TonDauCa).HasColumnName("TonDauCa");
+            entity.Property(e => e.TuongQuanDauCa).HasColumnName("TuongQuanDauCa");
+            entity.Property(e => e.NhapVaoTrongCa).HasColumnName("NhapVaoTrongCa");
+            entity.Property(e => e.TonCuoiCa).HasColumnName("TonCuoiCa");
+            entity.Property(e => e.TuongQuanCuoiCa).HasColumnName("TuongQuanCuoiCa");
+            entity.Property(e => e.TongThucTe).HasColumnName("TongThucTe");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.IDSilo).HasColumnName("IDSilo");
+        });
+        modelBuilder.Entity<STD_NXT_TOTAL_HRC2>(entity =>
+        {
+            entity.ToTable("STD_NXT_TOTAL_HRC2");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
+            entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
+            entity.Property(e => e.TongTonCuoiCa).HasColumnName("TongTonCuoiCa");
+            entity.Property(e => e.TongSuDung).HasColumnName("TongSuDung");
+            entity.Property(e => e.TongSDTrenSoSach).HasColumnName("TongSDTrenSoSach");
+            entity.Property(e => e.ChenhLech).HasColumnName("ChenhLech");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.HasPhanBo).HasColumnName("HasPhanBo");
+        });
+        modelBuilder.Entity<STD_NXT_Filter>(entity =>
+        {
+            entity.HasNoKey();
+            entity.ToTable("STD_NXT_Filter");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope)
+                .HasColumnName("Scope")
+                .HasPrecision(18, 0);
+            entity.Property(e => e.ID_PhuLieu)
+                .HasColumnName("ID_PhuLieu")
+                .HasPrecision(18, 0);
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.TotalKLPhuGia).HasColumnName("TotalKLPhuGia");
+        });
+        modelBuilder.Entity<STD_NXT_Filter_Init>(entity =>
+        {
+            entity.HasNoKey();
+            entity.ToTable("STD_NXT_Filter_Init");
+            entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.TonDauCa)
+                .HasColumnName("TonDauCa")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.NhapVaoTrongCa)
+                .HasColumnName("NhapVaoTrongCa")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.TonCuoiCa)
+                .HasColumnName("TonCuoiCa")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+        });
+        modelBuilder.Entity<Silo>(entity =>
+        {
+            entity.ToTable("Silo");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.TenSilo).HasColumnName("TenSilo");
+            entity.Property(e => e.TheTich)
+                .HasColumnName("TheTich")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.TinhTrang).HasColumnName("TinhTrang");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
+        });
+        modelBuilder.Entity<BmKiemKePhuLieu>(entity =>
+        {
+            entity.ToTable("BmKiemKePhuLieu");
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
+            entity.Property(e => e.ID_PhuLieuNM).HasColumnName("ID_PhuLieuNM");
+            entity.Property(e => e.ID_Silo).HasColumnName("ID_Silo");
+            entity.Property(e => e.TheTich)
+                .HasColumnName("TheTich")
+                .HasPrecision(18, 3);
+            entity.Property(e => e.TyTrong)
+                .HasColumnName("TyTrong")
+                .HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<MapSiloPhuLieuNM>(entity =>
+        {
+            entity.ToTable("Map_Silo_PhuLieuNM");
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.ID_Silo).HasColumnName("ID_Silo");
+            entity.Property(e => e.ID_PhuLieuNM).HasColumnName("ID_PhuLieuNM");
+            entity.Property(e => e.IsActive).HasColumnName("IsActive");
+            entity.Property(e => e.NgayBatDau).HasColumnName("NgayBatDau");
+            entity.Property(e => e.NgayKetThuc).HasColumnName("NgayKetThuc");
+        });
+        modelBuilder.Entity<BkKcsBbxnSanLuong>(entity =>
+        {
+            entity.ToTable("BK_KCS_BBXNSanLuong");
+            entity.Property(e => e.Ca).HasMaxLength(50);
+            entity.Property(e => e.SanPham).HasMaxLength(50);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.ChieuDai).HasColumnType("float");
+            entity.Property(e => e.SoBo).HasColumnName("SoBo");
+            entity.Property(e => e.SoThanh).HasColumnType("decimal(32, 0)");
+            entity.Property(e => e.KhoiLuong).HasColumnType("float");
+            entity.Property(e => e.TenPhanLoai).HasMaxLength(50);
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.TenCa).HasMaxLength(50);
+            entity.Property(e => e.IDXuongCan).HasMaxLength(50).HasColumnName("IDXuongCan");
+            entity.Property(e => e.TenXuongCan).HasMaxLength(50);
+            entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.IDPhieu).HasColumnName("IDPhieu");
+        });
+
+        modelBuilder.Entity<PhuLieu_NM>(entity =>
+        {
+            entity.ToTable("PhuLieu_NM");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.ID_PhuLieu).HasColumnName("ID_PhuLieu");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.IsActive).HasColumnName("IsActive");
+        });
+        modelBuilder.Entity<BBGN_ThepLong>(entity =>
+        {
+            entity.ToTable("BBGN_ThepLong");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.MayDuc).HasColumnName("MayDuc");
+            entity.Property(e => e.Me).HasColumnName("Me");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.ThungSo).HasColumnName("ThungSo");
+            entity.Property(e => e.ThoiGian).HasColumnName("ThoiGian");
+            entity.Property(e => e.KlLan1).HasColumnName("KlLan1");
+            entity.Property(e => e.KlLan2).HasColumnName("KlLan2");
+            entity.Property(e => e.KlLan3).HasColumnName("KlLan3");
+            entity.Property(e => e.KlThepLong).HasColumnName("KlThepLong");
+            entity.Property(e => e.GhiChu).HasColumnName("GhiChu");
+            entity.Property(e => e.TinhLuyenLenThang).HasColumnName("TinhLuyenLenThang");
+            entity.Property(e => e.PhanLoai).HasColumnName("PhanLoai");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.IdPhieu).HasColumnName("IdPhieu");
+            entity.Property(e => e.IsGhost).HasColumnName("IsGhost");
+            entity.Property(e => e.IsTrungMeThoi).HasColumnName("IsTrungMeThoi");
+            entity.Property(e => e.MacThepBKMIS).HasColumnName("MacThepBKMIS");
+            entity.Property(e => e.IdMacThep).HasColumnName("IdMacThep");
+            entity.Property(e => e.KLLFSauThep).HasColumnName("KLLFSauThep");
+            entity.Property(e => e.IsThuNghiem).HasColumnName("IsThuNghiem");
+            entity.Property(e => e.Kip).HasColumnName("Kip");
+        });
+
+        modelBuilder.Entity<MacThep>(entity =>
+        {
+            entity.ToTable("MacThep");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.TenMacThep).HasMaxLength(255);
+            entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
+            entity.Property(e => e.IsLock).HasColumnName("IsLock");
+            entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
+            entity.Property(e => e.Id_NhomPhanLoaiMacThep).HasColumnName("Id_NhomPhanLoaiMacThep");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+        });
+
+        modelBuilder.Entity<MacThep_MayDuc>(entity =>
+        {
+            entity.ToTable("MacThep_MayDuc");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.IdMacThep).HasColumnName("IdMacThep");
+            entity.Property(e => e.IdMayDuc).HasColumnName("IdMayDuc");
+        });
+
+        modelBuilder.Entity<MayDuc>(entity =>
+        {
+            entity.ToTable("MayDuc");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.TenMayDuc).HasMaxLength(255);
+            entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
+            entity.Property(e => e.IsLock).HasColumnName("IsLock");
+        });
+         modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
+        {
+            entity.ToTable("NhomPhanLoaiMacThep");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
         });
         OnModelCreatingPartial(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
 }

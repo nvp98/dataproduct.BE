@@ -23,7 +23,7 @@ public class STD_XUAT_NHAP_TON_HRC2
     public int Id_HeaderKey { get; set; }
 
     [StringLength(255)]
-    public string? TenNguyenLieu { get; set; }
+    public string? TenNguyenLieu { get; set; }  
 
     [Column(TypeName = "decimal(18,3)")]
     public decimal? TonDauCa { get; set; }
@@ -51,5 +51,8 @@ public class STD_XUAT_NHAP_TON_HRC2
     public decimal? TongThucTe { get; set; }
 
     public Guid Id_Phieu { get; set; }
+    public int? IDSilo { get; set; }
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? LuongSuDungKiemKe { get; set; }
 }
 

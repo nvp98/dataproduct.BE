@@ -38,5 +38,24 @@ public class STD_NXT_TOTAL_HRC2
     public decimal? ChenhLech { get; set; }
 
     public Guid Id_Phieu { get; set; }
+    public bool? HasPhanBo { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeBOF { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeTinhLuyen { get; set; }
+
+    // Khối lượng phân bổ (tính theo 1 mẻ) sau khi chia theo nhóm mẻ
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_BOF { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_TL { get; set; }
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeRH { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_RH { get; set; }
 }
 

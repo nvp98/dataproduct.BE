@@ -1,8 +1,11 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
+using dataproduct.api.Services.Exporters;
+using dataproduct.api.Services.Initializers;
 using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
@@ -17,14 +20,117 @@ namespace dataproduct.api.Business
         private readonly IBMPheDuyetRepository _pheDuyetRepo;
         private readonly BmPheDuyetService _pheDuyetService;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
+        private readonly DLNMHRC2Service _dlnmHrc2Service;
+        private readonly IEnumerable<IPhieuJsonInitializer> _jsonInitializers;
+        private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
+        private readonly IEnumerable<IPhieuExcelExporter> _excelExporters;
+        private readonly PhieuDetailExcelService _detailExcelService;
 
-        public PhieuService(IPhieuRepository repo, ISTD_NXT_HRC2Repository std_nxt_hrc2Repo, IBMPheDuyetRepository pheDuyetRepo, BmPheDuyetService pheDuyetService, ProductFormContext context)
+        public PhieuService(
+            IPhieuRepository repo,
+            ISTD_NXT_HRC2Repository std_nxt_hrc2Repo,
+            IBMPheDuyetRepository pheDuyetRepo,
+            BmPheDuyetService pheDuyetService,
+            ProductFormContext context,
+            ProductDataMasterDbContext masterContext,
+            DLNMHRC2Service dlnmHrc2Service,
+            IEnumerable<IPhieuJsonInitializer> jsonInitializers,
+            IEnumerable<IPhieuPdfExporter> pdfExporters,
+            IEnumerable<IPhieuExcelExporter> excelExporters,
+            PhieuDetailExcelService detailExcelService)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
             _pheDuyetRepo = pheDuyetRepo;
             _pheDuyetService = pheDuyetService;
             _context = context;
+            _masterContext = masterContext;
+            _dlnmHrc2Service = dlnmHrc2Service;
+            _jsonInitializers = jsonInitializers;
+            _pdfExporters = pdfExporters;
+            _excelExporters = excelExporters;
+            _detailExcelService = detailExcelService;
+        }
+
+        /// <summary>
+        /// Export PDF động - nếu có filters sẽ áp dụng, nếu không sẽ export toàn bộ
+        /// </summary>
+        public async Task<DTOs.Export.ExportFileResult> ExportPdfDynamicAsync(Guid phieuId, List<string>? filters = null)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var exporter = _pdfExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export PDF cho biểu mẫu: {phieu.MaBm}");
+
+            // Nếu có filters, dùng ExportPdfAsyncExtra; ngược lại dùng ExportPdfAsync
+            if (filters != null && filters.Count > 0)
+            {
+                return await exporter.ExportPdfAsyncExtra(phieuId, filters);
+            }
+
+            return await exporter.ExportPdfAsync(phieuId);
+        }
+
+        public async Task<DTOs.Export.ExportFileResult> ExportExcelDynamicPhieuAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export excel cho biểu mẫu: {phieu.MaBm}");
+
+
+            return await exporter.ExportExcelPhieuAsync(phieuId);
+        }
+
+
+        public async Task<DTOs.Export.ExportFileResult> ExportTongHopExcelDynamicAsync(string? maBm, DateOnly? fromDate, DateOnly? toDate)
+        {
+            if (string.IsNullOrWhiteSpace(maBm))
+                throw new ArgumentException("Thiếu maBm");
+
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(maBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export Excel tổng hợp cho biểu mẫu: {maBm}");
+
+            return await exporter.ExportTongHopExcelAsync(fromDate, toDate);
+        }
+
+
+        public async Task<DTOs.Export.ExportFileResult> ExportDetailExcelDynamicAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            // Thử exporter riêng theo maBm trước
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter != null)
+            {
+                try
+                {
+                    return await exporter.ExportDetailExcelAsync(phieuId);
+                }
+                catch (NotSupportedException)
+                {
+                    // Chưa implement → fallback về generic
+                }
+            }
+
+            // Fallback: render generic từ DataJson
+            var content = await _detailExcelService.ExportAsync(phieuId);
+            return new DTOs.Export.ExportFileResult
+            {
+                Content = content,
+                FileName = $"{phieu.MaBm}_{phieu.SoPhieu}_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
         }
 
         public async Task<IEnumerable<PhieuDto>> GetAllAsync(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
@@ -140,32 +246,52 @@ namespace dataproduct.api.Business
             };
         }
 
-        public async Task<BmPhieu> CreateAsync(JsonElement formData)
+        public async Task<BmPhieu?> CreateAsync(JsonElement formData)
         {
+            await CheckDuplicateAsync(formData);
+
             try
             {
+                using var tran = await _context.Database.BeginTransactionAsync();
+
                 var phieu = await _repo.AddAsync(formData);
+                if (phieu == null)
+                {
+                    await tran.RollbackAsync();
+                    return null;
+                }
+
+                await ResolveAndSaveKipAsync(phieu);
+
+                await RunJsonInitializersAsync(phieu);
+
+                await _context.SaveChangesAsync();
+                await tran.CommitAsync();
+
+                // Đồng bộ kíp nếu Ca hoặc NgaySX thay đổi
+                await ResolveAndSaveKipAsync(phieu);
+
                 return phieu;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                try
+                {
+                    await _context.Database.RollbackTransactionAsync();
+                }
+                catch { }
                 return null;
             }
         }
 
-        public async Task<BmPhieu?> UpdateAsync(Guid id, JsonElement formData)
+        public async Task<(BmPhieu? Phieu, List<string> Warnings)> UpdateAsync(Guid id, JsonElement formData)
         {
             // 1. Lấy phiếu hiện tại
             var existing = await _repo.GetByIdAsync(id);
-            if (existing == null) return null;
-
-            // save data khi them cho hrc2
-            string bm = formData.GetProperty("maBm").GetString();
-            if (bm == "HRC2_BB_NauLuyen_BOF" || bm == "HRC2_BB_NauLuyen_LF" || bm == "HRC2_BB_NauLuyen_RH")
-            {
-                var data = await BuildModelToInsert(formData);
-                await SaveHRC2ManualDataAsync(data);
-            }
+            if (existing == null) return (null, new List<string>());
+            EnsurePhieuOperable(existing);
+            // Cho phép update khi ĐangLuu (0), Đã thu hồi (3) hoặc Hiệu chỉnh (7 = phiếu clone đang chỉnh sửa). Lưu ở trạng thái 7 không đổi TinhTrang.
+            if (existing == null || (existing.TinhTrang != 0 && existing.TinhTrang != 3 && existing.TinhTrang != 7)) return (null, new List<string>());
 
             // 2. Cập nhật các field chính (nếu có trong JSON)
             if (formData.TryGetProperty("NgaySX", out var ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null)
@@ -185,7 +311,8 @@ namespace dataproduct.api.Business
 
             if (formData.TryGetProperty("idphongBan", out var idphongBan) && idphongBan.ValueKind != JsonValueKind.Null)
                 existing.IdphongBan = idphongBan.GetInt32();
-
+            if (formData.TryGetProperty("scope", out var scopeProp) && scopeProp.ValueKind != JsonValueKind.Null)
+                existing.Scope = scopeProp.GetInt32();
 
             // 3. Lưu lại JSON gốc (form động)
             existing.DataJson = formData.GetRawText();
@@ -196,6 +323,13 @@ namespace dataproduct.api.Business
 
             // 4. Gọi repository để lưu
             await _repo.UpdateAsync(existing);
+
+            // 4.1 Đồng bộ kíp nếu Ca hoặc NgaySX thay đổi
+            await ResolveAndSaveKipAsync(existing);
+
+            // 4.2 Đồng bộ lại dữ liệu bảng chi tiết từ DataJson.
+            var warnings = await RunJsonInitializersAsync(existing);
+
             // Cập nhật thông tin phê duyệt
             // Lưu thông tin phê duyệt
 
@@ -226,6 +360,84 @@ namespace dataproduct.api.Business
             }
 
 
+            return (existing, warnings);
+        }
+
+        public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
+        {
+            // 1. Lấy phiếu hiện tại
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return null;
+
+
+
+            int nguoiTaoId = NguoiTaoID ?? 0;
+
+            // 3. Lấy NgaySX, Ca, MaBm từ phiếu hiện tại
+            var ngaySX = existing.NgaySX;
+            var ca = existing.Ca;
+            var maBm = existing.MaBm;
+
+            if (!ngaySX.HasValue || !ca.HasValue || string.IsNullOrEmpty(maBm))
+            {
+                return null; // Thiếu thông tin cần thiết
+            }
+
+            // 4. Tìm tất cả các phiếu cùng NgaySX, Ca và MaBm
+            var phieusToUpdate = await _context.BmPhieus
+                .Where(x => x.NgaySX == ngaySX.Value
+                         && x.Ca == ca.Value
+                         && x.MaBm == maBm
+                         && x.IsDelete != 1) // Không cập nhật phiếu đã xóa
+                .ToListAsync();
+
+            if (!phieusToUpdate.Any())
+            {
+                return null;
+            }
+
+            // 5. Cập nhật NguoiTaoId cho tất cả phiếu
+            foreach (var phieu in phieusToUpdate)
+            {
+                phieu.NguoiTaoId = nguoiTaoId;
+            }
+
+            // 6. Lưu thay đổi
+            _context.BmPhieus.UpdateRange(phieusToUpdate);
+            await _context.SaveChangesAsync();
+
+            // 7. Cập nhật hoặc tạo mới BM_PheDuyet cho người tạo (CapDuyet = 0)
+            foreach (var phieu in phieusToUpdate)
+            {
+                // Tìm bản ghi phê duyệt với CapDuyet = 0
+                var pheDuyetCapDuyet0 = await _context.BmPheDuyets
+                    .FirstOrDefaultAsync(x => x.PhieuId == phieu.Idphieu && x.CapDuyet == 0);
+
+                if (pheDuyetCapDuyet0 != null)
+                {
+                    // Nếu đã tồn tại, cập nhật NguoiDuyetId
+                    pheDuyetCapDuyet0.NguoiDuyetId = nguoiTaoId;
+                    _context.BmPheDuyets.Update(pheDuyetCapDuyet0);
+                }
+                else
+                {
+                    // Nếu chưa tồn tại, tạo mới
+                    var newPheDuyet = new BmPheDuyet
+                    {
+                        PhieuId = phieu.Idphieu,
+                        CapDuyet = 0,
+                        NguoiDuyetId = nguoiTaoId,
+                        TinhTrang = 0,
+                        GhiChu = null
+                    };
+                    await _context.BmPheDuyets.AddAsync(newPheDuyet);
+                }
+            }
+
+            // 8. Lưu thay đổi BM_PheDuyet
+            await _context.SaveChangesAsync();
+
+            // 9. Trả về phiếu hiện tại đã được cập nhật
             return existing;
         }
 
@@ -241,39 +453,73 @@ namespace dataproduct.api.Business
         {
             try
             {
-                // 1. Lấy phiếu gốc để lấy VersionClone hiện tại
+                // 1. Lấy phiếu được bấm "Đề nghị hiệu chỉnh" (có thể là phiếu gốc hoặc phiếu clone),
+                // chỉ cho clone khi đang Hoàn thành (2) hoặc Đang phê duyệt (6)
                 var phieuGoc = await _repo.GetByIdAsync(id);
                 if (phieuGoc == null) return null;
+                EnsurePhieuOperable(phieuGoc);
+                PhieuStatusHelper.CheckAllowStatusChange(phieuGoc.TinhTrang ?? 0, 7);
 
+                // 2. Phiếu cha chỉ IsLock = 1 để ẩn khỏi trang, không đổi TinhTrang
                 phieuGoc.IsLock = 1;
                 await _repo.UpdateAsync(phieuGoc);
-                // 2. Tạo mới record từ formData (giống như hàm CreateAsync)
-                var phieu = await _repo.AddAsync(formData);
+
+                await _context.SaveChangesAsync();
+
+                // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
+                var phieu = await CreateAsync(formData);
                 if (phieu == null) return null;
 
-                // 3. Update các trường clone cho record mới tạo
+                // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
+                var nextVersion = (phieuGoc.VersionClone ?? 0) + 1;
+                var suffix = $"_HC_{nextVersion}";
+                // Strip đuôi _HC_{n} cũ (nếu có) để không bị cộng dồn _HC_1_HC_2...
+                var soPhieuBase = System.Text.RegularExpressions.Regex.Replace(
+                    (phieuGoc.SoPhieu ?? "").Trim(),
+                    @"_HC_\d+$", "");
+                if (soPhieuBase.Length + suffix.Length > 50)
+                    soPhieuBase = soPhieuBase.Substring(0, 50 - suffix.Length);
+                phieu.SoPhieu = soPhieuBase + suffix;
+
+                // 5. Clone mang trạng thái Hiệu chỉnh (7), hiện nút Lưu / Lưu và Gửi như Đang lưu
                 phieu.IsClone = true;
-                phieu.VersionClone = (phieuGoc.VersionClone ?? 0) + 1;
-                phieu.ID_PhieuGoc = id;
-                phieu.TinhTrang = 0;
+                phieu.VersionClone = nextVersion;
+                phieu.Kip = phieuGoc.Kip;
+                // ID_PhieuGoc luôn trỏ về phiếu cha (phiếu bị bấm clone), hỗ trợ clone nhiều tầng: A -> A1 -> A2...
+                phieu.ID_PhieuGoc = phieuGoc.Idphieu;
+                phieu.TinhTrang = 7;
                 await _repo.UpdateAsync(phieu);
 
                 return phieu;
             }
-            catch (Exception ex)
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception)
             {
                 return null;
             }
         }
 
-        public async Task<bool> ChangeStatusAsync(Guid id, int status)
+        public async Task<bool> ChangeStatusAsync(Guid id, int status, int? idUser)
         {
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return false;
+            EnsurePhieuOperable(existing);
             await CheckAllowPheDuyetAsync(existing.TinhTrang ?? 0, status);
             if (status == 1)
             {
+                // Khi "Đã gửi" thì cập nhật NguoiTaoId = người thực hiện gửi.
+                // idUser được FE gửi lên; nếu null/0 thì không ghi đè để tránh phá dữ liệu hiện hữu.
+                if (idUser.HasValue && idUser.Value > 0)
+                {
+                    existing.NguoiTaoId = idUser.Value;
+                }
+
                 var allPheDuyet = await _pheDuyetRepo.GetByIdPhieuAsync(id);
+                if (allPheDuyet == null)
+                    return false;
                 var isCreatorZero = allPheDuyet.Where(x => x.CapDuyet == 0).FirstOrDefault();
                 if (isCreatorZero == null) return false;
                 isCreatorZero.TinhTrang = 1;
@@ -294,6 +540,50 @@ namespace dataproduct.api.Business
             await _repo.UpdateAsync(existing);
 
             return true;
+        }
+
+        public async Task ChotNhieuPhieuAsync(List<Guid> idPhieus, int? idUser, int status)
+        {
+            if (idPhieus == null || idPhieus.Count == 0)
+                throw new InvalidOperationException("Danh sách phiếu không được để trống.");
+
+            if (status != 5 && status != 2)
+                throw new InvalidOperationException("Status không hợp lệ. Chỉ chấp nhận 5 (chốt) hoặc 2 (hủy chốt).");
+
+            var phieus = new List<BmPhieu>();
+            foreach (var id in idPhieus)
+            {
+                var phieu = await _repo.GetByIdAsync(id);
+                if (phieu == null)
+                    throw new InvalidOperationException($"Không tìm thấy phiếu {id}.");
+                EnsurePhieuOperable(phieu);
+                phieus.Add(phieu);
+            }
+
+            if (status == 5)
+            {
+                var notReady = phieus.Where(p => p.TinhTrang != 2).ToList();
+                if (notReady.Any())
+                {
+                    var soPhieus = string.Join(", ", notReady.Select(p => p.SoPhieu));
+                    throw new InvalidOperationException($"Các phiếu sau chưa ở trạng thái Hoàn thành, không thể chốt: {soPhieus}");
+                }
+            }
+            else // status == 2
+            {
+                var notChot = phieus.Where(p => p.TinhTrang != 5).ToList();
+                if (notChot.Any())
+                {
+                    var soPhieus = string.Join(", ", notChot.Select(p => p.SoPhieu));
+                    throw new InvalidOperationException($"Các phiếu sau chưa ở trạng thái chốt, không thể hủy chốt: {soPhieus}");
+                }
+            }
+
+            foreach (var phieu in phieus)
+            {
+                phieu.TinhTrang = status;
+                await _repo.UpdateAsync(phieu);
+            }
         }
 
         public async Task<bool> UpdateStatusExtendedAsync(Guid id, int? status, int? isLock, int? isDelete)
@@ -321,485 +611,73 @@ namespace dataproduct.api.Business
         public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingAsync(SearchPhieuRequest request)
         {
             var (data, totalCount) = await _repo.SearchWithPagingAsync(request);
+            var dataList = data.ToList();
+
+            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            {
+                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+            }
+
             return new PagedResult<SearchPhieuResponseModel>
             {
-                Data = data.ToList(),
+                Data = dataList,
                 TotalRecords = totalCount,
                 Page = request.page,
                 PageSize = request.pageSize
             };
         }
 
-        public async Task<bool> InitializeAsync(Guid phieuId)
+        public async Task<PagedResult<SearchPhieuResponseModel>> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request)
         {
-            using var tran = await _context.Database.BeginTransactionAsync();
+            var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
+            var dataList = data.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).ThenBy(x => x.Scope).ToList();
 
-            try
+            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
             {
-                var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == phieuId);
-
-                if (phieu == null)
-                {
-                    return false;
-                }
-
-                // Xác định loại biểu mẫu để chạy logic riêng
-                switch (phieu.MaBm)
-                {
-                    case "HRC2_STD_NXT":
-                        await InitializeHRC2_STD_NXTAsync(phieu);
-                        break;
-                    // them các biểu mẫu khác nếu cần khởi tạo default
-                    default:
-                        break;
-                }
-                await _context.SaveChangesAsync();
-                await tran.CommitAsync();
-
-
-                return true;
+                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
             }
-            catch (Exception ex)
+
+            return new PagedResult<SearchPhieuResponseModel>
             {
-                await tran.RollbackAsync();
-                return false;
-            }
-        }
-        public async Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu)
-        {
-            await _std_nxt_hrc2Repo.InitializeHRC2_STD_NXTAsync(phieu);
-        }
-
-        public async Task<List<HRC2InsertModel>> BuildModelToInsert(JsonElement formData)
-        {
-            var result = new List<HRC2InsertModel>();
-
-            string bm = formData.GetProperty("maBm").GetString();
-            int scope = formData.GetProperty("scope").GetInt32();
-            int ca = formData.GetProperty("ca").GetInt32();
-
-            string ngaySXstr = formData.TryGetProperty("NgaySX", out var nsxProp)
-                ? nsxProp.GetString()
-                : null;
-
-            DateTime ngaySX = !string.IsNullOrEmpty(ngaySXstr)
-                ? DateTime.Parse(ngaySXstr)
-                : DateTime.Now;
-
-            var table1 = formData.GetProperty("table1").EnumerateArray().ToList();
-            var dynamicRoot = formData.GetProperty("table1DynamicColumns");
-
-            // BM → nhóm cột dynamic
-            var bmColumnMap = new Dictionary<string, List<string>>
-            {
-                { "HRC2_BB_NauLuyen_BOF", new List<string> { "BOF_PhuGia", "others", "adjust" } },
-                { "HRC2_BB_NauLuyen_LF", new List<string> { "PG", "KL", "others", "adjust" } },
-                { "HRC2_BB_NauLuyen_RH", new List<string> { "PG", "KL", "others", "adjust" } }
+                Data = dataList,
+                TotalRecords = totalCount,
+                Page = request.page,
+                PageSize = request.pageSize
             };
-
-            if (!bmColumnMap.TryGetValue(bm, out var colGroups))
-                return result;
-            string LoaiBM = "";
-            if (bm == "HRC2_BB_NauLuyen_BOF") LoaiBM = "BOF";
-            else if (bm == "HRC2_BB_NauLuyen_LF") LoaiBM = "LF";
-            else LoaiBM = "RH";
-            // Gom tất cả dynamic columns
-            var dynamicCols = new List<JsonElement>();
-            foreach (var g in colGroups)
-                if (dynamicRoot.TryGetProperty(g, out var grp))
-                    dynamicCols.AddRange(grp.EnumerateArray());
-
-            // Lấy các row nhập tay
-            var rowsNhapTay = table1
-                .Where(r => r.TryGetProperty("IsNM", out var flag)
-                            && flag.ValueKind == JsonValueKind.False)
-                .ToList();
-
-            foreach (var row in rowsNhapTay)
-            {
-                string meThoi = row.GetProperty("meThoi").GetString();
-                string macThep = row.TryGetProperty("macThep", out var mt) ? mt.GetString() : null;
-
-                double? o2 = TryGetDouble(row, "o2");
-                double? n2 = TryGetDouble(row, "n2");
-                double? ar_RH = TryGetDouble(row, "ar_RH");
-                double? ar_LF = TryGetDouble(row, "ar_LF");
-                double? ar_BOF = TryGetDouble(row, "ar_BOF");
-
-                double? gang = TryGetDouble(row, "klGangLong");
-                double? phe = TryGetDouble(row, "klThepPhe");
-                double? klThepLong = TryGetDouble(row, "klThepLong");
-                int? id = row.TryGetProperty("id", out var idRow) ? idRow.GetInt32() : null;
-
-                // ==========================
-                // TẠO 1 DÒNG MODEL CHÍNH
-                // ==========================
-                var model = new HRC2InsertModel
-                {
-                    Id = id,
-                    Ngay = ngaySX,
-                    Ca = ca,
-                    BieuMau = LoaiBM,
-                    Scope = scope,
-
-                    MeThoi = meThoi,
-                    MacThep = macThep,
-
-                    O2 = o2,
-                    N2 = n2,
-                    AR_BOF = ar_BOF,
-                    AR_LF = ar_LF,
-                    AR_RH = ar_RH,
-
-                    KLGangLong = gang,
-                    KLThepPhe = phe,
-                    KlThepLong = klThepLong,
-
-                    IsNM = false,
-                    IsChuyenCa = false
-                };
-
-                // ==========================
-                // XỬ LÝ PHỤ LIỆU
-                // ==========================
-                foreach (var col in dynamicCols)
-                {
-                    string dataIndex = col.GetProperty("dataIndex").GetString();
-
-                    if (!row.TryGetProperty(dataIndex, out var valProp))
-                        continue;
-
-                    double? klPhuGia = TryConvertNumeric(valProp);
-                    if (klPhuGia == null)
-                        continue;
-
-                    // label & headerKeyId
-                    string label = col.TryGetProperty("label", out var lblProp)
-                        ? lblProp.GetString()
-                        : null;
-
-                    int? headerKeyId = null;
-                    if (col.TryGetProperty("headerKeyId", out var hkProp)
-                        && hkProp.ValueKind == JsonValueKind.Number)
-                    {
-                        headerKeyId = hkProp.GetInt32();
-                    }
-
-                    // mappingPayload → lấy ID_PhuLieu & TenPhuLieu
-                    int? idPhuLieu = null;
-                    string tenPhuLieu = null;
-
-                    if (col.TryGetProperty("mappingPayload", out var mp)
-                        && mp.ValueKind != JsonValueKind.Null)
-                    {
-                        if (mp.TryGetProperty("idPhuLieu", out var idp)
-                            && idp.ValueKind == JsonValueKind.Number)
-                        {
-                            idPhuLieu = idp.GetInt32();
-                        }
-
-                        tenPhuLieu = mp.TryGetProperty("tenPhuLieu", out var tnp)
-                            ? tnp.GetString()
-                            : null;
-                    }
-
-                    model.hRC2_PhuLieus.Add(new HRC2_PhuLieuInSertModel
-                    {
-                        MeThoi = meThoi,
-                        BieuMau = LoaiBM,
-                        ID_PhuLieu = idPhuLieu,
-                        TenPhuLieu = tenPhuLieu,
-                        KLPhuGia = klPhuGia,
-                        ID_HeaderKey = headerKeyId,
-                        TenHienThi = label
-                    });
-                }
-
-                result.Add(model);
-            }
-            return result;
         }
 
-        // public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models)
-        // {
-        //     if (models == null || !models.Any())
-        //         return;
-
-        //     var dlnmMap = new Dictionary<Guid, DLNM_HRC2>(); // Key = RowKey
-
-        //     foreach (var model in models)
-        //     {
-        //         // Tìm DLNM cha cũ (nếu có)
-        //         DLNM_HRC2 existing = null;
-        //         if (model.Id != null && model.Id > 0)
-        //         {
-        //             existing = await _context.DLNM_HRC2s
-        //                 .FirstOrDefaultAsync(x => x.ID == model.Id && x.IsNM == false);
-        //         }
-
-        //         // Kiểm tra trùng mẻ
-        //         var existingMeThoi = await _context.DLNM_HRC2s
-        //             .Where(x => x.MeThoi == model.MeThoi &&
-        //                         x.BieuMau == model.BieuMau &&
-        //                         x.IsNM == false)
-        //             .ToListAsync();
-
-        //         bool isTrung = existingMeThoi.Any();
-
-        //         if (isTrung)
-        //         {
-        //             foreach (var item in existingMeThoi)
-        //             {
-        //                 item.IsTrungMeThoi = true;
-        //             }
-        //             _context.DLNM_HRC2s.UpdateRange(existingMeThoi);
-        //         }
-
-        //         DLNM_HRC2 dlnm;
-
-        //         if (existing == null)
-        //         {
-        //             // Tạo mới DLNM
-        //             dlnm = new DLNM_HRC2
-        //             {
-        //                 REPORT_NO = null,
-        //                 NgaySx = model.Ngay,
-        //                 Ngay = model.Ngay,
-        //                 Ca = model.Ca,
-        //                 BieuMau = model.BieuMau,
-        //                 Scope = model.Scope,
-        //                 MeThoi = model.MeThoi,
-        //                 MacThep = model.MacThep,
-        //                 O2 = model.O2,
-        //                 N2 = model.N2,
-        //                 AR_RH = model.AR_RH,
-        //                 AR_LF = model.AR_LF,
-        //                 AR_BOF = model.AR_BOF,
-        //                 KLGangLong = model.KLGangLong,
-        //                 KLThepPhe = model.KLThepPhe,
-        //                 KLThepLong = model.KlThepLong,
-        //                 IsNM = false,
-        //                 IsChuyenCa = model.IsChuyenCa,
-        //                 IsTrungMeThoi = isTrung,
-
-        //                 TempKey = Guid.NewGuid()  // ⭐ Quan trọng để map phụ liệu
-        //             };
-
-        //             await _context.DLNM_HRC2s.AddAsync(dlnm);
-        //         }
-        //         else
-        //         {
-        //             // Update DLNM
-        //             dlnm = existing;
-
-        //             dlnm.MeThoi = model.MeThoi;
-        //             dlnm.MacThep = model.MacThep;
-        //             dlnm.O2 = model.O2;
-        //             dlnm.N2 = model.N2;
-        //             dlnm.AR_RH = model.AR_RH;
-        //             dlnm.AR_LF = model.AR_LF;
-        //             dlnm.AR_BOF = model.AR_BOF;
-        //             dlnm.KLGangLong = model.KLGangLong;
-        //             dlnm.KLThepPhe = model.KLThepPhe;
-        //             dlnm.KLThepLong = model.KlThepLong;
-        //             dlnm.IsChuyenCa = model.IsChuyenCa;
-        //             dlnm.NgaySx = model.Ngay;
-        //             dlnm.IsTrungMeThoi = isTrung;
-
-        //             if (dlnm.TempKey == Guid.Empty)
-        //                 dlnm.TempKey = Guid.NewGuid();
-
-        //             _context.DLNM_HRC2s.Update(dlnm);
-        //         }
-
-        //         // Lưu vào Map bằng RowKey (DUY NHẤT)
-        //         dlnmMap[model.RowKey] = dlnm;
-        //     }
-
-        //     await _context.SaveChangesAsync();
-
-        //     foreach (var model in models)
-        //     {
-        //         var dlnm = dlnmMap[model.RowKey];
-
-        //         // XÓA phụ liệu cũ theo ID cha (an toàn tuyệt đối)
-        //         var oldPL = await _context.PhuLieu_HRC2s
-        //             .Where(x => x.ID_MeThoi == dlnm.ID)
-        //             .ToListAsync();
-
-        //         _context.PhuLieu_HRC2s.RemoveRange(oldPL);
-
-        //         // THÊM phụ liệu mới
-        //         foreach (var pl in model.hRC2_PhuLieus)
-        //         {
-        //             _context.PhuLieu_HRC2s.Add(new PhuLieu_HRC2
-        //             {
-        //                 BieuMau = model.BieuMau,
-        //                 MeThoi = model.MeThoi,
-        //                 ID_PhuLieu = pl.ID_PhuLieu,
-        //                 TenPhuLieu = pl.TenPhuLieu,
-        //                 KLPhuGia = pl.KLPhuGia,
-        //                 ID_HeaderKey = pl.ID_HeaderKey,
-        //                 TenHienThi = pl.TenHienThi,
-        //                 ID_MeThoi = dlnm.ID  
-        //             });
-        //         }
-        //     }
-
-        //     // SAVE 2 — lưu phụ liệu
-        //     await _context.SaveChangesAsync();
-        // }
-        public async Task SaveHRC2ManualDataAsync(List<HRC2InsertModel> models)
+        public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
         {
-            if (models == null || !models.Any())
-                return;
+            // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
+            var idPhieus = await _context.BmPhieus
+                .Where(p => p.MaBm == "HRC2_STD_NXT"
+                         && p.NgaySX == workDate
+                         && p.Ca == shift
+                         && p.IsDelete != 1)
+                .Select(p => p.Idphieu)
+                .ToListAsync();
 
-            var dlnmMap = new Dictionary<Guid, DLNM_HRC2>(); // Key = RowKey
+            bool phanBoComplete = idPhieus.Any()
+                && !await _context.STD_NXT_TOTAL_HRC2s
+                    .Where(r => idPhieus.Contains(r.Id_Phieu) && r.HasPhanBo == null)
+                    .AnyAsync();
 
-            foreach (var model in models)
-            {
-                // Tìm DLNM cha cũ (nếu có)
-                DLNM_HRC2 existing = null;
-                if (model.Id != null && model.Id > 0)
-                {
-                    existing = await _context.DLNM_HRC2s
-                        .FirstOrDefaultAsync(x => x.ID == model.Id && x.IsNM == false);
-                }
+            // Bước 2: kiểm tra trạng thái BOF/LF/RH — relatedComplete = tất cả phiếu có TinhTrang IN (2, 5)
+            var nauLuyenMaBms = new[] { "HRC2_BB_NauLuyen_BOF", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_RH" };
+            var relatedStatuses = await _context.BmPhieus
+                .Where(p => nauLuyenMaBms.Contains(p.MaBm)
+                         && p.NgaySX == workDate
+                         && p.Ca == shift
+                         && p.IsDelete != 1
+                         && p.IsLock != 1)
+                .Select(p => p.TinhTrang)
+                .ToListAsync();
 
-                // ====== KIỂM TRA TRÙNG MẺ THỎI (IsNM = false) ======
-                var sameMeThoi = await _context.DLNM_HRC2s
-                    .Where(x =>
-                        x.MeThoi == model.MeThoi &&
-                        x.BieuMau == model.BieuMau)
-                    .ToListAsync();
+            bool relatedComplete = relatedStatuses.Any()
+                && relatedStatuses.All(t => t == 2 || t == 5);
 
-                bool isTrung = false;
-
-                if (existing == null)
-                {
-                    // INSERT → nếu có record khác trùng → trùng
-                    if (sameMeThoi.Any())
-                        isTrung = true;
-                }
-                else
-                {
-                    // UPDATE → loại bỏ chính nó khỏi danh sách kiểm tra
-                    var others = sameMeThoi.Where(x => x.ID != existing.ID).ToList();
-                    if (others.Any())
-                        isTrung = true;
-                }
-
-                // ====== UPDATE IsTrungMeThoi CHO TẤT CẢ BẢN GHI TRÙNG ======
-                if (isTrung)
-                {
-                    foreach (var item in sameMeThoi)
-                        item.IsTrungMeThoi = true;
-
-                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
-                }
-                else
-                {
-                    // Nếu không trùng → reset toàn bộ về false
-                    foreach (var item in sameMeThoi)
-                        item.IsTrungMeThoi = false;
-
-                    _context.DLNM_HRC2s.UpdateRange(sameMeThoi);
-                }
-
-                // ====== TẠO HOẶC UPDATE DLNM ======
-                DLNM_HRC2 dlnm;
-
-                if (existing == null)
-                {
-                    dlnm = new DLNM_HRC2
-                    {
-                        REPORT_NO = null,
-                        NgaySx = model.Ngay,
-                        Ngay = model.Ngay,
-                        Ca = model.Ca,
-                        BieuMau = model.BieuMau,
-                        Scope = model.Scope,
-                        MeThoi = model.MeThoi,
-                        MacThep = model.MacThep,
-                        O2 = model.O2,
-                        N2 = model.N2,
-                        AR_RH = model.AR_RH,
-                        AR_LF = model.AR_LF,
-                        AR_BOF = model.AR_BOF,
-                        KLGangLong = model.KLGangLong,
-                        KLThepPhe = model.KLThepPhe,
-                        KLThepLong = model.KlThepLong,
-                        IsNM = false,
-                        IsChuyenCa = model.IsChuyenCa,
-                        IsTrungMeThoi = isTrung,
-
-                        TempKey = Guid.NewGuid()
-                    };
-
-                    await _context.DLNM_HRC2s.AddAsync(dlnm);
-                }
-                else
-                {
-                    dlnm = existing;
-
-                    dlnm.MeThoi = model.MeThoi;
-                    dlnm.MacThep = model.MacThep;
-                    dlnm.O2 = model.O2;
-                    dlnm.N2 = model.N2;
-                    dlnm.AR_RH = model.AR_RH;
-                    dlnm.AR_LF = model.AR_LF;
-                    dlnm.AR_BOF = model.AR_BOF;
-                    dlnm.KLGangLong = model.KLGangLong;
-                    dlnm.KLThepPhe = model.KLThepPhe;
-                    dlnm.KLThepLong = model.KlThepLong;
-                    dlnm.IsChuyenCa = model.IsChuyenCa;
-                    dlnm.NgaySx = model.Ngay;
-                    dlnm.IsTrungMeThoi = isTrung;
-
-                    if (dlnm.TempKey == Guid.Empty)
-                        dlnm.TempKey = Guid.NewGuid();
-
-                    _context.DLNM_HRC2s.Update(dlnm);
-                }
-
-                // Lưu map
-                dlnmMap[model.RowKey] = dlnm;
-            }
-
-            // ====== SAVE 1 (lưu DLNM + IsTrung) ======
-            await _context.SaveChangesAsync();
-
-            // ====== XỬ LÝ PHỤ LIỆU ======
-            foreach (var model in models)
-            {
-                var dlnm = dlnmMap[model.RowKey];
-
-                // Xóa phụ liệu cũ
-                var oldPL = await _context.PhuLieu_HRC2s
-                    .Where(x => x.ID_MeThoi == dlnm.ID)
-                    .ToListAsync();
-
-                _context.PhuLieu_HRC2s.RemoveRange(oldPL);
-
-                // Thêm mới
-                foreach (var pl in model.hRC2_PhuLieus)
-                {
-                    _context.PhuLieu_HRC2s.Add(new PhuLieu_HRC2
-                    {
-                        BieuMau = model.BieuMau,
-                        MeThoi = model.MeThoi,
-                        ID_PhuLieu = pl.ID_PhuLieu,
-                        TenPhuLieu = pl.TenPhuLieu,
-                        KLPhuGia = pl.KLPhuGia,
-                        ID_HeaderKey = pl.ID_HeaderKey,
-                        TenHienThi = pl.TenHienThi,
-                        ID_MeThoi = dlnm.ID
-                    });
-                }
-            }
-
-            // SAVE 2 — lưu phụ liệu
-            await _context.SaveChangesAsync();
+            // Bước 3: kết hợp — cả 2 điều kiện phải true mới là "Đã hoàn thành"
+            return (phanBoComplete && relatedComplete) ? 2 : 1;
         }
 
 
@@ -822,8 +700,104 @@ namespace dataproduct.api.Business
 
             return null;
         }
+        private async Task CheckDuplicateAsync(JsonElement formData)
+        {
+            string? maBM = formData.TryGetProperty("maBm", out var mBm)
+                ? mBm.GetString()
+                : null;
 
+            if (string.IsNullOrEmpty(maBM))
+                return;
 
+            int Ca = formData.TryGetProperty("ca", out var ca)
+                ? ca.GetInt32()
+                : 0;
+
+            int? Scope = formData.TryGetProperty("scope", out var scope) && scope.ValueKind != JsonValueKind.Null
+                ? scope.GetInt32()
+                : null;
+
+            int? MayDuc = formData.TryGetProperty("mayduc", out var md) && md.ValueKind != JsonValueKind.Null
+                ? md.GetInt32()
+                : null;
+
+            DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var nsx) && nsx.ValueKind != JsonValueKind.Null
+                ? DateOnly.FromDateTime(nsx.GetDateTime())
+                : null;
+
+            if (!NgaySX.HasValue)
+                return;
+
+            bool exists = await _repo.CheckExistsAsync(maBM, NgaySX.Value, Ca, Scope, MayDuc);
+
+            if (exists)
+            {
+                throw new InvalidOperationException(
+                    $"Đã tồn tại phiếu {maBM} cho ngày {NgaySX:dd/MM/yyyy} ca {Ca}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Tra cứu Tbl_Kip theo NgaySX + Ca, nếu tìm thấy thì cập nhật Kip và Idkip trên phiếu.
+        /// </summary>
+        private async Task ResolveAndSaveKipAsync(BmPhieu? phieu)
+        {
+            if (phieu is null || !phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
+                return;
+
+            var kip = await _masterContext.Tbl_Kip
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.NgayLamViec == phieu.NgaySX.Value
+                                       && x.TenCa == phieu.Ca.Value.ToString());
+
+            if (kip is null)
+                return;
+
+            if (phieu.Kip == kip.TenKip && phieu.Idkip == kip.ID_Kip)
+                return;
+
+            phieu.Kip = kip.TenKip;
+            phieu.Idkip = kip.ID_Kip;
+            await _repo.UpdateAsync(phieu);
+        }
+
+        private async Task<List<string>> RunJsonInitializersAsync(BmPhieu? phieu)
+        {
+            var warnings = new List<string>();
+            if (phieu == null)
+                return warnings;
+
+            foreach (var initializer in _jsonInitializers)
+            {
+                if (initializer.CanHandle(phieu.MaBm))
+                {
+                    var w = await initializer.InitializeAsync(phieu);
+                    if (w?.Count > 0)
+                        warnings.AddRange(w);
+                }
+            }
+
+            return warnings;
+        }
+
+        private static void EnsurePhieuOperable(BmPhieu phieu)
+        {
+            if (phieu.IsDelete == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị xóa hoặc từ chối. Vui lòng quay về danh sách để tải lại dữ liệu mới nhất.");
+            }
+
+            if (phieu.IsLock == 1)
+            {
+                throw new InvalidOperationException("Phiếu đã bị khóa do đang có bản hiệu chỉnh. Vui lòng quay về danh sách để mở phiếu hợp lệ.");
+            }
+        }
+
+        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        {
+            return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
+        }
 
     }
 }

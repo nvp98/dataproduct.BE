@@ -1,4 +1,4 @@
-﻿using dataproduct.api.Business;
+using dataproduct.api.Business;
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +18,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID,int? NguoiDuyetID,int? isCheckDuyet)
+        public async Task<ActionResult<IEnumerable<PhieuDto>>> GetAll(string? MaBM, int? NguoiTaoID, int? NguoiDuyetID, int? isCheckDuyet)
             => Ok(await _service.GetAllAsync(MaBM, NguoiTaoID, NguoiDuyetID, isCheckDuyet));
 
         [HttpGet("{id}")]
@@ -47,18 +47,26 @@ namespace dataproduct.api.Controllers
             {
                 return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
             }
-             return Ok(new 
-                    { 
-                        success = true, 
-                        id = created.Idphieu
-                    });
+            return Ok(new
+            {
+                success = true,
+                id = created.Idphieu
+            });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] JsonElement formData)
         {
-            var ok = await _service.UpdateAsync(id, formData);
-            return ok != null ? NoContent() : NotFound();
+            try
+            {
+                var (phieu, warnings) = await _service.UpdateAsync(id, formData);
+                if (phieu == null) return NotFound();
+                return Ok(new { success = true, warnings });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{id}")]
@@ -71,8 +79,15 @@ namespace dataproduct.api.Controllers
         [HttpPost("{id}/clone")]
         public async Task<ActionResult<BmPhieu>> Clone(Guid id, [FromBody] JsonElement formData)
         {
-            var cloned = await _service.CloneAsync(id, formData);
-            return cloned != null ? Ok(cloned) : NotFound();
+            try
+            {
+                var cloned = await _service.CloneAsync(id, formData);
+                return cloned != null ? Ok(cloned) : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}/status")]
@@ -80,7 +95,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var ok = await _service.ChangeStatusAsync(id, request.Status);
+                var ok = await _service.ChangeStatusAsync(id, request.Status, request.IdUser);
                 return ok ? NoContent() : NotFound();
             }
             catch (Exception ex)
@@ -96,7 +111,7 @@ namespace dataproduct.api.Controllers
         [FromQuery] int? scope,
         [FromQuery] int? mayduc)
         {
-            var exists = await _service.CheckExistsAsync(maBm, ngaySX,ca,scope,mayduc);
+            var exists = await _service.CheckExistsAsync(maBm, ngaySX, ca, scope, mayduc);
             return Ok(new { exists });
         }
 
@@ -107,7 +122,7 @@ namespace dataproduct.api.Controllers
             {
                 var result = await _service.SearchWithPagingAsync(request);
 
-                return Ok(result );
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -115,29 +130,127 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        [HttpPost("{id:guid}/initialize")]
-        public async Task<IActionResult> Initialize(Guid id)
+        [HttpPost("search-by-user")]
+        public async Task<IActionResult> SearchByUser([FromBody] SearchPhieuByUserRequest request)
         {
-            var ok = await _service.InitializeAsync(id);
-            if (!ok)
-                return BadRequest(new { success = false, message = "Initialize thất bại" });
+            try
+            {
+                var result = await _service.SearchWithPagingByUserAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
 
-            return Ok(new { success = true });
+        [HttpGet("so-phieu")]
+        public async Task<IActionResult> GetSoPhieu([FromQuery] string maBm, [FromQuery] DateOnly? ngaySX, [FromQuery] int? ca)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(maBm))
+                    return BadRequest(new { message = "Thiếu tham số maBm" });
+
+                var soPhieus = await _service.GetSoPhieuAsync(maBm, ngaySX, ca);
+                return Ok(new
+                {
+                    success = true,
+                    data = soPhieus,
+                    count = soPhieus.Count()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id:guid}/export-pdf")]
+        public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
+        {
+            var file = await _service.ExportPdfDynamicAsync(id, filters);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpGet("export-excel-tonghop")]
+        public async Task<IActionResult> ExportExcelTongHop([FromQuery] string maBm, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate)
+        {
+            var file = await _service.ExportTongHopExcelDynamicAsync(maBm, fromDate, toDate);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpGet("{id:guid}/export-excel")]
+        public async Task<IActionResult> ExportExcelPhieu(Guid id)
+        {
+            var file = await _service.ExportExcelDynamicPhieuAsync(id);
+            return File(file.Content, file.ContentType, file.FileName);
         }
 
 
         [HttpPut("{id}/status-extended")]
         public async Task<IActionResult> UpdateStatusExtended(Guid id, [FromBody] UpdatePhieuStatusRequest request)
         {
-            var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
-            return ok ? NoContent() : NotFound();
+            try
+            {
+                var ok = await _service.UpdateStatusExtendedAsync(id, request.Status, request.IsLock, request.IsDelete);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("chot-nhieu-phieu")]
+        public async Task<IActionResult> ChotNhieuPhieu([FromBody] ChotNhieuPhieuRequest request)
+        {
+            try
+            {
+                await _service.ChotNhieuPhieuAsync(request.IdPhieus, request.IdUser, request.Status);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("hrc2-std-nxt/status")]
+        public async Task<IActionResult> GetStatusHRC2StdNxt([FromQuery] DateOnly ngaySX, [FromQuery] int ca)
+        {
+            var status = await _service.GetStatusHRC2_STD_NXT(ngaySX, ca);
+            return Ok(new { tinhTrang = status });
+        }
+
+        [HttpPut("{id}/sync-nguoi-tao")]
+        public async Task<IActionResult> SyncNguoiTao(Guid id, [FromBody] int? NguoiTaoID)
+        {
+            try
+            {
+                var result = await _service.UpdateNguoiTaoAsync(id, NguoiTaoID);
+                if (result == null)
+                {
+                    return BadRequest(new { success = false, message = "Đồng bộ người tạo thất bại. Kiểm tra dữ liệu đầu vào." });
+                }
+                return Ok(new { success = true, message = "Đồng bộ người tạo thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
+            }
         }
     }
-    
+
 
     public class ChangeStatusRequest
     {
         public int Status { get; set; }
+        public int? IdUser { get; set; }
     }
 
     public class UpdatePhieuStatusRequest
@@ -145,5 +258,12 @@ namespace dataproduct.api.Controllers
         public int? Status { get; set; }
         public int? IsLock { get; set; }
         public int? IsDelete { get; set; }
+    }
+
+    public class ChotNhieuPhieuRequest
+    {
+        public List<Guid> IdPhieus { get; set; } = new();
+        public int? IdUser { get; set; }
+        public int Status { get; set; }
     }
 }

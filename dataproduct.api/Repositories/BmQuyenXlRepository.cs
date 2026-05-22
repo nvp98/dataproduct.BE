@@ -46,6 +46,12 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public async Task AddRangeAsync(List<BmQuyenXl> entities)
+        {
+            await _context.BmQuyenXls.AddRangeAsync(entities);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task UpdateAsync(BmQuyenXl entity)
         {
             _context.BmQuyenXls.Update(entity);
@@ -62,16 +68,40 @@ namespace dataproduct.api.Repositories
             }
         }
 
+        public async Task DeleteRangeAsync(List<int> ids)
+        {
+            if (ids.Count == 0) return;
+            var entities = await _context.BmQuyenXls
+                .Where(x => ids.Contains(x.Id))
+                .ToListAsync();
+            if (entities.Count > 0)
+            {
+                _context.BmQuyenXls.RemoveRange(entities);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task DeleteByTaiKhoanAsync(int idTaiKhoan)
+        {
+            var entities = await _context.BmQuyenXls
+                .Where(x => x.IdTaiKhoan == idTaiKhoan)
+                .ToListAsync();
+            if (entities.Count > 0)
+            {
+                _context.BmQuyenXls.RemoveRange(entities);
+                await _context.SaveChangesAsync();
+            }
+        }
+
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.BmQuyenXls.AnyAsync(e => e.Id == id);
         }
 
-        public async Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, int? excludeId = null)
+        public async Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, string? khuVucPhu = null, int? excludeId = null)
         {
             var query = _context.BmQuyenXls.AsQueryable();
 
-            // Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc
             if (idTaiKhoan.HasValue)
                 query = query.Where(x => x.IdTaiKhoan == idTaiKhoan.Value);
             else
@@ -87,7 +117,16 @@ namespace dataproduct.api.Repositories
             else
                 query = query.Where(x => x.MaKhuVuc == null || x.MaKhuVuc == "");
 
-            // Loại trừ ID hiện tại khi update
+            if (quyenChucNang.HasValue)
+                query = query.Where(x => x.QuyenChucNang == quyenChucNang.Value);
+            else
+                query = query.Where(x => x.QuyenChucNang == null);
+
+            if (!string.IsNullOrEmpty(khuVucPhu))
+                query = query.Where(x => x.KhuVucPhu == khuVucPhu);
+            else
+                query = query.Where(x => x.KhuVucPhu == null || x.KhuVucPhu == "");
+
             if (excludeId.HasValue)
                 query = query.Where(x => x.Id != excludeId.Value);
 

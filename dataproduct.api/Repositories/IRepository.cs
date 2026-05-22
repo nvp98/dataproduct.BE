@@ -1,11 +1,37 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
+using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
 namespace dataproduct.api.Repositories
 {
+    public interface ICtdPhieuXuLyKphRepository
+    {
+        Task AddRangeAsync(List<CtdPhieuXuLyKph> entities);
+        Task DeleteByIdPhieuAsync(Guid idPhieu);
+        Task<List<CtdPhieuXuLyKph>> GetByIdPhieuAsync(Guid idPhieu);
+    }
+
+    public interface IBKKcscanBbxlSanxuatRepository
+    {
+        Task<IEnumerable<BkKcscanBbxlSanxuat>> GetAllAsync(DateOnly? ngaySX, string? ca, DateOnly? ngayXL, string? caXL, string? order, int? xuongCan);
+        Task<BkKcscanBbxlSanxuat?> GetByIdAsync(long id);
+    }
+
+    public interface IBkKcsBbxnSanLuongRepository
+    {
+        Task<IEnumerable<BkKcsBbxnSanLuong>> GetAllAsync(DateOnly? ngaySX, string? ca, string? sanPham, string? macThep, string? idXuongCan);
+        Task<BkKcsBbxnSanLuong?> GetByIdAsync(long id);
+        Task<IEnumerable<BkKcsBbxnSanLuong>> GetByIdPhieuAsync(Guid idPhieu);
+        Task UpdateAsync(BkKcsBbxnSanLuong entity);
+        Task UpdateRangeAsync(IEnumerable<BkKcsBbxnSanLuong> entities);
+        Task UpdatePhieuInfoAsync(IEnumerable<long> ids, Guid idPhieu, int tinhTrang);
+    }
+
     public interface IBKNguyenLieuRepository
     {
         Task<IEnumerable<BkNguyenLieu>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip);
@@ -18,6 +44,7 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID);
         Task<BmPhieu?> GetByIdAsync(Guid id);
+        Task<BmPhieu?> GetByIdPhieuChaAsync(Guid id);
         Task<BmPhieu> AddAsync([FromBody] JsonElement formData);
         Task UpdateAsync(BmPhieu entity);
         Task DeleteAsync(Guid id);
@@ -25,6 +52,8 @@ namespace dataproduct.api.Repositories
 
         Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc);
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
+        Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request);
+        Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
     }
     public interface IBMPheDuyetRepository
     {
@@ -34,13 +63,14 @@ namespace dataproduct.api.Repositories
         Task AddAsync(BmPheDuyet entity);
         Task UpdateAsync(BmPheDuyet entity);
         Task DeleteAsync(int id);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
         Task<bool> ExistsAsync(int id);
         Task AddListAsync(List<BmPheDuyet> pheDuyetList, Guid idphieu);
         Task<bool> UpdateTinhTrangAsync(Guid phieuId, int nguoiDuyetId, int tinhTrang);
     }
     public interface IBKPhoiThepRepository
     {
-        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
+        Task<IEnumerable<BkPhoiThep>> GetAllAsync(DateOnly? NgaySX, DateOnly? TuNgay, DateOnly? DenNgay, int? Ca, string? Kip, int? LoaiPhoi, int? MayDuc);
         Task<BkPhoiThep?> GetByIdAsync(int id);
         Task AddAsync(BkPhoiThep entity);
         Task UpdateAsync(BkPhoiThep entity);
@@ -64,6 +94,9 @@ namespace dataproduct.api.Repositories
         Task<(IEnumerable<DLNM_HRC2> Data, int TotalCount)> SearchWithPagingAsync(DateTime? NgaySX, int? Ca, string? LoaiBM, int? Scope, string? searchText, int page, int pageSize);
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
         Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca);
+        //Task<(IEnumerable<HRC2FilterThongKe> Data, int TotalCount)> SearchThongKeAsync(SearchThongKe dto);
+        Task<SearchThongKeApiResponse> SearchThongKeApiAsync(SearchThongKe dto);
+        Task<List<ThongKeSumItem>> GetThongKeSumAsync(SearchThongKe dto);
     }
     public interface IHeaderKeyRepository
     {
@@ -78,9 +111,11 @@ namespace dataproduct.api.Repositories
             string? LoaiPhieu,
             string? TrangThai,
             bool? IsUsedNXT,
+            bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
+            int? IdNhom,
             int page,
             int pageSize
         );
@@ -96,11 +131,16 @@ namespace dataproduct.api.Repositories
         Task DeleteByHeaderKeyAsync(int headerKeyId);
         Task<bool> ExistsAsync(int phuLieuId, int headerKeyId, int? excludeId = null);
     }
-    public interface ISTD_NXT_HRC2Repository{
+    public interface ISTD_NXT_HRC2Repository
+    {
         Task<STD_NXT_HRC2_UpsertResponse> UpsertAsync(STD_NXT_HRC2_UpsertDto entity);
         Task InitializeHRC2_STD_NXTAsync(BmPhieu phieu);
+        Task GetHRC2FilterInitAsync(InitXuatNhapTonHRC2Request request);
         Task<STD_NXT_HRC2_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
+        Task<STD_NXT_RelatedPhieuStatusResponse> GetRelatedPhieuStatusesAsync(STD_NXT_RelatedPhieuStatusRequest request);
         Task<bool> PhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC2_PhanBoDto entity);
+        Task<bool> KhongPhanBoAsync(STD_NXT_HRC2_KhongPhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
     }
@@ -113,19 +153,157 @@ namespace dataproduct.api.Repositories
         Task AddListAsync(List<CtdPhoiNong> entities);
         Task UpdateAsync(CtdPhoiNong entity);
         Task<int> UpdateStatusRangeAsync(List<CtdPhoiNongStatusUpdate> items);
-        Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me);
+        Task<int> UpdateStatusDone(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me, int? status);
         Task DeleteAsync(int id);
         Task<(int Created, int Updated)> UpsertListAsync(List<CtdPhoiNong> entities);
     }
+    //  Begin NM CTD 
+    public interface ICtdBMDucCTDRepository
+    {
+        Task<List<SanLuongPhoiDto>> GetSanLuongPhoiAsync(string ca, string kip, DateTime ngaySX);
+        Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoAsync(string ca, string kip, DateTime ngaySX, int mayduc);
+        Task<List<PhoinhapkhoNhanPhoiDto>> GetPhoiNhapKhoExportRangeAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<List<InsertSanLuongPhoiDto>> GetSanLuongPhoiChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task AddSanLuongPhoiListAsync(List<BM_SanLuongPhoi> entities);
+        Task DeleteSanLuongPhoiByPhieuAsync(Guid idPhieu);
+        Task<List<InsertPhoiNhapKhoDto>> GetPhoiNhapKhoChiTietAsync(int ca, string kip, DateTime ngaySX, int? mayDuc = null, Guid? idPhieu = null);
+        Task AddPhoiNhapKhoListAsync(List<BM_PhoiNhapKho> entities);
+        Task DeletePhoiNhapKhoByPhieuAsync(Guid idPhieu);
+
+        Task<List<BmPhieu>> GetDataAsync(DateOnly? fromDate, DateOnly? toDate);
+        Task<List<BmPhieu>> GetDataSanLuongPhoiAsync(DateOnly? fromDate, DateOnly? toDate);
+
+    }
+    //  End NM CTD 
+
+    public interface ICtdPhoiNguoiRepository
+    {
+        Task<IEnumerable<CtdPhoiNguoi>> GetByPhieuIdAsync(Guid phieuId);
+        Task AddAsync(CtdPhoiNguoi entity);
+        Task AddListAsync(List<CtdPhoiNguoi> entities);
+        Task DeleteByPhieuIdAsync(Guid phieuId);
+    }
+
+    public interface ICtdSoTheoDoiRepository
+    {
+        Task AddSoTheoDoiListAsync(List<CtdSoTheoDoi> entities);
+        Task AddDienBienListAsync(List<CtdStdDienBien> entities);
+        Task DeleteSoTheoDoiByPhieuIdAsync(Guid phieuId);
+        Task DeleteDienBienByPhieuIdAsync(Guid phieuId);
+        Task<List<CtdSoTheoDoi>> GetSoTheoDoiByPhieuIdAsync(Guid phieuId);
+        Task<List<CtdStdDienBien>> GetDienBienByPhieuIdAsync(Guid phieuId);
+    }
+
     public interface IBmQuyenXlRepository
     {
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
         Task<BmQuyenXl?> GetByIdAsync(int id);
         Task AddAsync(BmQuyenXl entity);
+        Task AddRangeAsync(List<BmQuyenXl> entities);
         Task UpdateAsync(BmQuyenXl entity);
         Task DeleteAsync(int id);
+        Task DeleteRangeAsync(List<int> ids);
+        Task DeleteByTaiKhoanAsync(int idTaiKhoan);
         Task<bool> ExistsAsync(int id);
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
-        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, int? excludeId = null);
+        /// <summary>
+        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang + KhuVucPhu.
+        /// </summary>
+        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, string? khuVucPhu = null, int? excludeId = null);
+    }
+
+    //  Begin láy thông tin người và chữ ký 
+
+    public interface IPheDuyetRepository
+    {
+        Task<List<BmPheDuyet>> GetBmPheDuyetByPhieuIdAsync(Guid phieuId);
+        Task<List<TaiKhoan>> GetTaiKhoanByIdsAsync(List<int> ids);
+        Task<List<PhongBan>> GetAllPhongBanAsync();
+        Task<List<ViTri>> GetAllViTriAsync();
+        Task<BmPheDuyet> InitializePheDuyetAsync(Guid phieuId, int capDuyet, int idNguoiDuyet);
+    }
+
+    // End
+    public interface ISiloRepository
+    {
+        Task<IEnumerable<Silo>> GetAllAsync();
+        Task<Silo?> GetByIdAsync(int id);
+        Task AddAsync(Silo entity);
+        Task UpdateAsync(Silo entity);
+        Task DeleteAsync(int id);
+        Task<(IEnumerable<Silo> Data, int TotalCount)> SearchMappingsWithPagingAsync(
+            string? searchKey,
+            int? scope,
+            bool? tinhTrang,
+            string? BieuMau,
+            int? nhaMay,
+            int page,
+            int pageSize
+        );
+        Task<bool> ExistsByTenSiloAsync(string tenSilo, int nhaMay, string bieuMau, int? scope, int? excludeId = null);
+        Task<List<SiloWithPhuLieuNmDto>> GetValidSilosAsync(
+                List<int> phuLieuNMIds,
+                DateTime ngaySX
+            );
+        Task<List<int>> GetPhuLieuNMInSiloAsync(
+            int siloId,
+            DateTime ngaySX
+        );
+        Task<bool> IsSiloContainPhuLieuNMAsync(
+            int siloId,
+            int phuLieuNMId,
+            DateTime ngaySX
+        );
+        // MapSiloPhuLieuNM methods
+        Task<List<MapSiloPhuLieuNMResponse>> GetMappingsBySiloIdAsync(int siloId);
+        Task<MapSiloPhuLieuNM?> GetMappingByIdAsync(int id);
+        Task<MapSiloPhuLieuNM> AddMappingAsync(MapSiloPhuLieuNM entity);
+        Task UpdateMappingAsync(MapSiloPhuLieuNM entity);
+        Task DeleteMappingAsync(int id);
+        Task<List<PhuLieu_NM>> GetAllPhuLieuNMAsync();
+        Task<(IEnumerable<PhuLieu_NM> Data, int TotalCount)> SearchPhuLieuNMWithPagingAsync(
+            string? searchKey,
+            int page,
+            int pageSize
+        );
+        Task<List<DTOs.SiloByHeaderKeyDto>> GetSilosByHeaderKeyAsync(
+            int headerKeyId,
+            DateTime ngaySX,
+            int nhaMay,
+            string? bieuMau
+        );
+    }
+
+    public interface IBBGN_ThepLongRepository
+    {
+        // Task<IEnumerable<BBGN_ThepLong>> GetAllAsync();
+        Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
+    }
+
+    public interface IMacThepRepository
+    {
+        Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, List<int>? idMayDucs = null);
+        Task<MacThep?> GetByIdAsync(int id);
+        Task AddAsync(MacThep entity);
+        Task UpdateAsync(MacThep entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsByTenAndMayDucAsync(string tenMacThep, List<int> idMayDucs, int? excludeId = null);
+    }
+
+    public interface IMacThep_MayDucRepository
+    {
+        Task<List<MacThep_MayDuc>> GetByMacThepIdAsync(int idMacThep);
+        Task<List<MacThep_MayDuc>> GetByMacThepIdsAsync(List<int> idMacTheps);
+        Task SetMayDucsAsync(int idMacThep, List<int> idMayDucs);
+    }
+
+    public interface IMayDucRepository
+    {
+        Task<IEnumerable<MayDuc>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMayDuc);
+        Task<MayDuc?> GetByIdAsync(int id);
+        Task AddAsync(MayDuc entity);
+        Task UpdateAsync(MayDuc entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsByTenAsync(string tenMayDuc, byte nhaMay, int? excludeId = null);
     }
 }

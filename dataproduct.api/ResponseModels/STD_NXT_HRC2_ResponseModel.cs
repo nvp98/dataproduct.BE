@@ -22,6 +22,8 @@ namespace dataproduct.api.ResponseModels
         public int Id_HeaderKey { get; set; }
         public string? TenNguyenLieu { get; set; }
         public int? ViTri { get; set; }
+        public int? IDSilo { get; set; }
+        public string? TenSilo { get; set; }
         public decimal? TonDauCa { get; set; }
         public string? TuongQuanDauCa { get; set; }
         public decimal? NhapVaoTrongCa { get; set; }
@@ -31,6 +33,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? TonCuoiCa { get; set; }
         public string? TuongQuanCuoiCa { get; set; }
         public decimal? TongThucTe { get; set; }
+        public decimal? LuongSuDungKiemKe { get; set; }
     }
 
     public class NXTSummaryResponseModel
@@ -43,6 +46,13 @@ namespace dataproduct.api.ResponseModels
         public decimal? TongSuDung { get; set; }
         public decimal? TongSDTrenSoSach { get; set; }
         public decimal? ChenhLech { get; set; }
+        public bool? HasPhanBo { get; set; }
+        public decimal? TyLeBOF { get; set; }
+        public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
+        public decimal? KLPB_BOF { get; set; }
+        public decimal? KLPB_TL { get; set; }
+        public decimal? KLPB_RH { get; set; }
     }
 }
 

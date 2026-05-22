@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Biên bản xác nhận sản lượng phôi thép</title>
+
+    <style>
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 13px;
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        .page {
+            padding: 20px 30px 0px 50px;
+        }
+
+        /* ================= HEADER ================= */
+        .header {
+            display: table;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .header-left,
+        .header-right {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+
+        .header-left {
+            font-weight: bold;
+        }
+
+            .header-left img {
+                height: 45px;
+                margin-bottom: 4px;
+            }
+
+            .header-left div {
+                text-transform: uppercase;
+                margin-top: 2px;
+            }
+
+        .header-right {
+            text-align: right;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* ===== TITLE ===== */
+        .title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 15px 0 5px 0;
+            text-transform: uppercase;
+        }
+
+        .sub-title {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        /* ===== CONTENT TEXT ===== */
+        .content {
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+            .content p {
+                margin: 4px 0;
+                font-size: 13px;
+            }
+        /* ===== NGƯỜI THAM GIA ===== */
+
+        .ds-nguoi {
+            margin-top: 5px;
+        }
+
+        .row-nguoi {
+            width: 100%;
+            margin-bottom: 4px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+            .row-nguoi span {
+                display: inline-block;
+                vertical-align: bottom;
+            }
+
+        /* Chia đúng theo khổ A4 lề trái 50px */
+
+        .col-1 {
+            width: 25%;
+        }
+
+        .col-2 {
+            width: 25%;
+        }
+
+        .col-3 {
+            width: 23%;
+        }
+
+        /* Dòng chấm */
+
+        .line {
+            display: inline-block;
+            width: 160px;
+            border-bottom: 1px #000;
+        }
+        /* ===== TABLE ===== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            border: 1px solid #000;
+            padding: 4px 3px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            font-weight: bold;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        /* ===== FOOTER ===== */
+        .note {
+            margin-top: 8px;
+        }
+        .note-ghichu .ghichu-title b {
+            text-decoration: underline;
+        }
+        .ghichu-title-subtitle {
+            margin-left: 35px;
+            line-height: 1;
+            font-style: italic;
+        }
+        .signatures {
+            margin-top: 45px;
+            display: flex;
+            justify-content: space-between;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .sign-box {
+            width: 30%;
+        }
+
+        .sign-name {
+            margin-top: 60px;
+        }
+
+        .sign-name {
+            height: 65px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+            .sign-name img {
+                max-height: 60px;
+            }
+
+        .sign-fullname {
+            margin-top: 5px;
+            font-weight: normal;
+            font-size: 13px;
+        }
+
+        table.sign-table,
+        table.sign-table td {
+            border: none !important;
+            border-collapse: collapse;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-left">
+                <img src="{{LogoUrl}}" alt="Logo" /><br />
+                <div>CÔNG TY CỔ PHẦN THÉP</div>
+                <div>HÒA PHÁT DUNG QUẤT</div>
+            </div>
+
+            <div class="header-right">
+                <div><b>BM.12/QT.05.11</b></div>
+                <div><b><i>Ngày hiệu lực:</i> 05/09/2025</b></div>
+                <div><b><i>Lần sửa đổi:</i> 02</b></div>
+            </div>
+        </div>
+
+        <!-- TITLE -->
+        <div class="title">
+            BIÊN BẢN <br> GIAO NHẬN PHÔI NHẬP KHO
+        </div>
+
+        <div class="sub-title">
+            <div class="kip-line">
+                Kíp: {{Ca}}{{Kip}} từ {{TuGio}} ngày {{TuNgay}}
+                đến {{DenGio}} ngày {{DenNgay}}
+            </div>
+            <div class="mayduc-line">
+                Máy đúc: {{MayDuc}}
+            </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+            <p>Chúng tôi gồm:</p>
+
+            <div class="ds-nguoi">
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        1. Ông/bà:
+                        <span class="line">{{NguoiGiao}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuGiao}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanGiao}}</span>
+                    </span>
+                </div>
+
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        2. Ông/bà:
+                        <span class="line">{{NguoiQLCL}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuQLCL}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanQLCL}}</span>
+                    </span>
+                </div>
+
+                <div class="row-nguoi">
+                    <span class="col-1">
+                        3. Ông/bà:
+                        <span class="line">{{NguoiNhan}}</span>
+                    </span>
+                    <span class="col-2">
+                        Chức vụ:
+                        <span class="line">{{ChucVuNhan}}</span>
+                    </span>
+                    <span class="col-3">
+                        BP:
+                        <span class="line">{{BoPhanNhan}}</span>
+                    </span>
+                </div>
+            </div>
+
+        <p>
+            Cùng nhau thống nhất lập “"Biên bản giao nhận phôi nhập kho” chi tiết như sau:
+        </p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">STT</th>
+                    <th rowspan="2">Mẻ</th>
+                    <th rowspan="2">Mác thép</th>
+                    <th rowspan="2">Kích thước</th>
+
+                    <th colspan="2">Loại I</th>
+                    <th colspan="2">Loại II BM</th>
+                    <th colspan="2">Loại II TPHH</th>
+
+                    <th colspan="3">Phôi ngắn - dài<br>(11m - 9m - 6m)</th>
+                    <th colspan="2">Loại III</th>
+                    <th rowspan="2">Tổng <br>  khối lượng (Tấn)</th>
+                </tr>
+                <tr>
+                    <th>Số <br> thanh</th>
+                    <th>Khối lượng<br>(Tấn)</th>
+
+                    <th>Số <br> thanh</th>
+                    <th>Khối lượng<br>(Tấn)</th>
+
+                    <th>Số <br> thanh</th>
+                    <th>Khối lượng<br>(Tấn)</th>
+
+                    <th>Số <br> thanh</th>
+                    <th>Chiều dài<br> (m)</th>
+                    <th>Khối lượng<br>(Tấn)</th>
+
+                    <th>Số <br> thanh</th>
+                    <th>Khối lượng<br>(Tấn)</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <!-- DÒNG DỮ LIỆU -->
+                {{Rows}}
+
+                <!-- TỔNG -->
+                <tr>
+                    <td colspan="2"><b>Tổng</b></td>
+                    <td></td>
+                    <td></td>
+                    <!-- Loại I -->
+                    <td><b>{{TongStLoai1}}</b></td>
+                    <td><b>{{TongKlLoai1}}</b></td>
+
+                    <!-- Loại II BM -->
+                    <td><b>{{TongStLoai2}}</b></td>
+                    <td><b>{{TongKlLoai2}}</b></td>
+
+                    <!-- Loại II TPHH -->
+                    <td><b>{{TongStLoai2TP}}</b></td>
+                    <td><b>{{TongKlLoai2TP}}</b></td>
+
+                    <!-- Phôi ngắn -->
+                    <td><b>{{TongStPhoiNgan}}</b></td>
+                    <td><b>{{TongCdPhoiNgan}}</b></td>
+                    <td><b>{{TongKlPhoiNgan}}</b></td>
+
+                    <!-- Loại III -->
+                    <td><b>{{TongStLoai3}}</b></td>
+                    <td><b>{{TongKlLoai3}}</b></td>
+
+                    <td><b>{{TongKhoiLuong}}</b></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- NOTE -->
+        <div class="note">
+            Biên bản này được lập thành 03 (ba) bản có giá trị như nhau, mỗi bên giữ 01 (một) bản để làm căn cứ.
+        </div>
+        <div class="note note-ghichu">
+            <p class="ghichu-title"><b><i>Ghi chú:</i></b></p>
+            <p class="ghichu-title-subtitle">- Tất cả phôi khi đã vào trong nhà máy cán, kể cả còn đang nằm trên bàn con lăn đều bàn giao ngay trong kíp, không để sang kíp sau.</p>
+            <p class="ghichu-title-subtitle">- Thời điểm xác nhận biên bản giao nhận phôi nóng ở thời điểm 8h00p và 20h00p.</pclass="ghichu-title">
+            <p class="ghichu-title-subtitle">- Trọng lượng trên được tính theo đơn trọng quy định và chiều dài thực.</p>
+            <p class="ghichu-title-subtitle">- Kích thước chỉ bao gồm các loại: Chiều dài chuẩn theo lệnh sản xuất, 6m, từ 9 - 12m.</p>
+        </div>
+
+        <table class="sign-table" style="width:100%; margin-top:20px; text-align:center;">
+            <tr>
+                <td style="width: 33%; font-weight: bold;">
+                    Kho phôi NM.HRC1
+                </td>
+                <td style="width: 33%; font-weight: bold;">
+                    P.QLCL
+                </td>
+                <td style="width: 33%; font-weight: bold;">
+                    Xưởng Đúc phôi vuông NM.HRC1
+                </td>
+            </tr>
+
+            <tr>
+                <td style="height:70px;">
+                    {{Sign_KhoPhoi}}
+                </td>
+                <td>
+                    {{Sign_QLCL}}
+                </td>
+                <td>
+                    {{Sign_XuongDuc}}
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_KhoPhoi}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_QLCL}}
+                </td>
+                <td style="padding-top:5px; font-weight:normal;">
+                    {{Name_XuongDuc}}
+                </td>
+            </tr>
+        </table>
+
+
+
+    </div>
+</body>
+</html>

@@ -23,6 +23,15 @@ namespace dataproduct.api.Utils
                 throw new Exception("Phiếu bị thu hồi, không thể không xác nhận");
             else if (newStatus == 5 && currentStatus != 2) 
                 throw new Exception("Phiếu chưa được duyệt, không thể chốt");
+            else if (newStatus == 7 && currentStatus == 5) 
+                throw new Exception("Phiếu đã được chốt, không thể đề nghị hiệu chỉnh");
+            else if (newStatus == 7 && currentStatus != 2 && currentStatus != 6) 
+                throw new Exception("Chỉ được đề nghị hiệu chỉnh khi phiếu ở trạng thái Hoàn thành hoặc Đang phê duyệt");
+            else if (newStatus == 3 && currentStatus == 2 )
+                throw new Exception("Phiếu đã được duyệt, vui lòng load lại và đề nghị hiệu chỉnh");
+            // Cho phép: DaGui (1) → DaThuHoi (3) thu hồi để sửa trực tiếp
+            // Clone từ 2/6: phiếu gốc chỉ IsLock=1; phiếu clone tạo với TinhTrang=7. Cho phép 7→1 khi Lưu và Gửi.
+            // Trạng thái 3 = Đã thu hồi (thu hồi từ Đã gửi, sửa trực tiếp). Trạng thái 7 = Hiệu chỉnh (phiếu clone, Lưu giữ 7, Gửi→1).
         }
     }
 }
