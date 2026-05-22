@@ -10,8 +10,8 @@ namespace dataproduct.api.Services.Exporters
             throw new NotSupportedException("Chưa hỗ trợ export detail Excel cho biểu mẫu này.");
         async Task<ExportFileResult> ExportExcelPhieuAsync(Guid phieuId)
         {
-            // Default: bỏ qua filters, chỉ export toàn bộ dữ liệu
-            return await ExportTongHopExcelAsync(null, null);
+            // Default: bỏ qua filters, export file trống
+            return await ExportDetailExcelAsync(phieuId);
         }
     }
 }
