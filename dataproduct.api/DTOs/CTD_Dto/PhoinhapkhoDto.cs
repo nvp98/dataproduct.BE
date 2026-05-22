@@ -60,6 +60,9 @@ namespace dataproduct.api.DTOs.CTD_Dto
 
         public int? TongSoThanh { get; set; }
         public decimal? TongKhoiLuong { get; set; }
+        public int? TinhTrangCap0 { get; set; }
+        public int? TinhTrangCap1 { get; set; }
+        public int? TinhTrangCap2 { get; set; }
     }
 
     public class InsertPhoiNhapKhoRequest

@@ -16,12 +16,7 @@ namespace dataproduct.api.Services.Exporters
             if (string.IsNullOrWhiteSpace(maBm))
                 return false;
 
-            return maBm.Equals("CTD_BB_GiaoNhanPhoiNhapKho", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("CTD_BB_PhoiNhapkho", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM12-QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM.12-QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM12/QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM.12/QT.05.11", StringComparison.OrdinalIgnoreCase);
+            return maBm.Equals("HRC1_BB_GiaoNhanPhoiNhapKho", StringComparison.OrdinalIgnoreCase);
         }
 
         public Task<ExportFileResult> ExportPdfAsync(Guid phieuId)

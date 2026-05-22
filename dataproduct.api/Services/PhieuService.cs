@@ -75,6 +75,21 @@ namespace dataproduct.api.Business
             return await exporter.ExportPdfAsync(phieuId);
         }
 
+        public async Task<DTOs.Export.ExportFileResult> ExportExcelDynamicPhieuAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export excel cho biểu mẫu: {phieu.MaBm}");
+
+
+            return await exporter.ExportExcelPhieuAsync(phieuId);
+        }
+
+
         public async Task<DTOs.Export.ExportFileResult> ExportTongHopExcelDynamicAsync(string? maBm, DateOnly? fromDate, DateOnly? toDate)
         {
             if (string.IsNullOrWhiteSpace(maBm))
@@ -86,6 +101,7 @@ namespace dataproduct.api.Business
 
             return await exporter.ExportTongHopExcelAsync(fromDate, toDate);
         }
+
 
         public async Task<DTOs.Export.ExportFileResult> ExportDetailExcelDynamicAsync(Guid phieuId)
         {

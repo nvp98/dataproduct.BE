@@ -180,6 +180,13 @@ namespace dataproduct.api.Controllers
             return File(file.Content, file.ContentType, file.FileName);
         }
 
+        [HttpGet("{id:guid}/export-excel")]
+        public async Task<IActionResult> ExportExcelPhieu(Guid id)
+        {
+            var file = await _service.ExportExcelDynamicPhieuAsync(id);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
 
         [HttpPut("{id}/status-extended")]
         public async Task<IActionResult> UpdateStatusExtended(Guid id, [FromBody] UpdatePhieuStatusRequest request)
