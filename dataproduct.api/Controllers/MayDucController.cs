@@ -33,7 +33,7 @@ namespace dataproduct.api.Controllers
             var data = ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(x => new { x.Id, x.TenMayDuc, x.NhaMay, x.IsLock });
+                .Select(x => new { x.Id, x.TenMayDuc, x.NhaMay, x.IsLock, x.LoaiMayDuc });
 
             return Ok(new
             {

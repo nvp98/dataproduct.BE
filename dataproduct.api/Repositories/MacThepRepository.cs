@@ -62,6 +62,7 @@ namespace dataproduct.api.Repositories
                 query = query.Where(m => m.IdMacThep != excludeId.Value);
             return query.AnyAsync();
         }
+
     }
 }
 

@@ -84,10 +84,11 @@ namespace dataproduct.api.DTOs
         /// </summary>
         public int? UserId { get; set; }
         /// <summary>
-        /// Vùng hiển thị trên UI:
-        /// 1 = Việc tôi bắt đầu (quyền 1|4): MaBm được phép và (NguoiTaoId==userId OR TinhTrang==0)
-        /// 2 = Việc đến tôi    (quyền 2|4): MaBm được phép và user có dòng BmPheDuyets (CapDuyet khác null và khác 0); (quyền 5): tất cả phiếu của MaBm
-        /// 3 = Thống kê        (IsThongKeUser==true): tất cả phiếu, không filter user
+        /// Vùng hiển thị trên UI (đối chiếu với field vung trong menuConfig FE):
+        /// 1 = Việc tôi bắt đầu (quyền 1|4): MaBm+MaKhuVuc→Scope được phép, NguoiTaoId==userId hoặc TinhTrang==0|7
+        /// 2 = Việc đến tôi    (quyền 2|4): MaBm+MaKhuVuc→Scope được phép, user có dòng BmPheDuyets (CapDuyet != 0)
+        /// 3 = Chỉ xem        (quyền 5):   MaBm+MaKhuVuc→Scope được phép, TinhTrang != 0
+        /// 4 = Thống kê       (IsThongKeUser==true): tất cả phiếu, không filter user
         /// null → coi như 1 (tương thích client cũ)
         /// </summary>
         public int? LoaiVung { get; set; }

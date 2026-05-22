@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace dataproduct.api.DTOs
 {
+    public class SearchMeThoiRequest
+    {
+        public int NhaMay { get; set; }
+        public string? TextStr { get; set; }
+        public List<int>? ID_LoThois { get; set; }
+    }
+
     public class FetchMeThoiRequest
     {
         public DateOnly NgaySX { get; set; }
@@ -52,7 +59,9 @@ namespace dataproduct.api.DTOs
         public string? ThungSo { get; set; }
         public string? TinhLuyenLenThang { get; set; }
         public string? PhanLoai { get; set; }
+        public string? PhanLoaiNhom { get; set; }
         public bool? IsTrungMeThoi { get; set; }
+        public bool? IsThuNghiem { get; set; }
         public string? BieuMau { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
@@ -62,6 +71,23 @@ namespace dataproduct.api.DTOs
     {
         public int TotalRows { get; set; }
         public decimal? TotalKlThepLong { get; set; }
+    }
+
+    public class TongHopItem
+    {
+        public string Label { get; set; } = null!;
+        public int SoMe { get; set; }
+    }
+
+    public class TongHopBBGNThepLongResponse
+    {
+        public List<TongHopItem> PhanLoai { get; set; } = new();
+        public List<TongHopItem> Ca { get; set; } = new();
+        public List<TongHopItem> Kip { get; set; } = new();
+        public List<TongHopItem> TinhLuyenLenThang { get; set; } = new();
+        public List<TongHopItem> DucVuong { get; set; } = new();
+        public List<TongHopItem> DucTam { get; set; } = new();
+        public List<TongHopItem> NhomPhanLoaiMacThep { get; set; } = new();
     }
 }
 

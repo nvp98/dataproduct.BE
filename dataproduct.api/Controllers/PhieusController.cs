@@ -59,8 +59,9 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var ok = await _service.UpdateAsync(id, formData);
-                return ok != null ? NoContent() : NotFound();
+                var (phieu, warnings) = await _service.UpdateAsync(id, formData);
+                if (phieu == null) return NotFound();
+                return Ok(new { success = true, warnings });
             }
             catch (InvalidOperationException ex)
             {
@@ -143,6 +144,28 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpGet("so-phieu")]
+        public async Task<IActionResult> GetSoPhieu([FromQuery] string maBm, [FromQuery] DateOnly? ngaySX, [FromQuery] int? ca)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(maBm))
+                    return BadRequest(new { message = "Thiếu tham số maBm" });
+
+                var soPhieus = await _service.GetSoPhieuAsync(maBm, ngaySX, ca);
+                return Ok(new
+                {
+                    success = true,
+                    data = soPhieus,
+                    count = soPhieus.Count()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
         {
@@ -154,6 +177,13 @@ namespace dataproduct.api.Controllers
         public async Task<IActionResult> ExportExcelTongHop([FromQuery] string maBm, [FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate)
         {
             var file = await _service.ExportTongHopExcelDynamicAsync(maBm, fromDate, toDate);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+
+        [HttpGet("{id:guid}/export-excel")]
+        public async Task<IActionResult> ExportExcelPhieu(Guid id)
+        {
+            var file = await _service.ExportExcelDynamicPhieuAsync(id);
             return File(file.Content, file.ContentType, file.FileName);
         }
 

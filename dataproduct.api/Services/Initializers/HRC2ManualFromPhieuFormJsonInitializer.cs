@@ -23,13 +23,14 @@ namespace dataproduct.api.Services.Initializers
                 || maBm.Equals("HRC2_BB_NauLuyen_RH", StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task InitializeAsync(BmPhieu phieu)
+        public async Task<List<string>> InitializeAsync(BmPhieu phieu)
         {
             if (string.IsNullOrWhiteSpace(phieu.DataJson))
-                return;
+                return new List<string>();
 
             using var doc = JsonDocument.Parse(phieu.DataJson);
             await _dlnmHrc2Service.SaveHRC2ManualFromPhieuFormAsync(doc.RootElement);
+            return new List<string>();
         }
     }
 }

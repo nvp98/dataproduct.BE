@@ -45,7 +45,7 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID);
         Task<BmPhieu?> GetByIdAsync(Guid id);
-        Task<BmPhieu?> GetPhieuByIdAsync(Guid id);
+        Task<BmPhieu?> GetByIdPhieuChaAsync(Guid id);
         Task<BmPhieu> AddAsync([FromBody] JsonElement formData);
         Task UpdateAsync(BmPhieu entity);
         Task DeleteAsync(Guid id);
@@ -55,6 +55,7 @@ namespace dataproduct.api.Repositories
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
         Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync();
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request);
+        Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
     }
     public interface IBMPheDuyetRepository
     {
@@ -116,6 +117,7 @@ namespace dataproduct.api.Repositories
             DateTime? FromDate,
             DateTime? ToDate,
             string? SortThuTu,
+            int? IdNhom,
             int page,
             int pageSize
         );
@@ -199,14 +201,17 @@ namespace dataproduct.api.Repositories
         Task<IEnumerable<BmQuyenXl>> GetAllAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc);
         Task<BmQuyenXl?> GetByIdAsync(int id);
         Task AddAsync(BmQuyenXl entity);
+        Task AddRangeAsync(List<BmQuyenXl> entities);
         Task UpdateAsync(BmQuyenXl entity);
         Task DeleteAsync(int id);
+        Task DeleteRangeAsync(List<int> ids);
+        Task DeleteByTaiKhoanAsync(int idTaiKhoan);
         Task<bool> ExistsAsync(int id);
         Task<IEnumerable<BmQuyenXl>> GetByTaiKhoanIdAsync(int idTaiKhoan);
         /// <summary>
-        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang.
+        /// Kiểm tra trùng lặp theo IdTaiKhoan + MaBm + MaKhuVuc + QuyenChucNang + KhuVucPhu.
         /// </summary>
-        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, int? excludeId = null);
+        Task<bool> CheckDuplicateAsync(int? idTaiKhoan, string? maBm, string? maKhuVuc, byte? quyenChucNang, string? khuVucPhu = null, int? excludeId = null);
     }
 
     //  Begin láy thông tin người và chữ ký 

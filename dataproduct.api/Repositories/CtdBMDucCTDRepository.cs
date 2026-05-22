@@ -205,7 +205,10 @@ namespace dataproduct.api.Repositories
                     KlLoai3 = x.KlLoai3,
 
                     TongSoThanh = x.TongSoThanh,
-                    TongKhoiLuong = x.TongKhoiLuong
+                    TongKhoiLuong = x.TongKhoiLuong,
+                    TinhTrangCap0 = x.TinhTrangCap0,
+                    TinhTrangCap1 = x.TinhTrangCap1,
+                    TinhTrangCap2 = x.TinhTrangCap2
                 })
                 .ToListAsync();
         }

@@ -32,4 +32,8 @@ public partial class Header_Key
     public int? ThuTu_Excel_BOF { get; set; }
     /// <summary>Thứ tự hiển thị trong Excel LF/RH</summary>
     public int? ThuTu_Excel_LFRH { get; set; }
+
+    /// <summary>FK → Header_Nhom.Id. Khi có giá trị, Header_Key này bị ẩn khỏi cột riêng;
+    /// giá trị được cộng vào cột nhóm (IDHeaderKey = -Header_Nhom.Id).</summary>
+    public int? ID_NhomKey { get; set; }
 }

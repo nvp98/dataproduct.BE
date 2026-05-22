@@ -52,5 +52,10 @@ public class STD_NXT_TOTAL_HRC2
 
     [Column(TypeName = "decimal(18,3)")]
     public decimal? KLPB_TL { get; set; }
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? TyLeRH { get; set; }
+
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLPB_RH { get; set; }
 }
 

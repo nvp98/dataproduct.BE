@@ -35,9 +35,10 @@ namespace dataproduct.api.Services
             if (await _repo.ExistsByTenAsync(entity.TenMayDuc, entity.NhaMay, id))
                 throw new InvalidOperationException("Tên máy đúc đã tồn tại trong nhà máy này.");
 
-            existing.TenMayDuc = entity.TenMayDuc;
-            existing.NhaMay = entity.NhaMay;
-            existing.IsLock = entity.IsLock;
+            existing.TenMayDuc   = entity.TenMayDuc;
+            existing.NhaMay      = entity.NhaMay;
+            existing.IsLock      = entity.IsLock;
+            existing.LoaiMayDuc  = entity.LoaiMayDuc;
             await _repo.UpdateAsync(existing);
             return true;
         }

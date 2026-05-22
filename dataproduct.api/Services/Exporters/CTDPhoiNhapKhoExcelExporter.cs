@@ -16,12 +16,7 @@ namespace dataproduct.api.Services.Exporters
             if (string.IsNullOrWhiteSpace(maBm))
                 return false;
 
-            return maBm.Equals("CTD_BB_GiaoNhanPhoiNhapKho", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("CTD_BB_PhoiNhapkho", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM12-QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM.12-QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM12/QT.05.11", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("BM.12/QT.05.11", StringComparison.OrdinalIgnoreCase);
+            return maBm.Equals("HRC1_BB_GiaoNhanPhoiNhapKho", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<ExportFileResult> ExportTongHopExcelAsync(DateOnly? fromDate, DateOnly? toDate)
@@ -31,6 +26,17 @@ namespace dataproduct.api.Services.Exporters
             {
                 Content = content,
                 FileName = $"TongHopPhoiNhapKho_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
+        }
+
+        public async Task<ExportFileResult> ExportExcelPhieuAsync(Guid phieuId)
+        {
+            var content = await _service.ExportExcelPhoiNhapKhoByPhieuAsync(phieuId);
+            return new ExportFileResult
+            {
+                Content = content,
+                FileName = $"ChiTietPhoiNhapKho_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }

@@ -177,6 +177,9 @@ namespace dataproduct.api.Services
                 .OrderBy(g => g.Key);
 
             int globalStt = 1;
+            decimal totalBo = groupedData.Sum(g => g.Sum(x => x.SoBo ?? 0));
+            double totalKl = groupedData.Sum(g => g.Sum(x => x.KhoiLuong ?? 0));
+            decimal totalThanh = groupedData.Sum(g => g.Sum(x => x.SoThanh ?? 0));
             foreach (var group in groupedData)
             {
                 // Dòng header loại
@@ -219,6 +222,15 @@ namespace dataproduct.api.Services
                 <td></td>
             </tr>");
             }
+            // them tong cong san luong
+            rows.Append($@"
+            <tr style='font-weight: bold; '>
+                <td colspan='4' class='text-left'>Tổng sản lượng</td>
+                <td class='text-right'>{totalBo:N0}</td>
+                <td class='text-right'>{totalKl:N0}</td>
+                <td class='text-right'>{totalThanh:N0}</td>
+                <td></td>
+            </tr>");
 
             // Lấy logo URL
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
@@ -241,7 +253,7 @@ namespace dataproduct.api.Services
             if (pheDuyetList.Any())
             {
                 // CapDuyet: 1=Trưởng kíp, 2=Trưởng KCS, 3=Thủ kho
-                var duyet0 = pheDuyetList.FirstOrDefault(x => x.CapDuyet == 0);
+                var duyet0 = pheDuyetList.FirstOrDefault(x => x.CapDuyet == 1);
                 if (duyet0 != null)
                 {
                     signTruongKip = _pheDuyetService.FormatChuKy(duyet0.ChuKy) ?? "";
@@ -250,7 +262,7 @@ namespace dataproduct.api.Services
                     bpTruongKip = duyet0.TenPhongBan ?? "";
                 }
 
-                var duyet1 = pheDuyetList.FirstOrDefault(x => x.CapDuyet == 1);
+                var duyet1 = pheDuyetList.FirstOrDefault(x => x.CapDuyet == 0);
                 if (duyet1 != null)
                 {
                     signTruongKCS = _pheDuyetService.FormatChuKy(duyet1.ChuKy) ?? "";
