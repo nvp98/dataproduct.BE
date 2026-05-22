@@ -49,8 +49,10 @@ namespace dataproduct.api.ResponseModels
         public bool? HasPhanBo { get; set; }
         public decimal? TyLeBOF { get; set; }
         public decimal? TyLeTinhLuyen { get; set; }
+        public decimal? TyLeRH { get; set; }
         public decimal? KLPB_BOF { get; set; }
         public decimal? KLPB_TL { get; set; }
+        public decimal? KLPB_RH { get; set; }
     }
 }
 
