@@ -350,86 +350,86 @@ namespace dataproduct.api.Repositories
             switch (loaiVung)
             {
                 case 1: // Việc tôi bắt đầu — quyền 1|4, lọc MaKhuVuc → Scope
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
-                    query = query.Where(x =>
-                        x.MaBm != null &&
-                        _context.BmQuyenXls.Any(q =>
-                            q.IdTaiKhoan == userId &&
-                            q.MaBm == x.MaBm &&
-                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
-                            (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
-                        ) &&
-                        (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3)
-                    );
-                    break;
-                }
+                        query = query.Where(x =>
+                            x.MaBm != null &&
+                            _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                            ) &&
+                            (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3)
+                        );
+                        break;
+                    }
 
                 case 2: // Việc đến tôi — quyền 2|4 (BmPheDuyets), lọc MaKhuVuc → Scope
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
-                    var bbgnThepLongMaBms = new[] { "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong" };
+                        var bbgnThepLongMaBms = new[] { "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong" };
 
-                    query = query.Where(x =>
-                        x.MaBm != null &&
-                        _context.BmQuyenXls.Any(q =>
-                            q.IdTaiKhoan == userId &&
-                            q.MaBm == x.MaBm &&
-                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
-                            (q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
-                        ) &&
-                        _context.BmPheDuyets.Any(pd =>
-                            pd.PhieuId == x.Idphieu &&
-                            pd.CapDuyet != null && pd.CapDuyet != 0 &&
-                            pd.NguoiDuyetId == userId
-                        ) &&
-                        (
-                            x.TinhTrang != 0
-                            || (
-                                // Riêng BBGN thép lỏng: trả về kể cả TinhTrang=0 nếu user có trong BmPheDuyets
-                                bbgnThepLongMaBms.Contains(x.MaBm) &&
-                                _context.BmPheDuyets.Any(pd =>
-                                    pd.PhieuId == x.Idphieu &&
-                                    pd.NguoiDuyetId == userId)
+                        query = query.Where(x =>
+                            x.MaBm != null &&
+                            _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                (q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
+                            ) &&
+                            _context.BmPheDuyets.Any(pd =>
+                                pd.PhieuId == x.Idphieu &&
+                                pd.CapDuyet != null && pd.CapDuyet != 0 &&
+                                pd.NguoiDuyetId == userId
+                            ) &&
+                            (
+                                x.TinhTrang != 0
+                                || (
+                                    // Riêng BBGN thép lỏng: trả về kể cả TinhTrang=0 nếu user có trong BmPheDuyets
+                                    bbgnThepLongMaBms.Contains(x.MaBm) &&
+                                    _context.BmPheDuyets.Any(pd =>
+                                        pd.PhieuId == x.Idphieu &&
+                                        pd.NguoiDuyetId == userId)
+                                )
                             )
-                        )
-                    );
-                    break;
-                }
+                        );
+                        break;
+                    }
 
                 case 3: // Chỉ xem — quyền 5, lọc MaKhuVuc → Scope
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
-                    query = query.Where(x =>
-                        x.MaBm != null &&
-                        _context.BmQuyenXls.Any(q =>
-                            q.IdTaiKhoan == userId &&
-                            q.MaBm == x.MaBm &&
-                            (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
-                            q.QuyenChucNang == 5
-                        )
-                    );
-                    break;
-                }
+                        query = query.Where(x =>
+                            x.MaBm != null &&
+                            _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                q.QuyenChucNang == 5
+                            )
+                        );
+                        break;
+                    }
 
                 case 4: // Thống kê — chỉ PKH / Admin, không filter theo user
-                {
-                    if (request.IsThongKeUser != true)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-                    break;
-                }
+                    {
+                        if (request.IsThongKeUser != true)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        break;
+                    }
 
                 default:
                     return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
@@ -469,17 +469,17 @@ namespace dataproduct.api.Repositories
 
             var result = data.Select(x => new SearchPhieuResponseModel
             {
-                Idphieu    = x.Idphieu,
-                SoPhieu    = x.SoPhieu,
-                MaBm       = x.MaBm,
-                NgaySX     = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
-                Ca         = x.Ca,
-                Kip        = x.Kip,
-                Scope      = x.Scope,
-                MayDuc     = x.MayDuc,
-                TinhTrang  = x.TinhTrang,
-                NguoiTao   = x.NguoiTaoId,
-                TenScope   = x.TenScope
+                Idphieu = x.Idphieu,
+                SoPhieu = x.SoPhieu,
+                MaBm = x.MaBm,
+                NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
+                Ca = x.Ca,
+                Kip = x.Kip,
+                Scope = x.Scope,
+                MayDuc = x.MayDuc,
+                TinhTrang = x.TinhTrang,
+                NguoiTao = x.NguoiTaoId,
+                TenScope = x.TenScope
             }).ToList();
 
             foreach (var item in result)
@@ -516,14 +516,14 @@ namespace dataproduct.api.Repositories
         public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             var query = _context.BmPhieus
-                .Where(x => x.IsDelete != 1 && x.IsLock != 1 && x.MaBm == maBm)
+                .Where(x => x.MaBm == maBm)
                 .AsQueryable();
 
             if (ngaySX.HasValue)
                 query = query.Where(x => x.NgaySX == ngaySX.Value);
 
-            if (ca.HasValue)
-                query = query.Where(x => x.Ca == ca.Value);
+            // if (ca.HasValue)
+            //     query = query.Where(x => x.Ca == ca.Value);
 
             var result = await query
                 .OrderByDescending(x => x.NgaySX)
