@@ -26,7 +26,7 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.NgayXL == ngayXL.Value || x.NgayXL == null);
 
             if (!string.IsNullOrWhiteSpace(caXL))
-                query = query.Where(x => x.CaXL != null && x.CaXL.Contains(caXL));
+                query = query.Where(x => (x.CaXL != null && x.CaXL.Contains(caXL)) || x.CaXL == null);
 
             if (!string.IsNullOrWhiteSpace(order))
                 query = query.Where(x => x.Order == order);
