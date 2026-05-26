@@ -326,6 +326,7 @@ namespace dataproduct.api.Repositories
                     TenNVL = nvl != null
                         ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
                         : c.TenNVL,
+                    TenNVLTk = nvl != null ? nvl.TenNVL_Tk : null,
                     KLTonCuoiKip = c.KLTonCuoiKip,
                     ManualKL = c.ManualKL,
                     KLGoc = c.KLGoc,

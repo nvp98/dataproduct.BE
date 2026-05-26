@@ -138,6 +138,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int? IDNVL { get; set; }
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
+        public string? TenNVLTk { get; set; }
         public decimal? KLTonCuoiKip { get; set; }
         public bool ManualKL { get; set; }
         public decimal? KLGoc { get; set; }

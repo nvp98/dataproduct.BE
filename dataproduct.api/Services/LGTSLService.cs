@@ -221,6 +221,25 @@ namespace dataproduct.api.Services
                 });
             }
 
+            // Backfill IDNVL từ mapping khi row không có idNVL
+            var needLookup = items.Where(x => x.IDNVL == null).ToList();
+            if (needLookup.Any())
+            {
+                // Tải mapping của ngày/ca/lò cao này một lần
+                var mappings = await _repo.GetMappingListAsync(idLoCao, ngay, ca);
+                // m.ID = IDMapping (PK), m.IDSiLo = ThuTu của silo
+                var mappingById   = mappings.ToDictionary(m => m.ID);
+                var mappingBySilo = mappings.ToDictionary(m => m.IDSiLo);
+
+                foreach (var item in needLookup)
+                {
+                    if (item.IDMapping.HasValue && mappingById.TryGetValue(item.IDMapping.Value, out var m1))
+                        item.IDNVL = m1.IDNVL;
+                    else if (mappingBySilo.TryGetValue(item.IDSiLo, out var m2))
+                        item.IDNVL = m2.IDNVL;
+                }
+            }
+
             // Replace mode: luôn xóa dữ liệu cũ của phiếu trước khi ghi mới.
             await _repo.DeleteByPhieuIdAsync(phieu.Idphieu);
 
@@ -274,27 +293,31 @@ namespace dataproduct.api.Services
 
         // ─── Export PDF ──────────────────────────────────────────────────────────
 
-        public async Task<ExportFileResult> ExportTonSiloPdfAsync(Guid idPhieu, List<PheDuyetDto> pheDuyets)
+        public async Task<ExportFileResult> ExportTonSiloPdfAsync(Guid idPhieu, List<PheDuyetDto> pheDuyets, bool useKeHoachName = false)
         {
             var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
                 ?? throw new Exception("Không tìm thấy phiếu.");
 
-            if (string.IsNullOrWhiteSpace(phieu.DataJson))
-                throw new Exception("Phiếu không có dữ liệu JSON.");
+            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+            var firstRow = chiTiet.FirstOrDefault();
 
-            using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
-            var root = jsonDoc.RootElement;
+            var ngay  = firstRow?.Ngay ?? DateTime.MinValue;
+            var ca    = firstRow?.Ca ?? 0;
+            var scope = firstRow?.IDLoCao ?? 0;
 
-            var ngayStr = TryGetString(root, "NgaySX", "ngaySX", "ngay");
-            var ca = TryGetInt(root, "ca", "Ca") ?? 0;
-            var scope = TryGetInt(root, "scope", "Scope", "idLoCao") ?? 0;
-
-            DateTime.TryParse(ngayStr, out var ngay);
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var caLabel = ca == 1 ? "1" : ca == 2 ? "2" : $"Ca {ca}";
             var loCao = scope > 0 ? scope.ToString() : "";
 
-            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+            // Bảng tra cứu TenNVL_Tk theo tên NM, dùng làm fallback khi IDNVL null
+            var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+            var nvlTkByName = nvlList
+                .Where(n => !string.IsNullOrWhiteSpace(n.TenNVL))
+                .GroupBy(n => n.TenNVL!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().TenNVLTk, StringComparer.OrdinalIgnoreCase);
+            var nvlTkById = nvlList
+                .Where(n => n.ID > 0)
+                .ToDictionary(n => n.ID, n => n.TenNVLTk);
 
             var rows = new StringBuilder();
             decimal tongKL = 0;
@@ -304,11 +327,22 @@ namespace dataproduct.api.Services
                 stt++;
                 tongKL += c.KLTonCuoiKip ?? 0;
 
+                // Ưu tiên: TenNVLTk từ JOIN theo IDNVL → fallback tra theo TenNVL
+                var tenNvlTk = c.TenNVLTk;
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IDNVL.HasValue && nvlTkById.TryGetValue(c.IDNVL.Value, out var tkById))
+                    tenNvlTk = tkById;
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && !string.IsNullOrWhiteSpace(c.TenNVL) && nvlTkByName.TryGetValue(c.TenNVL!, out var tkByName))
+                    tenNvlTk = tkByName;
+
+                var tenNvlLabel = useKeHoachName && !string.IsNullOrWhiteSpace(tenNvlTk)
+                    ? tenNvlTk!
+                    : c.TenNVL ?? "";
+
                 rows.Append($@"
                     <tr>
                         <td class=""text-center"">{stt}</td>
                         <td class=""text-center"">{c.TenSiLo ?? ""}</td>
-                        <td class=""text-center"">{c.TenNVL ?? ""}</td>
+                        <td class=""text-center"">{tenNvlLabel}</td>
                         <td class=""text-center"">
                             {(c.KLTonCuoiKip.HasValue ? c.KLTonCuoiKip.Value.ToString("N3") : "")}
                         </td>

@@ -266,12 +266,12 @@ namespace dataproduct.api.Controllers
         // ─── Export PDF ───────────────────────────────────────────────────────────
 
         [HttpGet("export-pdf/{idPhieu}")]
-        public async Task<IActionResult> ExportPdf(Guid idPhieu)
+        public async Task<IActionResult> ExportPdf(Guid idPhieu, [FromQuery] bool useKeHoachName = false)
         {
             try
             {
                 var pheDuyets = await _pdservice.GetPheDuyetPhieuAsync(idPhieu);
-                var file = await _service.ExportTonSiloPdfAsync(idPhieu, pheDuyets);
+                var file = await _service.ExportTonSiloPdfAsync(idPhieu, pheDuyets, useKeHoachName);
                 return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }

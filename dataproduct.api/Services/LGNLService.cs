@@ -445,28 +445,22 @@ namespace dataproduct.api.Services
 
         // ─── Export PDF ──────────────────────────────────────────────────────────
 
-        public async Task<ExportFileResult> ExportNapLieuPdfAsync(Guid idPhieu, List<PheDuyetDto> pheDuyets)
+        public async Task<ExportFileResult> ExportNapLieuPdfAsync(Guid idPhieu, List<PheDuyetDto> pheDuyets, bool useKeHoachName = false)
         {
             var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
                 ?? throw new Exception("Không tìm thấy phiếu.");
 
-            if (string.IsNullOrWhiteSpace(phieu.DataJson))
-                throw new Exception("Phiếu không có dữ liệu JSON.");
+            // Lấy chi tiết và NVL
+            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+            var firstRow = chiTiet.FirstOrDefault();
 
-            using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
-            var root = jsonDoc.RootElement;
+            var ngay    = firstRow?.Ngay ?? DateTime.MinValue;
+            var ca      = firstRow?.IDCa ?? 0;
+            var scope   = firstRow?.IDLoCao ?? 0;
 
-            var ngayStr  = TryGetString(root, "NgaySX", "ngaySX", "ngay");
-            var ca       = TryGetInt(root, "ca", "Ca") ?? 0;
-            var scope    = TryGetInt(root, "scope", "Scope", "idLoCao") ?? 0;
-
-            DateTime.TryParse(ngayStr, out var ngay);
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca}";
             var loCao       = scope > 0 ? scope.ToString() : "";
-
-            // Lấy chi tiết và NVL
-            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
             var nvlById = nvlList.ToDictionary(n => n.ID);
 
@@ -479,10 +473,16 @@ namespace dataproduct.api.Services
                 .ThenBy(n => n.ThuTu ?? 999)
                 .ToList();
 
+            // Hàm lấy tên hiển thị NVL theo quyền: P.KH dùng TenNVL_TK (nếu đã xác nhận), còn lại dùng TenNVL_NM
+            string NvlLabel(LGNLNvlDto n) =>
+                useKeHoachName && n.XacNhan == true && !string.IsNullOrWhiteSpace(n.TenNVL_TK)
+                    ? n.TenNVL_TK!
+                    : n.TenNVL_NM ?? "";
+
             // Nhóm NVL theo NhomHienThi để build header 2 tầng
             var nhomGroups = usedNvls
-                .GroupBy(n => n.NhomHienThi ?? (n.XacNhan == true && !string.IsNullOrWhiteSpace(n.TenNVL_TK) ? n.TenNVL_TK : n.TenNVL_NM) ?? "")
-                .OrderBy(g => usedNvls.First(n => (n.NhomHienThi ?? (n.XacNhan == true && !string.IsNullOrWhiteSpace(n.TenNVL_TK) ? n.TenNVL_TK : n.TenNVL_NM) ?? "") == g.Key).ThuTuNhom ?? 999)
+                .GroupBy(n => n.NhomHienThi ?? NvlLabel(n))
+                .OrderBy(g => usedNvls.First(n => (n.NhomHienThi ?? NvlLabel(n)) == g.Key).ThuTuNhom ?? 999)
                 .ToList();
 
             // Build thead
@@ -502,7 +502,7 @@ namespace dataproduct.api.Services
                 if (nvlsInGrp.Count == 1)
                 {
                     var n0 = nvlsInGrp[0];
-                    var label = (n0.XacNhan == true && !string.IsNullOrWhiteSpace(n0.TenNVL_TK) ? n0.TenNVL_TK : n0.TenNVL_NM) ?? grp.Key;
+                    var label = NvlLabel(n0) is { Length: > 0 } l ? l : grp.Key;
                     th1.Append($@"<th rowspan=""2"">{System.Net.WebUtility.HtmlEncode(label)}</th>");
                 }
                 else
@@ -510,8 +510,7 @@ namespace dataproduct.api.Services
                     th1.Append($@"<th colspan=""{nvlsInGrp.Count}"">{System.Net.WebUtility.HtmlEncode(grp.Key)}</th>");
                     foreach (var n in nvlsInGrp)
                     {
-                        var label = n.XacNhan == true && !string.IsNullOrWhiteSpace(n.TenNVL_TK) ? n.TenNVL_TK : n.TenNVL_NM;
-                        th2.Append($@"<th>{System.Net.WebUtility.HtmlEncode(label ?? "")}</th>");
+                        th2.Append($@"<th>{System.Net.WebUtility.HtmlEncode(NvlLabel(n))}</th>");
                     }
                 }
             }
