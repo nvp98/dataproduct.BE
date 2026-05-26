@@ -21,6 +21,7 @@ namespace dataproduct.api.ResponseModels
         public string? BieuMau { get; set; }
         public int Scope { get; set; }
         public int ID_PhuLieu { get; set; }
+        public int ID_HeaderKey { get; set; }
         public string? TenPhuLieu { get; set; }
         public double? TotalKLPhuGia { get; set; }
     }
