@@ -376,7 +376,10 @@ namespace dataproduct.api.Repositories
 
                     var userId = request.UserId.Value;
 
-                    var bbgnThepLongMaBms = new[] { "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong" };
+                    var bbgnThepLongMaBms = new[] {
+                        "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong",
+                        "HRC1_LoThoi", "HRC1_TinhLuyen"
+                    };
 
                     query = query.Where(x =>
                         x.MaBm != null &&
@@ -394,7 +397,6 @@ namespace dataproduct.api.Repositories
                         (
                             x.TinhTrang != 0
                             || (
-                                // Riêng BBGN thép lỏng: trả về kể cả TinhTrang=0 nếu user có trong BmPheDuyets
                                 bbgnThepLongMaBms.Contains(x.MaBm) &&
                                 _context.BmPheDuyets.Any(pd =>
                                     pd.PhieuId == x.Idphieu &&
@@ -445,7 +447,27 @@ namespace dataproduct.api.Repositories
             if (request.Ca.HasValue)
                 query = query.Where(x => x.Ca == request.Ca.Value);
 
-            if (request.Scope.HasValue)
+            if (request.ScopeFilters != null && request.ScopeFilters.Count > 0)
+            {
+                var pairs = request.ScopeFilters
+                    .Select(sf => sf.Split("::"))
+                    .Where(p => p.Length == 2 && int.TryParse(p[1], out _))
+                    .Select(p => (MaBm: p[0], Scope: int.Parse(p[1])))
+                    .ToList();
+
+                if (pairs.Count > 0)
+                {
+                    IQueryable<BmPhieu>? filtered = null;
+                    foreach (var pair in pairs)
+                    {
+                        var lMaBm = pair.MaBm; var lScope = pair.Scope;
+                        var sub = query.Where(x => x.MaBm == lMaBm && x.Scope == lScope);
+                        filtered = filtered == null ? sub : filtered.Union(sub);
+                    }
+                    query = filtered!;
+                }
+            }
+            else if (request.Scope.HasValue)
                 query = query.Where(x => x.Scope == request.Scope.Value);
 
             if (request.MayDuc.HasValue)
