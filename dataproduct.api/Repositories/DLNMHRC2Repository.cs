@@ -1347,29 +1347,50 @@ namespace dataproduct.api.Repositories
                 x.ID_HeaderKey
             });
 
+            //var result = grouped.Select(g =>
+            //{
+            //    var first = g.First();
+
+            //    return new FilterSTD_NXTResponse
+            //    {
+            //        BieuMau = first.BieuMau,
+            //        Scope = (int)first.Scope,
+            //        HeaderKeyId = first.ID_HeaderKey,
+            //        HeaderKeyName = first.TenPhuLieu,  // SP đã fallback về TenHienThi nếu IsAddManual
+            //        TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia),
+            //        PhuLieus = g
+            //            .Where(x => (int)x.ID_PhuLieu > 0)  // bỏ dòng IsAddManual không có PhuLieu thật
+            //            .GroupBy(x => (int)x.ID_PhuLieu)
+            //            .Select(pl => new PhuLieuNM
+            //            {
+            //                ID_PhuLieu = pl.Key,
+            //                TenPhuLieu = pl.First().TenPhuLieu
+            //            })
+            //            .ToList()
+            //    };
+            //}).ToList();
             var result = grouped.Select(g =>
             {
                 var first = g.First();
 
                 return new FilterSTD_NXTResponse
                 {
-                    BieuMau = first.BieuMau,
-                    Scope = (int)first.Scope,
+                    BieuMau = first.BieuMau ?? "",
+                    Scope = first.Scope ?? 0,
                     HeaderKeyId = first.ID_HeaderKey,
-                    HeaderKeyName = first.TenPhuLieu,  // SP đã fallback về TenHienThi nếu IsAddManual
-                    TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia),
+                    HeaderKeyName = first.TenPhuLieu ?? "",
+                    TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia ?? 0),
                     PhuLieus = g
-                        .Where(x => (int)x.ID_PhuLieu > 0)  // bỏ dòng IsAddManual không có PhuLieu thật
-                        .GroupBy(x => (int)x.ID_PhuLieu)
+                        .Where(x => (x.ID_PhuLieu ?? 0) > 0)
+                        .GroupBy(x => x.ID_PhuLieu ?? 0)
                         .Select(pl => new PhuLieuNM
                         {
                             ID_PhuLieu = pl.Key,
-                            TenPhuLieu = pl.First().TenPhuLieu
+                            TenPhuLieu = pl.First().TenPhuLieu ?? ""
                         })
                         .ToList()
                 };
             }).ToList();
-
             return result;
         }
 

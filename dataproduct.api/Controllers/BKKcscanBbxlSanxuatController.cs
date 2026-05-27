@@ -15,9 +15,9 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(DateOnly? ngaySX, string? ca, DateOnly? ngayXL, string? caXL, string? order, int? xuongCan)
+        public async Task<IActionResult> GetAll(DateOnly? ngaySX, string? caSX, DateOnly? ngayXL, string? caXL, string? order, int? xuongCan)
         {
-            return Ok(await _service.GetAllAsync(ngaySX, ca, ngayXL, caXL, order, xuongCan));
+            return Ok(await _service.GetAllAsync(ngaySX, caSX, ngayXL, caXL, order, xuongCan));
         }
 
         [HttpGet("{id}")]

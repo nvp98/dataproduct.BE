@@ -656,14 +656,17 @@ namespace dataproduct.api.Services
                     // Số thanh
                     ws.Cell(row, 11).Value = item.SoThanh;
 
+                    // Loại sản phẩm
+                    ws.Cell(row, 12).Value = item.TenPhanLoai;
+
                     // Ghi chú (để trống)
-                    ws.Cell(row, 12).Value = "";
+                    ws.Cell(row, 13).Value = "";
 
                     // Mã phiếu
-                    ws.Cell(row, 13).Value = item.SoPhieu;
+                    ws.Cell(row, 14).Value = item.SoPhieu;
 
                     // Tính trạng phiếu
-                    var statusCell = ws.Cell(row, 14);
+                    var statusCell = ws.Cell(row, 15);
                     statusCell.Value = GetTinhTrangText(item.TinhTrang);
                     statusCell.Style.Fill.BackgroundColor = GetTinhTrangColor(item.TinhTrang);
 
@@ -674,7 +677,7 @@ namespace dataproduct.api.Services
                     ws.Cell(row, 11).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
 
                     // Set borders cho toàn bộ cells trong dòng
-                    for (int col = 1; col <= 14; col++)
+                    for (int col = 1; col <= 15; col++)
                     {
                         ws.Cell(row, col).Style.Border.TopBorder = XLBorderStyleValues.Thin;
                         ws.Cell(row, col).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
