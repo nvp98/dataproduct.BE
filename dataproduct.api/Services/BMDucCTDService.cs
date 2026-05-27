@@ -790,7 +790,8 @@ namespace dataproduct.api.Services
                         x.NgaySX.Date == request.NgaySX.Date &&
                         x.Ca == request.Ca &&
                         NormalizeKeyValue(x.Me) == NormalizeKeyValue(row.Me) &&
-                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac));
+                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac) &&
+                        NormalizeKeyValue(x.KichThuoc) == NormalizeKeyValue(row.KichThuoc));
 
                     if (match == null)
                     {
