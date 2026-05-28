@@ -363,6 +363,34 @@ namespace dataproduct.api.Business
             return (existing, warnings);
         }
 
+        /// <summary>
+        /// Cập nhật chỉ dữ liệu bảng (DataJson) mà không kiểm tra ràng buộc tình trạng phiếu
+        /// Sử dụng cho phép cập nhật dữ liệu bảng khi phiếu ở trạng thái HoanThanh và người dùng có quyền Chốt
+        /// </summary>
+        public async Task<(BmPhieu? Phieu, List<string> Warnings)> UpdateTableDataOnlyAsync(Guid id, JsonElement formData)
+        {
+            // 1. Lấy phiếu hiện tại
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return (null, new List<string>());
+
+            // 2. Cho phép cập nhật cho các trạng thái: Chốt (5)
+            // Không kiểm tra ràng buộc như UpdateAsync - mục đích chỉ để update dữ liệu bảng
+            if (existing.TinhTrang == 5)
+                return (null, new List<string> { "Trạng thái phiếu không cho phép cập nhật dữ liệu bảng" });
+
+            // 3. Cập nhật DataJson (chỉ dữ liệu bảng, không cập nhật các field chính)
+            existing.DataJson = formData.GetRawText();
+            existing.NgayTao = existing.NgayTao; // giữ nguyên ngày tạo
+
+            // 4. Gọi repository để lưu
+            await _repo.UpdateAsync(existing);
+
+            // 5. Đồng bộ lại dữ liệu bảng chi tiết từ DataJson
+            var warnings = await RunJsonInitializersAsync(existing);
+
+            return (existing, warnings);
+        }
+
         public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
         {
             // 1. Lấy phiếu hiện tại

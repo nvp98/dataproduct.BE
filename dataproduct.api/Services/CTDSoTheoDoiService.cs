@@ -155,8 +155,8 @@ namespace dataproduct.api.Services
             var kipCa = $"{ca}{kip}";
 
             // Lấy người ký
-            var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
-            var nvVanHanh = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var nvVanHanh = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
 
             // Logo
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")

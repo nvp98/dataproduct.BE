@@ -69,6 +69,25 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        /// <summary>
+        /// Cập nhật chỉ dữ liệu bảng mà không kiểm tra ràng buộc tình trạng phiếu
+        /// Sử dụng cho phép cập nhật khi phiếu ở trạng thái HoanThanh
+        /// </summary>
+        [HttpPut("{id}/update-table-data")]
+        public async Task<IActionResult> UpdateTableDataOnly(Guid id, [FromBody] JsonElement formData)
+        {
+            try
+            {
+                var (phieu, warnings) = await _service.UpdateTableDataOnlyAsync(id, formData);
+                if (phieu == null) return NotFound();
+                return Ok(new { success = true, warnings });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
