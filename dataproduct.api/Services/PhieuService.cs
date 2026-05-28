@@ -827,6 +827,28 @@ namespace dataproduct.api.Business
             return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
         }
 
+        /// <summary>
+        /// Lấy dữ liệu ca kíp từ Tbl_Kip theo ngày và ca
+        /// </summary>
+        public async Task<dynamic?> GetKipByDateAndCaAsync(DateOnly ngayLamViec, int ca)
+        {
+            var kip = await _masterContext.Tbl_Kip
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.NgayLamViec == ngayLamViec
+                                       && x.TenCa == ca.ToString());
+
+            if (kip == null)
+                return null;
+
+            return new
+            {
+                id_kip = kip.ID_Kip,
+                ngayLamViec = kip.NgayLamViec,
+                tenCa = kip.TenCa,
+                tenKip = kip.TenKip
+            };
+        }
+
     }
 }
 
