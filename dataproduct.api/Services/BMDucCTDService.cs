@@ -1008,7 +1008,7 @@ namespace dataproduct.api.Services
                     x.TinhTrangCap2 == 1
                 );
 
-                if (!allCapsApproved)
+                if (!allCapsApproved && tinhTrangChot == 1) // Nếu đang chốt mà chưa duyệt hết thì không cho chốt
                     throw new Exception("Không thể chốt! Vui lòng đảm bảo tất cả cấp đều đã duyệt");
 
                 // Bước 5: Khi chốt, cập nhật tình trạng rows = 1
