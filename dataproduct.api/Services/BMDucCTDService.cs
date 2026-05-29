@@ -1081,7 +1081,8 @@ namespace dataproduct.api.Services
                 ca: request.Ca,
                 kip: request.Kip,
                 ngaySX: request.NgaySX,
-                idPhieu: request.IdPhieu
+                idPhieu: request.IdPhieu,
+                mayDuc:request.MayDuc
             );
             var data = items.ToList();
 
@@ -1176,6 +1177,7 @@ namespace dataproduct.api.Services
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
+                    <td>{t.NgaySX:dd/MM/yyyy}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>

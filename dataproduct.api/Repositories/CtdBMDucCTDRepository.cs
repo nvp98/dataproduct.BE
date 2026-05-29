@@ -160,25 +160,37 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .AsQueryable();
 
-            // 1️⃣ Ưu tiên theo IdPhieu (đã chốt)
+            // // 1️⃣ Ưu tiên theo IdPhieu (đã chốt)
+            // if (idPhieu.HasValue)
+            // {
+            //     query = query.Where(x => x.IdPhieu == idPhieu.Value);
+            // }
+            // else
+            // {
+
+            // }
+            // 2️⃣ Fallback theo Ngày + Ca + Kíp
+            query = query.Where(x =>
+                x.NgaySX.Date == ngaySX.Date &&
+                x.Ca == ca
+            );
+            // check BM_Phieu -> lay thong tin mayDuc de filter
             if (idPhieu.HasValue)
             {
-                query = query.Where(x => x.IdPhieu == idPhieu.Value);
-            }
-            else
-            {
-                // 2️⃣ Fallback theo Ngày + Ca + Kíp
-                query = query.Where(x =>
-                    x.NgaySX.Date == ngaySX.Date &&
-                    x.Ca == ca &&
-                    x.Kip == kip
-                );
+                var phieu = await _context.BmPhieus.FirstOrDefaultAsync(p => p.Idphieu == idPhieu.Value);
+                if (phieu != null)
+                {
+                    int phieuMayDuc = phieu.MayDuc.GetValueOrDefault(0);
+                    query = query.Where(x => x.MayDuc == phieuMayDuc);
+                }
             }
 
-            if (mayDuc.HasValue)
-            {
-                query = query.Where(x => x.MayDuc == mayDuc.Value);
-            }
+            // if (mayDuc.HasValue)
+            // {
+            //     query = query.Where(x => x.MayDuc == mayDuc.Value);
+            // }
+
+            // join voi table BK_PhoiThep để lấy ngaySX
 
             return await query
                 .Select(x => new InsertPhoiNhapKhoDto
@@ -186,6 +198,8 @@ namespace dataproduct.api.Repositories
                     Me = x.Me,
                     Mac = x.Mac,
                     KichThuoc = x.KichThuoc,
+                    NgayGiao = x.NgaySX,
+                    NgaySX = _context.BkPhoiThep.Where(pt => pt.Me == x.Me && pt.PhanLoaiPhoi == 2).Select(pt => pt.NgaySx).FirstOrDefault().ToDateTime(new TimeOnly(0, 0)), // lay tu bang 
 
                     StLoai1 = x.StLoai1,
                     KlLoai1 = x.KlLoai1,

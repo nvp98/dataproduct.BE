@@ -35,6 +35,7 @@ namespace dataproduct.api.DTOs.CTD_Dto
     {
         public string? SoPhieu { get; set; } = null!;
         public DateTime NgaySX { get; set; }
+        public DateTime? NgayGiao { get; set; }
         public int? Ca { get; set; }
         public string? Kip { get; set; } = null!;
         public int? MayDuc { get; set; }
