@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.DTOs.NMLG_Dto;
@@ -641,6 +642,232 @@ namespace dataproduct.api.Services
                 Content     = pdfBytes,
                 FileName    = fileName,
                 ContentType = "application/pdf",
+            };
+        }
+
+        // ─── Export Excel ─────────────────────────────────────────────────────────
+
+        public async Task<ExportFileResult> ExportNapLieuExcelAsync(Guid idPhieu)
+        {
+            var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
+                ?? throw new Exception("Không tìm thấy phiếu.");
+
+            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+            var firstRow = chiTiet.FirstOrDefault();
+
+            var ngay = firstRow?.Ngay ?? DateTime.MinValue;
+            var ca = firstRow?.IDCa ?? 0;
+            var scope = firstRow?.IDLoCao ?? 0;
+
+            var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
+            var caLabel = ca == 1 ? "Ca 1" : ca == 2 ? "Ca 2" : $"Ca {ca}";
+            var loCao = scope > 0 ? scope.ToString() : "";
+
+            var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+            var nvlById = nvlList.ToDictionary(n => n.ID);
+
+            var usedNvlIds = chiTiet.Select(x => x.IDNVL).Distinct().Order().ToList();
+            var usedNvls = usedNvlIds
+                .Select(id => nvlById.TryGetValue(id, out var n) ? n : null)
+                .OfType<LGNLNvlDto>()
+                .OrderBy(n => n.ThuTuNhom ?? 999)
+                .ThenBy(n => n.ThuTu ?? 999)
+                .ToList();
+
+            string NvlLabel(LGNLNvlDto n) => n.TenNVL_NM ?? "";
+
+            // Fixed prefix columns (6) + NVL columns + GhiChu
+            int fixedCols = 6;
+            int nvlColCount = usedNvls.Count;
+            int totalCols = fixedCols + nvlColCount + 1; // +1 for GhiChu
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("NapLieu");
+
+            // ── Row 1: Company header ──
+            ws.Cell(1, 1).Value = "CÔNG TY CỔ PHẦN THÉP HÒA PHÁT DUNG QUẤT";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Range(1, 1, 1, totalCols).Merge();
+
+            // ── Row 2: Date/Ca ──
+            ws.Cell(2, 1).Value = $"Ngày: {ngayDisplay}    {caLabel}    Lò cao: {loCao}";
+            ws.Range(2, 1, 2, totalCols).Merge();
+
+            // ── Row 3: Title ──
+            ws.Cell(3, 1).Value = $"SỔ THEO DÕI NẠP LIỆU LÒ CAO {loCao}";
+            ws.Cell(3, 1).Style.Font.Bold = true;
+            ws.Cell(3, 1).Style.Font.FontSize = 14;
+            ws.Cell(3, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Range(3, 1, 3, totalCols).Merge();
+
+            // ── Rows 4-5: Multi-level column headers ──
+            // Row 4 fixed cols (rowspan=2 → merge rows 4-5)
+            string[] fixedHdrs = { "Số mê", "Mê/giờ", "Thời gian nạp liệu", "Chế độ nạp liệu", "Thuốc thăm liệu 1 (m)", "Thuốc thăm liệu 2 (m)" };
+            for (int i = 0; i < fixedCols; i++)
+            {
+                ws.Range(4, i + 1, 5, i + 1).Merge();
+                ws.Cell(4, i + 1).Value = fixedHdrs[i];
+                ws.Cell(4, i + 1).Style.Font.Bold = true;
+                ws.Cell(4, i + 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+                ws.Cell(4, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(4, i + 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                ws.Cell(4, i + 1).Style.Alignment.WrapText = true;
+            }
+
+            // NVL columns: group by NhomHienThi
+            var nhomGroups = usedNvls
+                .GroupBy(n => n.NhomHienThi ?? NvlLabel(n))
+                .OrderBy(g => usedNvls.First(n => (n.NhomHienThi ?? NvlLabel(n)) == g.Key).ThuTuNhom ?? 999)
+                .ToList();
+
+            int col = fixedCols + 1;
+            foreach (var grp in nhomGroups)
+            {
+                var nvlsInGrp = grp.ToList();
+                if (nvlsInGrp.Count == 1)
+                {
+                    ws.Range(4, col, 5, col).Merge();
+                    ws.Cell(4, col).Value = NvlLabel(nvlsInGrp[0]) is { Length: > 0 } l ? l : grp.Key;
+                    ws.Cell(4, col).Style.Font.Bold = true;
+                    ws.Cell(4, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+                    ws.Cell(4, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    ws.Cell(4, col).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                    ws.Cell(4, col).Style.Alignment.WrapText = true;
+                    col++;
+                }
+                else
+                {
+                    ws.Range(4, col, 4, col + nvlsInGrp.Count - 1).Merge();
+                    ws.Cell(4, col).Value = grp.Key;
+                    ws.Cell(4, col).Style.Font.Bold = true;
+                    ws.Cell(4, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+                    ws.Cell(4, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    foreach (var n in nvlsInGrp)
+                    {
+                        ws.Cell(5, col).Value = NvlLabel(n);
+                        ws.Cell(5, col).Style.Font.Bold = true;
+                        ws.Cell(5, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+                        ws.Cell(5, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                        col++;
+                    }
+                }
+            }
+
+            // GhiChu header (rowspan=2)
+            ws.Range(4, col, 5, col).Merge();
+            ws.Cell(4, col).Value = "Ghi chú";
+            ws.Cell(4, col).Style.Font.Bold = true;
+            ws.Cell(4, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+            ws.Cell(4, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(4, col).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+            // Apply borders to header area
+            ws.Range(4, 1, 5, totalCols).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            ws.Range(4, 1, 5, totalCols).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+            // ── Data rows ──
+            var rowsByThuTu = chiTiet
+                .GroupBy(x => x.ThuTu ?? 0)
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            int dataRow = 6;
+            foreach (var grp in rowsByThuTu)
+            {
+                var sample = grp.First();
+                var nvlValues = grp.ToDictionary(x => x.IDNVL, x => x.GiaTri);
+
+                ws.Cell(dataRow, 1).Value = sample.SoMe.HasValue ? (double)sample.SoMe.Value : (double?)null;
+                ws.Cell(dataRow, 2).Value = sample.MeGio ?? "";
+                ws.Cell(dataRow, 3).Value = sample.ThoiGianNapLieu ?? "";
+                ws.Cell(dataRow, 4).Value = sample.CheDo ?? "";
+                ws.Cell(dataRow, 5).Value = sample.ThuocThamLieu1.HasValue ? (double)sample.ThuocThamLieu1.Value : (double?)null;
+                ws.Cell(dataRow, 6).Value = sample.ThuocThamLieu2.HasValue ? (double)sample.ThuocThamLieu2.Value : (double?)null;
+
+                int c2 = fixedCols + 1;
+                foreach (var n in usedNvls)
+                {
+                    var val = nvlValues.TryGetValue(n.ID, out var v) ? v : null;
+                    if (val.HasValue) ws.Cell(dataRow, c2).Value = (double)val.Value;
+                    ws.Cell(dataRow, c2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                    c2++;
+                }
+                ws.Cell(dataRow, c2).Value = sample.GhiChu ?? "";
+
+                for (int c3 = 1; c3 <= totalCols; c3++)
+                    ws.Cell(dataRow, c3).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+                dataRow++;
+            }
+
+            // ── Tổng cộng ──
+            ws.Cell(dataRow, 1).Value = "TỔNG CỘNG";
+            ws.Range(dataRow, 1, dataRow, fixedCols).Merge();
+            ws.Cell(dataRow, 1).Style.Font.Bold = true;
+            ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            int c4 = fixedCols + 1;
+            foreach (var n in usedNvls)
+            {
+                var total = chiTiet.Where(x => x.IDNVL == n.ID).Sum(x => x.GiaTri ?? 0);
+                ws.Cell(dataRow, c4).Value = (double)total;
+                ws.Cell(dataRow, c4).Style.Font.Bold = true;
+                ws.Cell(dataRow, c4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                c4++;
+            }
+            for (int c5 = 1; c5 <= totalCols; c5++)
+                ws.Cell(dataRow, c5).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            dataRow++;
+
+            // ── Độ ẩm ──
+            ws.Cell(dataRow, 1).Value = "Độ ẩm (%)";
+            ws.Range(dataRow, 1, dataRow, fixedCols).Merge();
+            ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            int c6 = fixedCols + 1;
+            foreach (var n in usedNvls)
+            {
+                var da = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.DoAm.HasValue)?.DoAm;
+                if (da.HasValue) ws.Cell(dataRow, c6).Value = (double)da.Value;
+                ws.Cell(dataRow, c6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                c6++;
+            }
+            for (int c7 = 1; c7 <= totalCols; c7++)
+                ws.Cell(dataRow, c7).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            dataRow++;
+
+            // ── Quy khô ──
+            ws.Cell(dataRow, 1).Value = "Quy khô";
+            ws.Range(dataRow, 1, dataRow, fixedCols).Merge();
+            ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            int c8 = fixedCols + 1;
+            foreach (var n in usedNvls)
+            {
+                var qk = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.QuyKho.HasValue)?.QuyKho;
+                if (qk.HasValue) ws.Cell(dataRow, c8).Value = (double)qk.Value;
+                ws.Cell(dataRow, c8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                c8++;
+            }
+            for (int c9 = 1; c9 <= totalCols; c9++)
+                ws.Cell(dataRow, c9).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+            // ── Column widths ──
+            ws.Column(1).Width = 8;
+            ws.Column(2).Width = 10;
+            ws.Column(3).Width = 14;
+            ws.Column(4).Width = 14;
+            ws.Column(5).Width = 12;
+            ws.Column(6).Width = 12;
+            for (int c10 = fixedCols + 1; c10 <= fixedCols + nvlColCount; c10++)
+                ws.Column(c10).Width = 12;
+            ws.Column(totalCols).Width = 20;
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            var fileName = $"NapLieuLoCao_{phieu.SoPhieu ?? idPhieu.ToString("N")}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+            return new ExportFileResult
+            {
+                Content = ms.ToArray(),
+                FileName = fileName,
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             };
         }
 

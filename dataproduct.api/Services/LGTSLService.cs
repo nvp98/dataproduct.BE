@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.DTOs.NMLG_Dto;
@@ -415,6 +416,118 @@ namespace dataproduct.api.Services
                 Content = pdfBytes,
                 FileName = fileName,
                 ContentType = "application/pdf",
+            };
+        }
+
+        // ─── Export Excel ─────────────────────────────────────────────────────────
+
+        public async Task<ExportFileResult> ExportTonSiloExcelAsync(Guid idPhieu)
+        {
+            var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
+                ?? throw new Exception("Không tìm thấy phiếu.");
+
+            var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
+            var firstRow = chiTiet.FirstOrDefault();
+
+            var ngay = firstRow?.Ngay ?? DateTime.MinValue;
+            var ca = firstRow?.Ca ?? 0;
+            var loCao = firstRow?.IDLoCao ?? 0;
+            var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
+            var caLabel = ca == 1 ? "Ca 1" : ca == 2 ? "Ca 2" : $"Ca {ca}";
+
+            var nvlList = await _repo.GetNvlListAsync(loCao > 0 ? loCao : null);
+            var nvlTkByName = nvlList
+                .Where(n => !string.IsNullOrWhiteSpace(n.TenNVL))
+                .GroupBy(n => n.TenNVL!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().TenNVLTk, StringComparer.OrdinalIgnoreCase);
+            var nvlTkById = nvlList.Where(n => n.ID > 0).ToDictionary(n => n.ID, n => n.TenNVLTk);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("TonSilo");
+
+            // ── Header ──
+            ws.Cell(1, 1).Value = "CÔNG TY CỔ PHẦN THÉP HÒA PHÁT DUNG QUẤT";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Range(1, 1, 1, 5).Merge();
+
+            ws.Cell(2, 1).Value = $"Ngày: {ngayDisplay}    {caLabel}    Lò cao: {(loCao > 0 ? loCao.ToString() : "")}";
+            ws.Range(2, 1, 2, 5).Merge();
+
+            // ── Title ──
+            ws.Cell(3, 1).Value = $"SỔ GIAO NHẬN TỒN SILO LÒ CAO {(loCao > 0 ? loCao.ToString() : "")}";
+            ws.Cell(3, 1).Style.Font.Bold = true;
+            ws.Cell(3, 1).Style.Font.FontSize = 14;
+            ws.Cell(3, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Range(3, 1, 3, 5).Merge();
+
+            // ── Column headers ──
+            string[] hdr = { "STT", "Tên Silo", "Tên NVL", "KL Tồn Cuối Kíp (t)", "Ghi chú" };
+            for (int c = 0; c < hdr.Length; c++)
+            {
+                var cell = ws.Cell(4, c + 1);
+                cell.Value = hdr[c];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            }
+
+            // ── Data rows ──
+            int row = 5;
+            int stt = 0;
+            decimal tongKL = 0;
+            foreach (var c in chiTiet)
+            {
+                stt++;
+                tongKL += c.KLTonCuoiKip ?? 0;
+
+                var tenNvlTk = c.TenNVLTk;
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IDNVL.HasValue && nvlTkById.TryGetValue(c.IDNVL.Value, out var tkById))
+                    tenNvlTk = tkById;
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && !string.IsNullOrWhiteSpace(c.TenNVL) && nvlTkByName.TryGetValue(c.TenNVL!, out var tkByName))
+                    tenNvlTk = tkByName;
+
+                ws.Cell(row, 1).Value = stt;
+                ws.Cell(row, 2).Value = c.TenSiLo ?? "";
+                ws.Cell(row, 3).Value = c.TenNVL ?? "";
+                ws.Cell(row, 4).Value = c.KLTonCuoiKip.HasValue ? (double)c.KLTonCuoiKip.Value : (double?)null;
+                if (c.KLTonCuoiKip.HasValue) ws.Cell(row, 4).Style.NumberFormat.Format = "#,##0.000";
+                ws.Cell(row, 5).Value = c.GhiChu ?? "";
+
+                for (int col = 1; col <= 5; col++)
+                {
+                    ws.Cell(row, col).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                    ws.Cell(row, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                }
+                ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                ws.Cell(row, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                row++;
+            }
+
+            // ── Tổng ──
+            ws.Cell(row, 3).Value = "Tổng KL:";
+            ws.Cell(row, 3).Style.Font.Bold = true;
+            ws.Cell(row, 4).Value = (double)tongKL;
+            ws.Cell(row, 4).Style.NumberFormat.Format = "#,##0.000";
+            ws.Cell(row, 4).Style.Font.Bold = true;
+            for (int col = 1; col <= 5; col++)
+                ws.Cell(row, col).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+
+            // ── Column widths ──
+            ws.Column(1).Width = 6;
+            ws.Column(2).Width = 18;
+            ws.Column(3).Width = 22;
+            ws.Column(4).Width = 20;
+            ws.Column(5).Width = 28;
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            var fileName = $"TonSiLoLoCao_{phieu.SoPhieu ?? idPhieu.ToString("N")}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+            return new ExportFileResult
+            {
+                Content = ms.ToArray(),
+                FileName = fileName,
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             };
         }
 

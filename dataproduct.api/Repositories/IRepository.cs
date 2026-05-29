@@ -319,6 +319,17 @@ namespace dataproduct.api.Repositories
         Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
     }
 
+    public interface ILGPTLCRepository
+    {
+        Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh);
+        Task<List<LGPTLCChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+        Task DeleteChiTietByPhieuAsync(Guid idPhieu);
+        Task AddChiTietRangeAsync(List<LG_NKVHPT_ChiTiet> entities);
+        Task UpdateManualValuesAsync(UpdateLGPTLCManualDto dto);
+        Task UpdatePhieuSummaryAsync(Guid idPhieu, UpdateLGPTLCSummaryDto dto);
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
+    }
+
     public interface ILGNLRepository
     {
         // TS Mapping lookup

@@ -331,6 +331,19 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        // ─── Export Excel ─────────────────────────────────────────────────────────
+
+        [HttpGet("export-excel/{idPhieu}")]
+        public async Task<IActionResult> ExportExcel(Guid idPhieu)
+        {
+            try
+            {
+                var file = await _service.ExportNapLieuExcelAsync(idPhieu);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpPost("mapping/doi-nvl")]
         public async Task<IActionResult> DoiNVLGiuaCa([FromBody] LGNLChangeSiLoNVLDto dto)
         {
