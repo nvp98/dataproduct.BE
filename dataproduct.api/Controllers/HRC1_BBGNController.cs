@@ -15,24 +15,29 @@ namespace dataproduct.api.Controllers
     {
         private readonly HRC1_BBGNService _svc;
         private readonly BBGN_ThepLongService _bbgnSvc;
+        private readonly SyncPhanLoaiService _syncSvc;
 
-        public HRC1_BBGNController(HRC1_BBGNService svc, BBGN_ThepLongService bbgnSvc)
+        public HRC1_BBGNController(HRC1_BBGNService svc, BBGN_ThepLongService bbgnSvc, SyncPhanLoaiService syncSvc)
         {
             _svc = svc;
             _bbgnSvc = bbgnSvc;
+            _syncSvc = syncSvc;
         }
 
         // -------------------------------------------------------
         // Phiếu — dùng chung cho cả 3 công đoạn
         // -------------------------------------------------------
 
-        /// <summary>GET /api/hrc1/phieu/{idPhieu}</summary>
+        /// <summary>GET /api/hrc1/phieu/{idPhieu}?loSo=&amp;scopePhieu=&amp;idMayDuc=</summary>
         [HttpGet("phieu/{idPhieu:guid}")]
-        public async Task<IActionResult> GetPhieu(Guid idPhieu)
+        public async Task<IActionResult> GetPhieu(Guid idPhieu,
+            [FromQuery] int? loSo = null,
+            [FromQuery] int? scopePhieu = null,
+            [FromQuery] int? idMayDuc = null)
         {
             try
             {
-                var result = await _svc.GetPhieuAsync(idPhieu);
+                var result = await _svc.GetPhieuAsync(idPhieu, loSo, scopePhieu, idMayDuc);
                 return Ok(result);
             }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
@@ -43,13 +48,13 @@ namespace dataproduct.api.Controllers
         // Lò thổi
         // -------------------------------------------------------
 
-        /// <summary>POST /api/hrc1/phieu/{idPhieu}/sync-lo-thoi — đồng bộ mẻ thổi từ gang lỏng, trả về phiếu cập nhật</summary>
+        /// <summary>POST /api/hrc1/phieu/{idPhieu}/sync-lo-thoi — đồng bộ mẻ thổi từ gang lỏng theo lò cụ thể</summary>
         [HttpPost("phieu/{idPhieu:guid}/sync-lo-thoi")]
-        public async Task<IActionResult> SyncLoThoi(Guid idPhieu)
+        public async Task<IActionResult> SyncLoThoi(Guid idPhieu, [FromBody] HRC1_SyncLoThoiRequest req)
         {
             try
             {
-                var result = await _svc.SyncMeThoiLoThoiAsync(idPhieu);
+                var result = await _svc.SyncMeThoiLoThoiAsync(idPhieu, req.LoSo);
                 return Ok(result);
             }
             catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
@@ -210,6 +215,47 @@ namespace dataproduct.api.Controllers
             catch (Exception ex)                 { return StatusCode(500, ex.Message); }
         }
 
+        /// <summary>GET /api/hrc1/tinh-luyen/search-me?q= — autocomplete tìm mẻ thổi</summary>
+        [HttpGet("tinh-luyen/search-me")]
+        public async Task<IActionResult> SearchMeThep([FromQuery] string q = "")
+        {
+            if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
+            try
+            {
+                var result = await _svc.SearchMeThepAsync(q);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/tinh-luyen/them-me-tay — thêm mẻ tay vào phiếu TL</summary>
+        [HttpPost("tinh-luyen/them-me-tay")]
+        public async Task<IActionResult> ThemMeTay([FromBody] HRC1_ThemMeTayRequest req)
+        {
+            try
+            {
+                var result = await _svc.ThemMeTayAsync(req, LayUserId());
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>DELETE /api/hrc1/tinh-luyen/me-tay/{mePhanCongId} — xóa dòng mẻ thêm tay</summary>
+        [HttpDelete("tinh-luyen/me-tay/{mePhanCongId:int}")]
+        public async Task<IActionResult> XoaMeTay(int mePhanCongId)
+        {
+            try
+            {
+                await _svc.XoaMeTayAsync(mePhanCongId, LayUserId());
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
         /// <summary>POST /api/hrc1/tinh-luyen/them-dong</summary>
         [HttpPost("tinh-luyen/them-dong")]
         public async Task<IActionResult> ThemDong([FromBody] HRC1_ThemDongTLRequest req)
@@ -250,6 +296,82 @@ namespace dataproduct.api.Controllers
                 await _svc.BoXacNhanDucAsync(req, LayUserId());
                 return NoContent();
             }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/chot-me — P.KH chốt mẻ đúc</summary>
+        [HttpPost("duc/chot-me")]
+        public async Task<IActionResult> ChotMe([FromBody] HRC1_DucChotMeRequest req)
+        {
+            try
+            {
+                await _svc.ChotMeAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/bo-chot-me — P.KH bỏ chốt mẻ đúc</summary>
+        [HttpPost("duc/bo-chot-me")]
+        public async Task<IActionResult> BoChotMe([FromBody] HRC1_DucBoChotMeRequest req)
+        {
+            try
+            {
+                await _svc.BoChotMeAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/chot-phieu-batch — P.KH chốt nhiều phiếu máy đúc, check điều kiện từng phiếu</summary>
+        [HttpPost("duc/chot-phieu-batch")]
+        public async Task<IActionResult> ChotPhieuBatch([FromBody] HRC1_ChotPhieuBatchRequest req)
+        {
+            try
+            {
+                var result = await _svc.ChotPhieuBatchAsync(req.IdPhieuList, LayUserId());
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/huy-chot-phieu-batch — P.KH hủy chốt nhiều phiếu máy đúc</summary>
+        [HttpPost("duc/huy-chot-phieu-batch")]
+        public async Task<IActionResult> HuyChotPhieuBatch([FromBody] HRC1_ChotPhieuBatchRequest req)
+        {
+            try
+            {
+                var result = await _svc.HuyChotPhieuBatchAsync(req.IdPhieuList, LayUserId());
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/sync-phan-loai-me-thep — đồng bộ phân loại &amp; mác BKMIS từ Linked Server vào HRC1_MeThep</summary>
+        [HttpPost("sync-phan-loai-me-thep")]
+        public async Task<IActionResult> SyncPhanLoaiMeThep([FromBody] HRC1_SyncPhanLoaiRequest req)
+        {
+            try
+            {
+                var result = await _syncSvc.SyncHRC1MeThepAsync(req.MaMes);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>PUT /api/hrc1/me/{meId}/ghi-chu — cập nhật ghi chú dùng chung cả 3 công đoạn</summary>
+        [HttpPut("me/{meId:int}/ghi-chu")]
+        public async Task<IActionResult> UpdateGhiChu(int meId, [FromBody] HRC1_UpdateGhiChuRequest req)
+        {
+            try
+            {
+                await _svc.UpdateGhiChuAsync(meId, req.GhiChu, LayUserId());
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
             catch (Exception ex)                 { return StatusCode(500, ex.Message); }
         }

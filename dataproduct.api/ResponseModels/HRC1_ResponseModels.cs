@@ -52,6 +52,9 @@ namespace dataproduct.api.ResponseModels
         public int? XacNhanBoi { get; set; }
         public DateTime? XacNhanLuc { get; set; }
 
+        // true = TL thêm tay thủ công (có thể xóa), null/false = nhận tự động
+        public bool? IsManualTL { get; set; }
+
         // Tên người sửa cuối theo công đoạn hiện tại (populated by service)
         public string? TenCapNhatBoi { get; set; }
     }
@@ -69,6 +72,31 @@ namespace dataproduct.api.ResponseModels
         public int? SoTinhLuyenNhan { get; set; }   // scope TL đã nhận; null = chưa nhận
         public int? TrangThaiTL { get; set; }  // 0/null=chờ nhận, 1=đã nhận
         public string? TenNguoiNhan { get; set; }   // HoVaTen của người TL nhận mẻ
+        public DateTime NgayTao { get; set; }
+        public DateTime? NgayNhanTL { get; set; }
+    }
+
+    // Mẻ trùng khi thêm tay (phiếu TL khác đã nhận mẻ này)
+    public class HRC1_TrungMeInfo
+    {
+        public string SoPhieu { get; set; } = string.Empty;
+        public string TenTinhLuyen { get; set; } = string.Empty;
+    }
+
+    // Kết quả thêm mẻ tay
+    public class HRC1_ThemMeTayResult
+    {
+        public List<HRC1_TrungMeInfo> TrungVoi { get; set; } = new();
+        public bool DaThemVao { get; set; }
+    }
+
+    // Search autocomplete mẻ thổi
+    public class HRC1_MeThepSearchVm
+    {
+        public int MeId { get; set; }
+        public string MaMe { get; set; } = string.Empty;
+        public string? ThungSo { get; set; }
+        public int? LoSo { get; set; }
     }
 
     public class HRC1_PagedResult<T>

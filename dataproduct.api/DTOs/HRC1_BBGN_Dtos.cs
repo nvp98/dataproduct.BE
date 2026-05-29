@@ -39,6 +39,9 @@ namespace dataproduct.api.DTOs
         public string? ThungSo { get; set; }
         public decimal? KLLFSauThep { get; set; }
         public decimal? KlLan3 { get; set; }
+        public string? ThoiGian { get; set; }      // chỉ dùng khi len_thang (lò thổi tự nhập)
+        public decimal? KlLan2 { get; set; }       // chỉ dùng khi len_thang (lò thổi tự nhập)
+        public decimal? KlThepLong { get; set; }   // chỉ dùng khi len_thang (tính từ FE)
         public string? DichChuyen { get; set; }    // tinh_luyen | len_thang
         public int? TLDichSo { get; set; }         // TL được chỉ định (1–5)
         public int? IdMayDucDich { get; set; }     // FK→MayDuc, bắt buộc nếu len_thang
@@ -54,6 +57,7 @@ namespace dataproduct.api.DTOs
     {
         public int MeId { get; set; }
         public Guid IdPhieu { get; set; }  // phiếu TL nhận
+        public int? ScopePhieu { get; set; }  // TL số đang nhận mẻ (1-5)
     }
 
     public class HRC1_TinhLuyenUpdateRequest
@@ -80,6 +84,7 @@ namespace dataproduct.api.DTOs
     {
         public int MeId { get; set; }
         public Guid IdPhieu { get; set; }  // phiếu TL cần hủy nhận
+        public int? ScopePhieu { get; set; }  // TL số đang hủy nhận
     }
 
     // -------------------------------------------------------
@@ -93,5 +98,75 @@ namespace dataproduct.api.DTOs
     public class HRC1_DucBoXacNhanRequest
     {
         public List<int> MeIds { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Tinh luyện — thêm mẻ tay (không qua luồng nhận mẻ)
+    // -------------------------------------------------------
+    public class HRC1_ThemMeTayRequest
+    {
+        public string MaMe { get; set; } = null!;
+        public Guid IdPhieu { get; set; }
+        public bool XacNhanTrung { get; set; }  // true = user đã xác nhận mẻ trùng
+        public int? ScopePhieu { get; set; }     // TL số đang thêm mẻ tay (1-5)
+    }
+
+    // -------------------------------------------------------
+    // Lò thổi — đồng bộ theo lò cụ thể
+    // -------------------------------------------------------
+    public class HRC1_SyncLoThoiRequest
+    {
+        public int LoSo { get; set; }  // lò thổi số 1–5 cần đồng bộ
+    }
+
+    // -------------------------------------------------------
+    // Đồng bộ phân loại & mác BKMIS từ Linked Server vào HRC1_MeThep
+    // -------------------------------------------------------
+    public class HRC1_SyncPhanLoaiRequest
+    {
+        public List<string> MaMes { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Máy đúc — chốt / bỏ chốt mẻ
+    // -------------------------------------------------------
+    public class HRC1_DucChotMeRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+        public Guid IdPhieu { get; set; }
+        public int IdMayDuc { get; set; }
+    }
+
+    public class HRC1_DucBoChotMeRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+        public Guid IdPhieu { get; set; }
+        public int IdMayDuc { get; set; }
+    }
+
+    public class HRC1_UpdateGhiChuRequest
+    {
+        public string? GhiChu { get; set; }
+    }
+
+    // -------------------------------------------------------
+    // Chốt/hủy chốt nhiều phiếu HRC1_BBGN_ThepLong (batch từ P.KH)
+    // -------------------------------------------------------
+    public class HRC1_ChotPhieuBatchRequest
+    {
+        public List<Guid> IdPhieuList { get; set; } = new();
+    }
+
+    public class HRC1_ChotPhieuBatchThatBai
+    {
+        public Guid IdPhieu { get; set; }
+        public string SoPhieu { get; set; } = string.Empty;
+        public List<string> LyDo { get; set; } = new();
+    }
+
+    public class HRC1_ChotPhieuBatchResult
+    {
+        public List<string> ThanhCong { get; set; } = new();
+        public List<HRC1_ChotPhieuBatchThatBai> ThatBai { get; set; } = new();
     }
 }

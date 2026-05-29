@@ -20,6 +20,10 @@ public class HRC1_MePhanCong
     // TL: mẻ thổi đích chuyển sang sau khi tinh luyện (null = giữ nguyên mẻ hiện tại)
     public int? ChuyenVeMeId { get; set; }
 
+    public bool? IsManualTL { get; set; }       // true = TL thêm tay, null/false = nhận tự động
+
+    public int? ScopePhieu { get; set; }       // lò số (lo_thoi) hoặc TL số (tinh_luyen) thực hiện mẻ này
+
     public int? XacNhanBoi { get; set; }       // ID_TaiKhoan
     public DateTime? XacNhanLuc { get; set; }
 }

@@ -34,6 +34,7 @@ public class HRC1_MeThep
     public bool? IsTrungMeThoi { get; set; }
     public bool? IsGhost { get; set; }
     public bool? IsChot { get; set; }             // kế hoạch chốt mẻ → khóa toàn bộ chỉnh sửa
+    public bool? IsManualTL { get; set; }         // true = mẻ do Tinh luyện tạo tay (độc lập, có thể xóa)
 
     [MaxLength(500)]
     public string? GhiChuLo { get; set; }

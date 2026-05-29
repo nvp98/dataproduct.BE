@@ -91,6 +91,53 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
+        /// Đồng bộ PhanLoai và MacThepBKMIS từ Linked Server vào bảng HRC1_MeThep.
+        /// Chỉ cập nhật những bản ghi còn null và không phải ghost.
+        /// </summary>
+        public async Task<SyncPhanLoaiResult> SyncHRC1MeThepAsync(List<string> maMes)
+        {
+            if (maMes == null || maMes.Count == 0)
+                return new SyncPhanLoaiResult();
+
+            var phanLoaiMap = await QueryViaStoredProcAsync("view_dq1_nmlt_nuocthep", maMes);
+
+            _logger.LogInformation("[SyncPhanLoai/HRC1_MeThep] MaMes={Count} | Linked Server có phân loại={Count2}",
+                maMes.Count, phanLoaiMap.Count);
+
+            if (phanLoaiMap.Count == 0)
+                return new SyncPhanLoaiResult { TotalFromMySQL = 0, TotalUpdated = 0 };
+
+            var maMesCoData = phanLoaiMap.Keys.ToList();
+            var rows = await _context.HRC1_MeTheps
+                .Where(x => maMesCoData.Contains(x.MaMe!)
+                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
+                         && x.IsGhost != true)
+                .ToListAsync();
+
+            int updated = 0;
+            foreach (var row in rows)
+            {
+                if (row.MaMe != null && phanLoaiMap.TryGetValue(row.MaMe, out var entry))
+                {
+                    row.PhanLoai = entry.PhanLoai;
+                    row.MacThepBKMIS = entry.GradeCode;
+                    updated++;
+                }
+            }
+
+            if (updated > 0)
+                await _context.SaveChangesAsync();
+
+            _logger.LogInformation("[SyncPhanLoai/HRC1_MeThep] Updated={Updated}", updated);
+
+            return new SyncPhanLoaiResult
+            {
+                TotalFromMySQL = phanLoaiMap.Count,
+                TotalUpdated   = updated
+            };
+        }
+
+        /// <summary>
         /// Lấy danh sách mã mẻ có PhanLoai IS NULL trong N ngày gần nhất.
         /// Dùng cho Background Service.
         /// </summary>
