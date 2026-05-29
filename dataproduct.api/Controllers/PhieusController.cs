@@ -176,7 +176,7 @@ namespace dataproduct.api.Controllers
                 {
                     success = true,
                     data = soPhieus,
-                    count = soPhieus.Count()
+                    count = soPhieus != null ? soPhieus.Max() : 100
                 });
             }
             catch (Exception ex)

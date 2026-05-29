@@ -513,7 +513,7 @@ namespace dataproduct.api.Repositories
             return (result, totalCount);
         }
 
-        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        public async Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             var query = _context.BmPhieus
                 .Where(x => x.MaBm == maBm)
@@ -528,7 +528,7 @@ namespace dataproduct.api.Repositories
             var result = await query
                 .OrderByDescending(x => x.NgaySX)
                 .ThenByDescending(x => x.Ca)
-                .Select(x => x.SoPhieu)
+                .Select(x => x.Scope)
                 .ToListAsync();
 
             return result;
