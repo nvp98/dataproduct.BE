@@ -41,7 +41,7 @@ namespace dataproduct.api.Services
             if (request.NgaySanXuat == DateTime.MinValue)
                 throw new Exception("Ngày vận hành không hợp lệ");
 
-            return await _repo.GetAutoDataAsync(request.IDLoCao, request.NgaySanXuat);
+            return await _repo.GetAutoDataAsync(request.IDLoCao, request.NgaySanXuat, request.IdPhieu);
         }
 
         // ─── Chi tiết (LG_NKVHPT_ChiTiet) ────────────────────────────────────────

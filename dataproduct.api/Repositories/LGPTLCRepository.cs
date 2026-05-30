@@ -13,17 +13,32 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh)
+        public async Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh, Guid? idPhieu = null)
         {
             var tuThoiGian = ngayVanHanh.Date.AddHours(8);
             var denThoiGian = ngayVanHanh.Date.AddDays(1).AddHours(7).AddMinutes(59).AddSeconds(59);
 
-            return await _context.LG_NKVHPT_DuLieu
+            List<int>? existingHours = null;
+            if (idPhieu.HasValue)
+            {
+                existingHours = await _context.LG_NKVHPT_ChiTiet
+                    .AsNoTracking()
+                    .Where(x => x.IDPhieu == idPhieu.Value)
+                    .Select(x => x.ThoiGian.Hour)
+                    .ToListAsync();
+            }
+
+            var query = _context.LG_NKVHPT_DuLieu
                 .AsNoTracking()
                 .Where(x =>
                     x.ID_LoCao == idLoCao &&
                     x.ThoiGian >= tuThoiGian &&
-                    x.ThoiGian <= denThoiGian)
+                    x.ThoiGian <= denThoiGian);
+
+            if (existingHours != null && existingHours.Count > 0)
+                query = query.Where(x => !existingHours.Contains(x.ThoiGian.Hour));
+
+            return await query
                 .OrderBy(x => x.ThoiGian)
                 .Select(x => new LG_NKVHPT_DuLieuAuto
                 {

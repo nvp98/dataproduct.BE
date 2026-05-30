@@ -19,6 +19,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public int IDLoCao { get; set; }
         public DateTime NgaySanXuat { get; set; }
+        public Guid? IdPhieu { get; set; }
     }
 
     // ─── Chi tiết phun than (LG_NKVHPT_ChiTiet) ─────────────────────────────────

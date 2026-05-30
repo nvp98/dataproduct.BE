@@ -22,14 +22,16 @@ namespace dataproduct.api.Controllers
         [HttpGet("get-phunthan-auto-data")]
         public async Task<IActionResult> GetDLPhunThanAutoData(
             [FromQuery] int idLoCao,
-            [FromQuery] DateTime ngaySanXuat)
+            [FromQuery] DateTime ngaySanXuat,
+            [FromQuery] Guid? idPhieu = null)
         {
             try
             {
                 var result = await _service.GetAutoDataAsync(new GetAutoDataRequest
                 {
                     IDLoCao = idLoCao,
-                    NgaySanXuat = ngaySanXuat
+                    NgaySanXuat = ngaySanXuat,
+                    IdPhieu = idPhieu
                 });
                 return Ok(result);
             }

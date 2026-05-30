@@ -8,7 +8,8 @@ namespace dataproduct.api.Utils
         public static async Task<string> GenerateAutoSoPhieu(ProductFormContext context, string prefix, int scope, int ca, DateOnly? ngaySX)
         {
             string today = ngaySX.Value.ToString("yyyyMMdd");
-            string caStr = ca == 1 ? "N" : "D";
+            string caStr = ca == 1 ? "N" :ca ==2 ? "D" :"";
+
             if(scope > 0){
                 return $"{prefix}-{today}-{caStr}-{scope}";
             }else{

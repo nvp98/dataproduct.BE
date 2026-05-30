@@ -321,7 +321,7 @@ namespace dataproduct.api.Repositories
 
     public interface ILGPTLCRepository
     {
-        Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh);
+        Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh, Guid? idPhieu = null);
         Task<List<LGPTLCChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
         Task DeleteChiTietByPhieuAsync(Guid idPhieu);
         Task AddChiTietRangeAsync(List<LG_NKVHPT_ChiTiet> entities);
