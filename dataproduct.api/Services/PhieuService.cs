@@ -246,9 +246,12 @@ namespace dataproduct.api.Business
             };
         }
 
-        public async Task<BmPhieu?> CreateAsync(JsonElement formData)
+        public async Task<BmPhieu?> CreateAsync(JsonElement formData, bool skipDuplicateCheck = false)
         {
-            await CheckDuplicateAsync(formData);
+            if (!skipDuplicateCheck)
+            {
+                await CheckDuplicateAsync(formData);
+            }
 
             try
             {
@@ -495,7 +498,7 @@ namespace dataproduct.api.Business
                 await _context.SaveChangesAsync();
 
                 // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
-                var phieu = await CreateAsync(formData);
+                var phieu = await CreateAsync(formData, skipDuplicateCheck: true);
                 if (phieu == null) return null;
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
@@ -847,6 +850,29 @@ namespace dataproduct.api.Business
                 tenCa = kip.TenCa,
                 tenKip = kip.TenKip
             };
+        }
+
+        /// <summary>
+        /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)
+        /// </summary>
+        public async Task<BmPhieu?> ResetPhieuAsync(Guid id)
+        {
+            var phieu = await _repo.GetByIdAsync(id);
+            if (phieu == null)
+                return null;
+
+            EnsurePhieuOperable(phieu);
+
+            // Reset về trạng thái Đang lưu (0)
+            phieu.TinhTrang = 0;
+            phieu.IsLock = 0;
+            phieu.IsDelete = 0;
+            phieu.IsClone = false;
+            // phieu.NgayTao = DateTime.Now;
+
+            await _repo.UpdateAsync(phieu);
+
+            return phieu;
         }
 
     }

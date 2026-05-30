@@ -263,26 +263,58 @@ namespace dataproduct.api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
             }
         }
-    }
 
+        /// <summary>
+        /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)
+        /// Sử dụng khi cần đưa phiếu trở lại trạng thái chỉnh sửa
+        /// </summary>
+        [HttpPut("{id}/reset")]
+        public async Task<IActionResult> ResetPhieu(Guid id)
+        {
+            try
+            {
+                var result = await _service.ResetPhieuAsync(id);
+                if (result == null)
+                    return NotFound(new { success = false, message = "Không tìm thấy phiếu" });
 
-    public class ChangeStatusRequest
-    {
-        public int Status { get; set; }
-        public int? IdUser { get; set; }
-    }
-
-    public class UpdatePhieuStatusRequest
-    {
-        public int? Status { get; set; }
-        public int? IsLock { get; set; }
-        public int? IsDelete { get; set; }
-    }
-
-    public class ChotNhieuPhieuRequest
-    {
-        public List<Guid> IdPhieus { get; set; } = new();
-        public int? IdUser { get; set; }
-        public int Status { get; set; }
+                return Ok(new
+                {
+                    success = true,
+                    message = "Reset phiếu thành công",
+                    data = result,
+                    tinhTrang = result.TinhTrang
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
+            }
+        }
     }
 }
+
+
+public class ChangeStatusRequest
+{
+    public int Status { get; set; }
+    public int? IdUser { get; set; }
+}
+
+public class UpdatePhieuStatusRequest
+{
+    public int? Status { get; set; }
+    public int? IsLock { get; set; }
+    public int? IsDelete { get; set; }
+}
+
+public class ChotNhieuPhieuRequest
+{
+    public List<Guid> IdPhieus { get; set; } = new();
+    public int? IdUser { get; set; }
+    public int Status { get; set; }
+}
+
