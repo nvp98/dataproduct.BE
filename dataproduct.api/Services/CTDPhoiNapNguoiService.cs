@@ -88,6 +88,45 @@ namespace dataproduct.api.Services
                 return 0;
 
             await _repo.AddListAsync(entities);
+
+            // ─────────────────────────────────────────────────────────────────────────
+            // Insert notes vào BM_Phieu_ChiTiet nếu có key "notes"
+            // ─────────────────────────────────────────────────────────────────────────
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
+            {
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (root.TryGetProperty("notes", out var notesElement) &&
+                    notesElement.ValueKind != JsonValueKind.Null &&
+                    !string.IsNullOrWhiteSpace(notesElement.GetString()))
+                {
+                    var notesValue = notesElement.GetString();
+
+                    // Xóa record cũ của notes (if any)
+                    var oldNotes = await _context.BmPhieuChiTiets
+                        .Where(x => x.PhieuId == phieu.Idphieu && x.ThongSo == "notes")
+                        .ToListAsync();
+
+                    if (oldNotes.Any())
+                    {
+                        _context.BmPhieuChiTiets.RemoveRange(oldNotes);
+                    }
+
+                    // Insert record mới
+                    var notesRecord = new BmPhieuChiTiet
+                    {
+                        PhieuId = phieu.Idphieu,
+                        ThongSo = "notes",
+                        GiaTri = notesValue,
+                        RowId = null
+                    };
+
+                    _context.BmPhieuChiTiets.Add(notesRecord);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             return entities.Count;
         }
 
@@ -322,6 +361,22 @@ namespace dataproduct.api.Services
             var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy, qlcl?.TinhTrang == 1);
             var signCTD = await FormatChuKyBase64Async(ctd?.ChuKy, ctd?.TinhTrang == 1);
 
+            // ─────────────────────────────────────────────────────────────────────────
+            // Lấy notes từ BmPhieuChiTiet và convert newline thành <br />
+            // ─────────────────────────────────────────────────────────────────────────
+            var notesRecord = await _context.BmPhieuChiTiets
+                .FirstOrDefaultAsync(x => x.PhieuId == phieuId && x.ThongSo == "notes");
+
+            var notesHtml = "";
+            if (!string.IsNullOrWhiteSpace(notesRecord?.GiaTri))
+            {
+                // Escape HTML entities và convert newline thành <br />
+                notesHtml = System.Net.WebUtility.HtmlEncode(notesRecord.GiaTri)
+                    .Replace("\r\n", "<br />")
+                    .Replace("\n", "<br />")
+                    .Replace("\r", "<br />");
+            }
+
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{XuongCan}}", xuongCan)
@@ -347,6 +402,8 @@ namespace dataproduct.api.Services
                 .Replace("{{Rows}}", rows.ToString())
                 .Replace("{{TongST}}", tongST.ToString("N0"))
                 .Replace("{{TongKL}}", tongKL.ToString("N0"))
+                // Notes
+                .Replace("{{Notes}}", notesHtml)
                 // Chữ ký
                 .Replace("{{ChuKyNguoiNhanHRC1}}", signHRC1)
                 .Replace("{{ChuKyNguoiNhanQLCL}}", signQLCL)

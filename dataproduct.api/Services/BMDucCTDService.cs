@@ -426,6 +426,12 @@ namespace dataproduct.api.Services
                 ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
                 idPhieu: idPhieu
             );
+            // lay thong tin mayDuc tu BM_Phieu (de hien thi tren header)
+            var phieu = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(x => x.Idphieu == idPhieu.Value)
+                .Select(x => new { x.MayDuc })
+                .FirstOrDefaultAsync();
 
             var data = items.ToList();
 
@@ -526,8 +532,8 @@ namespace dataproduct.api.Services
                 </tr>");
             }
 
-            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
-            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
 
             // Convert logo và chữ ký sang base64
@@ -570,6 +576,7 @@ namespace dataproduct.api.Services
                 .Replace("{{NgaySX}}", NgaySX.Value.ToString("dd/MM/yyyy"))
                 .Replace("{{Ca}}", Ca.Value.ToString())
                 .Replace("{{Kip}}", Kip)
+                .Replace("MayDuc", phieu?.MayDuc.ToString() ?? "")
 
                 // Content
                 //.Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
@@ -1082,7 +1089,7 @@ namespace dataproduct.api.Services
                 kip: request.Kip,
                 ngaySX: request.NgaySX,
                 idPhieu: request.IdPhieu,
-                mayDuc:request.MayDuc
+                mayDuc: request.MayDuc
             );
             var data = items.ToList();
 
