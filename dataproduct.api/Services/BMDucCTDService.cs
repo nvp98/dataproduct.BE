@@ -1017,6 +1017,18 @@ namespace dataproduct.api.Services
 
                 if (!allCapsApproved && tinhTrangChot == 1) // Nếu đang chốt mà chưa duyệt hết thì không cho chốt
                     throw new Exception("Không thể chốt! Vui lòng đảm bảo tất cả cấp đều đã duyệt");
+                // Nếu chốt thì check ở table BM_PheDuyet va update tinh trang xu ly cho cap duyet tuong ung
+                var pheDuyets = await _context.BmPheDuyets
+                   .Where(x => x.PhieuId == idPhieu && x.TinhTrang == 0) // chỉ lấy những phe duyệt đang ở trạng thái đã duyệt
+                   .ToListAsync();
+
+                if (tinhTrangChot == 1 && pheDuyets != null && pheDuyets.Count > 0) // chốt
+                {
+                    foreach (var pheDuyet in pheDuyets)
+                    {
+                        pheDuyet.TinhTrang = 1; // cập nhật thành đã xử lý
+                    }
+                }
 
                 // Bước 5: Khi chốt, cập nhật tình trạng rows = 1
                 foreach (var row in rowsToChot)
