@@ -415,6 +415,7 @@ namespace dataproduct.api.Repositories
                 KlLan2             = m.KlLan2,
                 KlLan3             = m.KlLan3,
                 KlThepLong         = m.KlThepLong,
+                KLThepLongPhanBo   = m.KLThepLongPhanBo,
                 GhiChuLo           = m.GhiChuLo,
                 IsThuNghiem        = m.IsThuNghiem,
                 IsManualTL         = m.IsManualTL,
@@ -495,7 +496,8 @@ namespace dataproduct.api.Repositories
                 allMes = allMes.Where(m => m.Kip == q.Kip).ToList();
 
             int total = allMes.Count;
-            decimal? totalKl = allMes.Sum(m => m.KlThepLong);
+            decimal? totalKl       = allMes.Sum(m => m.KlThepLong);
+            decimal? totalKlPhanBo = allMes.Sum(m => m.KLThepLongPhanBo);
 
             var paged = allMes
                 .Skip((q.Page - 1) * q.PageSize)
@@ -504,11 +506,12 @@ namespace dataproduct.api.Repositories
 
             return new HRC1_ThongKeResult
             {
-                Items           = paged.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict)).ToList(),
-                TotalRecords    = total,
-                TotalKlThepLong = totalKl,
-                Page            = q.Page,
-                PageSize        = q.PageSize,
+                Items                   = paged.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict)).ToList(),
+                TotalRecords            = total,
+                TotalKlThepLong         = totalKl,
+                TotalKlThepLongPhanBo   = totalKlPhanBo,
+                Page                    = q.Page,
+                PageSize                = q.PageSize,
             };
         }
 

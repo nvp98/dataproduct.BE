@@ -680,6 +680,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KlLan2).HasColumnType("decimal(10,2)");
             entity.Property(e => e.KlLan3).HasColumnType("decimal(10,2)");
             entity.Property(e => e.KlThepLong).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.KLThepLongPhanBo).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Kip).HasColumnType("nchar(1)");
             entity.Property(e => e.DichChuyen).HasMaxLength(20);
             entity.Property(e => e.GhiChuLo).HasMaxLength(500);
             entity.Property(e => e.PhanLoai).HasMaxLength(50);

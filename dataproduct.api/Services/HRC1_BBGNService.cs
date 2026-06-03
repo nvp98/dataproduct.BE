@@ -251,10 +251,11 @@ namespace dataproduct.api.Services
                 me.KlLan2     = req.KlLan2     ?? me.KlLan2;
                 me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
             }
-            me.IsThuNghiem    = req.IsThuNghiem    ?? me.IsThuNghiem;
-            me.IsTrungMeThoi  = req.IsTrungMeThoi  ?? me.IsTrungMeThoi;
-            me.GhiChuLo       = req.GhiChuLo       ?? me.GhiChuLo;
-            me.CapNhatBoi     = userId;
+            me.IsThuNghiem       = req.IsThuNghiem       ?? me.IsThuNghiem;
+            me.IsTrungMeThoi     = req.IsTrungMeThoi     ?? me.IsTrungMeThoi;
+            me.GhiChuLo          = req.GhiChuLo          ?? me.GhiChuLo;
+            me.KLThepLongPhanBo  = req.KlThepLongPhanBo  ?? me.KLThepLongPhanBo;
+            me.CapNhatBoi        = userId;
             me.CapNhatLuc     = DateTime.Now;
 
             _repo.AddLichSu(new HRC1_LichSu
@@ -1071,8 +1072,9 @@ namespace dataproduct.api.Services
                 KlLan1          = m.KlLan1,
                 KlLan2          = m.KlLan2,
                 KlLan3          = m.KlLan3,
-                KlThepLong      = m.KlThepLong,
-                DichChuyen      = m.DichChuyen,
+                KlThepLong          = m.KlThepLong,
+                KlThepLongPhanBo    = m.KLThepLongPhanBo,
+                DichChuyen          = m.DichChuyen,
                 TLDichSo        = m.TLDichSo,
                 IdMayDucDich    = m.IdMayDucDich,
                 TenMayDucDich   = tenMayDucDich,

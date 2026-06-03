@@ -48,6 +48,7 @@ namespace dataproduct.api.DTOs
         public bool? IsThuNghiem { get; set; }
         public bool? IsTrungMeThoi { get; set; }
         public string? GhiChuLo { get; set; }
+        public decimal? KlThepLongPhanBo { get; set; }
     }
 
     // -------------------------------------------------------
@@ -188,6 +189,7 @@ namespace dataproduct.api.DTOs
         public decimal? KlLan2 { get; set; }
         public decimal? KlLan3 { get; set; }
         public decimal? KlThepLong { get; set; }
+        public decimal? KLThepLongPhanBo { get; set; }
         public string? GhiChuLo { get; set; }
         public bool? IsThuNghiem { get; set; }
         public string? TenMayDuc { get; set; }
@@ -252,6 +254,7 @@ namespace dataproduct.api.DTOs
         public List<HRC1_ExportRow> Items { get; set; } = new();
         public int TotalRecords { get; set; }
         public decimal? TotalKlThepLong { get; set; }
+        public decimal? TotalKlThepLongPhanBo { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }
     }

@@ -69,6 +69,8 @@ public class HRC1_MeThep
 
     public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
 
-    [MaxLength(50)]
+    [MaxLength(1)]
     public string? Kip { get; set; }           // kíp của phiếu lò thổi
+
+    public decimal? KLThepLongPhanBo { get; set; }
 }
