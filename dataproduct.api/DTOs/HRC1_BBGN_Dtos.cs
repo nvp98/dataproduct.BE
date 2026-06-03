@@ -204,9 +204,10 @@ namespace dataproduct.api.DTOs
         public int? TrangThaiDuc { get; set; }
         public bool? IsChot { get; set; }
         public DateTime NgayTao { get; set; }
-        public DateTime? NgayNhanTL { get; set; }
         public int? Ca { get; set; }
         public string? Kip { get; set; }
+        public DateTime? NgayNhanTL { get; set; }
+        public int? CaTinhLuyen { get; set; }
         public string? TenNhomPhanLoai { get; set; }      // Nhóm phân loại mác thép
         public string? TenCapNhatBoiLo { get; set; }   // người sửa lò thổi (CapNhatBoi)
         public string? TenCapNhatBoiTL { get; set; }   // người sửa tinh luyện (CapNhatBoiTL)

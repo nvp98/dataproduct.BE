@@ -371,15 +371,11 @@ namespace dataproduct.api.Services
             if (await _repo.ExistsMePhanCongAsync(req.MeId, "tinh_luyen"))
                 throw new InvalidOperationException("Mẻ đã được nhận vào tinh luyện.");
 
-            // Ghi nhận thời điểm TL nhận mẻ theo ngày/ca của phiếu TL.
-            // GetMeThepsByMayDucAsync dùng NgayNhanTL để lọc ca cho mẻ tinh_luyen,
-            // giữ nguyên NgayTao (ngày tạo thực tế từ sync gang lỏng).
             var phieuTL = await _repo.GetBmPhieuAsync(req.IdPhieu);
             if (phieuTL?.NgaySX.HasValue == true && phieuTL.Ca.HasValue)
             {
-                me.NgayNhanTL = phieuTL.Ca.Value == 1
-                    ? phieuTL.NgaySX.Value.ToDateTime(new TimeOnly(6, 0))
-                    : phieuTL.NgaySX.Value.ToDateTime(new TimeOnly(18, 0));
+                me.NgayNhanTL  = phieuTL.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+                me.CaTinhLuyen = phieuTL.Ca;
             }
 
             _repo.AddMePhanCong(new HRC1_MePhanCong
@@ -506,6 +502,7 @@ namespace dataproduct.api.Services
 
             me.TrangThaiTL   = null;
             me.NgayNhanTL    = null;
+            me.CaTinhLuyen   = null;
             me.ThoiGian      = null;
             me.KlLan1        = null;
             me.KlLan2        = null;
@@ -715,10 +712,8 @@ namespace dataproduct.api.Services
             var phieu = await _repo.GetBmPhieuAsync(req.IdPhieu)
                 ?? throw new KeyNotFoundException($"Không tìm thấy phiếu {req.IdPhieu}.");
 
-            var ngayNhanTL = (phieu.NgaySX.HasValue && phieu.Ca.HasValue)
-                ? (phieu.Ca.Value == 1
-                    ? phieu.NgaySX.Value.ToDateTime(new TimeOnly(6, 0))
-                    : phieu.NgaySX.Value.ToDateTime(new TimeOnly(18, 0)))
+            var ngayNhanTL = phieu.NgaySX.HasValue
+                ? phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue)
                 : DateTime.Now;
 
             // Tạo HRC1_MeThep mới — độc lập với mẻ gốc lò thổi
@@ -730,6 +725,7 @@ namespace dataproduct.api.Services
                 IsManualTL   = true,
                 TrangThaiTL  = 1,
                 NgayNhanTL   = ngayNhanTL,
+                CaTinhLuyen  = phieu.Ca,
                 NgayTao      = ngayNhanTL,
                 CapNhatBoi   = userId,
                 CapNhatLuc   = DateTime.Now,

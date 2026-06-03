@@ -65,7 +65,8 @@ public class HRC1_MeThep
     public int? CapNhatBoiDuc { get; set; }    // ID_TaiKhoan (máy đúc cuối)
 
     public DateTime NgayTao { get; set; }      // set by SQL DEFAULT GETDATE() on insert; không thay đổi sau khi tạo
-    public DateTime? NgayNhanTL { get; set; }  // thời điểm TL nhận mẻ; dùng để lọc ca cho phiếu máy đúc
+    public DateTime? NgayNhanTL { get; set; }  // ngày TL nhận mẻ (date-only; dùng để lọc ngày cho phiếu máy đúc)
+    public int? CaTinhLuyen { get; set; }      // ca khi TL nhận mẻ (1=ngày, 2=đêm); dùng để lọc ca cho phiếu máy đúc
 
     public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
 

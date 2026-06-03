@@ -91,27 +91,24 @@ namespace dataproduct.api.Repositories
         public Task<List<HRC1_MeThep>> GetMeThepsByIdsAsync(IEnumerable<int> meIds) =>
             _ctx.HRC1_MeTheps.Where(m => meIds.Contains(m.Id)).ToListAsync();
 
-        // Mẻ thuộc phiếu máy đúc: lọc theo IdMayDucDich + khoảng ca
-        // - tinh_luyen: dùng NgayNhanTL (ngày TL nhận mẻ, không phải ngày lò thổi tạo)
-        // - len_thang:  dùng NgayTao    (ngày lò thổi sync, vì không qua TL)
-        // Ca 1 (ngày): 08:00–20:00; Ca 2 (đêm): 20:00–08:00 hôm sau
+        // Mẻ thuộc phiếu máy đúc:
+        // - tinh_luyen: IdMayDucDich + CaTinhLuyen + date(NgayNhanTL) == ngay
+        // - len_thang:  IdMayDucDich + Ca           + date(NgayTao)    == ngay
         public Task<List<HRC1_MeThep>> GetMeThepsByMayDucAsync(DateOnly ngay, int ca, int idMayDuc)
         {
-            var start = ca == 1
-                ? ngay.ToDateTime(new TimeOnly(8, 0))
-                : ngay.ToDateTime(new TimeOnly(20, 0));
-            var end = ca == 1
-                ? ngay.ToDateTime(new TimeOnly(20, 0))
-                : ngay.AddDays(1).ToDateTime(new TimeOnly(8, 0));
+            var ngayStart = ngay.ToDateTime(TimeOnly.MinValue);
+            var ngayEnd   = ngay.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
             return _ctx.HRC1_MeTheps
                 .Where(m => m.IdMayDucDich == idMayDuc
                          && (
                              (m.NgayNhanTL.HasValue
-                                 && m.NgayNhanTL.Value >= start && m.NgayNhanTL.Value < end)
+                                 && m.CaTinhLuyen == ca
+                                 && m.NgayNhanTL.Value >= ngayStart && m.NgayNhanTL.Value < ngayEnd)
                              ||
                              (m.DichChuyen == "len_thang"
-                                 && m.NgayTao >= start && m.NgayTao < end)
+                                 && m.Ca == ca
+                                 && m.NgayTao >= ngayStart && m.NgayTao < ngayEnd)
                          ))
                 .OrderBy(m => m.NgayNhanTL.HasValue ? m.NgayNhanTL : m.NgayTao)
                 .ToListAsync();
@@ -430,9 +427,10 @@ namespace dataproduct.api.Repositories
                 TrangThaiDuc       = m.TrangThaiDuc,
                 IsChot             = m.IsChot,
                 NgayTao            = m.NgayTao,
-                NgayNhanTL         = m.NgayNhanTL,
                 Ca                 = m.Ca,
                 Kip                = m.Kip,
+                NgayNhanTL         = m.NgayNhanTL,
+                CaTinhLuyen        = m.CaTinhLuyen,
                 TenNhomPhanLoai    = tenNhom,
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
