@@ -2124,7 +2124,7 @@ namespace dataproduct.api.Services
                 // ★ Lấy dữ liệu phôi nhập kho từ phiếu
                 var phoiNhapKhoData = await _context.BM_PhoiNhapKho
                     .AsNoTracking()
-                    .Where(x => x.IdPhieu == phieuId)
+                    .Where(x => x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date && x.Ca == phieu.Ca && x.MayDuc == phieu.MayDuc) // Giới hạn dữ liệu theo ngày sản xuất và ca của phiếu
                     .OrderBy(x => x.NgaySX)
                     .ThenBy(x => x.Ca)
                     .ThenBy(x => x.Me)
