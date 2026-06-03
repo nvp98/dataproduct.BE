@@ -169,8 +169,25 @@ namespace dataproduct.api.Controllers
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
         {
-            var file = await _service.ExportPdfDynamicAsync(id, filters);
-            return File(file.Content, file.ContentType, file.FileName);
+            try
+            {
+                var file = await _service.ExportPdfDynamicAsync(id, filters);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (NotSupportedException ex) { return StatusCode(501, ex.Message); }
+            catch (Exception ex)             { return StatusCode(500, ex.Message); }
+        }
+
+        [HttpGet("{id:guid}/export-excel-detail")]
+        public async Task<IActionResult> ExportExcelDetail(Guid id)
+        {
+            try
+            {
+                var file = await _service.ExportDetailExcelDynamicAsync(id);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (NotSupportedException ex) { return StatusCode(501, ex.Message); }
+            catch (Exception ex)             { return StatusCode(500, ex.Message); }
         }
 
         [HttpGet("export-excel-tonghop")]

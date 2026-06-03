@@ -57,6 +57,11 @@ namespace dataproduct.api.ResponseModels
 
         // Tên người sửa cuối theo công đoạn hiện tại (populated by service)
         public string? TenCapNhatBoi { get; set; }
+
+        // Chuyển mẻ (Tinh luyện chọn mẻ đích để báo cáo chuyển sang)
+        public int? ChuyenVeMeId { get; set; }       // FK→HRC1_MeThep của mẻ đích
+        public string? ChuyenVeMaMe { get; set; }    // MaMe của mẻ đích
+        public string? TenMayDucChuyen { get; set; } // Tên máy đúc của mẻ đích
     }
 
     public class HRC1_ChoNhanMeVm
@@ -74,6 +79,7 @@ namespace dataproduct.api.ResponseModels
         public string? TenNguoiNhan { get; set; }   // HoVaTen của người TL nhận mẻ
         public DateTime NgayTao { get; set; }
         public DateTime? NgayNhanTL { get; set; }
+        public string? TenMayDuc { get; set; }   // chỉ có khi DichChuyen=len_thang
     }
 
     // Mẻ trùng khi thêm tay (phiếu TL khác đã nhận mẻ này)

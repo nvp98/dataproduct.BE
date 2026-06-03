@@ -72,6 +72,7 @@ namespace dataproduct.api.DTOs
         public string? MacThepBKMIS { get; set; }
         public int? IdMacThep { get; set; }
         public string? GhiChuTL { get; set; }
+        public int? ChuyenVeMeId { get; set; }     // FK→HRC1_MeThep; null = không chuyển
     }
 
     public class HRC1_ThemDongTLRequest
@@ -147,6 +148,112 @@ namespace dataproduct.api.DTOs
     public class HRC1_UpdateGhiChuRequest
     {
         public string? GhiChu { get; set; }
+    }
+
+    // -------------------------------------------------------
+    // Export Excel / PDF — điều kiện tìm kiếm
+    // -------------------------------------------------------
+    public class HRC1_ExportQuery
+    {
+        public DateOnly? TuNgay { get; set; }
+        public DateOnly? DenNgay { get; set; }
+        public int? Ca { get; set; }              // 1=Ca ngày, 2=Ca đêm
+        public string? Kip { get; set; }
+        public string? MaMe { get; set; }
+        public int? LoSo { get; set; }            // lò thổi số 1–5
+        public int? TlSo { get; set; }            // tinh luyện số 1–5
+        public int? IdMayDuc { get; set; }        // FK→MayDuc
+        public int? TrangThaiLo { get; set; }
+        public int? TrangThaiTL { get; set; }
+        public int? TrangThaiDuc { get; set; }
+        public string? ThungSo { get; set; }
+        public string? PhanLoai { get; set; }
+        public bool? IsChot { get; set; }
+        public bool? IsManualTL { get; set; }
+        public bool? ChuaCoNhomPhanLoai { get; set; } // true = chỉ lấy mẻ chưa có nhóm phân loại
+        public int? IdNhomPhanLoai { get; set; }
+    }
+
+    // -------------------------------------------------------
+    // Export row — kết quả trả về từ repository cho exporter + thống kê
+    // -------------------------------------------------------
+    public class HRC1_ExportRow
+    {
+        public int MeId { get; set; }
+        public string? MaMe { get; set; }
+        public string? ThungSo { get; set; }
+        public string? ThoiGian { get; set; }
+        public decimal? KLLFSauThep { get; set; }
+        public decimal? KlLan1 { get; set; }
+        public decimal? KlLan2 { get; set; }
+        public decimal? KlLan3 { get; set; }
+        public decimal? KlThepLong { get; set; }
+        public string? GhiChuLo { get; set; }
+        public bool? IsThuNghiem { get; set; }
+        public string? TenMayDuc { get; set; }
+        public string? MacThep { get; set; }
+        public string? PhanLoai { get; set; }
+        public string? MacThepBKMIS { get; set; }
+        public string? TinhLuyenLenThang { get; set; }   // "Tinh luyện" | "Lên thẳng"
+        public bool? IsTrungMeThoi { get; set; }
+        public bool? IsManualTL { get; set; }
+        public int? TrangThaiLo { get; set; }
+        public int? TrangThaiTL { get; set; }
+        public int? TrangThaiDuc { get; set; }
+        public bool? IsChot { get; set; }
+        public DateTime NgayTao { get; set; }
+        public DateTime? NgayNhanTL { get; set; }
+        public int? Ca { get; set; }
+        public string? Kip { get; set; }
+        public string? TenNhomPhanLoai { get; set; }      // Nhóm phân loại mác thép
+        public string? TenCapNhatBoiLo { get; set; }   // người sửa lò thổi (CapNhatBoi)
+        public string? TenCapNhatBoiTL { get; set; }   // người sửa tinh luyện (CapNhatBoiTL)
+        public string? TenCapNhatBoiDuc { get; set; }  // người xác nhận máy đúc (CapNhatBoiDuc)
+    }
+
+    // -------------------------------------------------------
+    // Tổng hợp — item nhóm (label + số mẻ)
+    // -------------------------------------------------------
+    public class HRC1_TongHopItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public int SoMe { get; set; }
+    }
+
+    // -------------------------------------------------------
+    // Tổng hợp — kết quả nhóm theo các chiều
+    // -------------------------------------------------------
+    public class HRC1_TongHopResult
+    {
+        public List<HRC1_TongHopItem> PhanLoai { get; set; } = new();
+        public List<HRC1_TongHopItem> Ca { get; set; } = new();
+        public List<HRC1_TongHopItem> Kip { get; set; } = new();
+        public List<HRC1_TongHopItem> TinhLuyenLenThang { get; set; } = new();
+        public List<HRC1_TongHopItem> DucVuong { get; set; } = new();
+        public List<HRC1_TongHopItem> DucTam { get; set; } = new();
+        public List<HRC1_TongHopItem> NhomPhanLoaiMacThep { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Thống kê — query có phân trang (extends HRC1_ExportQuery)
+    // -------------------------------------------------------
+    public class HRC1_ThongKeQuery : HRC1_ExportQuery
+    {
+        public bool? IsTrungMeThoi { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
+
+    // -------------------------------------------------------
+    // Thống kê — kết quả phân trang
+    // -------------------------------------------------------
+    public class HRC1_ThongKeResult
+    {
+        public List<HRC1_ExportRow> Items { get; set; } = new();
+        public int TotalRecords { get; set; }
+        public decimal? TotalKlThepLong { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
     }
 
     // -------------------------------------------------------

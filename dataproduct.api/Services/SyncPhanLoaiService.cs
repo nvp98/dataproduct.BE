@@ -120,7 +120,7 @@ namespace dataproduct.api.Services
                 if (row.MaMe != null && phanLoaiMap.TryGetValue(row.MaMe, out var entry))
                 {
                     row.PhanLoai = entry.PhanLoai;
-                    row.MacThepBKMIS = entry.GradeCode;
+                    row.MacThepBKMIS = entry.GradeCode?.Trim();
                     updated++;
                 }
             }

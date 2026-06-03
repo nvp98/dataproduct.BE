@@ -66,4 +66,9 @@ public class HRC1_MeThep
 
     public DateTime NgayTao { get; set; }      // set by SQL DEFAULT GETDATE() on insert; không thay đổi sau khi tạo
     public DateTime? NgayNhanTL { get; set; }  // thời điểm TL nhận mẻ; dùng để lọc ca cho phiếu máy đúc
+
+    public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
+
+    [MaxLength(50)]
+    public string? Kip { get; set; }           // kíp của phiếu lò thổi
 }

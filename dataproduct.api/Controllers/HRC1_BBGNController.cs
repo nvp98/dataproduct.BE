@@ -17,9 +17,12 @@ namespace dataproduct.api.Controllers
         private readonly BBGN_ThepLongService _bbgnSvc;
         private readonly SyncPhanLoaiService _syncSvc;
 
-        public HRC1_BBGNController(HRC1_BBGNService svc, BBGN_ThepLongService bbgnSvc, SyncPhanLoaiService syncSvc)
+        public HRC1_BBGNController(
+            HRC1_BBGNService svc,
+            BBGN_ThepLongService bbgnSvc,
+            SyncPhanLoaiService syncSvc)
         {
-            _svc = svc;
+            _svc     = svc;
             _bbgnSvc = bbgnSvc;
             _syncSvc = syncSvc;
         }
@@ -374,6 +377,53 @@ namespace dataproduct.api.Controllers
             catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
             catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        // -------------------------------------------------------
+        // Export
+        // -------------------------------------------------------
+
+        /// <summary>GET /api/hrc1/thong-ke — tìm kiếm phân trang từ HRC1_MeThep</summary>
+        [HttpGet("thong-ke")]
+        public async Task<IActionResult> ThongKe([FromQuery] HRC1_ThongKeQuery query)
+        {
+            try
+            {
+                var result = await _svc.SearchThongKeAsync(query);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>GET /api/hrc1/thong-ke/tong-hop — tổng hợp theo nhóm từ HRC1_MeThep</summary>
+        [HttpGet("thong-ke/tong-hop")]
+        public async Task<IActionResult> TongHop([FromQuery] HRC1_ThongKeQuery query)
+        {
+            try
+            {
+                var result = await _svc.TongHopAsync(query);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>GET /api/hrc1/export/excel — xuất Excel danh sách mẻ theo điều kiện lọc</summary>
+        [HttpGet("export/excel")]
+        public async Task<IActionResult> ExportExcel([FromQuery] HRC1_ExportQuery query)
+        {
+            try
+            {
+                var result = await _svc.ExportExcelAsync(query);
+                return File(result.Content, result.ContentType, result.FileName);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>GET /api/hrc1/export/pdf — xuất PDF (chưa triển khai)</summary>
+        [HttpGet("export/pdf")]
+        public IActionResult ExportPdf([FromQuery] HRC1_ExportQuery _)
+        {
+            return StatusCode(501, "Chưa hỗ trợ export PDF cho HRC1 BBGN Thép lỏng.");
         }
 
         // -------------------------------------------------------
