@@ -1196,7 +1196,7 @@ namespace dataproduct.api.Services
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
-                    <td>{t.NgaySX:dd/MM/yyyy}</td>
+                    <td>{t.NgayGiao:dd/MM/yyyy}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>
