@@ -222,7 +222,8 @@ namespace dataproduct.api.Repositories
                     TongKhoiLuong = x.TongKhoiLuong,
                     TinhTrangCap0 = x.TinhTrangCap0,
                     TinhTrangCap1 = x.TinhTrangCap1,
-                    TinhTrangCap2 = x.TinhTrangCap2
+                    TinhTrangCap2 = x.TinhTrangCap2,
+                    TinhTrang = x.TinhTrang
                 })
                 .ToListAsync();
         }

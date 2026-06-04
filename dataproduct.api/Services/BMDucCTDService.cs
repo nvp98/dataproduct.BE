@@ -1196,7 +1196,7 @@ namespace dataproduct.api.Services
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
-                    <td>{t.NgayGiao:dd/MM/yyyy}</td>
+                    <td>{t.NgaySX:dd/MM/yyyy}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>
@@ -2121,15 +2121,24 @@ namespace dataproduct.api.Services
                 if (phieu == null)
                     throw new ArgumentException($"Không tìm thấy phiếu với ID: {phieuId}");
 
+
+                var phoiNhapKhoData = await _repo.GetPhoiNhapKhoChiTietAsync(
+                            ca: phieu.Ca.Value,
+                            kip: phieu.Kip,
+                            ngaySX: phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue),
+                            idPhieu: phieu.Idphieu,
+                            mayDuc: phieu.MayDuc
+                        );
+
                 // ★ Lấy dữ liệu phôi nhập kho từ phiếu
-                var phoiNhapKhoData = await _context.BM_PhoiNhapKho
-                    .AsNoTracking()
-                    .Where(x => x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date && x.Ca == phieu.Ca && x.MayDuc == phieu.MayDuc) // Giới hạn dữ liệu theo ngày sản xuất và ca của phiếu
-                    .OrderBy(x => x.NgaySX)
-                    .ThenBy(x => x.Ca)
-                    .ThenBy(x => x.Me)
-                    .ThenBy(x => x.Mac)
-                    .ToListAsync();
+                // var phoiNhapKhoData = await _context.BM_PhoiNhapKho
+                //     .AsNoTracking()
+                //     .Where(x => x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date && x.Ca == phieu.Ca && x.MayDuc == phieu.MayDuc) // Giới hạn dữ liệu theo ngày sản xuất và ca của phiếu
+                //     .OrderBy(x => x.NgaySX)
+                //     .ThenBy(x => x.Ca)
+                //     .ThenBy(x => x.Me)
+                //     .ThenBy(x => x.Mac)
+                //     .ToListAsync();
 
                 if (!phoiNhapKhoData.Any())
                     throw new ArgumentException($"Phiếu {phieuId} không có dữ liệu phôi nhập kho");
