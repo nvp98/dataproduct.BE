@@ -92,7 +92,7 @@ namespace dataproduct.api.Services
 
         /// <summary>
         /// Đồng bộ PhanLoai và MacThepBKMIS từ Linked Server vào bảng HRC1_MeThep.
-        /// Chỉ cập nhật những bản ghi còn null và không phải ghost.
+        /// Chỉ cập nhật những bản ghi chưa chốt và không phải ghost.
         /// </summary>
         public async Task<SyncPhanLoaiResult> SyncHRC1MeThepAsync(List<string> maMes)
         {
@@ -110,7 +110,7 @@ namespace dataproduct.api.Services
             var maMesCoData = phanLoaiMap.Keys.ToList();
             var rows = await _context.HRC1_MeTheps
                 .Where(x => maMesCoData.Contains(x.MaMe!)
-                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
+                         && x.IsChot != true
                          && x.IsGhost != true)
                 .ToListAsync();
 
