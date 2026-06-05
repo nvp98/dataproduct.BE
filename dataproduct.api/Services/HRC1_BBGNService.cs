@@ -422,6 +422,7 @@ namespace dataproduct.api.Services
             me.ThoiGian      = req.ThoiGian      ?? me.ThoiGian;
             me.KlLan1        = req.KlLan1        ?? me.KlLan1;
             me.KlLan2        = req.KlLan2        ?? me.KlLan2;
+            me.KlLan3        = req.KlLan3        ?? me.KlLan3;
             me.KlThepLong    = req.KlThepLong    ?? me.KlThepLong;
             me.IdMayDucDich  = req.IdMayDucDich  ?? me.IdMayDucDich;
             me.PhanLoai      = req.PhanLoai      ?? me.PhanLoai;
@@ -429,6 +430,12 @@ namespace dataproduct.api.Services
             me.MacThepBKMIS  = req.MacThepBKMIS  ?? me.MacThepBKMIS;
             me.IdMacThep     = req.IdMacThep     ?? me.IdMacThep;
             me.GhiChuTL      = req.GhiChuTL      ?? me.GhiChuTL;
+            // Chỉ mẻ IsManualTL mới được TinhLuyen ghi các field thường do LoThoi nhập
+            if (me.IsManualTL == true)
+            {
+                me.ThungSo     = req.ThungSo     ?? me.ThungSo;
+                me.KLLFSauThep = req.KllfSauThep ?? me.KLLFSauThep;
+            }
             me.CapNhatBoi    = userId;
             me.CapNhatLuc    = DateTime.Now;
             me.CapNhatBoiTL  = userId;

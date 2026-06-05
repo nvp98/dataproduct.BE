@@ -66,8 +66,12 @@ namespace dataproduct.api.DTOs
         public string? ThoiGian { get; set; }      // HH:mm
         public decimal? KlLan1 { get; set; }       // disabled nếu DichChuyen = len_thang
         public decimal? KlLan2 { get; set; }
+        public decimal? KlLan3 { get; set; }
         public decimal? KlThepLong { get; set; }   // FE tự tính, gửi kèm để persist
         public int? IdMayDucDich { get; set; }     // disabled nếu DichChuyen = len_thang
+        // Chỉ áp dụng khi IsManualTL — mẻ do TinhLuyen tạo tay, không có LoThoi nhập
+        public string? ThungSo { get; set; }
+        public decimal? KllfSauThep { get; set; }
         public string? PhanLoai { get; set; }
         public string? MacThep { get; set; }
         public string? MacThepBKMIS { get; set; }
