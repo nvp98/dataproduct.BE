@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Biên bản giao nhận thép lỏng - HRC1</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Times New Roman", serif; font-size: 11pt; color: #000; }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 12mm 12mm 10mm 12mm;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    .header {
+        display: table;
+        width: 100%;
+        margin-bottom: 6px;
+      }
+
+      .header-left {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        font-weight: bold;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+      }
+
+      .header-left img {
+        max-height: 60px;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+
+      .header-right {
+        display: table-cell;
+        width: 50%;
+        vertical-align: middle;
+        text-align: right;
+        font-size: 8pt;
+        line-height: 1.5;
+      }
+
+    .title {
+      text-align: center;
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin: 8px 0 5px;
+    }
+    .sub-title {
+      text-align: center;
+      font-size: 9.5pt;
+      margin-bottom: 8px;
+      line-height: 1.8;
+    }
+
+    .info-wrap { margin: 6px 0; font-size: 11pt; }
+    .info-row  { margin: 3px 0; }
+    .info-italic { font-style: italic; margin: 7px 0 9px; }
+
+    table.main-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin-top: 6px;
+    }
+    .main-table th,
+    .main-table td {
+      border: 1px solid #333;
+      padding: 2px 3px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .main-table th { font-weight: bold; background-color: #f0f0f0; }
+    .col-tt    { width: 4%;    }
+    .col-may   { width: 13%;    }
+    .col-mac   { width: 14%;   }  /* Mác thép — rộng hơn */
+    .col-thung { width: 6%;    }
+    .col-tg    { width: 6%;    }  /* Thời gian — hẹp lại */
+    .col-a     { width: 8.5%;  }  /* KL a — nhỏ lại */
+    .col-b     { width: 7%;    }  /* KL b — nhỏ lại */
+    .col-c     { width: 8.5%;  }  /* KL c — nhỏ lại */
+    .col-kl    { width: 8%;    }  /* KL thép lỏng — nhỏ lại */
+    .col-gc    { width: 13.5%;  }
+    .col-tl    { width: 12.5%; }
+    .sum-label { font-weight: bold; }
+
+    .legal-note { margin-top: 10px; font-size: 8.5pt; font-style: italic; }
+
+    .sig-section { display: flex; justify-content: space-around; margin-top: 24px; }
+    .sig-block { text-align: center; width: 44%; }
+    .sig-title { font-weight: bold; font-size: 11pt; margin-bottom: 4px; }
+    .sig-note  { font-size: 9.5pt; font-style: italic; color: #444; }
+    .sig-space { height: 36px; }
+    .sig-line  { border-top: 1px solid #000; margin: 0 20px 4px; }
+    .sig-name  { font-weight: bold; }
+
+    @page { size: A4 portrait; margin: 0; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{{LogoUrl}}" alt="Logo" />
+      <br />
+      CÔNG TY CỔ PHẦN THÉP<br />
+      HÒA PHÁT DUNG QUẤT
+    </div>
+    <div class="header-right">
+      {{BmCode}}
+    </div>
+  </div>
+
+  <!-- TIÊU ĐỀ -->
+  <div class="title">BIÊN BẢN GIAO NHẬN THÉP LỎNG</div>
+  <div class="sub-title">
+    Kíp&nbsp;<strong>{{Kip}}</strong>
+    &nbsp;Từ&nbsp;<strong>{{TuGio}}</strong>&nbsp;giờ ngày&nbsp;<strong>{{TuNgay}}</strong>
+    &nbsp;đến&nbsp;<strong>{{DenGio}}</strong>&nbsp;giờ ngày&nbsp;<strong>{{DenNgay}}</strong>
+  </div>
+
+  <!-- THÔNG TIN HAI BÊN -->
+  <div class="info-wrap">
+    <div style="margin-bottom:3px;">Chúng tôi gồm:</div>
+    <div class="info-row">
+      1. Bên giao &nbsp;: Ông/bà: <strong>{{TenBenGiao}}</strong>
+      &nbsp;&nbsp;Chức vụ: {{ChucVuBenGiao}}
+      &nbsp;&nbsp;{{NhaMayBenGiao}}
+    </div>
+    <div class="info-row">
+      2. Bên nhận: Ông/bà: <strong>{{TenBenNhan}}</strong>
+      &nbsp;&nbsp;Chức vụ: {{ChucVuBenNhan}}
+      &nbsp;&nbsp;{{NhaMayBenNhan}}
+    </div>
+    <div class="info-italic">
+      Cùng nhau thống nhất lập "Biên bản giao nhận thép lỏng" chi tiết như sau:
+    </div>
+  </div>
+
+  <!-- BẢNG DỮ LIỆU -->
+  <table class="main-table">
+    <colgroup>
+      <col class="col-tt"    />
+      <col class="col-may"   />
+      <col class="col-mac"   />
+      <col class="col-thung" />
+      <col class="col-tg"    />
+      <col class="col-a"     />
+      <col class="col-b"     />
+      <col class="col-c"     />
+      <col class="col-kl"    />
+      <col class="col-gc"    />
+      <col class="col-tl"    />
+    </colgroup>
+    <thead>
+      <tr>
+        <th rowspan="2">TT</th>
+        <th rowspan="2">Máy đúc</th>
+        <th rowspan="2">Mác thép</th>
+        <th rowspan="2">Thùng số</th>
+        <th rowspan="2">Thời gian</th>
+        <th colspan="3">KL. thùng &amp; thép lỏng vào bệ xoay (tấn) - lần 1</th>
+        <th rowspan="2">KL. thép lỏng (tấn)</th>
+        <th rowspan="2">Ghi chú</th>
+        <th rowspan="2">Tinh luyện / Lên thẳng</th>
+      </tr>
+      <tr>
+        <th>a</th>
+        <th>b</th>
+        <th>c</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{Rows}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="8" class="sum-label">Tổng</td>
+        <td><strong>{{TongKl}}</strong></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- GHI CHÚ PHÁP LÝ -->
+  <div class="legal-note">
+    Ghi chú: Biên bản này được lập thành 2 bản có giá trị như nhau: bên giao và bên nhận mỗi bên giữ 1 bản.
+  </div>
+
+  <!-- CHỮ KÝ -->
+    <table style="width:100%; margin-top:24px; border:none; border-collapse:collapse;">
+      <tr>
+        <td style="width:50%; text-align:center; border:none; vertical-align:top;">
+          <div style="font-weight:bold; font-size:11pt; margin-bottom:8px;">BÊN GIAO</div>
+          <!-- {{BenGiaoHtml}} -->
+        </td>
+        <td style="width:50%; text-align:center; border:none; vertical-align:top;">
+          <div style="font-weight:bold; font-size:11pt; margin-bottom:8px;">BÊN NHẬN</div>
+          <!-- {{BenNhanHtml}} -->
+        </td>
+      </tr>
+    </table>
+
+</div>
+</body>
+</html>
