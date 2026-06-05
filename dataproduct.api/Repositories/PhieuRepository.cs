@@ -580,22 +580,22 @@ namespace dataproduct.api.Repositories
             return (result, totalCount);
         }
 
-        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        public async Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             var query = _context.BmPhieus
-                .Where(x => x.IsDelete != 1 && x.IsLock != 1 && x.MaBm == maBm)
+                .Where(x => x.MaBm == maBm)
                 .AsQueryable();
 
             if (ngaySX.HasValue)
                 query = query.Where(x => x.NgaySX == ngaySX.Value);
 
-            if (ca.HasValue)
-                query = query.Where(x => x.Ca == ca.Value);
+            // if (ca.HasValue)
+            //     query = query.Where(x => x.Ca == ca.Value);
 
             var result = await query
                 .OrderByDescending(x => x.NgaySX)
                 .ThenByDescending(x => x.Ca)
-                .Select(x => x.SoPhieu)
+                .Select(x => x.Scope)
                 .ToListAsync();
 
             return result;

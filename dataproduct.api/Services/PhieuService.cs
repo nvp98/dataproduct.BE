@@ -75,6 +75,21 @@ namespace dataproduct.api.Business
             return await exporter.ExportPdfAsync(phieuId);
         }
 
+        public async Task<DTOs.Export.ExportFileResult> ExportExcelDynamicPhieuAsync(Guid phieuId)
+        {
+            var phieu = await _repo.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var exporter = _excelExporters.FirstOrDefault(x => x.CanHandle(phieu.MaBm));
+            if (exporter == null)
+                throw new NotSupportedException($"Chưa cấu hình export excel cho biểu mẫu: {phieu.MaBm}");
+
+
+            return await exporter.ExportExcelPhieuAsync(phieuId);
+        }
+
+
         public async Task<DTOs.Export.ExportFileResult> ExportTongHopExcelDynamicAsync(string? maBm, DateOnly? fromDate, DateOnly? toDate)
         {
             if (string.IsNullOrWhiteSpace(maBm))
@@ -86,6 +101,7 @@ namespace dataproduct.api.Business
 
             return await exporter.ExportTongHopExcelAsync(fromDate, toDate);
         }
+
 
         public async Task<DTOs.Export.ExportFileResult> ExportDetailExcelDynamicAsync(Guid phieuId)
         {
@@ -230,9 +246,12 @@ namespace dataproduct.api.Business
             };
         }
 
-        public async Task<BmPhieu?> CreateAsync(JsonElement formData)
+        public async Task<BmPhieu?> CreateAsync(JsonElement formData, bool skipDuplicateCheck = false)
         {
-            await CheckDuplicateAsync(formData);
+            if (!skipDuplicateCheck)
+            {
+                await CheckDuplicateAsync(formData);
+            }
 
             try
             {
@@ -347,6 +366,34 @@ namespace dataproduct.api.Business
             return (existing, warnings);
         }
 
+        /// <summary>
+        /// Cập nhật chỉ dữ liệu bảng (DataJson) mà không kiểm tra ràng buộc tình trạng phiếu
+        /// Sử dụng cho phép cập nhật dữ liệu bảng khi phiếu ở trạng thái HoanThanh và người dùng có quyền Chốt
+        /// </summary>
+        public async Task<(BmPhieu? Phieu, List<string> Warnings)> UpdateTableDataOnlyAsync(Guid id, JsonElement formData)
+        {
+            // 1. Lấy phiếu hiện tại
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return (null, new List<string>());
+
+            // 2. Cho phép cập nhật cho các trạng thái: Chốt (5)
+            // Không kiểm tra ràng buộc như UpdateAsync - mục đích chỉ để update dữ liệu bảng
+            if (existing.TinhTrang == 5)
+                return (null, new List<string> { "Trạng thái phiếu không cho phép cập nhật dữ liệu bảng" });
+
+            // 3. Cập nhật DataJson (chỉ dữ liệu bảng, không cập nhật các field chính)
+            existing.DataJson = formData.GetRawText();
+            existing.NgayTao = existing.NgayTao; // giữ nguyên ngày tạo
+
+            // 4. Gọi repository để lưu
+            await _repo.UpdateAsync(existing);
+
+            // 5. Đồng bộ lại dữ liệu bảng chi tiết từ DataJson
+            var warnings = await RunJsonInitializersAsync(existing);
+
+            return (existing, warnings);
+        }
+
         public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
         {
             // 1. Lấy phiếu hiện tại
@@ -451,7 +498,7 @@ namespace dataproduct.api.Business
                 await _context.SaveChangesAsync();
 
                 // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
-                var phieu = await CreateAsync(formData);
+                var phieu = await CreateAsync(formData, skipDuplicateCheck: true);
                 if (phieu == null) return null;
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
@@ -778,9 +825,54 @@ namespace dataproduct.api.Business
             }
         }
 
-        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        public async Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
+        }
+
+        /// <summary>
+        /// Lấy dữ liệu ca kíp từ Tbl_Kip theo ngày và ca
+        /// </summary>
+        public async Task<dynamic?> GetKipByDateAndCaAsync(DateOnly ngayLamViec, int ca)
+        {
+            var kip = await _masterContext.Tbl_Kip
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.NgayLamViec == ngayLamViec
+                                       && x.TenCa == ca.ToString());
+
+            if (kip == null)
+                return null;
+
+            return new
+            {
+                id_kip = kip.ID_Kip,
+                ngayLamViec = kip.NgayLamViec,
+                tenCa = kip.TenCa,
+                tenKip = kip.TenKip
+            };
+        }
+
+        /// <summary>
+        /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)
+        /// </summary>
+        public async Task<BmPhieu?> ResetPhieuAsync(Guid id)
+        {
+            var phieu = await _repo.GetByIdAsync(id);
+            if (phieu == null)
+                return null;
+
+            EnsurePhieuOperable(phieu);
+
+            // Reset về trạng thái Đang lưu (0)
+            phieu.TinhTrang = 0;
+            phieu.IsLock = 0;
+            phieu.IsDelete = 0;
+            phieu.IsClone = false;
+            // phieu.NgayTao = DateTime.Now;
+
+            await _repo.UpdateAsync(phieu);
+
+            return phieu;
         }
 
     }

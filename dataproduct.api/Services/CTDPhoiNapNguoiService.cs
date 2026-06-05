@@ -88,6 +88,45 @@ namespace dataproduct.api.Services
                 return 0;
 
             await _repo.AddListAsync(entities);
+
+            // ─────────────────────────────────────────────────────────────────────────
+            // Insert notes vào BM_Phieu_ChiTiet nếu có key "notes"
+            // ─────────────────────────────────────────────────────────────────────────
+            if (!string.IsNullOrWhiteSpace(phieu.DataJson))
+            {
+                using var jsonDoc = JsonDocument.Parse(phieu.DataJson);
+                var root = jsonDoc.RootElement;
+
+                if (root.TryGetProperty("notes", out var notesElement) &&
+                    notesElement.ValueKind != JsonValueKind.Null &&
+                    !string.IsNullOrWhiteSpace(notesElement.GetString()))
+                {
+                    var notesValue = notesElement.GetString();
+
+                    // Xóa record cũ của notes (if any)
+                    var oldNotes = await _context.BmPhieuChiTiets
+                        .Where(x => x.PhieuId == phieu.Idphieu && x.ThongSo == "notes")
+                        .ToListAsync();
+
+                    if (oldNotes.Any())
+                    {
+                        _context.BmPhieuChiTiets.RemoveRange(oldNotes);
+                    }
+
+                    // Insert record mới
+                    var notesRecord = new BmPhieuChiTiet
+                    {
+                        PhieuId = phieu.Idphieu,
+                        ThongSo = "notes",
+                        GiaTri = notesValue,
+                        RowId = null
+                    };
+
+                    _context.BmPhieuChiTiets.Add(notesRecord);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             return entities.Count;
         }
 
@@ -322,6 +361,22 @@ namespace dataproduct.api.Services
             var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy, qlcl?.TinhTrang == 1);
             var signCTD = await FormatChuKyBase64Async(ctd?.ChuKy, ctd?.TinhTrang == 1);
 
+            // ─────────────────────────────────────────────────────────────────────────
+            // Lấy notes từ BmPhieuChiTiet và convert newline thành <br />
+            // ─────────────────────────────────────────────────────────────────────────
+            var notesRecord = await _context.BmPhieuChiTiets
+                .FirstOrDefaultAsync(x => x.PhieuId == phieuId && x.ThongSo == "notes");
+
+            var notesHtml = "";
+            if (!string.IsNullOrWhiteSpace(notesRecord?.GiaTri))
+            {
+                // Escape HTML entities và convert newline thành <br />
+                notesHtml = System.Net.WebUtility.HtmlEncode(notesRecord.GiaTri)
+                    .Replace("\r\n", "<br />")
+                    .Replace("\n", "<br />")
+                    .Replace("\r", "<br />");
+            }
+
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{XuongCan}}", xuongCan)
@@ -347,6 +402,8 @@ namespace dataproduct.api.Services
                 .Replace("{{Rows}}", rows.ToString())
                 .Replace("{{TongST}}", tongST.ToString("N0"))
                 .Replace("{{TongKL}}", tongKL.ToString("N0"))
+                // Notes
+                .Replace("{{Notes}}", notesHtml)
                 // Chữ ký
                 .Replace("{{ChuKyNguoiNhanHRC1}}", signHRC1)
                 .Replace("{{ChuKyNguoiNhanQLCL}}", signQLCL)
@@ -388,6 +445,132 @@ namespace dataproduct.api.Services
                 FileName = $"BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
                 ContentType = "application/pdf"
             };
+        }
+
+        public async Task<ExportFileResult> ExportExcelByPhieuAsync(Guid phieuId)
+        {
+            try
+            {
+                var maBmList = new[]
+             {
+                "CTD_BB_Phoinapnguoi",
+                "CTD_BB_Phoinapnguoi",
+                "CTD_BB_PhoiNguoi",
+                "BM.02-QT.05.13",
+                "BM.02/QT.05.13"
+            };
+
+                var phieuQuery = _context.BmPhieus
+                    .AsNoTracking()
+                    .Where(x => x.Idphieu == phieuId);
+
+                var phieus = await phieuQuery
+                    .Select(x => new
+                    {
+                        x.Idphieu,
+                        x.SoPhieu,
+                        x.NgaySX,
+                        x.Ca,
+                        x.Kip,
+                        x.MayDuc,
+                        x.TinhTrang,
+                        x.Scope,
+                        x.DataJson,
+                        x.MaBm,
+                    })
+                    .ToListAsync();
+
+                var phieuIds = phieus.Select(x => x.Idphieu).ToList();
+                var details = await _context.CtdPhoiNguois
+                    .AsNoTracking()
+                    .Where(x => x.PhieuId.HasValue && phieuIds.Contains(x.PhieuId.Value))
+                    .ToListAsync();
+
+                var rows = (from p in phieus
+                            join d in details on p.Idphieu equals d.PhieuId
+                            orderby p.NgaySX, p.Ca, p.Kip, p.SoPhieu
+                            select new
+                            {
+                                p.SoPhieu,
+                                p.NgaySX,
+                                p.Ca,
+                                p.Kip,
+                                p.MayDuc,
+                                d.Me,
+                                d.Mac,
+                                d.KichThuoc,
+                                d.SoThanh,
+                                d.TongKl,
+                                d.GhiChu,
+                                p.TinhTrang,
+                                p.Scope
+                            }).ToList();
+
+                var templatePath = Path.Combine(_env.WebRootPath, "templates", "BM_TongHopPhoiNapNguoi.xlsx");
+                if (!File.Exists(templatePath))
+                    throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+                using var workbook = new XLWorkbook(templatePath);
+                var ws = workbook.Worksheet(1);
+
+
+
+                var startRow = 6;
+                var rowIndex = startRow;
+                foreach (var item in rows)
+                {
+                    if (rowIndex > startRow)
+                        ws.Row(startRow).CopyTo(ws.Row(rowIndex));
+
+                    ws.Cell(rowIndex, 1).Value = item.NgaySX?.ToDateTime(TimeOnly.MinValue);
+                    ws.Cell(rowIndex, 2).Value = item.Kip;
+                    ws.Cell(rowIndex, 3).Value = item.Ca;
+                    ws.Cell(rowIndex, 4).Value = item.Scope;
+                    ws.Cell(rowIndex, 5).Value = item.Me;
+                    ws.Cell(rowIndex, 6).Value = item.Mac;
+                    ws.Cell(rowIndex, 7).Value = item.KichThuoc;
+                    ws.Cell(rowIndex, 8).Value = item.SoThanh;
+                    ws.Cell(rowIndex, 9).Value = item.TongKl;
+                    ws.Cell(rowIndex, 10).Value = item.GhiChu;
+                    ws.Cell(rowIndex, 11).Value = item.SoPhieu;
+
+                    var statusCell = ws.Cell(rowIndex, 12);
+                    statusCell.Value = item.TinhTrang switch
+                    {
+                        0 => "Đang lưu",
+                        1 => "Đã gửi",
+                        2 => "Hoàn thành",
+                        3 => "Đã thu hồi",
+                        4 => "Không xác nhận",
+                        5 => "Đã chốt",
+                        6 => "Đang phê duyệt",
+                        7 => "Hiệu chỉnh",
+                        _ => "Không xác định"
+                    };
+                    rowIndex++;
+                }
+
+                if (rows.Count > 0)
+                {
+                    var lastRow = rowIndex - 1;
+                    ws.Range(startRow, 1, lastRow, 1).Style.DateFormat.Format = "dd/MM/yyyy";
+                    // ws.Range(startRow, 8, lastRow, 9).Style.NumberFormat.Format = "#,##0.##";
+                }
+
+                using var stream = new MemoryStream();
+                workbook.SaveAs(stream);
+
+                return new ExportFileResult
+                {
+                    Content = stream.ToArray(),
+                    FileName = $"PhoiNapNguoi_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                    ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Lỗi khi export Excel phôi nguội: {ex.Message}", ex);
+            }
         }
 
         public async Task<ExportFileResult> ExportTongHopExcelByPhieuAsync(DateOnly? fromDate, DateOnly? toDate)

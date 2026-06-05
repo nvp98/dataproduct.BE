@@ -210,7 +210,7 @@ public partial class ProductFormContext : DbContext
             entity.ToTable("BM_Phieu_ChiTiet");
 
             entity.Property(e => e.Id).HasColumnName("ID");
-            entity.Property(e => e.GiaTri).HasMaxLength(20);
+            entity.Property(e => e.GiaTri).HasMaxLength(500);
             entity.Property(e => e.PhieuId).HasColumnName("PhieuID");
             entity.Property(e => e.RowId).HasColumnName("RowID");
             entity.Property(e => e.ThongSo).HasMaxLength(20);
@@ -228,7 +228,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.MaKhuVuc).HasMaxLength(20);
             entity.Property(e => e.QuyenChucNang).HasColumnName("QuyenChucNang");
             entity.Property(e => e.KhuVucPhu).HasColumnName("KhuVucPhu");
-            
+
         });
 
         modelBuilder.Entity<CtdPhoiNguoi>(entity =>

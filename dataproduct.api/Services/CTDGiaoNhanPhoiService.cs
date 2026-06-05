@@ -149,7 +149,9 @@ namespace dataproduct.api.Services
 
             rows.Append($@"
                 <tr class=""total-row"">
-                    <td colspan=""4"">TỔNG SỐ</td>
+                    <td colspan=""2"">TỔNG SỐ</td>
+                    <td></td>
+                    <td></td>
                     <td>{tongSoCay:N0}</td>
                     <td></td>
                 </tr>");

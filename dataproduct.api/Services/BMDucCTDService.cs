@@ -426,6 +426,12 @@ namespace dataproduct.api.Services
                 ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
                 idPhieu: idPhieu
             );
+            // lay thong tin mayDuc tu BM_Phieu (de hien thi tren header)
+            var phieu = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(x => x.Idphieu == idPhieu.Value)
+                .Select(x => new { x.MayDuc })
+                .FirstOrDefaultAsync();
 
             var data = items.ToList();
 
@@ -526,8 +532,8 @@ namespace dataproduct.api.Services
                 </tr>");
             }
 
-            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
-            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
 
             // Convert logo và chữ ký sang base64
@@ -535,18 +541,18 @@ namespace dataproduct.api.Services
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
 
 
-            var nguoiGiao = xuongDuc.HoVaTen;
-            var chucVuGiao = xuongDuc.TenViTri;
-            var bPhanGiao = xuongDuc.TenPhongBan;
+            var nguoiGiao = xuongDuc?.HoVaTen;
+            var chucVuGiao = xuongDuc?.TenViTri;
+            var bPhanGiao = xuongDuc?.TenPhongBan;
 
 
-            var nguoiqlclo = qlcl.HoVaTen;
-            var chucVuqlcl = qlcl.TenViTri;
-            var bPhanqlcl = qlcl.TenPhongBan;
+            var nguoiqlclo = qlcl?.HoVaTen;
+            var chucVuqlcl = qlcl?.TenViTri;
+            var bPhanqlcl = qlcl?.TenPhongBan;
 
-            var nguoiNhan = khoPhoi.HoVaTen;
-            var chucVuNhan = khoPhoi.TenViTri;
-            var bPhanNhan = khoPhoi.TenPhongBan;
+            var nguoiNhan = khoPhoi?.HoVaTen;
+            var chucVuNhan = khoPhoi?.TenViTri;
+            var bPhanNhan = khoPhoi?.TenPhongBan;
 
 
             var signXuongDuc = await FormatChuKyBase64Async(
@@ -570,6 +576,7 @@ namespace dataproduct.api.Services
                 .Replace("{{NgaySX}}", NgaySX.Value.ToString("dd/MM/yyyy"))
                 .Replace("{{Ca}}", Ca.Value.ToString())
                 .Replace("{{Kip}}", Kip)
+                .Replace("MayDuc", phieu?.MayDuc.ToString() ?? "")
 
                 // Content
                 //.Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
@@ -790,7 +797,8 @@ namespace dataproduct.api.Services
                         x.NgaySX.Date == request.NgaySX.Date &&
                         x.Ca == request.Ca &&
                         NormalizeKeyValue(x.Me) == NormalizeKeyValue(row.Me) &&
-                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac));
+                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac) &&
+                        NormalizeKeyValue(x.KichThuoc) == NormalizeKeyValue(row.KichThuoc));
 
                     if (match == null)
                     {
@@ -964,7 +972,7 @@ namespace dataproduct.api.Services
                 var phieu = _context.BmPhieus.FirstOrDefault(x => x.Idphieu == idPhieu);
                 if (phieu.TinhTrang == 0)
                 {
-                    phieu.TinhTrang = 1; // đã gửi
+                    phieu.TinhTrang = 2; // Hoàn thành
                     await _context.SaveChangesAsync();
                 }
 
@@ -1007,8 +1015,20 @@ namespace dataproduct.api.Services
                     x.TinhTrangCap2 == 1
                 );
 
-                if (!allCapsApproved)
+                if (!allCapsApproved && tinhTrangChot == 1) // Nếu đang chốt mà chưa duyệt hết thì không cho chốt
                     throw new Exception("Không thể chốt! Vui lòng đảm bảo tất cả cấp đều đã duyệt");
+                // Nếu chốt thì check ở table BM_PheDuyet va update tinh trang xu ly cho cap duyet tuong ung
+                var pheDuyets = await _context.BmPheDuyets
+                   .Where(x => x.PhieuId == idPhieu && x.TinhTrang == 0) // chỉ lấy những phe duyệt đang ở trạng thái đã duyệt
+                   .ToListAsync();
+
+                if (tinhTrangChot == 1 && pheDuyets != null && pheDuyets.Count > 0) // chốt
+                {
+                    foreach (var pheDuyet in pheDuyets)
+                    {
+                        pheDuyet.TinhTrang = 1; // cập nhật thành đã xử lý
+                    }
+                }
 
                 // Bước 5: Khi chốt, cập nhật tình trạng rows = 1
                 foreach (var row in rowsToChot)
@@ -1080,7 +1100,8 @@ namespace dataproduct.api.Services
                 ca: request.Ca,
                 kip: request.Kip,
                 ngaySX: request.NgaySX,
-                idPhieu: request.IdPhieu
+                idPhieu: request.IdPhieu,
+                mayDuc: request.MayDuc
             );
             var data = items.ToList();
 
@@ -1126,7 +1147,7 @@ namespace dataproduct.api.Services
             var nguoiThamGia = new StringBuilder();
             int indexNguoi = 1;
 
-            var pheDuyets = request.listNguoiPheDuyet ?? new List<PheDuyetDto>();
+            var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(request.IdPhieu) ?? new List<PheDuyetDto>();
 
 
 
@@ -1175,6 +1196,7 @@ namespace dataproduct.api.Services
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
+                    <td>{t.NgaySX:dd/MM/yyyy}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>
@@ -1199,6 +1221,25 @@ namespace dataproduct.api.Services
                 </tr>");
             }
 
+            // Kiểm tra xem ds data nếu đã duyệt hết thì update tinh trang duyet, nếu chưa thì để nguyên
+            if (data.All(x => x.TinhTrangCap0 == 1))
+            {
+                // update tinh trang duyet cap 0
+                pheDuyets.Where(x => x.CapDuyet == 0).ToList().ForEach(x => x.TinhTrang = 1);
+            }
+            if (data.All(x => x.TinhTrangCap1 == 1))
+            {
+                // update tinh trang duyet cap 1
+                pheDuyets.Where(x => x.CapDuyet == 1).ToList().ForEach(x => x.TinhTrang = 1);
+            }
+            if (data.All(x => x.TinhTrangCap2 == 1))
+            {
+                // update tinh trang duyet cap 2
+                pheDuyets.Where(x => x.CapDuyet == 2).ToList().ForEach(x => x.TinhTrang = 1);
+            }
+            await _context.SaveChangesAsync();
+
+
             var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
@@ -1208,18 +1249,18 @@ namespace dataproduct.api.Services
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
 
-            var nguoiGiao = xuongDuc.HoVaTen;
-            var chucVuGiao = xuongDuc.TenViTri;
-            var bPhanGiao = xuongDuc.TenPhongBan;
+            var nguoiGiao = xuongDuc?.HoVaTen;
+            var chucVuGiao = xuongDuc?.TenViTri;
+            var bPhanGiao = xuongDuc?.TenPhongBan;
 
 
-            var nguoiqlclo = qlcl.HoVaTen;
-            var chucVuqlcl = qlcl.TenViTri;
-            var bPhanqlcl = qlcl.TenPhongBan;
+            var nguoiqlclo = qlcl?.HoVaTen;
+            var chucVuqlcl = qlcl?.TenViTri;
+            var bPhanqlcl = qlcl?.TenPhongBan;
 
-            var nguoiNhan = khoPhoi.HoVaTen;
-            var chucVuNhan = khoPhoi.TenViTri;
-            var bPhanNhan = khoPhoi.TenPhongBan;
+            var nguoiNhan = khoPhoi?.HoVaTen;
+            var chucVuNhan = khoPhoi?.TenViTri;
+            var bPhanNhan = khoPhoi?.TenPhongBan;
 
             var signXuongDuc = await FormatChuKyBase64Async(xuongDuc?.ChuKy, xuongDuc?.TinhTrang == 1);
             var signQLCL = await FormatChuKyBase64Async(qlcl?.ChuKy, qlcl?.TinhTrang == 1);
@@ -2064,6 +2105,205 @@ namespace dataproduct.api.Services
             workbook.SaveAs(stream);
 
             return stream.ToArray();
+        }
+
+        /// <summary>
+        /// Export Excel chi tiết dữ liệu phôi nhập kho theo phiếu
+        /// Sử dụng template BM_GiaoNhanPhoiNhapKho.xlsx
+        /// Bao gồm tất cả dòng phôi trong phiếu với đầy đủ thông tin chi tiết
+        /// </summary>
+        public async Task<byte[]> ExportExcelPhoiNhapKhoByPhieuAsync(Guid phieuId)
+        {
+            try
+            {
+                // ★ Lấy thông tin phiếu
+                var phieu = await _repoPhieu.GetByIdAsync(phieuId);
+                if (phieu == null)
+                    throw new ArgumentException($"Không tìm thấy phiếu với ID: {phieuId}");
+
+
+                var phoiNhapKhoData = await _repo.GetPhoiNhapKhoChiTietAsync(
+                            ca: phieu.Ca.Value,
+                            kip: phieu.Kip,
+                            ngaySX: phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue),
+                            idPhieu: phieu.Idphieu,
+                            mayDuc: phieu.MayDuc
+                        );
+
+                // ★ Lấy dữ liệu phôi nhập kho từ phiếu
+                // var phoiNhapKhoData = await _context.BM_PhoiNhapKho
+                //     .AsNoTracking()
+                //     .Where(x => x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date && x.Ca == phieu.Ca && x.MayDuc == phieu.MayDuc) // Giới hạn dữ liệu theo ngày sản xuất và ca của phiếu
+                //     .OrderBy(x => x.NgaySX)
+                //     .ThenBy(x => x.Ca)
+                //     .ThenBy(x => x.Me)
+                //     .ThenBy(x => x.Mac)
+                //     .ToListAsync();
+
+                if (!phoiNhapKhoData.Any())
+                    throw new ArgumentException($"Phiếu {phieuId} không có dữ liệu phôi nhập kho");
+
+                // ★ Load template
+                var templatePath = Path.Combine(
+                    _env.WebRootPath,
+                    "templates",
+                    "BM_GiaoNhanPhoiNhapKho.xlsx"
+                );
+
+                if (!File.Exists(templatePath))
+                    throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+                using var workbook = new XLWorkbook(templatePath);
+                var ws = workbook.Worksheet(1);
+
+                // ★ Cập nhật thông tin phiếu ở dòng 4 (nếu có ô dành cho tiêu đề chi tiết)
+                // Ví dụ: "Chi tiết phôi nhập kho - Số phiếu: xxxxx"
+                ws.Cell("A4").Value = $"Chi tiết phôi nhập kho - Số phiếu: {phieu.SoPhieu} (Ngày: {DateTime.Now:dd/MM/yyyy})";
+
+                // ★ Điền dữ liệu (bắt đầu từ dòng 8, giống template)
+                int dataRow = 8;
+                int stt = 1;
+                decimal totalTongSoThanh = 0;
+                decimal totalTongKhoiLuong = 0;
+
+                foreach (var row in phoiNhapKhoData)
+                {
+                    // ★ Copy format từ dòng 8 nếu cần thêm dòng
+                    if (dataRow > 8)
+                    {
+                        ws.Row(8).CopyTo(ws.Row(dataRow));
+                    }
+
+                    // ★ Điền dữ liệu theo cấu trúc template
+                    ws.Cell(dataRow, 1).Value = stt++;
+                    ws.Cell(dataRow, 2).Value = row.NgaySX.ToString("dd/MM/yyyy");
+                    ws.Cell(dataRow, 3).Value = row.Me;
+                    ws.Cell(dataRow, 4).Value = row.Mac;
+                    ws.Cell(dataRow, 5).Value = row.KichThuoc;
+
+                    // Loại I
+                    ws.Cell(dataRow, 6).Value = row.StLoai1;
+                    ws.Cell(dataRow, 7).Value = row.KlLoai1;
+
+                    // Loại II BM
+                    ws.Cell(dataRow, 8).Value = row.StLoai2;
+                    ws.Cell(dataRow, 9).Value = row.KlLoai2;
+
+                    // Loại II TP
+                    ws.Cell(dataRow, 10).Value = row.StLoai2TP;
+                    ws.Cell(dataRow, 11).Value = row.KlLoai2TP;
+
+                    // Phôi ngắn (11m - 9m - 6m)
+                    ws.Cell(dataRow, 12).Value = row.StPhoiNgan;
+                    ws.Cell(dataRow, 13).Value = row.CdPhoiNgan;
+                    ws.Cell(dataRow, 14).Value = row.KlPhoiNgan;
+
+                    // Loại III
+                    ws.Cell(dataRow, 15).Value = row.StLoai3;
+                    ws.Cell(dataRow, 16).Value = row.KlLoai3;
+
+                    // Tổng
+                    ws.Cell(dataRow, 17).Value = row.TongSoThanh;
+                    ws.Cell(dataRow, 18).Value = row.TongKhoiLuong;
+
+                    // ★ Trạng thái xác nhận (thêm vào cột sau)
+                    // QLCL
+                    var qlclStatus = row.TinhTrangCap1 == 1 ? "✓" : "";
+                    ws.Cell(dataRow, 19).Value = qlclStatus;
+                    if (row.TinhTrangCap1 == 1)
+                        ws.Cell(dataRow, 19).Style.Fill.BackgroundColor = XLColor.LightGreen;
+
+                    // Đúc
+                    var ducStatus = row.TinhTrangCap2 == 1 ? "✓" : "";
+                    ws.Cell(dataRow, 20).Value = ducStatus;
+                    if (row.TinhTrangCap2 == 1)
+                        ws.Cell(dataRow, 20).Style.Fill.BackgroundColor = XLColor.LightGreen;
+
+                    // Chốt
+                    var chotStatus = row.TinhTrang == 1 ? "✓" : "";
+                    ws.Cell(dataRow, 21).Value = chotStatus;
+                    if (row.TinhTrang == 1)
+                        ws.Cell(dataRow, 21).Style.Fill.BackgroundColor = XLColor.DarkGreen;
+
+                    totalTongSoThanh += row.TongSoThanh ?? 0;
+                    totalTongKhoiLuong += row.TongKhoiLuong ?? 0;
+
+                    dataRow++;
+                }
+
+                // ★ Dòng tổng cộng
+                int totalRow = dataRow;
+                ws.Row(8).CopyTo(ws.Row(totalRow));
+
+                ws.Cell(totalRow, 1).Value = "";
+                ws.Cell(totalRow, 2).Value = "";
+                ws.Cell(totalRow, 3).Value = "TỔNG CỘNG";
+                ws.Cell(totalRow, 3).Style.Font.Bold = true;
+                ws.Cell(totalRow, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                ws.Cell(totalRow, 4).Value = "";
+                ws.Cell(totalRow, 5).Value = "";
+
+                // Sum từng loại
+                ws.Cell(totalRow, 6).Value = phoiNhapKhoData.Sum(x => x.StLoai1);
+                ws.Cell(totalRow, 7).Value = phoiNhapKhoData.Sum(x => x.KlLoai1);
+                ws.Cell(totalRow, 8).Value = phoiNhapKhoData.Sum(x => x.StLoai2);
+                ws.Cell(totalRow, 9).Value = phoiNhapKhoData.Sum(x => x.KlLoai2);
+                ws.Cell(totalRow, 10).Value = phoiNhapKhoData.Sum(x => x.StLoai2TP);
+                ws.Cell(totalRow, 11).Value = phoiNhapKhoData.Sum(x => x.KlLoai2TP);
+                ws.Cell(totalRow, 12).Value = phoiNhapKhoData.Sum(x => x.StPhoiNgan);
+                ws.Cell(totalRow, 13).Value = phoiNhapKhoData.Sum(x => x.CdPhoiNgan);
+                ws.Cell(totalRow, 14).Value = phoiNhapKhoData.Sum(x => x.KlPhoiNgan);
+                ws.Cell(totalRow, 15).Value = phoiNhapKhoData.Sum(x => x.StLoai3);
+                ws.Cell(totalRow, 16).Value = phoiNhapKhoData.Sum(x => x.KlLoai3);
+
+                // Tổng số thanh và khối lượng
+                ws.Cell(totalRow, 17).Value = totalTongSoThanh;
+                ws.Cell(totalRow, 17).Style.Font.Bold = true;
+                ws.Cell(totalRow, 17).Style.Fill.BackgroundColor = XLColor.Yellow;
+
+                ws.Cell(totalRow, 18).Value = totalTongKhoiLuong;
+                ws.Cell(totalRow, 18).Style.Font.Bold = true;
+                ws.Cell(totalRow, 18).Style.Fill.BackgroundColor = XLColor.Yellow;
+
+                // ★ Format các cột số
+                for (int col = 6; col <= 18; col++)
+                {
+                    ws.Range(8, col, totalRow, col).Style.NumberFormat.Format = "0.00";
+                    ws.Range(8, col, totalRow, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
+
+                // ★ Đóng băng dòng header
+                ws.SheetView.FreezeRows(7);
+
+                // ★ Xuất file
+                using var stream = new MemoryStream();
+                workbook.SaveAs(stream);
+
+                return stream.ToArray();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Lỗi khi export Excel phôi nhập kho: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Helper để hiển thị trạng thái phiếu
+        /// </summary>
+        private static string GetTinhTrangDisplay(int? tinhTrang)
+        {
+            return tinhTrang switch
+            {
+                0 => "Đang lưu",
+                1 => "Đã gửi",
+                2 => "Hoàn thành",
+                3 => "Đã thu hồi",
+                4 => "Không xác nhận",
+                5 => "Đã chốt",
+                6 => "Đang phê duyệt",
+                7 => "Hiệu chỉnh",
+                _ => "Không xác định"
+            };
         }
     }
 }
