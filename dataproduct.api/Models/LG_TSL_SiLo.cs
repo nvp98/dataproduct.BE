@@ -9,5 +9,6 @@ namespace dataproduct.api.Models
         public int? ID_LoCao { get; set; }
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
+        public int? ThuTuCoDinh { get; set; }
     }
 }

@@ -39,6 +39,19 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        /// <summary>Tải SCADA mới nhất, merge ManualKL, lưu DB, trả mapping view. Gọi khi bấm "Tải dữ liệu" trên phiếu đã tồn tại.</summary>
+        [HttpPost("sync-chitiet/{idPhieu}")]
+        public async Task<IActionResult> SyncChiTiet(Guid idPhieu)
+        {
+            try
+            {
+                var result = await _service.SyncChiTietFromScadaAsync(idPhieu);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         // ─── SiLo ────────────────────────────────────────────────────────────────
 
         [HttpGet("tonsilo-silo")]

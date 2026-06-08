@@ -77,6 +77,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
+
+        public  int? ThuTuCoDinh { get; set; }  
     }
 
     public class CreateLGTSSiLoDto

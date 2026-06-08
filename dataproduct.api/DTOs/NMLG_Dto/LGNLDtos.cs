@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace dataproduct.api.DTOs.NMLG_Dto
 {
     // ─── SiLo Master DTOs ─────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int? IDSiLo { get; set; }
         public string? TenSiLo { get; set; }    // join từ LG_NL_SiLo
         public string? TagKey { get; set; }     // join từ LG_NL_SiLo
+        [JsonPropertyName("idNVL")]
         public int? IDNVL { get; set; }
         public string? MaNVL { get; set; }      // join từ LG_NL_NVL
         public string? TenNVL { get; set; }     // join từ LG_NL_NVL
@@ -66,6 +69,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public int IDSiLo { get; set; }
         public string? TenSiLo { get; set; }
+        [JsonPropertyName("idNVL")]
         public int? IDNVL { get; set; }
         public string? TenNVL { get; set; }
         public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca
@@ -244,6 +248,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public decimal? ThuocThamLieu1 { get; set; }
         public decimal? ThuocThamLieu2 { get; set; }
         public string? GhiChu { get; set; }
+        [JsonPropertyName("idNVL")]
         public int IDNVL { get; set; }
         public decimal? GiaTri { get; set; }
         public int? ThuTu { get; set; }

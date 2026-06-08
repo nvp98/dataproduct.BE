@@ -133,70 +133,149 @@ namespace dataproduct.api.Repositories
             ).AsNoTracking().ToListAsync();
         }
 
-        public async Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
-            int idLoCao, DateTime ngay, int idCa)
+        //public async Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
+        //    int idLoCao, DateTime ngay, int idCa)
+        //{
+        //    // 1. Tìm config đang hiệu lực (cùng logic với pivot)
+        //    var configRef = await _context.LG_NL_Mapping
+        //        .Where(m => m.IDLoCao == idLoCao
+        //                 && m.ThoiDiemBD == null
+        //                 && (m.Ngay < ngay || (m.Ngay == ngay && m.IDCa <= idCa))
+        //                 && (m.NgayHetHL == null
+        //                     || m.NgayHetHL > ngay
+        //                     || (m.NgayHetHL == ngay && m.IDCaHetHL > idCa)))
+        //        .OrderByDescending(m => m.Ngay)
+        //        .ThenByDescending(m => m.IDCa)
+        //        .Select(m => new { m.Ngay, m.IDCa })
+        //        .FirstOrDefaultAsync();
+
+        //    if (configRef == null) return [];
+
+        //    var now = DateTime.Now;
+
+        //    // 2. Lấy tất cả mapping của config (gồm cả đổi NVL giữa ca)
+        //    var mappings = await (
+        //        from m in _context.LG_NL_Mapping
+        //        join s in _context.LG_NL_SiLo on m.IDSiLo equals s.ID into sg
+        //        from s in sg.DefaultIfEmpty()
+        //        join n in _context.LG_NL_NVL on m.IDNVL equals n.ID into ng
+        //        from n in ng.DefaultIfEmpty()
+        //        where m.IDLoCao == idLoCao
+        //           && m.Ngay == configRef.Ngay
+        //           && m.IDCa == configRef.IDCa
+        //        select new
+        //        {
+        //            IDSiLo = m.IDSiLo,
+        //            TenSiLo = s != null ? s.TenSiLo : null,
+        //            IDNVL = n != null ? (int?)n.ID : null,
+        //            TenNVL = n != null ? (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) : null,
+        //            ThoiDiemBD = m.ThoiDiemBD,
+        //            ThuTu = s != null ? s.ThuTu : (int?)null,
+        //        }
+        //    ).AsNoTracking().ToListAsync();
+
+        //    // 3. Với mỗi silo, tìm NVL đang hiệu lực tại thời điểm hiện tại
+        //    return mappings
+        //        .GroupBy(m => m.IDSiLo)
+        //        .Select(g =>
+        //        {
+        //            var rows = g.OrderBy(r => r.ThoiDiemBD ?? DateTime.MinValue).ToList();
+        //            //var activeRow = rows.LastOrDefault(r => r.ThoiDiemBD == null || r.ThoiDiemBD <= now)
+        //            //                ?? rows.First();
+        //            var activeRow = rows
+        //            .OrderBy(r => r.ThoiDiemBD ?? DateTime.MinValue)
+        //            .Last();
+        //            return new LGNLSiloSnapshotDto
+        //            {
+        //                IDSiLo = g.Key ?? 0,
+        //                TenSiLo = activeRow.TenSiLo,
+        //                IDNVL = activeRow.IDNVL,
+        //                TenNVL = activeRow.TenNVL,
+        //                ThoiDiemBD = activeRow.ThoiDiemBD,
+        //                DaDoiGiuaCa = rows.Any(r => r.ThoiDiemBD != null),
+        //                ThuTu = activeRow.ThuTu,
+        //            };
+        //        })
+        //        .OrderBy(s => s.ThuTu)
+        //        .ToList();
+        //}
+        public async Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync( int idLoCao, DateTime ngay, int idCa)
         {
-            // 1. Tìm config đang hiệu lực (cùng logic với pivot)
-            var configRef = await _context.LG_NL_Mapping
-                .Where(m => m.IDLoCao == idLoCao
-                         && m.ThoiDiemBD == null
-                         && (m.Ngay < ngay || (m.Ngay == ngay && m.IDCa <= idCa))
-                         && (m.NgayHetHL == null
-                             || m.NgayHetHL > ngay
-                             || (m.NgayHetHL == ngay && m.IDCaHetHL > idCa)))
-                .OrderByDescending(m => m.Ngay)
-                .ThenByDescending(m => m.IDCa)
-                .Select(m => new { m.Ngay, m.IDCa })
-                .FirstOrDefaultAsync();
-
-            if (configRef == null) return [];
-
-            var now = DateTime.Now;
-
-            // 2. Lấy tất cả mapping của config (gồm cả đổi NVL giữa ca)
             var mappings = await (
                 from m in _context.LG_NL_Mapping
-                join s in _context.LG_NL_SiLo on m.IDSiLo equals s.ID into sg
+
+                join s in _context.LG_NL_SiLo
+                    on m.IDSiLo equals s.ID into sg
                 from s in sg.DefaultIfEmpty()
-                join n in _context.LG_NL_NVL on m.IDNVL equals n.ID into ng
+
+                join n in _context.LG_NL_NVL
+                    on m.IDNVL equals n.ID into ng
                 from n in ng.DefaultIfEmpty()
+
                 where m.IDLoCao == idLoCao
-                   && m.Ngay == configRef.Ngay
-                   && m.IDCa == configRef.IDCa
+                   && m.Ngay == ngay.Date
+                   && m.IDCa == idCa
+
                 select new
                 {
                     IDSiLo = m.IDSiLo,
                     TenSiLo = s != null ? s.TenSiLo : null,
-                    IDNVL = n != null ? (int?)n.ID : null,
-                    TenNVL = n != null ? (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) : null,
-                    ThoiDiemBD = m.ThoiDiemBD,
-                    ThuTu = s != null ? s.ThuTu : (int?)null,
-                }
-            ).AsNoTracking().ToListAsync();
 
-            // 3. Với mỗi silo, tìm NVL đang hiệu lực tại thời điểm hiện tại
+                    IDNVL = n != null
+                        ? (int?)n.ID
+                        : null,
+
+                    TenNVL = n != null
+                        ? (
+                            n.XacNhan == true &&
+                            !string.IsNullOrWhiteSpace(n.TenNVL_TK)
+                                ? n.TenNVL_TK
+                                : n.TenNVL_NM
+                          )
+                        : null,
+
+                    ThoiDiemBD = m.ThoiDiemBD,
+
+                    ThuTu = s != null
+                        ? s.ThuTu
+                        : (int?)null
+                }
+            )
+            .AsNoTracking()
+            .ToListAsync();
+
+            if (!mappings.Any())
+                return [];
+
             return mappings
-                .GroupBy(m => m.IDSiLo)
+                .GroupBy(x => x.IDSiLo)
                 .Select(g =>
                 {
-                    var rows = g.OrderBy(r => r.ThoiDiemBD ?? DateTime.MinValue).ToList();
-                    var activeRow = rows.LastOrDefault(r => r.ThoiDiemBD == null || r.ThoiDiemBD <= now)
-                                    ?? rows.First();
+                    // Mapping cuối cùng của silo trong ca
+                    var activeRow = g
+                        .OrderBy(x => x.ThoiDiemBD ?? DateTime.MinValue)
+                        .Last();
+
                     return new LGNLSiloSnapshotDto
                     {
                         IDSiLo = g.Key ?? 0,
+
                         TenSiLo = activeRow.TenSiLo,
+
                         IDNVL = activeRow.IDNVL,
+
                         TenNVL = activeRow.TenNVL,
+
                         ThoiDiemBD = activeRow.ThoiDiemBD,
-                        DaDoiGiuaCa = rows.Any(r => r.ThoiDiemBD != null),
-                        ThuTu = activeRow.ThuTu,
+
+                        DaDoiGiuaCa = g.Count() > 1,
+
+                        ThuTu = activeRow.ThuTu
                     };
                 })
-                .OrderBy(s => s.ThuTu)
+                .OrderBy(x => x.ThuTu)
                 .ToList();
         }
-
         public async Task<LG_NL_Mapping?> GetMappingByIdAsync(int id)
             => await _context.LG_NL_Mapping.FindAsync(id);
 

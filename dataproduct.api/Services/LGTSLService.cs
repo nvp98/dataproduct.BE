@@ -11,6 +11,14 @@ using System.Text.Json;
 
 namespace dataproduct.api.Services
 {
+    /// <summary>Ném ra khi silo đã có NVL khác và người dùng chưa xác nhận ghi đè.</summary>
+    public class NvlConflictException(int currentNvlId, string? currentNvlName)
+        : Exception($"Silo đã được mapping với NVL '{currentNvlName}'.")
+    {
+        public int CurrentNvlId { get; } = currentNvlId;
+        public string? CurrentNvlName { get; } = currentNvlName;
+    }
+
     public class LGTSLService
     {
         private readonly ILGTSLRepository _repo;
@@ -129,9 +137,17 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto> AddMappingAsync(CreateLGTSMappingDto dto)
         {
-            // IDSiLo trong Mapping lưu ThuTu (không phải ID) → tra cứu ThuTu từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuAsync(dto.IDSiLo, dto.IDLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTu.");
+            // IDSiLo trong Mapping lưu ThuTuCoDinh (không phải ID) → tra cứu ThuTuCoDinh từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IDSiLo, dto.IDLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
+
+            // Kiểm tra trùng: silo đã có mapping NVL cho cùng ngày/ca/lò cao chưa?
+            var duplicate = await _repo.GetExistingMappingAsync(thuTu, dto.IDLoCao, dto.Ngay, dto.Ca);
+            if (duplicate != null)
+            {
+                var currentNvl = await _repo.GetNvlByIdAsync(duplicate.IDNVL);
+                throw new NvlConflictException(duplicate.IDNVL, currentNvl?.TenNVL);
+            }
 
             var entity = new LG_TSL_SiLo_Mapping
             {
@@ -146,11 +162,22 @@ namespace dataproduct.api.Services
             return MapMapping(result);
         }
 
-        public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto)
+        public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto, bool force = false)
         {
-            // IDSiLo trong Mapping lưu ThuTu → tra cứu ThuTu từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuAsync(dto.IDSiLo, dto.IDLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTu.");
+            // IDSiLo trong Mapping lưu ThuTuCoDinh → tra cứu ThuTuCoDinh từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IDSiLo, dto.IDLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
+
+            // Khi không có force=true: kiểm tra NVL hiện tại, ném NvlConflictException nếu đang thay NVL khác
+            if (!force)
+            {
+                var existing = await _repo.GetMappingByIdAsync(id);
+                if (existing != null && existing.IDNVL != dto.IDNVL)
+                {
+                    var currentNvl = await _repo.GetNvlByIdAsync(existing.IDNVL);
+                    throw new NvlConflictException(existing.IDNVL, currentNvl?.TenNVL);
+                }
+            }
 
             var entity = new LG_TSL_SiLo_Mapping
             {
@@ -241,6 +268,31 @@ namespace dataproduct.api.Services
                 }
             }
 
+            // Bảo vệ KLGoc: giá trị gốc phải là SCADA (tự động), không được là giá trị nhập tay.
+            // Nếu _klGoc từ JSON null (lỗi FE cũ hoặc dữ liệu thiếu) → dùng giá trị đã lưu trong DB.
+            if (items.Any(x => x.ManualKL && x.KLGoc == null))
+            {
+                var savedChiTiet = await _repo.GetChiTietByPhieuAsync(phieu.Idphieu);
+                var savedByMapping = savedChiTiet
+                    .Where(r => r.ManualKL && r.IDMapping.HasValue && r.KLGoc.HasValue)
+                    .GroupBy(r => r.IDMapping!.Value)
+                    .ToDictionary(g => g.Key, g => g.First());
+                var savedBySilo = savedChiTiet
+                    .Where(r => r.ManualKL && !r.IDMapping.HasValue && r.KLGoc.HasValue)
+                    .GroupBy(r => r.IDSiLo)
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                foreach (var item in items.Where(x => x.ManualKL && x.KLGoc == null))
+                {
+                    LGTSChiTietDto? saved = null;
+                    if (item.IDMapping.HasValue && savedByMapping.TryGetValue(item.IDMapping.Value, out var s1))
+                        saved = s1;
+                    else if (savedBySilo.TryGetValue(item.IDSiLo, out var s2))
+                        saved = s2;
+                    item.KLGoc = saved?.KLGoc;
+                }
+            }
+
             // Replace mode: luôn xóa dữ liệu cũ của phiếu trước khi ghi mới.
             await _repo.DeleteByPhieuIdAsync(phieu.Idphieu);
 
@@ -254,6 +306,96 @@ namespace dataproduct.api.Services
             });
 
             return items.Count;
+        }
+
+        // ─── Sync chi tiết từ SCADA khi người dùng bấm "Tải dữ liệu" ─────────────
+        // Đọc NgaySX/Ca/Scope từ BmPhieu → lấy dữ liệu SCADA → merge ManualKL → lưu DB → trả mapping view.
+
+        public async Task<List<LGTSSiLoMappingViewDto>> SyncChiTietFromScadaAsync(Guid idPhieu)
+        {
+            // 1. Đọc ngày/ca/lò cao từ BmPhieu — không phụ thuộc frontend truyền xuống
+            var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
+                ?? throw new InvalidOperationException($"Không tìm thấy phiếu {idPhieu}.");
+
+            if (phieu.NgaySX is null || phieu.Ca is null || phieu.Scope is null)
+                throw new InvalidOperationException("Phiếu thiếu thông tin NgaySX, Ca hoặc Scope.");
+
+            var ngay    = phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+            var ca      = phieu.Ca.Value;
+            var idLoCao = phieu.Scope.Value;
+
+            // 2. Lấy dữ liệu SCADA mới nhất (mapping view: silo + NVL + KL tồn)
+            var viewData = await _repo.GetSiLoByMappingAsync(idLoCao, ngay, ca);
+
+            // 3. Load bản ghi đã lưu để giữ lại ManualKL.
+            // Dùng GroupBy thay cho ToDictionary để tránh exception khi có bản ghi trùng khóa.
+            // Ưu tiên khớp theo IDMapping (unique per silo-NVL pair, ổn định trong cùng ngày/ca);
+            // fallback về IDSiLo nếu IDMapping chưa có (trường hợp dữ liệu cũ).
+            var savedRecords = await _repo.GetChiTietByPhieuAsync(idPhieu);
+
+            var manualByMapping = savedRecords
+                .Where(r => r.ManualKL && r.IDMapping.HasValue)
+                .GroupBy(r => r.IDMapping!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var manualBySilo = savedRecords
+                .Where(r => r.ManualKL && !r.IDMapping.HasValue)
+                .GroupBy(r => r.IDSiLo)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // 4. Build danh sách items từ SCADA, merge ManualKL
+            var items = viewData.Select((v, idx) =>
+            {
+                // Tìm bản ghi nhập tay: ưu tiên khớp IDMapping, fallback IDSiLo
+                LGTSChiTietDto? saved = null;
+                if (manualByMapping.TryGetValue(v.IDMapping, out var s1))
+                    saved = s1;
+                else if (manualBySilo.TryGetValue(v.IDSiLo, out var s2))
+                    saved = s2;
+
+                if (saved is not null)
+                {
+                    return new UpsertLGTSChiTietItemDto
+                    {
+                        IDSiLo       = v.IDSiLo,
+                        IDMapping    = v.IDMapping,
+                        IDNVL        = v.IDNVL,
+                        TenSiLo      = v.TenSiLo,
+                        TenNVL       = v.TenNVL,
+                        KLTonCuoiKip = saved.KLTonCuoiKip,   // giữ giá trị nhập tay
+                        ManualKL     = true,
+                        KLGoc        = v.Ton,                  // cập nhật KL gốc SCADA mới nhất
+                        GhiChu       = v.GhiChu,
+                        ThuTu        = v.ThuTu ?? idx + 1,
+                    };
+                }
+                return new UpsertLGTSChiTietItemDto
+                {
+                    IDSiLo       = v.IDSiLo,
+                    IDMapping    = v.IDMapping,
+                    IDNVL        = v.IDNVL,
+                    TenSiLo      = v.TenSiLo,
+                    TenNVL       = v.TenNVL,
+                    KLTonCuoiKip = v.Ton,
+                    ManualKL     = false,
+                    KLGoc        = null,
+                    GhiChu       = v.GhiChu,
+                    ThuTu        = v.ThuTu ?? idx + 1,
+                };
+            }).ToList();
+
+            // 5. Delete cũ → Insert mới (đã merge)
+            await _repo.DeleteByPhieuIdAsync(idPhieu);
+            await _repo.UpsertChiTietAsync(new UpsertLGTSChiTietDto
+            {
+                IDPhieu = idPhieu,
+                IDLoCao = idLoCao,
+                Ngay    = ngay,
+                Ca      = ca,
+                Items   = items,
+            });
+
+            return viewData;
         }
 
         // ─── Mappers ─────────────────────────────────────────────────────────────
@@ -299,13 +441,15 @@ namespace dataproduct.api.Services
             var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
                 ?? throw new Exception("Không tìm thấy phiếu.");
 
+            var kip = phieu.Kip ?? throw new Exception("Phiếu chưa có thông tin kíp.");
+
             var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
             var firstRow = chiTiet.FirstOrDefault();
 
             var ngay  = firstRow?.Ngay ?? DateTime.MinValue;
             var ca    = firstRow?.Ca ?? 0;
             var scope = firstRow?.IDLoCao ?? 0;
-
+            
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var caLabel = ca == 1 ? "1" : ca == 2 ? "2" : $"Ca {ca}";
             var loCao = scope > 0 ? scope.ToString() : "";
@@ -371,7 +515,7 @@ namespace dataproduct.api.Services
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{LoCao}}", loCao)
-                .Replace("{{CaLabel}}", caLabel)
+                .Replace("{{CaLabel}}", $"{caLabel} {kip}")
                 .Replace("{{NgaySX}}", ngayDisplay)
                 .Replace("{{Rows}}", rows.ToString())
                 .Replace("{{TongKhoiLuong}}", tongKL.ToString("N3"))

@@ -278,13 +278,14 @@ namespace dataproduct.api.Services
             return await _repo.GetDataByFilterAsync(idLoCao, ngayBatDau, ngayKetThuc);
         }
 
-        // ─── Pivot dữ liệu nạp liệu theo Silo mapping ───────────────
+        // ─── Pivot dữ liệu nạp liệu theo Silo mapping (LO 1-4) ───────
 
         public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
             DateTime ngay, int idCa, int idLoCao)
         {
             return await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
         }
+
 
         // ─── Snapshot trạng thái Silo ──────────────────────────────
 
@@ -373,7 +374,7 @@ namespace dataproduct.api.Services
                         if (fixedKeys.Contains(prop.Name)) continue;
                         if (!int.TryParse(prop.Name, out var idNvl)) continue;
                         if (prop.Value.ValueKind == JsonValueKind.Null) continue;
-                        if (!prop.Value.TryGetDecimal(out var giaTri)) continue;
+                        if (!TryParseDecimalElement(prop.Value, out var giaTri)) continue;
 
                         // Manual tracking: _manual_{idNvl} và _goc_{idNvl} trong cùng row
                         var isManual = row.TryGetProperty($"_manual_{idNvl}", out var manualEl)
@@ -381,7 +382,7 @@ namespace dataproduct.api.Services
                         decimal? giaTri_Goc = null;
                         if (row.TryGetProperty($"_goc_{idNvl}", out var gocEl)
                             && gocEl.ValueKind != JsonValueKind.Null
-                            && gocEl.TryGetDecimal(out var gocVal))
+                            && TryParseDecimalElement(gocEl, out var gocVal))
                             giaTri_Goc = gocVal;
 
                         var doAm = doAmByNvl.TryGetValue(idNvl, out var da) ? da : (decimal?)null;
@@ -416,6 +417,46 @@ namespace dataproduct.api.Services
                     .Select(g => g.First())
                     .ToList();
 
+                // ── Merge với dữ liệu đã lưu trong DB ──────────────────────────
+                // Khoá so khớp: (SoMe, ThoiGianNapLieu, IDNVL).
+                // Nếu bản ghi cũ có ManualGiaTri = true → giữ GiaTri nhập tay,
+                // cập nhật GiaTri_Goc = giá trị API mới để người dùng so sánh.
+                var savedRecords = await _repo.GetChiTietByPhieuAsync(phieu.Idphieu);
+                var manualMap = savedRecords
+                    .Where(r => r.ManualGiaTri)
+                    .ToDictionary(r => (r.SoMe, r.ThoiGianNapLieu, r.IDNVL));
+
+                //foreach (var item in items)
+                //{
+                //    var key = (item.SoMe, item.ThoiGianNapLieu, item.IDNVL);
+                //    if (manualMap.TryGetValue(key, out var saved))
+                //    {
+                //        // GiaTri_Goc = giá trị SCADA (tự động), không bao giờ là giá trị nhập tay.
+                //        // Ưu tiên: _goc_ từ JSON (đã set khi lần đầu chuyển sang manual),
+                //        // fallback về GiaTri_Goc đã lưu trong DB.
+                //        // KHÔNG dùng item.GiaTri vì đó là giá trị nhập tay từ JSON.
+                //        item.GiaTri_Goc   = item.GiaTri_Goc ?? saved.GiaTri_Goc;
+                //        item.GiaTri       = saved.GiaTri;  // giữ nguyên giá trị nhập tay
+                //        item.ManualGiaTri = true;
+                //    }
+                //}
+                foreach (var item in items)
+                {
+                    var key = (item.SoMe, item.ThoiGianNapLieu, item.IDNVL);
+
+                    if (manualMap.TryGetValue(key, out var saved))
+                    {
+                        item.ManualGiaTri =
+                            item.ManualGiaTri || saved.ManualGiaTri;
+
+                        // Giữ nguyên giá trị gốc đầu tiên
+                        item.GiaTri_Goc =
+                            item.GiaTri_Goc ?? saved.GiaTri_Goc;
+
+                        // KHÔNG ghi đè GiaTri
+                        // item.GiaTri = saved.GiaTri;
+                    }
+                }
                 // Tính QuyKho server-side: sum(GiaTri) per IDNVL * (1 - DoAm/100)
                 var totalByNvl = items
                     .GroupBy(x => x.IDNVL)
@@ -427,7 +468,7 @@ namespace dataproduct.api.Services
                         item.QuyKho = total * (100 - pct) / 100;
                 }
 
-                // Replace mode: xóa dữ liệu cũ rồi ghi mới
+                // Replace mode: xóa dữ liệu cũ rồi ghi mới (đã merge)
                 await _repo.DeleteChiTietByPhieuIdAsync(phieu.Idphieu);
 
                 if (items.Count > 0)
@@ -442,6 +483,124 @@ namespace dataproduct.api.Services
                 Console.WriteLine(ex);
                 return 0;
             }
+        }
+
+        // ─── Sync chi tiết từ SCADA khi người dùng bấm "Tải dữ liệu" ─────────────
+        // Lấy dữ liệu SCADA mới nhất → merge với bản ghi đã lưu (giữ ManualGiaTri) → lưu DB → trả về pivot để hiển thị.
+
+        public async Task<LGNLDuLieuSiLoResult> SyncChiTietFromScadaAsync(Guid idPhieu)
+        {
+            // 1. Đọc ngày/ca/lò cao trực tiếp từ cột BmPhieu — không parse DataJson
+            var phieu = await _repo.GetPhieuByIdAsync(idPhieu)
+                ?? throw new InvalidOperationException($"Không tìm thấy phiếu {idPhieu}.");
+
+            if (phieu.NgaySX is null || phieu.Ca is null || phieu.Scope is null)
+                throw new InvalidOperationException("Phiếu thiếu thông tin ngày/ca/lò cao (NgaySX, Ca, Scope).");
+
+            var ngay    = phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+            var idCa    = phieu.Ca.Value;
+            var idLoCao = phieu.Scope.Value;
+
+            // 2. Lấy dữ liệu SCADA mới nhất (pivot)
+            var pivot = await _repo.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
+
+            // 3. Load bản ghi đã lưu để lấy doAm và giá trị nhập tay
+            var savedRecords = await _repo.GetChiTietByPhieuAsync(idPhieu);
+
+            var doAmByNvl = savedRecords
+                .Where(r => r.DoAm.HasValue)
+                .GroupBy(r => r.IDNVL)
+                .ToDictionary(g => g.Key, g => g.First().DoAm!.Value);
+
+            var manualMap = savedRecords
+                .Where(r => r.ManualGiaTri)
+                .ToDictionary(r => (r.SoMe, r.ThoiGianNapLieu, r.IDNVL));
+
+            // 4. Convert pivot rows → LG_NL_ChiTiet
+            var fixedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "id", "time", "soMe", "meGio", "thoiGianNapLieu",
+                "cheDoNapLieu", "thuocThamLieu1", "thuocThamLieu2", "ghiChu", "key"
+            };
+
+            var items = new List<LG_NL_ChiTiet>();
+            int thuTu = 0;
+
+            foreach (var row in pivot.Rows)
+            {
+                thuTu++;
+
+                var soMe        = ObjToDecimal(row.GetValueOrDefault("soMe"));
+                var timeStr     = row.GetValueOrDefault("time")?.ToString();
+                var thoiGian    = DateTime.TryParse(timeStr, out var dt)
+                                    ? dt.ToString("HH:mm:ss")
+                                    : "";
+
+                foreach (var kv in row)
+                {
+                    if (fixedKeys.Contains(kv.Key)) continue;
+                    if (!int.TryParse(kv.Key, out var idNvl)) continue;
+                    if (kv.Value is null) continue;
+                    if (!ObjToDecimal(kv.Value).HasValue) continue;
+
+                    var giaTri = ObjToDecimal(kv.Value)!.Value;
+                    var doAm   = doAmByNvl.TryGetValue(idNvl, out var da) ? da : (decimal?)null;
+
+                    items.Add(new LG_NL_ChiTiet
+                    {
+                        IDPhieu          = idPhieu,
+                        IDLoCao          = idLoCao,
+                        Ngay             = ngay,
+                        IDCa             = idCa,
+                        ThoiGianNapLieu  = thoiGian,
+                        SoMe             = soMe,
+                        IDNVL            = idNvl,
+                        GiaTri           = giaTri,
+                        ThuTu            = thuTu,
+                        NgayTao          = DateTime.Now,
+                        ManualGiaTri     = false,
+                        DoAm             = doAm,
+                    });
+                }
+            }
+
+            // 5. Merge: giữ giá trị nhập tay, cập nhật GiaTri_Goc = giá trị SCADA mới
+            foreach (var item in items)
+            {
+                var key = (item.SoMe, item.ThoiGianNapLieu, item.IDNVL);
+                if (manualMap.TryGetValue(key, out var saved))
+                {
+                    item.GiaTri_Goc  = item.GiaTri;
+                    item.GiaTri      = saved.GiaTri;
+                    item.ManualGiaTri = true;
+                    item.DoAm        = saved.DoAm ?? item.DoAm;
+                }
+            }
+
+            // 6. Tính QuyKho
+            var totalByNvl = items
+                .GroupBy(x => x.IDNVL)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.GiaTri ?? 0));
+
+            foreach (var item in items)
+            {
+                if (doAmByNvl.TryGetValue(item.IDNVL, out var pct) && totalByNvl.TryGetValue(item.IDNVL, out var total))
+                    item.QuyKho = total * (100 - pct) / 100;
+            }
+
+            // 7. Xóa cũ → ghi mới (đã merge)
+            await _repo.DeleteChiTietByPhieuIdAsync(idPhieu);
+            if (items.Count > 0)
+                await _repo.AddChiTietRangeAsync(items);
+
+            return pivot;
+        }
+
+        private static decimal? ObjToDecimal(object? value)
+        {
+            if (value is null) return null;
+            try { return Convert.ToDecimal(value); }
+            catch { return null; }
         }
 
         // ─── Export PDF ──────────────────────────────────────────────────────────
@@ -463,16 +622,6 @@ namespace dataproduct.api.Services
             var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca}";
             var loCao       = scope > 0 ? scope.ToString() : "";
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
-            var nvlById = nvlList.ToDictionary(n => n.ID);
-
-            // Tập hợp IDNVLs từ chi tiết
-            var usedNvlIds = chiTiet.Select(x => x.IDNVL).Distinct().Order().ToList();
-            var usedNvls   = usedNvlIds
-                .Select(id => nvlById.TryGetValue(id, out var n) ? n : null)
-                .OfType<LGNLNvlDto>()
-                .OrderBy(n => n.ThuTuNhom ?? 999)
-                .ThenBy(n => n.ThuTu ?? 999)
-                .ToList();
 
             // Hàm lấy tên hiển thị NVL theo quyền: P.KH dùng TenNVL_TK (nếu đã xác nhận), còn lại dùng TenNVL_NM
             string NvlLabel(LGNLNvlDto n) =>
@@ -480,16 +629,28 @@ namespace dataproduct.api.Services
                     ? n.TenNVL_TK!
                     : n.TenNVL_NM ?? "";
 
-            // Nhóm NVL theo NhomHienThi để build header 2 tầng
-            var nhomGroups = usedNvls
-                .GroupBy(n => n.NhomHienThi ?? NvlLabel(n))
-                .OrderBy(g => usedNvls.First(n => (n.NhomHienThi ?? NvlLabel(n)) == g.Key).ThuTuNhom ?? 999)
+            // Luôn lấy đủ 6 nhóm NVL; NVL được sắp xếp theo nhóm rồi theo thứ tự NVL
+            var nhomList = (await _repo.GetNhomNvlListAsync(scope > 0 ? scope : null))
+                .Select(MapNhomNvl)
+                .OrderBy(nh => nh.ThuTu ?? 999)
                 .ToList();
+            var nvlByNhomId = nvlList
+                .GroupBy(n => n.IDNhomNVL ?? 0)
+                .ToDictionary(g => g.Key, g => g.OrderBy(n => n.ThuTu ?? 999).ToList());
+
+            // colSlots: 1 entry per NVL; nhóm không có NVL → 1 slot placeholder (Nvl = null)
+            var colSlots = new List<(LGNLNhomNvlDto Nhom, LGNLNvlDto? Nvl)>();
+            foreach (var nhom in nhomList)
+            {
+                if (nvlByNhomId.TryGetValue(nhom.ID, out var nvls) && nvls.Count > 0)
+                    foreach (var n in nvls) colSlots.Add((nhom, n));
+                else
+                    colSlots.Add((nhom, null));
+            }
 
             // Build thead
             var th1 = new StringBuilder();
             var th2 = new StringBuilder();
-            // Fixed prefix cols header row 1 (rowspan=2)
             th1.Append(@"<th rowspan=""2"" style=""width:45px"">Số mê</th>");
             th1.Append(@"<th rowspan=""2"" style=""width:55px"">Mê/giờ</th>");
             th1.Append(@"<th rowspan=""2"" style=""width:80px"">Thời gian nạp liệu</th>");
@@ -497,22 +658,20 @@ namespace dataproduct.api.Services
             th1.Append(@"<th rowspan=""2"" style=""width:55px"">Thuốc thăm liệu 1 (m)</th>");
             th1.Append(@"<th rowspan=""2"" style=""width:55px"">Thuốc thăm liệu 2 (m)</th>");
 
-            foreach (var grp in nhomGroups)
+            foreach (var nhom in nhomList)
             {
-                var nvlsInGrp = grp.ToList();
-                if (nvlsInGrp.Count == 1)
+                var nvlsInNhom = nvlByNhomId.TryGetValue(nhom.ID, out var nlist) ? nlist : new List<LGNLNvlDto>();
+                if (nvlsInNhom.Count == 0)
                 {
-                    var n0 = nvlsInGrp[0];
-                    var label = NvlLabel(n0) is { Length: > 0 } l ? l : grp.Key;
-                    th1.Append($@"<th rowspan=""2"">{System.Net.WebUtility.HtmlEncode(label)}</th>");
+                    // Nhóm chưa có NVL → 1 cột placeholder, rowspan=2
+                    th1.Append($@"<th rowspan=""2"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
                 }
                 else
                 {
-                    th1.Append($@"<th colspan=""{nvlsInGrp.Count}"">{System.Net.WebUtility.HtmlEncode(grp.Key)}</th>");
-                    foreach (var n in nvlsInGrp)
-                    {
+                    // Luôn hiển thị tên nhóm ở row 1, tên NVL ở row 2 (dù chỉ có 1 NVL)
+                    th1.Append($@"<th colspan=""{nvlsInNhom.Count}"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
+                    foreach (var n in nvlsInNhom)
                         th2.Append($@"<th>{System.Net.WebUtility.HtmlEncode(NvlLabel(n))}</th>");
-                    }
                 }
             }
 
@@ -538,9 +697,10 @@ namespace dataproduct.api.Services
                 dataRows.Append($"<td class=\"text-right\">{(sample.ThuocThamLieu1.HasValue ? sample.ThuocThamLieu1.Value.ToString("N2") : "")}</td>");
                 dataRows.Append($"<td class=\"text-right\">{(sample.ThuocThamLieu2.HasValue ? sample.ThuocThamLieu2.Value.ToString("N2") : "")}</td>");
 
-                foreach (var n in usedNvls)
+                foreach (var (_, nvl) in colSlots)
                 {
-                    var val = nvlValues.TryGetValue(n.ID, out var v) ? v : null;
+                    if (nvl == null) { dataRows.Append("<td></td>"); continue; }
+                    var val = nvlValues.TryGetValue(nvl.ID, out var v) ? v : null;
                     dataRows.Append($"<td class=\"text-right\">{(val.HasValue ? val.Value.ToString("N0") : "")}</td>");
                 }
 
@@ -551,9 +711,10 @@ namespace dataproduct.api.Services
             // Tổng cộng row
             var tongRow = new StringBuilder();
             tongRow.Append(@"<tr class=""tfoot-row""><td colspan=""6"" class=""text-center""><b>TỔNG CỘNG</b></td>");
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var total = chiTiet.Where(x => x.IDNVL == n.ID).Sum(x => x.GiaTri ?? 0);
+                if (nvl == null) { tongRow.Append("<td></td>"); continue; }
+                var total = chiTiet.Where(x => x.IDNVL == nvl.ID).Sum(x => x.GiaTri ?? 0);
                 tongRow.Append($"<td class=\"text-right\"><b>{total.ToString("N0")}</b></td>");
             }
             tongRow.Append("<td></td></tr>");
@@ -561,9 +722,10 @@ namespace dataproduct.api.Services
             // Độ ẩm row
             var doAmRow = new StringBuilder();
             doAmRow.Append(@"<tr class=""doam-row""><td colspan=""6"" class=""text-center"">Độ ẩm (%)</td>");
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var da = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.DoAm.HasValue)?.DoAm;
+                if (nvl == null) { doAmRow.Append("<td></td>"); continue; }
+                var da = chiTiet.FirstOrDefault(x => x.IDNVL == nvl.ID && x.DoAm.HasValue)?.DoAm;
                 doAmRow.Append($"<td class=\"text-center\">{(da.HasValue ? da.Value.ToString("N2") : "")}</td>");
             }
             doAmRow.Append("<td></td></tr>");
@@ -571,9 +733,10 @@ namespace dataproduct.api.Services
             // Quy khô row
             var quyKhoRow = new StringBuilder();
             quyKhoRow.Append(@"<tr class=""quykho-row""><td colspan=""6"" class=""text-center"">Quy khô</td>");
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var qk = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.QuyKho.HasValue)?.QuyKho;
+                if (nvl == null) { quyKhoRow.Append("<td></td>"); continue; }
+                var qk = chiTiet.FirstOrDefault(x => x.IDNVL == nvl.ID && x.QuyKho.HasValue)?.QuyKho;
                 quyKhoRow.Append($"<td class=\"text-right\">{(qk.HasValue ? qk.Value.ToString("N0") : "")}</td>");
             }
             quyKhoRow.Append("<td></td></tr>");
@@ -664,21 +827,31 @@ namespace dataproduct.api.Services
             var loCao = scope > 0 ? scope.ToString() : "";
 
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
-            var nvlById = nvlList.ToDictionary(n => n.ID);
-
-            var usedNvlIds = chiTiet.Select(x => x.IDNVL).Distinct().Order().ToList();
-            var usedNvls = usedNvlIds
-                .Select(id => nvlById.TryGetValue(id, out var n) ? n : null)
-                .OfType<LGNLNvlDto>()
-                .OrderBy(n => n.ThuTuNhom ?? 999)
-                .ThenBy(n => n.ThuTu ?? 999)
-                .ToList();
 
             string NvlLabel(LGNLNvlDto n) => n.TenNVL_NM ?? "";
 
-            // Fixed prefix columns (6) + NVL columns + GhiChu
+            // Luôn lấy đủ 6 nhóm NVL; NVL sắp xếp theo nhóm rồi theo thứ tự NVL
+            var nhomList = (await _repo.GetNhomNvlListAsync(scope > 0 ? scope : null))
+                .Select(MapNhomNvl)
+                .OrderBy(nh => nh.ThuTu ?? 999)
+                .ToList();
+            var nvlByNhomId = nvlList
+                .GroupBy(n => n.IDNhomNVL ?? 0)
+                .ToDictionary(g => g.Key, g => g.OrderBy(n => n.ThuTu ?? 999).ToList());
+
+            // colSlots: 1 entry per NVL; nhóm không có NVL → 1 slot placeholder (Nvl = null)
+            var colSlots = new List<(LGNLNhomNvlDto Nhom, LGNLNvlDto? Nvl)>();
+            foreach (var nhom in nhomList)
+            {
+                if (nvlByNhomId.TryGetValue(nhom.ID, out var nvls) && nvls.Count > 0)
+                    foreach (var n in nvls) colSlots.Add((nhom, n));
+                else
+                    colSlots.Add((nhom, null));
+            }
+
+            // Fixed prefix columns (6) + NVL/placeholder columns + GhiChu
             int fixedCols = 6;
-            int nvlColCount = usedNvls.Count;
+            int nvlColCount = colSlots.Count;
             int totalCols = fixedCols + nvlColCount + 1; // +1 for GhiChu
 
             using var wb = new XLWorkbook();
@@ -701,7 +874,6 @@ namespace dataproduct.api.Services
             ws.Range(3, 1, 3, totalCols).Merge();
 
             // ── Rows 4-5: Multi-level column headers ──
-            // Row 4 fixed cols (rowspan=2 → merge rows 4-5)
             string[] fixedHdrs = { "Số mê", "Mê/giờ", "Thời gian nạp liệu", "Chế độ nạp liệu", "Thuốc thăm liệu 1 (m)", "Thuốc thăm liệu 2 (m)" };
             for (int i = 0; i < fixedCols; i++)
             {
@@ -714,20 +886,16 @@ namespace dataproduct.api.Services
                 ws.Cell(4, i + 1).Style.Alignment.WrapText = true;
             }
 
-            // NVL columns: group by NhomHienThi
-            var nhomGroups = usedNvls
-                .GroupBy(n => n.NhomHienThi ?? NvlLabel(n))
-                .OrderBy(g => usedNvls.First(n => (n.NhomHienThi ?? NvlLabel(n)) == g.Key).ThuTuNhom ?? 999)
-                .ToList();
-
+            // NVL columns: luôn xuất đủ 6 nhóm, tên nhóm ở row 4, tên NVL ở row 5
             int col = fixedCols + 1;
-            foreach (var grp in nhomGroups)
+            foreach (var nhom in nhomList)
             {
-                var nvlsInGrp = grp.ToList();
-                if (nvlsInGrp.Count == 1)
+                var nvlsInNhom = nvlByNhomId.TryGetValue(nhom.ID, out var nlist) ? nlist : new List<LGNLNvlDto>();
+                if (nvlsInNhom.Count == 0)
                 {
+                    // Nhóm chưa có NVL → 1 cột placeholder, rowspan=2
                     ws.Range(4, col, 5, col).Merge();
-                    ws.Cell(4, col).Value = NvlLabel(nvlsInGrp[0]) is { Length: > 0 } l ? l : grp.Key;
+                    ws.Cell(4, col).Value = nhom.TenNhom ?? "";
                     ws.Cell(4, col).Style.Font.Bold = true;
                     ws.Cell(4, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
                     ws.Cell(4, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -737,12 +905,16 @@ namespace dataproduct.api.Services
                 }
                 else
                 {
-                    ws.Range(4, col, 4, col + nvlsInGrp.Count - 1).Merge();
-                    ws.Cell(4, col).Value = grp.Key;
+                    // Luôn hiển thị tên nhóm ở row 4 (colspan=N), tên NVL ở row 5 (dù chỉ có 1 NVL)
+                    if (nvlsInNhom.Count > 1)
+                        ws.Range(4, col, 4, col + nvlsInNhom.Count - 1).Merge();
+                    ws.Cell(4, col).Value = nhom.TenNhom ?? "";
                     ws.Cell(4, col).Style.Font.Bold = true;
                     ws.Cell(4, col).Style.Fill.BackgroundColor = XLColor.FromHtml("#dce6f1");
                     ws.Cell(4, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                    foreach (var n in nvlsInGrp)
+                    ws.Cell(4, col).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                    ws.Cell(4, col).Style.Alignment.WrapText = true;
+                    foreach (var n in nvlsInNhom)
                     {
                         ws.Cell(5, col).Value = NvlLabel(n);
                         ws.Cell(5, col).Style.Font.Bold = true;
@@ -785,11 +957,14 @@ namespace dataproduct.api.Services
                 ws.Cell(dataRow, 6).Value = sample.ThuocThamLieu2.HasValue ? (double)sample.ThuocThamLieu2.Value : (double?)null;
 
                 int c2 = fixedCols + 1;
-                foreach (var n in usedNvls)
+                foreach (var (_, nvl) in colSlots)
                 {
-                    var val = nvlValues.TryGetValue(n.ID, out var v) ? v : null;
-                    if (val.HasValue) ws.Cell(dataRow, c2).Value = (double)val.Value;
-                    ws.Cell(dataRow, c2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                    if (nvl != null)
+                    {
+                        var val = nvlValues.TryGetValue(nvl.ID, out var v) ? v : null;
+                        if (val.HasValue) ws.Cell(dataRow, c2).Value = (double)val.Value;
+                        ws.Cell(dataRow, c2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                    }
                     c2++;
                 }
                 ws.Cell(dataRow, c2).Value = sample.GhiChu ?? "";
@@ -806,12 +981,15 @@ namespace dataproduct.api.Services
             ws.Cell(dataRow, 1).Style.Font.Bold = true;
             ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             int c4 = fixedCols + 1;
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var total = chiTiet.Where(x => x.IDNVL == n.ID).Sum(x => x.GiaTri ?? 0);
-                ws.Cell(dataRow, c4).Value = (double)total;
-                ws.Cell(dataRow, c4).Style.Font.Bold = true;
-                ws.Cell(dataRow, c4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                if (nvl != null)
+                {
+                    var total = chiTiet.Where(x => x.IDNVL == nvl.ID).Sum(x => x.GiaTri ?? 0);
+                    ws.Cell(dataRow, c4).Value = (double)total;
+                    ws.Cell(dataRow, c4).Style.Font.Bold = true;
+                    ws.Cell(dataRow, c4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
                 c4++;
             }
             for (int c5 = 1; c5 <= totalCols; c5++)
@@ -823,11 +1001,14 @@ namespace dataproduct.api.Services
             ws.Range(dataRow, 1, dataRow, fixedCols).Merge();
             ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             int c6 = fixedCols + 1;
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var da = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.DoAm.HasValue)?.DoAm;
-                if (da.HasValue) ws.Cell(dataRow, c6).Value = (double)da.Value;
-                ws.Cell(dataRow, c6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                if (nvl != null)
+                {
+                    var da = chiTiet.FirstOrDefault(x => x.IDNVL == nvl.ID && x.DoAm.HasValue)?.DoAm;
+                    if (da.HasValue) ws.Cell(dataRow, c6).Value = (double)da.Value;
+                    ws.Cell(dataRow, c6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                }
                 c6++;
             }
             for (int c7 = 1; c7 <= totalCols; c7++)
@@ -839,11 +1020,14 @@ namespace dataproduct.api.Services
             ws.Range(dataRow, 1, dataRow, fixedCols).Merge();
             ws.Cell(dataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             int c8 = fixedCols + 1;
-            foreach (var n in usedNvls)
+            foreach (var (_, nvl) in colSlots)
             {
-                var qk = chiTiet.FirstOrDefault(x => x.IDNVL == n.ID && x.QuyKho.HasValue)?.QuyKho;
-                if (qk.HasValue) ws.Cell(dataRow, c8).Value = (double)qk.Value;
-                ws.Cell(dataRow, c8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                if (nvl != null)
+                {
+                    var qk = chiTiet.FirstOrDefault(x => x.IDNVL == nvl.ID && x.QuyKho.HasValue)?.QuyKho;
+                    if (qk.HasValue) ws.Cell(dataRow, c8).Value = (double)qk.Value;
+                    ws.Cell(dataRow, c8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                }
                 c8++;
             }
             for (int c9 = 1; c9 <= totalCols; c9++)
@@ -978,6 +1162,23 @@ namespace dataproduct.api.Services
                     return s;
             }
             return null;
+        }
+
+        // Xử lý giá trị có thể là Number hoặc String (frontend đôi khi gửi số dạng chuỗi)
+        private static bool TryParseDecimalElement(JsonElement el, out decimal result)
+        {
+            if (el.ValueKind == JsonValueKind.Number)
+                return el.TryGetDecimal(out result);
+
+            if (el.ValueKind == JsonValueKind.String)
+                return decimal.TryParse(
+                    el.GetString(),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out result);
+
+            result = 0;
+            return false;
         }
     }
 }

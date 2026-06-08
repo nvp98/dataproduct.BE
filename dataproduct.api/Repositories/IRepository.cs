@@ -300,12 +300,13 @@ namespace dataproduct.api.Repositories
         // Mapping
         Task<List<LGTSMappingDto>> GetMappingListAsync(int? idLoCao, DateTime? ngay, int? ca);
         Task<LG_TSL_SiLo_Mapping?> GetMappingByIdAsync(int id);
+        Task<LG_TSL_SiLo_Mapping?> GetExistingMappingAsync(int thuTuCoDinh, int idLoCao, DateTime ngay, int ca);
         Task<LG_TSL_SiLo_Mapping> AddMappingAsync(LG_TSL_SiLo_Mapping entity);
         Task<LG_TSL_SiLo_Mapping?> UpdateMappingAsync(int id, LG_TSL_SiLo_Mapping entity);
         Task<bool> DeleteMappingAsync(int id);
 
-        // Lấy ThuTu của silo theo ID + IDLoCao (dùng để lưu ThuTu vào IDSiLo của Mapping)
-        Task<int?> GetSiLoThuTuAsync(int siloId, int idLoCao);
+        // Lấy ThuTuCoDinh của silo theo ID + IDLoCao (dùng để lưu ThuTuCoDinh vào IDSiLo của Mapping)
+        Task<int?> GetSiLoThuTuCoDinhAsync(int siloId, int idLoCao);
 
         // View: SiLo + NVL theo Ngày/Ca/LoCao (dùng tạo phiếu tồn silo)
         Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao, DateTime? ngay, int? ca);
@@ -370,7 +371,7 @@ namespace dataproduct.api.Repositories
         Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
             int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc);
 
-        // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao)
+        // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao) — LO 1-4
         Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
             DateTime ngay, int idCa, int idLoCao);
 

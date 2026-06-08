@@ -81,6 +81,7 @@ namespace dataproduct.api.Repositories
                     IDLoCao = s.ID_LoCao,
                     TenSiLo = s.TenSiLo,
                     ThuTu = s.ThuTu,
+                    ThuTuCoDinh=s.ThuTuCoDinh
                 })
                 .ToListAsync();
         }
@@ -194,10 +195,10 @@ namespace dataproduct.api.Repositories
         {
             return await (
                 from m in _context.LG_TSL_SiLo_Mapping
-                // IDSiLo trong Mapping lưu ThuTu → join qua ThuTu + IDLoCao
+                // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
                 join s in _context.LG_TSL_SiLo
-                    on new { ThuTu = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
-                    equals new { ThuTu = s.ThuTu, LoCao = s.ID_LoCao } into siloGroup
+                    on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
+                    equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
                 join n in _context.LG_TSL_NVL
                     on m.IDNVL equals n.ID into nvlGroup
@@ -211,7 +212,7 @@ namespace dataproduct.api.Repositories
                 {
                     ID = m.ID,
                     IDLoCao = m.IDLoCao,
-                    IDSiLo = m.IDSiLo,   // = ThuTu của silo
+                    IDSiLo = m.IDSiLo,   // = ThuTuCoDinh của silo
                     IDNVL = m.IDNVL,
                     Ngay = m.Ngay,
                     Ca = m.Ca,
@@ -219,17 +220,26 @@ namespace dataproduct.api.Repositories
                     NgayTao = m.NgayTao,
                     NguoiTao = m.NguoiTao,
                     TenSiLo = s != null ? s.TenSiLo : null,
-                    ThuTuSiLo = m.IDSiLo,   // IDSiLo chính là ThuTu
+                    ThuTuSiLo = s != null ? s.ThuTu : (int?)null,
                     TenNVL = n != null ? n.TenNVL : null,
                     TenNVLTk = n != null ? n.TenNVL_Tk : null,
                 }
             ).AsNoTracking().ToListAsync();
         }
 
-        public async Task<int?> GetSiLoThuTuAsync(int siloId, int idLoCao)
+        public async Task<LG_TSL_SiLo_Mapping?> GetExistingMappingAsync(int thuTuCoDinh, int idLoCao, DateTime ngay, int ca)
+            => await _context.LG_TSL_SiLo_Mapping
+                .Where(m =>
+                    m.IDSiLo == thuTuCoDinh &&
+                    m.IDLoCao == idLoCao &&
+                    m.Ngay.Date == ngay.Date &&
+                    m.Ca == ca)
+                .FirstOrDefaultAsync();
+
+        public async Task<int?> GetSiLoThuTuCoDinhAsync(int siloId, int idLoCao)
             => await _context.LG_TSL_SiLo
                 .Where(s => s.ID == siloId && s.ID_LoCao == idLoCao)
-                .Select(s => s.ThuTu)
+                .Select(s => s.ThuTuCoDinh)
                 .FirstOrDefaultAsync();
 
         public async Task<LG_TSL_SiLo_Mapping?> GetMappingByIdAsync(int id)
@@ -354,8 +364,8 @@ namespace dataproduct.api.Repositories
                 ? fromDate?.AddHours(19).AddMinutes(35)
                 : fromDate?.AddDays(1).AddHours(7).AddMinutes(35);
 
-            // IDSiLo trong Mapping lưu ThuTu → join qua ThuTu + IDLoCao
-            // để lấy đúng TenSiLo từ LG_TSL_SiLo và sắp xếp theo thứ tự vật lý.
+            // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
+            // để lấy đúng TenSiLo từ LG_TSL_SiLo và sắp xếp theo thứ tự vật lý (ThuTu).
             var result = await (
                 from m in _context.LG_TSL_SiLo_Mapping.AsNoTracking()
                 where
@@ -364,8 +374,8 @@ namespace dataproduct.api.Repositories
                     (fromDate == null || (m.Ngay >= fromDate && m.Ngay < toDate))
 
                 join s in _context.LG_TSL_SiLo.AsNoTracking()
-                    on new { ThuTu = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
-                    equals new { ThuTu = s.ThuTu, LoCao = s.ID_LoCao } into siloGroup
+                    on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
+                    equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
 
                 join nvl in _context.LG_TSL_NVL.AsNoTracking()
@@ -377,25 +387,25 @@ namespace dataproduct.api.Repositories
                 select new LGTSSiLoMappingViewDto
                 {
                     IDMapping = m.ID,
-                    IDSiLo    = m.IDSiLo,
-                    IDLoCao   = m.IDLoCao,
-                    IDNVL     = m.IDNVL,
-                    TenSiLo   = s != null ? s.TenSiLo : null,
-                    ThuTu     = m.IDSiLo,
-                    TenNVL    = nvl != null
+                    IDSiLo = m.IDSiLo,
+                    IDLoCao = m.IDLoCao,
+                    IDNVL = m.IDNVL,
+                    TenSiLo = s != null ? s.TenSiLo : null,
+                    ThuTu = s != null ? s.ThuTu : m.IDSiLo,
+                    TenNVL = nvl != null
                                   ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
                                   : null,
                     TenNVLTk = nvl != null ? nvl.TenNVL_Tk : null,
-                    Ngay      = m.Ngay,
-                    Ca        = m.Ca,
-                    GhiChu    = m.GhiChu,
+                    Ngay = m.Ngay,
+                    Ca = m.Ca,
+                    GhiChu = m.GhiChu,
                     // Lấy bản ghi mới nhất trong khung giờ của ca
                     Ton = _context.SiLoTon
                         .Where(t =>
                             t.IDSiLo == m.IDSiLo &&
                             t.IdLoCao == m.IDLoCao &&
                             (tonFrom == null || t.Ngay >= tonFrom) &&
-                            (tonTo   == null || t.Ngay <  tonTo))
+                            (tonTo == null || t.Ngay < tonTo))
                         .OrderByDescending(t => t.Ngay)
                         .Select(t => (decimal?)t.Ton)
                         .FirstOrDefault() ?? 0
@@ -404,7 +414,6 @@ namespace dataproduct.api.Repositories
 
             return result;
         }
-
         public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
             => await _context.BmPhieus.AsNoTracking().FirstOrDefaultAsync(p => p.Idphieu == idPhieu);
     }

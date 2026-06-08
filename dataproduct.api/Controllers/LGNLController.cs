@@ -283,14 +283,28 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                //if (!DateOnly.TryParse(ngay, out var parsedNgay))
-                //    return BadRequest(new { message = "ngay không hợp lệ. Định dạng: yyyy-MM-dd" });
                 if (idCa != 1 && idCa != 2)
                     return BadRequest(new { message = "idCa chỉ nhận giá trị 1 hoặc 2." });
 
                 var result = await _service.GetDuLieuSiloPivotAsync(ngay, idCa, idLoCao);
                 return Ok(result);
             }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Tải dữ liệu SCADA mới nhất, merge với bản ghi đã lưu (giữ ManualGiaTri), lưu DB, trả về pivot.
+        /// Gọi khi người dùng bấm "Tải dữ liệu" trên phiếu đã tồn tại.
+        /// </summary>
+        [HttpPost("sync-chitiet/{idPhieu}")]
+        public async Task<IActionResult> SyncChiTiet(Guid idPhieu)
+        {
+            try
+            {
+                var result = await _service.SyncChiTietFromScadaAsync(idPhieu);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
