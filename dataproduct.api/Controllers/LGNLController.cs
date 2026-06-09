@@ -18,22 +18,25 @@ namespace dataproduct.api.Controllers
             _pdservice = pdservice;
         }
 
+        // ─── TS Mapping ───────────────────────────────────────────────────────────
 
-        [HttpGet("ts-mapping")]
+        [HttpGet("get-ts-mapping")]
         public async Task<IActionResult> GetTsMapping()
         {
             try { return Ok(await _service.GetTsMappingListAsync()); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("silo-master")]
+        // ─── Silo Master ──────────────────────────────────────────────────────────
+
+        [HttpGet("get-silo-master")]
         public async Task<IActionResult> GetSiLoMasterList([FromQuery] int? idLoCao)
         {
             try { return Ok(await _service.GetSiLoMasterListAsync(idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("silo-master/{id}")]
+        [HttpGet("get-silo-master/{id}")]
         public async Task<IActionResult> GetSiLoMasterById(int id)
         {
             try
@@ -44,18 +47,18 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("silo-master")]
+        [HttpPost("create-silo-master")]
         public async Task<IActionResult> CreateSiLoMaster([FromBody] CreateLGNLSiLoMasterDto dto)
         {
             try
             {
                 var r = await _service.AddSiLoMasterAsync(dto);
-                return CreatedAtAction(nameof(GetSiLoMasterById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetSiLoMasterById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("silo-master/{id}")]
+        [HttpPut("update-silo-master/{id}")]
         public async Task<IActionResult> UpdateSiLoMaster(int id, [FromBody] UpdateLGNLSiLoMasterDto dto)
         {
             try
@@ -66,7 +69,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("silo-master/{id}")]
+        [HttpDelete("delete-silo-master/{id}")]
         public async Task<IActionResult> DeleteSiLoMaster(int id)
         {
             try
@@ -77,8 +80,9 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        // ─── Mapping Silo ↔ NVL ───────────────────────────────────────────────────
 
-        [HttpGet("mapping")]
+        [HttpGet("get-mapping")]
         public async Task<IActionResult> GetMappingList(
             [FromQuery] DateTime? ngay,
             [FromQuery] int? idCa,
@@ -93,7 +97,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("mapping/{id}")]
+        [HttpGet("get-mapping/{id}")]
         public async Task<IActionResult> GetMappingById(int id)
         {
             try
@@ -104,33 +108,33 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("mapping")]
+        [HttpPost("create-mapping")]
         public async Task<IActionResult> CreateMapping([FromBody] CreateLGNLMappingDto dto)
         {
             try
             {
-                if (dto.IDCa != 1 && dto.IDCa != 2)
-                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
+                if (dto.IdCa != 1 && dto.IdCa != 2)
+                    return BadRequest(new { message = "IdCa chỉ nhận giá trị 1 hoặc 2." });
                 var r = await _service.AddMappingAsync(dto);
-                return CreatedAtAction(nameof(GetMappingById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetMappingById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("mapping/{id}")]
+        [HttpPut("update-mapping/{id}")]
         public async Task<IActionResult> UpdateMapping(int id, [FromBody] UpdateLGNLMappingDto dto)
         {
             try
             {
-                if (dto.IDCa != 1 && dto.IDCa != 2)
-                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
+                if (dto.IdCa != 1 && dto.IdCa != 2)
+                    return BadRequest(new { message = "IdCa chỉ nhận giá trị 1 hoặc 2." });
                 var r = await _service.UpdateMappingAsync(id, dto);
                 return r == null ? NotFound(new { message = $"Không tìm thấy Mapping ID={id}" }) : Ok(r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("mapping/{id}")]
+        [HttpDelete("delete-mapping/{id}")]
         public async Task<IActionResult> DeleteMapping(int id)
         {
             try
@@ -141,15 +145,35 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-
-        [HttpGet("nhom-nvl")]
-        public async Task<IActionResult> GetNhomNvlList([FromQuery] int? idLoCao)
+        [HttpPost("doi-nvl")]
+        public async Task<IActionResult> DoiNVLGiuaCa([FromBody] LGNLChangeSiLoNVLDto dto)
         {
-            try { return Ok(await _service.GetNhomNvlListAsync(idLoCao)); }
+            try
+            {
+                if (dto.IdCa != 1 && dto.IdCa != 2)
+                    return BadRequest(new { message = "IdCa chỉ nhận giá trị 1 hoặc 2." });
+                if (dto.IdSiLo <= 0 || dto.IdNVLMoi <= 0)
+                    return BadRequest(new { message = "IdSiLo và IdNVLMoi phải lớn hơn 0." });
+
+                var result = await _service.ChangeSiLoNVLAsync(
+                    dto.IdLoCao, dto.Ngay, dto.IdCa,
+                    dto.IdSiLo, dto.IdNVLMoi, dto.ThoiDiem, dto.GhiChu);
+
+                return Ok(new { message = "Đổi NVL thành công.", id = result.ID });
+            }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("nhom-nvl/{id}")]
+        // ─── Nhóm NVL ─────────────────────────────────────────────────────────────
+
+        [HttpGet("get-nhom-nvl")]
+        public async Task<IActionResult> GetNhomNvlList()
+        {
+            try { return Ok(await _service.GetNhomNvlListAsync(null)); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("get-nhom-nvl/{id}")]
         public async Task<IActionResult> GetNhomNvlById(int id)
         {
             try
@@ -160,18 +184,18 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("nhom-nvl")]
+        [HttpPost("create-nhom-nvl")]
         public async Task<IActionResult> CreateNhomNvl([FromBody] CreateLGNLNhomNvlDto dto)
         {
             try
             {
                 var r = await _service.AddNhomNvlAsync(dto);
-                return CreatedAtAction(nameof(GetNhomNvlById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetNhomNvlById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("nhom-nvl/{id}")]
+        [HttpPut("update-nhom-nvl/{id}")]
         public async Task<IActionResult> UpdateNhomNvl(int id, [FromBody] UpdateLGNLNhomNvlDto dto)
         {
             try
@@ -182,7 +206,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("nhom-nvl/{id}")]
+        [HttpDelete("delete-nhom-nvl/{id}")]
         public async Task<IActionResult> DeleteNhomNvl(int id)
         {
             try
@@ -193,17 +217,16 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("nvl")]
+        // ─── NVL ──────────────────────────────────────────────────────────────────
+
+        [HttpGet("get-nvl")]
         public async Task<IActionResult> GetNvlList([FromQuery] int? idLoCao)
         {
-            try
-            {
-                return Ok(await _service.GetNvlListAsync(idLoCao));
-            }
+            try { return Ok(await _service.GetNvlListAsync(idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("nvl/{id}")]
+        [HttpGet("get-nvl/{id}")]
         public async Task<IActionResult> GetNvlById(int id)
         {
             try
@@ -214,18 +237,18 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("nvl")]
+        [HttpPost("create-nvl")]
         public async Task<IActionResult> CreateNvl([FromBody] CreateLGNLNvlDto dto)
         {
             try
             {
                 var r = await _service.AddNvlAsync(dto);
-                return CreatedAtAction(nameof(GetNvlById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetNvlById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("nvl/{id}")]
+        [HttpPut("update-nvl/{id}")]
         public async Task<IActionResult> UpdateNvl(int id, [FromBody] UpdateLGNLNvlDto dto)
         {
             try
@@ -236,7 +259,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("nvl/{id}")]
+        [HttpDelete("delete-nvl/{id}")]
         public async Task<IActionResult> DeleteNvl(int id)
         {
             try
@@ -247,20 +270,20 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("nvl/xac-nhan")]
+        [HttpPut("update-nvl-xac-nhan")]
         public async Task<IActionResult> UpdateXacNhan([FromBody] UpdateXacNhanDto dto)
         {
             try
             {
                 var ok = await _service.UpdateXacNhanAsync(dto);
-                return ok ? Ok(new { message = "Cập nhật xác nhận thành công." }) : NotFound(new { message = $"Không tìm thấy NVL ID={dto.ID}" });
+                return ok ? Ok(new { message = "Cập nhật xác nhận thành công." }) : NotFound(new { message = $"Không tìm thấy NVL ID={dto.Id}" });
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // ─── Dữ liệu theo LoCao, Ngày ───────────────────────────────
+        // ─── Dữ liệu nạp liệu ────────────────────────────────────────────────────
 
-        [HttpGet("datanaplieu-filter")]
+        [HttpGet("get-datanaplieu-filter")]
         public async Task<IActionResult> GetDataNapLieuFilter(
             [FromQuery] int? idLoCao,
             [FromQuery] DateTime? ngayBatDau,
@@ -274,8 +297,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        /// </summary>
-        [HttpGet("dulieu-silo")]
+        [HttpGet("get-dulieu-silo")]
         public async Task<IActionResult> GetDuLieuSilo(
             [FromQuery] DateTime ngay,
             [FromQuery] int idCa,
@@ -292,10 +314,6 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        /// <summary>
-        /// Tải dữ liệu SCADA mới nhất, merge với bản ghi đã lưu (giữ ManualGiaTri), lưu DB, trả về pivot.
-        /// Gọi khi người dùng bấm "Tải dữ liệu" trên phiếu đã tồn tại.
-        /// </summary>
         [HttpPost("sync-chitiet/{idPhieu}")]
         public async Task<IActionResult> SyncChiTiet(Guid idPhieu)
         {
@@ -308,7 +326,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("snapshot-silo")]
+        [HttpGet("get-snapshot-silo")]
         public async Task<IActionResult> GetSnapshotSilo(
             [FromQuery] DateTime ngay,
             [FromQuery] int idCa,
@@ -324,16 +342,14 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("chitiet/{idPhieu}")]
+        [HttpGet("get-chitiet/{idPhieu}")]
         public async Task<IActionResult> GetChiTietByPhieu(Guid idPhieu)
         {
             try { return Ok(await _service.GetChiTietByPhieuAsync(idPhieu)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // ─── Export PDF ───────────────────────────────────────────────────────────
-
-        [HttpGet("export-pdf/{idPhieu}")]
+        [HttpGet("get-export-pdf/{idPhieu}")]
         public async Task<IActionResult> ExportPdf(Guid idPhieu, [FromQuery] bool useKeHoachName = false)
         {
             try
@@ -345,34 +361,13 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // ─── Export Excel ─────────────────────────────────────────────────────────
-
-        [HttpGet("export-excel/{idPhieu}")]
+        [HttpGet("get-export-excel/{idPhieu}")]
         public async Task<IActionResult> ExportExcel(Guid idPhieu)
         {
             try
             {
                 var file = await _service.ExportNapLieuExcelAsync(idPhieu);
                 return File(file.Content, file.ContentType, file.FileName);
-            }
-            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
-        }
-
-        [HttpPost("mapping/doi-nvl")]
-        public async Task<IActionResult> DoiNVLGiuaCa([FromBody] LGNLChangeSiLoNVLDto dto)
-        {
-            try
-            {
-                if (dto.IDCa != 1 && dto.IDCa != 2)
-                    return BadRequest(new { message = "IDCa chỉ nhận giá trị 1 hoặc 2." });
-                if (dto.IDSiLo <= 0 || dto.IDNVLMoi <= 0)
-                    return BadRequest(new { message = "IDSiLo và IDNVLMoi phải lớn hơn 0." });
-
-                var result = await _service.ChangeSiLoNVLAsync(
-                    dto.IDLoCao, dto.Ngay, dto.IDCa,
-                    dto.IDSiLo, dto.IDNVLMoi, dto.ThoiDiem, dto.GhiChu);
-
-                return Ok(new { message = "Đổi NVL thành công.", id = result.ID });
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

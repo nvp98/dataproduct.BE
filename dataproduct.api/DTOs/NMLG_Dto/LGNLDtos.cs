@@ -1,13 +1,11 @@
-using System.Text.Json.Serialization;
-
 namespace dataproduct.api.DTOs.NMLG_Dto
 {
     // ─── SiLo Master DTOs ─────────────────────────────────────────────────────
 
     public class LGNLSiLoMasterDto
     {
-        public int ID { get; set; }
-        public int? IDLoCao { get; set; }
+        public int Id { get; set; }
+        public int? IdLoCao { get; set; }
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
         public DateTime? NgayTao { get; set; }
@@ -16,7 +14,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class CreateLGNLSiLoMasterDto
     {
-        public int IDLoCao { get; set; }
+        public int IdLoCao { get; set; }
         public string TenSiLo { get; set; } = string.Empty;
         public int? ThuTu { get; set; }
         public string? TagKey { get; set; }
@@ -24,7 +22,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGNLSiLoMasterDto
     {
-        public int IDLoCao { get; set; }
+        public int IdLoCao { get; set; }
         public string TenSiLo { get; set; } = string.Empty;
         public int? ThuTu { get; set; }
         public string? TagKey { get; set; }
@@ -34,7 +32,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLTsMappingDto
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
         public string? TagKey { get; set; }
         public bool? IsActive { get; set; }
     }
@@ -43,22 +41,21 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLMappingDto
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
         public DateTime? Ngay { get; set; }
-        public int? IDCa { get; set; }
-        public int? IDLoCao { get; set; }
-        public int? IDSiLo { get; set; }
+        public int? IdCa { get; set; }
+        public int? IdLoCao { get; set; }
+        public int? IdSiLo { get; set; }
         public string? TenSiLo { get; set; }    // join từ LG_NL_SiLo
         public string? TagKey { get; set; }     // join từ LG_NL_SiLo
-        [JsonPropertyName("idNVL")]
-        public int? IDNVL { get; set; }
+        public int? IdNVL { get; set; }
         public string? MaNVL { get; set; }      // join từ LG_NL_NVL
         public string? TenNVL { get; set; }     // join từ LG_NL_NVL
         public string? NhomHienThi { get; set; }// join từ LG_NL_NVL
         public int? ThuTuNhom { get; set; }     // join từ LG_NL_NVL
         public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca; có giá trị = đổi NVL giữa ca
         public DateTime? NgayHetHL { get; set; }
-        public int? IDCaHetHL { get; set; }
+        public int? IdCaHetHL { get; set; }
         public string? GhiChu { get; set; }
         public DateTime? NgayTao { get; set; }
     }
@@ -67,10 +64,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLSiloSnapshotDto
     {
-        public int IDSiLo { get; set; }
+        public int IdSiLo { get; set; }
         public string? TenSiLo { get; set; }
-        [JsonPropertyName("idNVL")]
-        public int? IDNVL { get; set; }
+        public int? IdNVL { get; set; }
         public string? TenNVL { get; set; }
         public DateTime? ThoiDiemBD { get; set; } // null = từ đầu ca
         public bool DaDoiGiuaCa { get; set; }
@@ -80,20 +76,20 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     public class CreateLGNLMappingDto
     {
         public DateTime? Ngay { get; set; }
-        public int IDCa { get; set; }
-        public int IDLoCao { get; set; }
-        public int? IDSiLo { get; set; }
-        public int? IDNVL { get; set; }
+        public int IdCa { get; set; }
+        public int IdLoCao { get; set; }
+        public int? IdSiLo { get; set; }
+        public int? IdNVL { get; set; }
         public string? GhiChu { get; set; }
     }
 
     public class UpdateLGNLMappingDto
     {
         public DateTime? Ngay { get; set; }
-        public int IDCa { get; set; }
-        public int IDLoCao { get; set; }
-        public int? IDSiLo { get; set; }
-        public int? IDNVL { get; set; }
+        public int IdCa { get; set; }
+        public int IdLoCao { get; set; }
+        public int? IdSiLo { get; set; }
+        public int? IdNVL { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -101,17 +97,14 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLNhomNvlDto
     {
-        public int ID { get; set; }
-        public int? IDLoCao { get; set; }
+        public int Id { get; set; }
         public string? TenNhom { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
-        public DateTime? NgayTao { get; set; }
     }
 
     public class CreateLGNLNhomNvlDto
     {
-        public int IDLoCao { get; set; }
         public string TenNhom { get; set; } = string.Empty;
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
@@ -119,7 +112,6 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGNLNhomNvlDto
     {
-        public int IDLoCao { get; set; }
         public string TenNhom { get; set; } = string.Empty;
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
@@ -129,9 +121,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLNvlDto
     {
-        public int ID { get; set; }
-        public int? IDLoCao { get; set; }
-        public int? IDNhomNVL { get; set; }
+        public int Id { get; set; }
+        public int? IdLoCao { get; set; }
+        public int? IdNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
@@ -141,13 +133,13 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenNVL_TK { get; set; }
         public bool? XacNhan { get; set; }
         public DateTime? NgayXacNhan { get; set; }
-        public int? IDNguoiXacNhan { get; set; }
+        public int? IdNguoiXacNhan { get; set; }
     }
 
     public class CreateLGNLNvlDto
     {
-        public int IDLoCao { get; set; }
-        public int? IDNhomNVL { get; set; }
+        public int IdLoCao { get; set; }
+        public int? IdNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
@@ -156,8 +148,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGNLNvlDto
     {
-        public int IDLoCao { get; set; }
-        public int? IDNhomNVL { get; set; }
+        public int IdLoCao { get; set; }
+        public int? IdNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
         public string? TenNVL_TK { get; set; }
         public int? ThuTu { get; set; }
@@ -167,7 +159,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     }
     public class UpdateXacNhanDto
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
         public bool XacNhan { get; set; }
     }
 
@@ -196,16 +188,16 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public List<Dictionary<string, object?>> Rows { get; set; } = [];
         // Config hiệu lực đang được áp dụng (khác ngay/idCa yêu cầu = đang dùng config cũ)
         public DateTime? NgayHieuLuc { get; set; }
-        public int? IDCaHieuLuc { get; set; }
+        public int? IdCaHieuLuc { get; set; }
     }
 
     public class LGNLChangeSiLoNVLDto
     {
-        public int IDLoCao { get; set; }
+        public int IdLoCao { get; set; }
         public DateTime Ngay { get; set; }
-        public int IDCa { get; set; }
-        public int IDSiLo { get; set; }
-        public int IDNVLMoi { get; set; }
+        public int IdCa { get; set; }
+        public int IdSiLo { get; set; }
+        public int IdNVLMoi { get; set; }
         public DateTime ThoiDiem { get; set; }              // thời điểm bắt đầu dùng NVL mới
         public string? GhiChu { get; set; }
     }
@@ -214,12 +206,12 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     /// </summary>
     public class LGNLDuLieuScadaDto
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
         public string? TagName { get; set; }
         public string? TagKey { get; set; }
         public DateTime? Time { get; set; }
         public double? Value { get; set; }
-        public int? IDLoCao { get; set; }
+        public int? IdLoCao { get; set; }
     }
 
 
@@ -227,7 +219,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     public class GetLGNLDataByFilterDto
     {
         public string? TagKey { get; set; }
-        public int? IDLoCao { get; set; }
+        public int? IdLoCao { get; set; }
         public DateTime? NgayBatDau { get; set; }
         public DateTime? NgayKetThuc { get; set; }
     }
@@ -236,11 +228,11 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGNLChiTietDto
     {
-        public int ID { get; set; }
-        public Guid IDPhieu { get; set; }
-        public int? IDLoCao { get; set; }
+        public int Id { get; set; }
+        public Guid IdPhieu { get; set; }
+        public int? IdLoCao { get; set; }
         public DateTime? Ngay { get; set; }
-        public int? IDCa { get; set; }
+        public int? IdCa { get; set; }
         public string? ThoiGianNapLieu { get; set; }
         public decimal? SoMe { get; set; }
         public string? MeGio { get; set; }
@@ -248,8 +240,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public decimal? ThuocThamLieu1 { get; set; }
         public decimal? ThuocThamLieu2 { get; set; }
         public string? GhiChu { get; set; }
-        [JsonPropertyName("idNVL")]
-        public int IDNVL { get; set; }
+        public int IdNVL { get; set; }
         public decimal? GiaTri { get; set; }
         public int? ThuTu { get; set; }
         public decimal? DoAm { get; set; }

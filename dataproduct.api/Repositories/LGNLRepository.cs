@@ -22,7 +22,7 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .Select(x => new LGNLTsMappingDto
                 {
-                    ID = x.ID,
+                    Id = x.ID,
                     TagKey = x.TagKey,
                     IsActive = x.IsActive
                 })
@@ -113,20 +113,20 @@ namespace dataproduct.api.Repositories
                 orderby m.Ngay, m.IDCa, s.ThuTu
                 select new LGNLMappingDto
                 {
-                    ID = m.ID,
+                    Id = m.ID,
                     Ngay = m.Ngay,
-                    IDCa = m.IDCa,
-                    IDLoCao = m.IDLoCao,
-                    IDSiLo = m.IDSiLo,
+                    IdCa = m.IDCa,
+                    IdLoCao = m.IDLoCao,
+                    IdSiLo = m.IDSiLo,
                     TenSiLo = s != null ? s.TenSiLo : null,
                     TagKey = s != null ? s.TagKey : null,
-                    IDNVL = m.IDNVL,
+                    IdNVL = m.IDNVL,
                     TenNVL = n != null ? (n.XacNhan == true && n.TenNVL_TK != null ? n.TenNVL_TK : n.TenNVL_NM) : null,
                     NhomHienThi = nh != null ? nh.TenNhom : null,
                     ThuTuNhom = nh != null ? nh.ThuTu : null,
                     ThoiDiemBD = m.ThoiDiemBD,
                     NgayHetHL = m.NgayHetHL,
-                    IDCaHetHL = m.IDCaHetHL,
+                    IdCaHetHL = m.IDCaHetHL,
                     GhiChu = m.GhiChu,
                     NgayTao = m.NgayTao
                 }
@@ -258,11 +258,11 @@ namespace dataproduct.api.Repositories
 
                     return new LGNLSiloSnapshotDto
                     {
-                        IDSiLo = g.Key ?? 0,
+                        IdSiLo = g.Key ?? 0,
 
                         TenSiLo = activeRow.TenSiLo,
 
-                        IDNVL = activeRow.IDNVL,
+                        IdNVL = activeRow.IDNVL,
 
                         TenNVL = activeRow.TenNVL,
 
@@ -420,9 +420,9 @@ namespace dataproduct.api.Repositories
                 where idLoCao == null || n.IDLoCao == idLoCao
                 select new LGNLNvlDto
                 {
-                    ID = n.ID,
-                    IDLoCao = n.IDLoCao,
-                    IDNhomNVL = n.IDNhomNVL,
+                    Id = n.ID,
+                    IdLoCao = n.IDLoCao,
+                    IdNhomNVL = n.IDNhomNVL,
                     TenNVL_NM = n.TenNVL_NM,
                     ThuTu = n.ThuTu,
                     GhiChu = n.GhiChu,
@@ -925,11 +925,11 @@ namespace dataproduct.api.Repositories
                 .ThenBy(x => x.IDNVL)
                 .Select(x => new LGNLChiTietDto
                 {
-                    ID = x.ID,
-                    IDPhieu = x.IDPhieu,
-                    IDLoCao = x.IDLoCao,
+                    Id = x.ID,
+                    IdPhieu = x.IDPhieu,
+                    IdLoCao = x.IDLoCao,
                     Ngay = x.Ngay,
-                    IDCa = x.IDCa,
+                    IdCa = x.IDCa,
                     ThoiGianNapLieu = x.ThoiGianNapLieu,
                     SoMe = x.SoMe,
                     MeGio = x.MeGio,
@@ -937,7 +937,7 @@ namespace dataproduct.api.Repositories
                     ThuocThamLieu1 = x.ThuocThamLieu1,
                     ThuocThamLieu2 = x.ThuocThamLieu2,
                     GhiChu = x.GhiChu,
-                    IDNVL = x.IDNVL,
+                    IdNVL = x.IDNVL,
                     GiaTri = x.GiaTri,
                     ThuTu = x.ThuTu,
                     DoAm = x.DoAm,
@@ -964,12 +964,12 @@ namespace dataproduct.api.Repositories
                         orderby d.Time
                         select new LGNLDuLieuScadaDto
                         {
-                            ID = d.ID,
+                            Id = d.ID,
                             TagName = d.TagName,
                             TagKey = d.TagKey,
                             Time = d.Time,
                             Value = d.Value,
-                            IDLoCao = d.ID_LoCao
+                            IdLoCao = d.ID_LoCao
                         };
 
             return await query.AsNoTracking().ToListAsync();

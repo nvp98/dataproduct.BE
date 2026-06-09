@@ -78,7 +78,7 @@ namespace dataproduct.api.Controllers
             try
             {
                 var r = await _service.AddSiLoAsync(dto);
-                return CreatedAtAction(nameof(GetSiLoById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetSiLoById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
@@ -131,7 +131,7 @@ namespace dataproduct.api.Controllers
             try
             {
                 var r = await _service.AddNvlAsync(dto);
-                return CreatedAtAction(nameof(GetNvlById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetNvlById), new { id = r.Id }, r);
             }
             catch (Exception ex)
             {
@@ -173,7 +173,7 @@ namespace dataproduct.api.Controllers
                 var ok = await _service.UpdateXacNhanAsync(dto);
                 return ok
                     ? Ok(new { message = "Cập nhật xác nhận thành công." })
-                    : NotFound(new { message = $"Không tìm thấy NVL ID={dto.ID}" });
+                    : NotFound(new { message = $"Không tìm thấy NVL ID={dto.Id}" });
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
@@ -216,7 +216,7 @@ namespace dataproduct.api.Controllers
                     return BadRequest(new { message = "Ca chỉ nhận giá trị 1 hoặc 2." });
 
                 var r = await _service.AddMappingAsync(dto);
-                return CreatedAtAction(nameof(GetMappingById), new { id = r.ID }, r);
+                return CreatedAtAction(nameof(GetMappingById), new { id = r.Id }, r);
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }

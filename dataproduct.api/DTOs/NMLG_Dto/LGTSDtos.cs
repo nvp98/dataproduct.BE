@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace dataproduct.api.DTOs.NMLG_Dto
 {
@@ -25,12 +24,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGTSNvlDto
     {
-        [JsonPropertyName("id")]
-        public int ID { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
+        public int Id { get; set; }
+        public int IdLoCao { get; set; }
         public string? TenNVL { get; set; }
         public string? TenNVLTk { get; set; }
         /// <summary>Tên hiển thị: TenNVLTk nếu đã xác nhận, ngược lại TenNVL.</summary>
@@ -39,16 +34,12 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public DateTime NgayTao { get; set; }
         public bool XacNhan { get; set; }
         public DateTime? NgayXacNhan { get; set; }
-
-        [JsonPropertyName("idNguoiXacNhan")]
-        public int? IDNguoiXacNhan { get; set; }
+        public int? IdNguoiXacNhan { get; set; }
     }
 
     public class CreateLGTSNvlDto
     {
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
+        public int IdLoCao { get; set; }
         public string TenNVL { get; set; } = string.Empty;
         public string? TenNVLTk { get; set; }
         public string? GhiChu { get; set; }
@@ -59,9 +50,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGTSXacNhanDto
     {
-        [JsonPropertyName("id")]
-        public int ID { get; set; }
-
+        public int Id { get; set; }
         public bool XacNhan { get; set; }
     }
 
@@ -69,23 +58,16 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGTSSiLoDto
     {
-        [JsonPropertyName("id")]
-        public int ID { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int? IDLoCao { get; set; }   // DB: ID_LoCao
-
+        public int Id { get; set; }
+        public int? IdLoCao { get; set; }   // DB: ID_LoCao
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
-
-        public  int? ThuTuCoDinh { get; set; }  
+        public int? ThuTuCoDinh { get; set; }
     }
 
     public class CreateLGTSSiLoDto
     {
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
+        public int IdLoCao { get; set; }
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
     }
@@ -93,24 +75,13 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     public class UpdateLGTSSiLoDto : CreateLGTSSiLoDto { }
 
     // ─── LG_TSL_SiLo_Mapping ─────────────────────────────────────────────────────
-    // [JsonPropertyName] trên các field ID-prefix để đảm bảo JSON output khớp với
-    // TypeScript interface: idNVL, idSiLo, idLoCao thay vì iDNVL, iDSiLo, iDLoCao
-    // (System.Text.Json CamelCase chỉ lowercase ký tự đầu: IDNVL → iDNVL, không phải idNVL)
 
     public class LGTSMappingDto
     {
-        [JsonPropertyName("id")]
-        public int ID { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
-        [JsonPropertyName("idSiLo")]
-        public int IDSiLo { get; set; }
-
-        [JsonPropertyName("idNVL")]
-        public int IDNVL { get; set; }
-
+        public int Id { get; set; }
+        public int IdLoCao { get; set; }
+        public int IdSiLo { get; set; }
+        public int IdNVL { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
         public string? GhiChu { get; set; }
@@ -124,15 +95,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class CreateLGTSMappingDto
     {
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
-        [JsonPropertyName("idSiLo")]
-        public int IDSiLo { get; set; }
-
-        [JsonPropertyName("idNVL")]
-        public int IDNVL { get; set; }
-
+        public int IdLoCao { get; set; }
+        public int IdSiLo { get; set; }
+        public int IdNVL { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
         public string? GhiChu { get; set; }
@@ -144,18 +109,10 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGTSSiLoMappingViewDto
     {
-        [JsonPropertyName("idMapping")]
-        public int IDMapping { get; set; }
-
-        [JsonPropertyName("idSiLo")]
-        public int IDSiLo { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
-        [JsonPropertyName("idNVL")]
-        public int IDNVL { get; set; }
-
+        public int IdMapping { get; set; }
+        public int IdSiLo { get; set; }
+        public int IdLoCao { get; set; }
+        public int IdNVL { get; set; }
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
         public string? TenNVL { get; set; }
@@ -170,27 +127,14 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class LGTSChiTietDto
     {
-        [JsonPropertyName("id")]
-        public int ID { get; set; }
-
-        [JsonPropertyName("idPhieu")]
-        public Guid IDPhieu { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
+        public int Id { get; set; }
+        public Guid IdPhieu { get; set; }
+        public int IdLoCao { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
-
-        [JsonPropertyName("idSiLo")]
-        public int IDSiLo { get; set; }
-
-        [JsonPropertyName("idMapping")]
-        public int? IDMapping { get; set; }
-
-        [JsonPropertyName("idNVL")]
-        public int? IDNVL { get; set; }
-
+        public int IdSiLo { get; set; }
+        public int? IdMapping { get; set; }
+        public int? IdNVL { get; set; }
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
         public string? TenNVLTk { get; set; }
@@ -203,15 +147,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpsertLGTSChiTietItemDto
     {
-        [JsonPropertyName("idSiLo")]
-        public int IDSiLo { get; set; }
-
-        [JsonPropertyName("idMapping")]
-        public int? IDMapping { get; set; }
-
-        [JsonPropertyName("idNVL")]
-        public int? IDNVL { get; set; }
-
+        public int IdSiLo { get; set; }
+        public int? IdMapping { get; set; }
+        public int? IdNVL { get; set; }
         public string? TenSiLo { get; set; }
         public string? TenNVL { get; set; }
         public decimal? KLTonCuoiKip { get; set; }
@@ -223,12 +161,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpsertLGTSChiTietDto
     {
-        [JsonPropertyName("idPhieu")]
-        public Guid IDPhieu { get; set; }
-
-        [JsonPropertyName("idLoCao")]
-        public int IDLoCao { get; set; }
-
+        public Guid IdPhieu { get; set; }
+        public int IdLoCao { get; set; }
         public DateTime Ngay { get; set; }
         public int Ca { get; set; }
         public List<UpsertLGTSChiTietItemDto> Items { get; set; } = new();

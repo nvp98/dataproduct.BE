@@ -55,7 +55,7 @@ namespace dataproduct.api.Services
         {
             var entity = new LG_TSL_SiLo
             {
-                ID_LoCao = dto.IDLoCao,
+                ID_LoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu = dto.ThuTu,
             };
@@ -67,7 +67,7 @@ namespace dataproduct.api.Services
         {
             var entity = new LG_TSL_SiLo
             {
-                ID_LoCao = dto.IDLoCao,
+                ID_LoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu = dto.ThuTu,
             };
@@ -93,7 +93,7 @@ namespace dataproduct.api.Services
 
             var entity = new LG_TSL_NVL
             {
-                IDLoCao = dto.IDLoCao,
+                IDLoCao = dto.IdLoCao,
                 TenNVL = dto.TenNVL?.Trim(),
                 TenNVL_Tk = dto.TenNVLTk,
                 GhiChu = dto.GhiChu,
@@ -109,7 +109,7 @@ namespace dataproduct.api.Services
 
             var entity = new LG_TSL_NVL
             {
-                IDLoCao = dto.IDLoCao,
+                IDLoCao = dto.IdLoCao,
                 TenNVL = dto.TenNVL.Trim(),
                 TenNVL_Tk = dto.TenNVLTk,
                 GhiChu = dto.GhiChu,
@@ -122,7 +122,7 @@ namespace dataproduct.api.Services
         public Task<bool> DeleteNvlAsync(int id) => _repo.DeleteNvlAsync(id);
 
         public Task<bool> UpdateXacNhanAsync(UpdateLGTSXacNhanDto dto)
-            => _repo.UpdateXacNhanAsync(dto.ID, dto.XacNhan);
+            => _repo.UpdateXacNhanAsync(dto.Id, dto.XacNhan);
 
         // ─── Mapping ─────────────────────────────────────────────────────────────
 
@@ -137,12 +137,12 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto> AddMappingAsync(CreateLGTSMappingDto dto)
         {
-            // IDSiLo trong Mapping lưu ThuTuCoDinh (không phải ID) → tra cứu ThuTuCoDinh từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IDSiLo, dto.IDLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
+            // IdSiLo trong Mapping lưu ThuTuCoDinh (không phải ID) → tra cứu ThuTuCoDinh từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IdSiLo, dto.IdLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IdSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
 
             // Kiểm tra trùng: silo đã có mapping NVL cho cùng ngày/ca/lò cao chưa?
-            var duplicate = await _repo.GetExistingMappingAsync(thuTu, dto.IDLoCao, dto.Ngay, dto.Ca);
+            var duplicate = await _repo.GetExistingMappingAsync(thuTu, dto.IdLoCao, dto.Ngay, dto.Ca);
             if (duplicate != null)
             {
                 var currentNvl = await _repo.GetNvlByIdAsync(duplicate.IDNVL);
@@ -151,9 +151,9 @@ namespace dataproduct.api.Services
 
             var entity = new LG_TSL_SiLo_Mapping
             {
-                IDLoCao = dto.IDLoCao,
+                IDLoCao = dto.IdLoCao,
                 IDSiLo  = thuTu,
-                IDNVL   = dto.IDNVL,
+                IDNVL   = dto.IdNVL,
                 Ngay    = dto.Ngay,
                 Ca      = dto.Ca,
                 GhiChu  = dto.GhiChu,
@@ -162,28 +162,28 @@ namespace dataproduct.api.Services
             return MapMapping(result);
         }
 
-        public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto, bool force = false)
+        public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto)
         {
-            // IDSiLo trong Mapping lưu ThuTuCoDinh → tra cứu ThuTuCoDinh từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IDSiLo, dto.IDLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IDSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
+            // IdSiLo trong Mapping lưu ThuTuCoDinh → tra cứu ThuTuCoDinh từ silo ID
+            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IdSiLo, dto.IdLoCao)
+                        ?? throw new InvalidOperationException($"Silo ID={dto.IdSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
 
-            // Khi không có force=true: kiểm tra NVL hiện tại, ném NvlConflictException nếu đang thay NVL khác
-            if (!force)
-            {
-                var existing = await _repo.GetMappingByIdAsync(id);
-                if (existing != null && existing.IDNVL != dto.IDNVL)
-                {
-                    var currentNvl = await _repo.GetNvlByIdAsync(existing.IDNVL);
-                    throw new NvlConflictException(existing.IDNVL, currentNvl?.TenNVL);
-                }
-            }
+            //// Khi không có force=true: kiểm tra NVL hiện tại, ném NvlConflictException nếu đang thay NVL khác
+            //if (!force)
+            //{
+            //    var existing = await _repo.GetMappingByIdAsync(id);
+            //    if (existing != null && existing.IDNVL != dto.IdNVL)
+            //    {
+            //        var currentNvl = await _repo.GetNvlByIdAsync(existing.IDNVL);
+            //        throw new NvlConflictException(existing.IDNVL, currentNvl?.TenNVL);
+            //    }
+            //}
 
             var entity = new LG_TSL_SiLo_Mapping
             {
-                IDLoCao = dto.IDLoCao,
+                IDLoCao = dto.IdLoCao,
                 IDSiLo  = thuTu,
-                IDNVL   = dto.IDNVL,
+                IDNVL   = dto.IdNVL,
                 Ngay    = dto.Ngay,
                 Ca      = dto.Ca,
                 GhiChu  = dto.GhiChu,
@@ -236,9 +236,9 @@ namespace dataproduct.api.Services
 
                 items.Add(new UpsertLGTSChiTietItemDto
                 {
-                    IDSiLo = idSiLo.Value,
-                    IDMapping = TryGetInt(row, "idMapping", "IDMapping"),
-                    IDNVL = TryGetInt(row, "idNVL", "IDNVL"),
+                    IdSiLo = idSiLo.Value,
+                    IdMapping = TryGetInt(row, "idMapping", "IDMapping"),
+                    IdNVL = TryGetInt(row, "idNVL", "IDNVL"),
                     TenSiLo = TryGetString(row, "silo", "tenSiLo", "TenSiLo"),
                     TenNVL = TryGetString(row, "loaiNguyenNhienLieu", "tenNVL", "TenNVL"),
                     KLTonCuoiKip = TryGetDecimal(row, "klTonCuoiKip", "KLTonCuoiKip", "ton"),
@@ -249,22 +249,22 @@ namespace dataproduct.api.Services
                 });
             }
 
-            // Backfill IDNVL từ mapping khi row không có idNVL
-            var needLookup = items.Where(x => x.IDNVL == null).ToList();
+            // Backfill IdNVL từ mapping khi row không có idNVL
+            var needLookup = items.Where(x => x.IdNVL == null).ToList();
             if (needLookup.Any())
             {
                 // Tải mapping của ngày/ca/lò cao này một lần
                 var mappings = await _repo.GetMappingListAsync(idLoCao, ngay, ca);
-                // m.ID = IDMapping (PK), m.IDSiLo = ThuTu của silo
-                var mappingById   = mappings.ToDictionary(m => m.ID);
-                var mappingBySilo = mappings.ToDictionary(m => m.IDSiLo);
+                // m.Id = IdMapping (PK), m.IdSiLo = ThuTu của silo
+                var mappingById   = mappings.ToDictionary(m => m.Id);
+                var mappingBySilo = mappings.ToDictionary(m => m.IdSiLo);
 
                 foreach (var item in needLookup)
                 {
-                    if (item.IDMapping.HasValue && mappingById.TryGetValue(item.IDMapping.Value, out var m1))
-                        item.IDNVL = m1.IDNVL;
-                    else if (mappingBySilo.TryGetValue(item.IDSiLo, out var m2))
-                        item.IDNVL = m2.IDNVL;
+                    if (item.IdMapping.HasValue && mappingById.TryGetValue(item.IdMapping.Value, out var m1))
+                        item.IdNVL = m1.IdNVL;
+                    else if (mappingBySilo.TryGetValue(item.IdSiLo, out var m2))
+                        item.IdNVL = m2.IdNVL;
                 }
             }
 
@@ -274,20 +274,20 @@ namespace dataproduct.api.Services
             {
                 var savedChiTiet = await _repo.GetChiTietByPhieuAsync(phieu.Idphieu);
                 var savedByMapping = savedChiTiet
-                    .Where(r => r.ManualKL && r.IDMapping.HasValue && r.KLGoc.HasValue)
-                    .GroupBy(r => r.IDMapping!.Value)
+                    .Where(r => r.ManualKL && r.IdMapping.HasValue && r.KLGoc.HasValue)
+                    .GroupBy(r => r.IdMapping!.Value)
                     .ToDictionary(g => g.Key, g => g.First());
                 var savedBySilo = savedChiTiet
-                    .Where(r => r.ManualKL && !r.IDMapping.HasValue && r.KLGoc.HasValue)
-                    .GroupBy(r => r.IDSiLo)
+                    .Where(r => r.ManualKL && !r.IdMapping.HasValue && r.KLGoc.HasValue)
+                    .GroupBy(r => r.IdSiLo)
                     .ToDictionary(g => g.Key, g => g.First());
 
                 foreach (var item in items.Where(x => x.ManualKL && x.KLGoc == null))
                 {
                     LGTSChiTietDto? saved = null;
-                    if (item.IDMapping.HasValue && savedByMapping.TryGetValue(item.IDMapping.Value, out var s1))
+                    if (item.IdMapping.HasValue && savedByMapping.TryGetValue(item.IdMapping.Value, out var s1))
                         saved = s1;
-                    else if (savedBySilo.TryGetValue(item.IDSiLo, out var s2))
+                    else if (savedBySilo.TryGetValue(item.IdSiLo, out var s2))
                         saved = s2;
                     item.KLGoc = saved?.KLGoc;
                 }
@@ -298,8 +298,8 @@ namespace dataproduct.api.Services
 
             await _repo.UpsertChiTietAsync(new UpsertLGTSChiTietDto
             {
-                IDPhieu = phieu.Idphieu,
-                IDLoCao = idLoCao,
+                IdPhieu = phieu.Idphieu,
+                IdLoCao = idLoCao,
                 Ngay = ngay,
                 Ca = ca,
                 Items = items,
@@ -334,13 +334,13 @@ namespace dataproduct.api.Services
             var savedRecords = await _repo.GetChiTietByPhieuAsync(idPhieu);
 
             var manualByMapping = savedRecords
-                .Where(r => r.ManualKL && r.IDMapping.HasValue)
-                .GroupBy(r => r.IDMapping!.Value)
+                .Where(r => r.ManualKL && r.IdMapping.HasValue)
+                .GroupBy(r => r.IdMapping!.Value)
                 .ToDictionary(g => g.Key, g => g.First());
 
             var manualBySilo = savedRecords
-                .Where(r => r.ManualKL && !r.IDMapping.HasValue)
-                .GroupBy(r => r.IDSiLo)
+                .Where(r => r.ManualKL && !r.IdMapping.HasValue)
+                .GroupBy(r => r.IdSiLo)
                 .ToDictionary(g => g.Key, g => g.First());
 
             // 4. Build danh sách items từ SCADA, merge ManualKL
@@ -348,18 +348,18 @@ namespace dataproduct.api.Services
             {
                 // Tìm bản ghi nhập tay: ưu tiên khớp IDMapping, fallback IDSiLo
                 LGTSChiTietDto? saved = null;
-                if (manualByMapping.TryGetValue(v.IDMapping, out var s1))
+                if (manualByMapping.TryGetValue(v.IdMapping, out var s1))
                     saved = s1;
-                else if (manualBySilo.TryGetValue(v.IDSiLo, out var s2))
+                else if (manualBySilo.TryGetValue(v.IdSiLo, out var s2))
                     saved = s2;
 
                 if (saved is not null)
                 {
                     return new UpsertLGTSChiTietItemDto
                     {
-                        IDSiLo       = v.IDSiLo,
-                        IDMapping    = v.IDMapping,
-                        IDNVL        = v.IDNVL,
+                        IdSiLo       = v.IdSiLo,
+                        IdMapping    = v.IdMapping,
+                        IdNVL        = v.IdNVL,
                         TenSiLo      = v.TenSiLo,
                         TenNVL       = v.TenNVL,
                         KLTonCuoiKip = saved.KLTonCuoiKip,   // giữ giá trị nhập tay
@@ -371,9 +371,9 @@ namespace dataproduct.api.Services
                 }
                 return new UpsertLGTSChiTietItemDto
                 {
-                    IDSiLo       = v.IDSiLo,
-                    IDMapping    = v.IDMapping,
-                    IDNVL        = v.IDNVL,
+                    IdSiLo       = v.IdSiLo,
+                    IdMapping    = v.IdMapping,
+                    IdNVL        = v.IdNVL,
                     TenSiLo      = v.TenSiLo,
                     TenNVL       = v.TenNVL,
                     KLTonCuoiKip = v.Ton,
@@ -388,8 +388,8 @@ namespace dataproduct.api.Services
             await _repo.DeleteByPhieuIdAsync(idPhieu);
             await _repo.UpsertChiTietAsync(new UpsertLGTSChiTietDto
             {
-                IDPhieu = idPhieu,
-                IDLoCao = idLoCao,
+                IdPhieu = idPhieu,
+                IdLoCao = idLoCao,
                 Ngay    = ngay,
                 Ca      = ca,
                 Items   = items,
@@ -402,31 +402,31 @@ namespace dataproduct.api.Services
 
         private static LGTSSiLoDto MapSiLo(LG_TSL_SiLo e) => new()
         {
-            ID = e.ID,
-            IDLoCao = e.ID_LoCao,
+            Id = e.ID,
+            IdLoCao = e.ID_LoCao,
             TenSiLo = e.TenSiLo,
             ThuTu = e.ThuTu,
         };
 
         private static LGTSNvlDto MapNvl(LG_TSL_NVL e) => new()
         {
-            ID = e.ID,
-            IDLoCao = e.IDLoCao,
+            Id = e.ID,
+            IdLoCao = e.IDLoCao,
             TenNVL = e.TenNVL,
             TenNVLTk = e.TenNVL_Tk,
             GhiChu = e.GhiChu,
             NgayTao = e.NgayTao,
             XacNhan = e.XacNhan,
             NgayXacNhan = e.NgayXacNhan,
-            IDNguoiXacNhan = e.IDNguoiXacNhan,
+            IdNguoiXacNhan = e.IDNguoiXacNhan,
         };
 
         private static LGTSMappingDto MapMapping(LG_TSL_SiLo_Mapping e) => new()
         {
-            ID = e.ID,
-            IDLoCao = e.IDLoCao,
-            IDSiLo = e.IDSiLo,
-            IDNVL = e.IDNVL,
+            Id = e.ID,
+            IdLoCao = e.IDLoCao,
+            IdSiLo = e.IDSiLo,
+            IdNVL = e.IDNVL,
             Ngay = e.Ngay,
             Ca = e.Ca,
             GhiChu = e.GhiChu,
@@ -448,21 +448,21 @@ namespace dataproduct.api.Services
 
             var ngay  = firstRow?.Ngay ?? DateTime.MinValue;
             var ca    = firstRow?.Ca ?? 0;
-            var scope = firstRow?.IDLoCao ?? 0;
-            
+            var scope = firstRow?.IdLoCao ?? 0;
+
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var caLabel = ca == 1 ? "1" : ca == 2 ? "2" : $"Ca {ca}";
             var loCao = scope > 0 ? scope.ToString() : "";
 
-            // Bảng tra cứu TenNVL_Tk theo tên NM, dùng làm fallback khi IDNVL null
+            // Bảng tra cứu TenNVL_Tk theo tên NM, dùng làm fallback khi IdNVL null
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
             var nvlTkByName = nvlList
                 .Where(n => !string.IsNullOrWhiteSpace(n.TenNVL))
                 .GroupBy(n => n.TenNVL!, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().TenNVLTk, StringComparer.OrdinalIgnoreCase);
             var nvlTkById = nvlList
-                .Where(n => n.ID > 0)
-                .ToDictionary(n => n.ID, n => n.TenNVLTk);
+                .Where(n => n.Id > 0)
+                .ToDictionary(n => n.Id, n => n.TenNVLTk);
 
             var rows = new StringBuilder();
             decimal tongKL = 0;
@@ -472,9 +472,9 @@ namespace dataproduct.api.Services
                 stt++;
                 tongKL += c.KLTonCuoiKip ?? 0;
 
-                // Ưu tiên: TenNVLTk từ JOIN theo IDNVL → fallback tra theo TenNVL
+                // Ưu tiên: TenNVLTk từ JOIN theo IdNVL → fallback tra theo TenNVL
                 var tenNvlTk = c.TenNVLTk;
-                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IDNVL.HasValue && nvlTkById.TryGetValue(c.IDNVL.Value, out var tkById))
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IdNVL.HasValue && nvlTkById.TryGetValue(c.IdNVL.Value, out var tkById))
                     tenNvlTk = tkById;
                 if (string.IsNullOrWhiteSpace(tenNvlTk) && !string.IsNullOrWhiteSpace(c.TenNVL) && nvlTkByName.TryGetValue(c.TenNVL!, out var tkByName))
                     tenNvlTk = tkByName;
@@ -575,7 +575,7 @@ namespace dataproduct.api.Services
 
             var ngay = firstRow?.Ngay ?? DateTime.MinValue;
             var ca = firstRow?.Ca ?? 0;
-            var loCao = firstRow?.IDLoCao ?? 0;
+            var loCao = firstRow?.IdLoCao ?? 0;
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var caLabel = ca == 1 ? "Ca 1" : ca == 2 ? "Ca 2" : $"Ca {ca}";
 
@@ -584,7 +584,7 @@ namespace dataproduct.api.Services
                 .Where(n => !string.IsNullOrWhiteSpace(n.TenNVL))
                 .GroupBy(n => n.TenNVL!, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().TenNVLTk, StringComparer.OrdinalIgnoreCase);
-            var nvlTkById = nvlList.Where(n => n.ID > 0).ToDictionary(n => n.ID, n => n.TenNVLTk);
+            var nvlTkById = nvlList.Where(n => n.Id > 0).ToDictionary(n => n.Id, n => n.TenNVLTk);
 
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add("TonSilo");
@@ -626,7 +626,7 @@ namespace dataproduct.api.Services
                 tongKL += c.KLTonCuoiKip ?? 0;
 
                 var tenNvlTk = c.TenNVLTk;
-                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IDNVL.HasValue && nvlTkById.TryGetValue(c.IDNVL.Value, out var tkById))
+                if (string.IsNullOrWhiteSpace(tenNvlTk) && c.IdNVL.HasValue && nvlTkById.TryGetValue(c.IdNVL.Value, out var tkById))
                     tenNvlTk = tkById;
                 if (string.IsNullOrWhiteSpace(tenNvlTk) && !string.IsNullOrWhiteSpace(c.TenNVL) && nvlTkByName.TryGetValue(c.TenNVL!, out var tkByName))
                     tenNvlTk = tkByName;

@@ -42,9 +42,9 @@ namespace dataproduct.api.Repositories
                 .OrderBy(x => x.ThoiGian)
                 .Select(x => new LG_NKVHPT_DuLieuAuto
                 {
-                    ID = x.ID,
+                    Id = x.ID,
                     ThoiGian = x.ThoiGian,
-                    IDCa = x.ThoiGian.Hour >= 8 && x.ThoiGian.Hour < 20 ? 1 : 2,
+                    IdCa = x.ThoiGian.Hour >= 8 && x.ThoiGian.Hour < 20 ? 1 : 2,
                     TrongLuongBonPhunThoi1_Auto = x.TrongLuongBonPhunThoi1,
                     TrongLuongBonPhunThoi2_Auto = x.TrongLuongBonPhunThoi2,
                     TrongLuongBonPhunThoi3_Auto = x.TrongLuongBonPhunThoi3,
@@ -64,12 +64,12 @@ namespace dataproduct.api.Repositories
                 .OrderBy(x => x.ThoiGian)
                 .Select(x => new LGPTLCChiTietDto
                 {
-                    ID = x.ID,
-                    IDPhieu = x.IDPhieu,
+                    Id = x.ID,
+                    IdPhieu = x.IDPhieu,
                     SoPhieu = x.SoPhieu,
-                    IDLoCao = x.ID_LoCao,
+                    IdLoCao = x.ID_LoCao,
                     NgayVanHanh = x.NgayVanHanh,
-                    IDCa = x.IDCa,
+                    IdCa = x.IDCa,
                     Kip = x.Kip,
                     ThoiGian = x.ThoiGian,
                     NhietDoSiloBotThan1_Auto = x.NhietDoSiloBotThan1_Auto,
@@ -154,16 +154,16 @@ namespace dataproduct.api.Repositories
         {
             if (dto.Items.Count == 0) return;
 
-            var ids = dto.Items.Select(x => x.ID).ToList();
+            var ids = dto.Items.Select(x => x.Id).ToList();
             var rows = await _context.LG_NKVHPT_ChiTiet
-                .Where(x => x.IDPhieu == dto.IDPhieu && ids.Contains(x.ID))
+                .Where(x => x.IDPhieu == dto.IdPhieu && ids.Contains(x.ID))
                 .ToListAsync();
 
             var lookup = rows.ToDictionary(r => r.ID);
 
             foreach (var item in dto.Items)
             {
-                if (!lookup.TryGetValue(item.ID, out var row)) continue;
+                if (!lookup.TryGetValue(item.Id, out var row)) continue;
 
                 row.NhietDoSiloBotThan1_Manual = item.NhietDoSiloBotThan1_Manual;
                 row.NhietDoSiloBotThan2_Manual = item.NhietDoSiloBotThan2_Manual;

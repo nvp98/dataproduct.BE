@@ -340,14 +340,14 @@ namespace dataproduct.api.Repositories
             IEnumerable<string> tagKeys, int idLoCao, DateTime timeFrom, DateTime timeTo);
 
         // SiLo Master
-        Task<List<LG_NL_SiLo>> GetSiLoMasterListAsync(int? idLoCao);
+        Task<List<LG_NL_SiLo>> GetSiLoMasterListAsync(int? idLoCao, string? search = null);
         Task<LG_NL_SiLo?> GetSiLoMasterByIdAsync(int id);
         Task<LG_NL_SiLo> AddSiLoMasterAsync(LG_NL_SiLo entity);
         Task<LG_NL_SiLo?> UpdateSiLoMasterAsync(int id, LG_NL_SiLo entity);
         Task<bool> DeleteSiLoMasterAsync(int id);
 
         // Mapping
-        Task<List<LGNLMappingDto>> GetMappingListAsync(DateTime? ngay, int? idCa, int? idLoCao);
+        Task<List<LGNLMappingDto>> GetMappingListAsync(DateTime? ngay, int? idCa, int? idLoCao, string? search = null);
         Task<LG_NL_Mapping?> GetMappingByIdAsync(int id);
         Task<LG_NL_Mapping> AddMappingAsync(LG_NL_Mapping entity);
         Task<LG_NL_Mapping?> UpdateMappingAsync(int id, LG_NL_Mapping entity);
@@ -361,7 +361,7 @@ namespace dataproduct.api.Repositories
         Task<bool> DeleteNhomNvlAsync(int id);
 
         // NVL
-        Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao);
+        Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao, string? search = null);
         Task<LG_NL_NVL?> GetNvlByIdAsync(int id);
         Task<LG_NL_NVL> AddNvlAsync(LG_NL_NVL entity);
         Task<LG_NL_NVL?> UpdateNvlAsync(int id, LG_NL_NVL entity);

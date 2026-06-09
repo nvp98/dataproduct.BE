@@ -77,11 +77,11 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .Select(s => new LGTSSiLoDto
                 {
-                    ID = s.ID,
-                    IDLoCao = s.ID_LoCao,
+                    Id = s.ID,
+                    IdLoCao = s.ID_LoCao,
                     TenSiLo = s.TenSiLo,
                     ThuTu = s.ThuTu,
-                    ThuTuCoDinh=s.ThuTuCoDinh
+                    ThuTuCoDinh = s.ThuTuCoDinh
                 })
                 .ToListAsync();
         }
@@ -128,8 +128,8 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .Select(n => new LGTSNvlDto
                 {
-                    ID = n.ID,
-                    IDLoCao = n.IDLoCao,
+                    Id = n.ID,
+                    IdLoCao = n.IDLoCao,
                     TenNVL = n.TenNVL,
                     TenNVLTk = n.TenNVL_Tk,
                     TenHienThi = n.XacNhan && n.TenNVL_Tk != null ? n.TenNVL_Tk : n.TenNVL,
@@ -137,7 +137,7 @@ namespace dataproduct.api.Repositories
                     NgayTao = n.NgayTao,
                     XacNhan = n.XacNhan,
                     NgayXacNhan = n.NgayXacNhan,
-                    IDNguoiXacNhan = n.IDNguoiXacNhan,
+                    IdNguoiXacNhan = n.IDNguoiXacNhan,
                 })
                 .ToListAsync();
         }
@@ -210,10 +210,10 @@ namespace dataproduct.api.Repositories
                 orderby m.Ngay descending, m.Ca, s != null ? s.ThuTu : 999
                 select new LGTSMappingDto
                 {
-                    ID = m.ID,
-                    IDLoCao = m.IDLoCao,
-                    IDSiLo = m.IDSiLo,   // = ThuTuCoDinh của silo
-                    IDNVL = m.IDNVL,
+                    Id = m.ID,
+                    IdLoCao = m.IDLoCao,
+                    IdSiLo = m.IDSiLo,   // = ThuTuCoDinh của silo
+                    IdNVL = m.IDNVL,
                     Ngay = m.Ngay,
                     Ca = m.Ca,
                     GhiChu = m.GhiChu,
@@ -288,19 +288,19 @@ namespace dataproduct.api.Repositories
         public async Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto)
         {
             var existing = _context.LG_TSL_ChiTiet
-                .Where(c => c.IDPhieu == dto.IDPhieu);
+                .Where(c => c.IDPhieu == dto.IdPhieu);
             _context.LG_TSL_ChiTiet.RemoveRange(existing);
 
             var now = DateTime.Now;
             var newRecords = dto.Items.Select(item => new LG_TSL_ChiTiet
             {
-                IDPhieu = dto.IDPhieu,
-                IDLoCao = dto.IDLoCao,
+                IDPhieu = dto.IdPhieu,
+                IDLoCao = dto.IdLoCao,
                 Ngay = dto.Ngay.Date,
                 Ca = dto.Ca,
-                IDSiLo = item.IDSiLo,
-                IDMapping = item.IDMapping,
-                IDNVL = item.IDNVL,
+                IDSiLo = item.IdSiLo,
+                IDMapping = item.IdMapping,
+                IDNVL = item.IdNVL,
                 TenSiLo = item.TenSiLo,
                 TenNVL = item.TenNVL,
                 KLTonCuoiKip = item.KLTonCuoiKip,
@@ -324,14 +324,14 @@ namespace dataproduct.api.Repositories
                 orderby c.ThuTu
                 select new LGTSChiTietDto
                 {
-                    ID = c.ID,
-                    IDPhieu = c.IDPhieu,
-                    IDLoCao = c.IDLoCao,
+                    Id = c.ID,
+                    IdPhieu = c.IDPhieu,
+                    IdLoCao = c.IDLoCao,
                     Ngay = c.Ngay,
                     Ca = c.Ca,
-                    IDSiLo = c.IDSiLo,
-                    IDMapping = c.IDMapping,
-                    IDNVL = c.IDNVL,
+                    IdSiLo = c.IDSiLo,
+                    IdMapping = c.IDMapping,
+                    IdNVL = c.IDNVL,
                     TenSiLo = c.TenSiLo,
                     TenNVL = nvl != null
                         ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
@@ -386,10 +386,10 @@ namespace dataproduct.api.Repositories
 
                 select new LGTSSiLoMappingViewDto
                 {
-                    IDMapping = m.ID,
-                    IDSiLo = m.IDSiLo,
-                    IDLoCao = m.IDLoCao,
-                    IDNVL = m.IDNVL,
+                    IdMapping = m.ID,
+                    IdSiLo = m.IDSiLo,
+                    IdLoCao = m.IDLoCao,
+                    IdNVL = m.IDNVL,
                     TenSiLo = s != null ? s.TenSiLo : null,
                     ThuTu = s != null ? s.ThuTu : m.IDSiLo,
                     TenNVL = nvl != null

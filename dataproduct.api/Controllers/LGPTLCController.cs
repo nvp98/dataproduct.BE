@@ -29,7 +29,7 @@ namespace dataproduct.api.Controllers
             {
                 var result = await _service.GetAutoDataAsync(new GetAutoDataRequest
                 {
-                    IDLoCao = idLoCao,
+                    IdLoCao = idLoCao,
                     NgaySanXuat = ngaySanXuat,
                     IdPhieu = idPhieu
                 });

@@ -3,9 +3,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     // ─── Auto data from LG_NKVHPT_DuLieu ────────────────────────────────────────
     public class LG_NKVHPT_DuLieuAuto
     {
-        public long ID { get; set; }
+        public long Id { get; set; }
         public DateTime ThoiGian { get; set; }
-        public int? IDCa { get; set; }
+        public int? IdCa { get; set; }
         public decimal? TrongLuongBonPhunThoi1_Auto { get; set; }
         public decimal? TrongLuongBonPhunThoi2_Auto { get; set; }
         public decimal? TrongLuongBonPhunThoi3_Auto { get; set; }
@@ -17,7 +17,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class GetAutoDataRequest
     {
-        public int IDLoCao { get; set; }
+        public int IdLoCao { get; set; }
         public DateTime NgaySanXuat { get; set; }
         public Guid? IdPhieu { get; set; }
     }
@@ -25,12 +25,12 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     // ─── Chi tiết phun than (LG_NKVHPT_ChiTiet) ─────────────────────────────────
     public class LGPTLCChiTietDto
     {
-        public long ID { get; set; }
-        public Guid IDPhieu { get; set; }
+        public long Id { get; set; }
+        public Guid IdPhieu { get; set; }
         public string? SoPhieu { get; set; }
-        public int IDLoCao { get; set; }
+        public int IdLoCao { get; set; }
         public DateTime NgayVanHanh { get; set; }
-        public int IDCa { get; set; }
+        public int IdCa { get; set; }
         public string? Kip { get; set; }
         public DateTime ThoiGian { get; set; }
 
@@ -99,7 +99,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     // ─── Update manual values per row ────────────────────────────────────────────
     public class UpdateLGPTLCManualItemDto
     {
-        public long ID { get; set; }
+        public long Id { get; set; }
         public decimal? NhietDoSiloBotThan1_Manual { get; set; }
         public decimal? NhietDoSiloBotThan2_Manual { get; set; }
         public decimal? NhietDoBonPhunThoi1_Manual { get; set; }
@@ -132,7 +132,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGPTLCManualDto
     {
-        public Guid IDPhieu { get; set; }
+        public Guid IdPhieu { get; set; }
         public List<UpdateLGPTLCManualItemDto> Items { get; set; } = new();
     }
 

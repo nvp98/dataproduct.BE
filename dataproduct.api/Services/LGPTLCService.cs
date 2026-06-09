@@ -35,13 +35,13 @@ namespace dataproduct.api.Services
 
         public async Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(GetAutoDataRequest request)
         {
-            if (request.IDLoCao <= 0)
+            if (request.IdLoCao <= 0)
                 throw new Exception("ID lò cao không hợp lệ");
 
             if (request.NgaySanXuat == DateTime.MinValue)
                 throw new Exception("Ngày vận hành không hợp lệ");
 
-            return await _repo.GetAutoDataAsync(request.IDLoCao, request.NgaySanXuat, request.IdPhieu);
+            return await _repo.GetAutoDataAsync(request.IdLoCao, request.NgaySanXuat, request.IdPhieu);
         }
 
         // ─── Chi tiết (LG_NKVHPT_ChiTiet) ────────────────────────────────────────
@@ -363,7 +363,7 @@ namespace dataproduct.api.Services
             var firstRow = chiTiet.FirstOrDefault();
 
             var ngay = firstRow?.NgayVanHanh ?? DateTime.MinValue;
-            var loCao = firstRow?.IDLoCao ?? 0;
+            var loCao = firstRow?.IdLoCao ?? 0;
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
             var loCaoDisplay = loCao > 0 ? $"Lò cao {loCao}" : "";
 
@@ -496,7 +496,7 @@ namespace dataproduct.api.Services
             var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
             var firstRow = chiTiet.FirstOrDefault();
             var ngay = firstRow?.NgayVanHanh ?? DateTime.MinValue;
-            var loCao = firstRow?.IDLoCao ?? 0;
+            var loCao = firstRow?.IdLoCao ?? 0;
 
             string kip1 = "", kip2 = "", kip3 = "", tong = "";
             string sanLuongNghien = "", sanLuongPhun = "";
