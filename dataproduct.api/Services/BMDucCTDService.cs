@@ -1377,7 +1377,7 @@ namespace dataproduct.api.Services
             var phieu = await _repoPhieu.GetByIdAsync(phieuId);
             if (phieu == null)
                 throw new Exception("Không tìm thấy phiếu");
-            phieu.Kip = "A"; // Mặc định kíp A nếu chưa có, vì kíp là bắt buộc để xuất
+            // phieu.Kip = "A"; // Mặc định kíp A nếu chưa có, vì kíp là bắt buộc để xuất
             if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue || string.IsNullOrWhiteSpace(phieu.Kip))
                 throw new ArgumentException("Phiếu thiếu thông tin Ngày / Ca / Kíp");
 
