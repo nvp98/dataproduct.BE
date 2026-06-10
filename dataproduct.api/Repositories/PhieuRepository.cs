@@ -245,6 +245,10 @@ namespace dataproduct.api.Repositories
                     )
                 );
             }
+            if (request.IsCheck.HasValue)
+            {
+                query = query.Where(x => x.IsCheck == request.IsCheck.Value);
+            }
             var totalCount = await query.CountAsync();
             var data = await query.Skip((request.page - 1) * request.pageSize).Take(request.pageSize).ToListAsync();
             var ids = data.Select(x => x.Idphieu).ToList();
@@ -260,6 +264,7 @@ namespace dataproduct.api.Repositories
                 MayDuc = x.MayDuc,
                 TinhTrang = x.TinhTrang,
                 NguoiTao = x.NguoiTaoId,
+                IsCheck = x.IsCheck,
             }).ToList();
             foreach (var item in result)
             {

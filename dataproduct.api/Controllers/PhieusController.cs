@@ -256,6 +256,24 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpPost("check-nhieu-phieu")]
+        public async Task<IActionResult> CheckNhieuPhieu([FromBody] CheckNhieuPhieuRequest request)
+        {
+            try
+            {
+                await _service.CheckNhieuPhieuAsync(request.IdPhieus, request.IsCheck);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("hrc2-std-nxt/status")]
         public async Task<IActionResult> GetStatusHRC2StdNxt([FromQuery] DateOnly ngaySX, [FromQuery] int ca)
         {
@@ -333,5 +351,11 @@ public class ChotNhieuPhieuRequest
     public List<Guid> IdPhieus { get; set; } = new();
     public int? IdUser { get; set; }
     public int Status { get; set; }
+}
+
+public class CheckNhieuPhieuRequest
+{
+    public List<Guid> IdPhieus { get; set; } = new();
+    public int IsCheck { get; set; }
 }
 

@@ -617,6 +617,25 @@ namespace dataproduct.api.Business
             }
         }
 
+        public async Task CheckNhieuPhieuAsync(List<Guid> idPhieus, int isCheck)
+        {
+            if (idPhieus == null || idPhieus.Count == 0)
+                throw new InvalidOperationException("Danh sách phiếu không được để trống.");
+
+            var phieus = await _context.BmPhieus
+                .Where(x => idPhieus.Contains(x.Idphieu))
+                .ToListAsync();
+
+            var notFound = idPhieus.Except(phieus.Select(p => p.Idphieu)).ToList();
+            if (notFound.Any())
+                throw new InvalidOperationException($"Không tìm thấy {notFound.Count} phiếu trong danh sách.");
+
+            foreach (var phieu in phieus)
+                phieu.IsCheck = isCheck;
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<bool> UpdateStatusExtendedAsync(Guid id, int? status, int? isLock, int? isDelete)
         {
             var existing = await _repo.GetByIdAsync(id);
