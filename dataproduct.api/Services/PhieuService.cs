@@ -6,6 +6,7 @@ using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Services.Exporters;
 using dataproduct.api.Services.Initializers;
+using dataproduct.api.Services.PhieuEnrichers;
 using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
@@ -26,6 +27,7 @@ namespace dataproduct.api.Business
         private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
         private readonly IEnumerable<IPhieuExcelExporter> _excelExporters;
         private readonly PhieuDetailExcelService _detailExcelService;
+        private readonly Dictionary<string, IPhieuSearchEnricher> _enricherMap;
 
         public PhieuService(
             IPhieuRepository repo,
@@ -38,7 +40,8 @@ namespace dataproduct.api.Business
             IEnumerable<IPhieuJsonInitializer> jsonInitializers,
             IEnumerable<IPhieuPdfExporter> pdfExporters,
             IEnumerable<IPhieuExcelExporter> excelExporters,
-            PhieuDetailExcelService detailExcelService)
+            PhieuDetailExcelService detailExcelService,
+            IEnumerable<IPhieuSearchEnricher> enrichers)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
@@ -51,6 +54,7 @@ namespace dataproduct.api.Business
             _pdfExporters = pdfExporters;
             _excelExporters = excelExporters;
             _detailExcelService = detailExcelService;
+            _enricherMap = enrichers.ToDictionary(e => e.MaBm);
         }
 
         /// <summary>
@@ -682,9 +686,10 @@ namespace dataproduct.api.Business
             var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
             var dataList = data.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).ThenBy(x => x.Scope).ToList();
 
-            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            foreach (var item in dataList)
             {
-                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+                if (_enricherMap.TryGetValue(item.MaBm ?? "", out var enricher))
+                    await enricher.EnrichAsync(item);
             }
 
             return new PagedResult<SearchPhieuResponseModel>
@@ -696,9 +701,9 @@ namespace dataproduct.api.Business
             };
         }
 
+
         public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
         {
-            // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
             var idPhieus = await _context.BmPhieus
                 .Where(p => p.MaBm == "HRC2_STD_NXT"
                          && p.NgaySX == workDate
@@ -712,7 +717,6 @@ namespace dataproduct.api.Business
                     .Where(r => idPhieus.Contains(r.Id_Phieu) && r.HasPhanBo == null)
                     .AnyAsync();
 
-            // Bước 2: kiểm tra trạng thái BOF/LF/RH — relatedComplete = tất cả phiếu có TinhTrang IN (2, 5)
             var nauLuyenMaBms = new[] { "HRC2_BB_NauLuyen_BOF", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_RH" };
             var relatedStatuses = await _context.BmPhieus
                 .Where(p => nauLuyenMaBms.Contains(p.MaBm)
@@ -726,10 +730,8 @@ namespace dataproduct.api.Business
             bool relatedComplete = relatedStatuses.Any()
                 && relatedStatuses.All(t => t == 2 || t == 5);
 
-            // Bước 3: kết hợp — cả 2 điều kiện phải true mới là "Đã hoàn thành"
             return (phanBoComplete && relatedComplete) ? 2 : 1;
         }
-
 
         // Helper
         private double? TryGetDouble(JsonElement row, string key)
