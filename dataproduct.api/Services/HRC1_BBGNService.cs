@@ -374,8 +374,9 @@ namespace dataproduct.api.Services
             var phieuTL = await _repo.GetBmPhieuAsync(req.IdPhieu);
             if (phieuTL?.NgaySX.HasValue == true && phieuTL.Ca.HasValue)
             {
-                me.NgayNhanTL  = phieuTL.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
-                me.CaTinhLuyen = phieuTL.Ca;
+                me.NgayNhanTL   = phieuTL.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+                me.CaTinhLuyen  = phieuTL.Ca;
+                me.KipTinhLuyen = phieuTL.Kip;
             }
 
             _repo.AddMePhanCong(new HRC1_MePhanCong
@@ -510,6 +511,7 @@ namespace dataproduct.api.Services
             me.TrangThaiTL   = null;
             me.NgayNhanTL    = null;
             me.CaTinhLuyen   = null;
+            me.KipTinhLuyen  = null;
             me.ThoiGian      = null;
             me.KlLan1        = null;
             me.KlLan2        = null;
@@ -733,6 +735,7 @@ namespace dataproduct.api.Services
                 TrangThaiTL  = 1,
                 NgayNhanTL   = ngayNhanTL,
                 CaTinhLuyen  = phieu.Ca,
+                KipTinhLuyen = phieu.Kip,
                 NgayTao      = ngayNhanTL,
                 CapNhatBoi   = userId,
                 CapNhatLuc   = DateTime.Now,

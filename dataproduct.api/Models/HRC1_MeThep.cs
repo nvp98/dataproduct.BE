@@ -68,6 +68,9 @@ public class HRC1_MeThep
     public DateTime? NgayNhanTL { get; set; }  // ngày TL nhận mẻ (date-only; dùng để lọc ngày cho phiếu máy đúc)
     public int? CaTinhLuyen { get; set; }      // ca khi TL nhận mẻ (1=ngày, 2=đêm); dùng để lọc ca cho phiếu máy đúc
 
+    [MaxLength(1)]
+    public string? KipTinhLuyen { get; set; }  // kíp khi TL nhận mẻ; dùng để lọc kíp cho phiếu máy đúc
+
     public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
 
     [MaxLength(1)]

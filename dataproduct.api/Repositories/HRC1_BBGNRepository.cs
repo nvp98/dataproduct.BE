@@ -295,9 +295,17 @@ namespace dataproduct.api.Repositories
         private IQueryable<HRC1_MeThep> ApplyMeThepFilters(IQueryable<HRC1_MeThep> q, HRC1_ExportQuery f)
         {
             if (f.TuNgay.HasValue)
-                q = q.Where(m => m.NgayTao >= f.TuNgay.Value.ToDateTime(TimeOnly.MinValue));
+            {
+                var _tuNgay = f.TuNgay.Value.ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => (m.DichChuyen == "len_thang" && m.NgayTao   >= _tuNgay)
+                               || (m.DichChuyen != "len_thang" && m.NgayNhanTL >= _tuNgay));
+            }
             if (f.DenNgay.HasValue)
-                q = q.Where(m => m.NgayTao < f.DenNgay.Value.AddDays(1).ToDateTime(TimeOnly.MinValue));
+            {
+                var _denNgay = f.DenNgay.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => (m.DichChuyen == "len_thang" && m.NgayTao   < _denNgay)
+                               || (m.DichChuyen != "len_thang" && m.NgayNhanTL < _denNgay));
+            }
             if (!string.IsNullOrEmpty(f.MaMe))
                 q = q.Where(m => m.MaMe != null && m.MaMe.Contains(f.MaMe));
             if (f.LoSo.HasValue)
@@ -431,6 +439,7 @@ namespace dataproduct.api.Repositories
                 Kip                = m.Kip,
                 NgayNhanTL         = m.NgayNhanTL,
                 CaTinhLuyen        = m.CaTinhLuyen,
+                KipTinhLuyen       = m.KipTinhLuyen,
                 TenNhomPhanLoai    = tenNhom,
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
@@ -456,9 +465,9 @@ namespace dataproduct.api.Repositories
             var (mayDucs, userNames, nhomDict) = await LoadMeThepLookupAsync(mes);
 
             if (q.Ca.HasValue)
-                mes = mes.Where(m => m.Ca == q.Ca).ToList();
+                mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
-                mes = mes.Where(m => m.Kip == q.Kip).ToList();
+                mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
             return mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict)).ToList();
         }
@@ -489,9 +498,9 @@ namespace dataproduct.api.Repositories
 
             // ── Lọc Ca/Kíp in-memory ──
             if (q.Ca.HasValue)
-                allMes = allMes.Where(m => m.Ca == q.Ca).ToList();
+                allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
-                allMes = allMes.Where(m => m.Kip == q.Kip).ToList();
+                allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
             int total = allMes.Count;
             decimal? totalKl       = allMes.Sum(m => m.KlThepLong);
@@ -538,8 +547,8 @@ namespace dataproduct.api.Repositories
 
             // ── 2. Ca ─────────────────────────────────────────────────────────
             var caRaw = await meQuery
-                .Where(m => m.Ca.HasValue)
-                .GroupBy(m => m.Ca!.Value)
+                .Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen).HasValue)
+                .GroupBy(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)!.Value)
                 .Select(g => new { Ca = g.Key, SoMe = g.Count() })
                 .OrderBy(x => x.Ca)
                 .ToListAsync();
@@ -551,8 +560,9 @@ namespace dataproduct.api.Repositories
 
             // ── 3. Kíp ────────────────────────────────────────────────────────
             var kip = await meQuery
-                .Where(m => m.Kip != null && m.Kip != "")
-                .GroupBy(m => m.Kip!)
+                .Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) != null
+                         && (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) != "")
+                .GroupBy(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen)!)
                 .OrderBy(g => g.Key)
                 .Select(g => new HRC1_TongHopItem { Label = g.Key, SoMe = g.Count() })
                 .ToListAsync();

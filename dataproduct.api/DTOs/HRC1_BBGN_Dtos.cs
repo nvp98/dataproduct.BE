@@ -212,6 +212,7 @@ namespace dataproduct.api.DTOs
         public string? Kip { get; set; }
         public DateTime? NgayNhanTL { get; set; }
         public int? CaTinhLuyen { get; set; }
+        public string? KipTinhLuyen { get; set; }
         public string? TenNhomPhanLoai { get; set; }      // Nhóm phân loại mác thép
         public string? TenCapNhatBoiLo { get; set; }   // người sửa lò thổi (CapNhatBoi)
         public string? TenCapNhatBoiTL { get; set; }   // người sửa tinh luyện (CapNhatBoiTL)

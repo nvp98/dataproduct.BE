@@ -553,32 +553,9 @@ namespace dataproduct.api.Repositories
                 NguoiTao   = x.NguoiTaoId,
                 TenScope   = x.TenScope
             }).ToList();
-
             foreach (var item in result)
             {
                 var pheDuyet = await _pdservice.GetPheDuyetPhieuAsync(item.Idphieu);
-
-                if (item.MaBm == "CTD_BB_Phoinong")
-                {
-                    var hasPendingCTD = await _context.CtdPhoiNongs
-                        .AnyAsync(x => x.NgaySx == item.NgaySX && x.Ca == item.Ca && x.NmCan == item.MayDuc && x.TinhTrangCTD != 1);
-
-                    var hasPendingQLCL = await _context.CtdPhoiNongs
-                        .AnyAsync(x => x.NgaySx == item.NgaySX && x.Ca == item.Ca && x.NmCan == item.MayDuc && x.TinhTrangQLCL != 1);
-
-                    if (hasPendingCTD)
-                    {
-                        var ctd = pheDuyet.FirstOrDefault(x => x.CapDuyet == 2);
-                        if (ctd != null) ctd.TinhTrang = 0;
-                    }
-
-                    if (hasPendingQLCL)
-                    {
-                        var qlcl = pheDuyet.FirstOrDefault(x => x.CapDuyet == 1);
-                        if (qlcl != null) qlcl.TinhTrang = 0;
-                    }
-                }
-
                 item.PheDuyet = pheDuyet.ToList();
             }
 
