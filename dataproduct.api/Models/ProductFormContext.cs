@@ -75,6 +75,11 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
     public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
 
+    // HRC2 Slab
+    public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
+    public virtual DbSet<BkHrc2SlabTrangThai> BkHrc2SlabTrangThais { get; set; }
+    public virtual DbSet<BkSyncHrc2SlabControl> BkSyncHrc2SlabControls { get; set; }
+
     // HRC1
     public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
     public virtual DbSet<HRC1_MePhanCong> HRC1_MePhanCongs { get; set; }
@@ -710,6 +715,62 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.DuLieuCu).HasColumnType("nvarchar(MAX)");
             entity.Property(e => e.DuLieuMoi).HasColumnType("nvarchar(MAX)");
             entity.Property(e => e.Luc).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<BkHrc2Slab>(entity =>
+        {
+            entity.ToTable("BK_HRC2_Slab");
+
+            entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
+            entity.Property(e => e.IdSlab).HasColumnName("IDSlab").HasMaxLength(100);
+            entity.Property(e => e.ShiftName).HasMaxLength(50);
+            entity.Property(e => e.CaSanXuat).HasColumnType("nchar(1)");
+            entity.Property(e => e.KipSanXuat).HasColumnType("nchar(1)");
+            entity.Property(e => e.MeThep).HasMaxLength(100);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.ChatLuong).HasMaxLength(50);
+            entity.Property(e => e.ChatLuongTPHH).HasMaxLength(50);
+            entity.Property(e => e.ThongTinPhoi).HasMaxLength(200);
+            entity.Property(e => e.TpKhongDatGangLong).HasColumnName("TPKhongDatGangLong").HasMaxLength(200);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.LoaiPhoi).HasMaxLength(50);
+            entity.Property(e => e.SapCode).HasColumnName("SAPCode").HasMaxLength(50);
+            entity.Property(e => e.SapDescription).HasColumnName("SAPDescription").HasMaxLength(200);
+            entity.Property(e => e.SoLo).HasMaxLength(100);
+            entity.Property(e => e.OrderId).HasColumnName("OrderId").HasMaxLength(50);
+            entity.Property(e => e.SapLastTime).HasColumnName("SAPLastTime");
+            entity.Property(e => e.ChecksumVal).HasColumnName("Checksum_Val").HasMaxLength(50);
+            entity.Property(e => e.ChieuDay).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.ChieuRong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.ChieuDai).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.KhoiLuong).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.KhoiLuongTinhToan).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.IsChot).HasDefaultValue(false);
+
+            entity.HasOne(s => s.TrangThai)
+                .WithOne(t => t.Slab)
+                .HasForeignKey<BkHrc2SlabTrangThai>(t => t.IdSlab);
+        });
+
+        modelBuilder.Entity<BkHrc2SlabTrangThai>(entity =>
+        {
+            entity.ToTable("BK_HRC2_Slab_TrangThai");
+            entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.NgayChuyenKCS).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanKho).HasColumnType("datetime");
+            entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<BkSyncHrc2SlabControl>(entity =>
+        {
+            entity.ToTable("BK_SyncHRC2SlabControl");
+            entity.Property(e => e.TableName).HasMaxLength(100);
+            entity.Property(e => e.TrangThai).HasMaxLength(20);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.BatDauLuc).HasColumnType("datetime");
+            entity.Property(e => e.KetThucLuc).HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);

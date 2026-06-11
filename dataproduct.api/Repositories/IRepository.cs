@@ -297,6 +297,23 @@ namespace dataproduct.api.Repositories
         Task SetMayDucsAsync(int idMacThep, List<int> idMayDucs);
     }
 
+    public interface IHrc2SlabWorkflowRepository
+    {
+        Task<(IEnumerable<BkHrc2SlabItem> Data, int TotalCount)> SearchWithTrangThaiAsync(HrcSlabSearchRequest request);
+        Task<IEnumerable<SlabTongHopItem>> GetTongHopAsync(DateOnly? tuNgay, DateOnly? denNgay, string? ca, string? kip);
+        Task<IEnumerable<PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
+        Task<IEnumerable<SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
+        Task<IEnumerable<BkHrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu);
+        Task ChuyenBBSLAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien);
+        Task ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
+        Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc);
+        Task<SyncStatusItem?> GetSyncStatusAsync();
+    }
+
     public interface IMayDucRepository
     {
         Task<IEnumerable<MayDuc>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMayDuc);
