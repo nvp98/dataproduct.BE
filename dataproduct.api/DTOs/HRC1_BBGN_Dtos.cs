@@ -217,6 +217,8 @@ namespace dataproduct.api.DTOs
         public string? TenCapNhatBoiLo { get; set; }   // người sửa lò thổi (CapNhatBoi)
         public string? TenCapNhatBoiTL { get; set; }   // người sửa tinh luyện (CapNhatBoiTL)
         public string? TenCapNhatBoiDuc { get; set; }  // người xác nhận máy đúc (CapNhatBoiDuc)
+        public string? ChuyenVeMaMe { get; set; }       // mã mẻ đích khi TL chuyển mẻ
+        public string? TenMayDucChuyen { get; set; }    // tên máy đúc của mẻ đích
     }
 
     // -------------------------------------------------------

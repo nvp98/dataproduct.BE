@@ -291,7 +291,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkMe)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkMe.ThuTu_Excel_BOF : hkMe.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -572,7 +574,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkRN)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkRN.ThuTu_Excel_BOF : hkRN.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -859,7 +863,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGia_Manual = phuLieuItem.KLPhuGia_Manual,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkId)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkId.ThuTu_Excel_BOF : hkId.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 else if (phuLieuItem.IsManual == true)
