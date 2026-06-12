@@ -356,14 +356,15 @@ namespace dataproduct.api.Repositories
             return q;
         }
 
-        // ── Helper: load TL/phieu + mayDuc + userNames + nhomPhanLoai cho danh sách mẻ
+        // ── Helper: load TL/phieu + mayDuc + userNames + nhomPhanLoai + chuyenVe cho danh sách mẻ
         private async Task<(
             Dictionary<int, string?> MayDucs,
             Dictionary<int, string?> UserNames,
-            Dictionary<string, string> NhomPhanLoai)>
+            Dictionary<string, string> NhomPhanLoai,
+            Dictionary<int, (string? maMe, string? tenMayDuc)> ChuyenVeDict)>
             LoadMeThepLookupAsync(List<HRC1_MeThep> mes)
         {
-            var mayDucs = await _ctx.MayDucs.ToDictionaryAsync(m => m.Id, m => m.TenMayDuc);
+            var mayDucs = await _ctx.MayDucs.ToDictionaryAsync(m => m.Id, m => (string?)m.TenMayDuc);
 
             var auditIds = mes
                 .SelectMany(m => new[] { m.CapNhatBoi, m.CapNhatBoiTL, m.CapNhatBoiDuc })
@@ -392,14 +393,41 @@ namespace dataproduct.api.Repositories
                     nhomDict[x.TenMacThep] = x.TenNhom;
             }
 
-            return (mayDucs, userNames, nhomDict);
+            // ChuyenVe: lấy ChuyenVeMeId từ MePhanCong tinh_luyen (dòng chính, ThuTuTL = null)
+            var meIds = mes.Select(m => m.Id).ToList();
+            var chuyenVeDict = new Dictionary<int, (string? maMe, string? tenMayDuc)>();
+            var tlPcs = await _ctx.HRC1_MePhanCongs
+                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                          && meIds.Contains(pc.MeId) && pc.ChuyenVeMeId.HasValue)
+                .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
+                .ToListAsync();
+            if (tlPcs.Count > 0)
+            {
+                var chuyenVeMeIds = tlPcs.Select(pc => pc.ChuyenVeMeId!.Value).Distinct().ToList();
+                var chuyenVeMes = await _ctx.HRC1_MeTheps
+                    .Where(m => chuyenVeMeIds.Contains(m.Id))
+                    .Select(m => new { m.Id, m.MaMe, m.IdMayDucDich })
+                    .ToListAsync();
+                var chuyenVeMeById = chuyenVeMes.ToDictionary(m => m.Id);
+                foreach (var pc in tlPcs)
+                {
+                    if (chuyenVeMeById.TryGetValue(pc.ChuyenVeMeId!.Value, out var cvm))
+                    {
+                        var tenMdc = cvm.IdMayDucDich.HasValue && mayDucs.TryGetValue(cvm.IdMayDucDich.Value, out var tmd) ? tmd : null;
+                        chuyenVeDict[pc.MeId] = (cvm.MaMe, tenMdc);
+                    }
+                }
+            }
+
+            return (mayDucs, userNames, nhomDict, chuyenVeDict);
         }
 
         private static HRC1_ExportRow MapToExportRow(
             HRC1_MeThep m,
             Dictionary<int, string?> mayDucs,
             Dictionary<int, string?> userNames,
-            Dictionary<string, string> nhomPhanLoai)
+            Dictionary<string, string> nhomPhanLoai,
+            Dictionary<int, (string? maMe, string? tenMayDuc)> chuyenVeDict)
         {
             string? tenMayDuc    = m.IdMayDucDich.HasValue   && mayDucs.TryGetValue(m.IdMayDucDich.Value, out var tn)    ? tn : null;
             string? tenLoThoi    = m.CapNhatBoi.HasValue     && userNames.TryGetValue(m.CapNhatBoi.Value, out var uLo)   ? uLo : null;
@@ -409,6 +437,7 @@ namespace dataproduct.api.Repositories
             string? tlLt = m.DichChuyen == "tinh_luyen" ? "Tinh luyện"
                          : m.DichChuyen == "len_thang"  ? "Lên thẳng"
                          : null;
+            chuyenVeDict.TryGetValue(m.Id, out var chuyenVe);
             return new HRC1_ExportRow
             {
                 MeId               = m.Id,
@@ -444,6 +473,8 @@ namespace dataproduct.api.Repositories
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
                 TenCapNhatBoiDuc   = tenDuc,
+                ChuyenVeMaMe       = chuyenVe.maMe,
+                TenMayDucChuyen    = chuyenVe.tenMayDuc,
             };
         }
 
@@ -462,14 +493,14 @@ namespace dataproduct.api.Repositories
             var mes = await meQuery.OrderBy(m => m.NgayTao).ToListAsync();
             if (mes.Count == 0) return new List<HRC1_ExportRow>();
 
-            var (mayDucs, userNames, nhomDict) = await LoadMeThepLookupAsync(mes);
+            var (mayDucs, userNames, nhomDict, chuyenVeDict) = await LoadMeThepLookupAsync(mes);
 
             if (q.Ca.HasValue)
                 mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
                 mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
-            return mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict)).ToList();
+            return mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict)).ToList();
         }
 
         public async Task<HRC1_ThongKeResult> GetMeThepsPagedAsync(HRC1_ThongKeQuery q)
@@ -494,7 +525,7 @@ namespace dataproduct.api.Repositories
             if (allMes.Count == 0)
                 return new HRC1_ThongKeResult { Page = q.Page, PageSize = q.PageSize };
 
-            var (mayDucs, userNames, nhomDict) = await LoadMeThepLookupAsync(allMes);
+            var (mayDucs, userNames, nhomDict, chuyenVeDict) = await LoadMeThepLookupAsync(allMes);
 
             // ── Lọc Ca/Kíp in-memory ──
             if (q.Ca.HasValue)
@@ -513,7 +544,7 @@ namespace dataproduct.api.Repositories
 
             return new HRC1_ThongKeResult
             {
-                Items                   = paged.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict)).ToList(),
+                Items                   = paged.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict)).ToList(),
                 TotalRecords            = total,
                 TotalKlThepLong         = totalKl,
                 TotalKlThepLongPhanBo   = totalKlPhanBo,

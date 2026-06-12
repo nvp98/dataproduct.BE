@@ -29,12 +29,12 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration config)
         {
-            _repo        = repo;
-            _bbgnSvc     = bbgnSvc;
+            _repo = repo;
+            _bbgnSvc = bbgnSvc;
             _pheDuyetSvc = pheDuyetSvc;
             _pdfConverter = pdfConverter;
-            _env         = env;
-            _config      = config;
+            _env = env;
+            _config = config;
         }
 
         // -------------------------------------------------------
@@ -48,10 +48,10 @@ namespace dataproduct.api.Services
 
             var congDoan = phieu.MaBm switch
             {
-                "HRC1_LoThoi"         => "lo_thoi",
-                "HRC1_TinhLuyen"      => "tinh_luyen",
-                "HRC1_BBGN_ThepLong"  => "duc",
-                _                     => phieu.MaBm ?? string.Empty
+                "HRC1_LoThoi" => "lo_thoi",
+                "HRC1_TinhLuyen" => "tinh_luyen",
+                "HRC1_BBGN_ThepLong" => "duc",
+                _ => phieu.MaBm ?? string.Empty
             };
 
             var mayDucs = await _repo.GetMayDucsHRC1Async();
@@ -69,15 +69,25 @@ namespace dataproduct.api.Services
                 danhSachMe = rawMes
                     .Select(m => MapToVm(m, new HRC1_MePhanCong { MeId = m.Id, IdPhieu = idPhieu, CongDoan = "duc" }, mayDucs))
                     .ToList();
+
+                // Load TL nào đã nhận mẻ để hiển thị cột "Tinh luyện/Lên thẳng"
+                if (danhSachMe.Count > 0)
+                {
+                    var ducMeIds = danhSachMe.Select(m => m.Id).ToList();
+                    var tlScopes = await _repo.GetTLScopesByMeIdsAsync(ducMeIds);
+                    foreach (var meVm in danhSachMe)
+                        if (tlScopes.TryGetValue(meVm.Id, out var scope))
+                            meVm.SoTinhLuyenNhan = scope;
+                }
             }
             else
             {
                 // lo_thoi: lọc theo loSo; tinh_luyen: lọc theo scopePhieu; null = trả tất cả
                 int? effectiveScope = congDoan == "lo_thoi" ? loSo : scopePhieu;
                 var phanCongs = await _repo.GetMePhanCongsByPhieuAsync(idPhieu, congDoan, effectiveScope);
-                var meIds     = phanCongs.Select(pc => pc.MeId).Distinct().ToList();
-                rawMes        = await _repo.GetMeThepsByIdsAsync(meIds);
-                var meDict    = rawMes.ToDictionary(m => m.Id);
+                var meIds = phanCongs.Select(pc => pc.MeId).Distinct().ToList();
+                rawMes = await _repo.GetMeThepsByIdsAsync(meIds);
+                var meDict = rawMes.ToDictionary(m => m.Id);
 
                 // Tải mẻ đích ChuyenVeMe để tra tên máy đúc (chỉ cần cho tinh_luyen)
                 Dictionary<int, HRC1_MeThep> chuyenVeDict = new();
@@ -112,10 +122,10 @@ namespace dataproduct.api.Services
             var auditIds = danhSachMe
                 .Select(vm => congDoan switch
                 {
-                    "lo_thoi"    => rawMeDict.GetValueOrDefault(vm.Id)?.CapNhatBoi,
+                    "lo_thoi" => rawMeDict.GetValueOrDefault(vm.Id)?.CapNhatBoi,
                     "tinh_luyen" => rawMeDict.GetValueOrDefault(vm.Id)?.CapNhatBoiTL,
-                    "duc"        => rawMeDict.GetValueOrDefault(vm.Id)?.CapNhatBoiDuc,
-                    _            => null
+                    "duc" => rawMeDict.GetValueOrDefault(vm.Id)?.CapNhatBoiDuc,
+                    _ => null
                 })
                 .Where(id => id.HasValue).Select(id => id!.Value)
                 .Distinct().ToList();
@@ -129,10 +139,10 @@ namespace dataproduct.api.Services
                 var raw = rawMeDict.GetValueOrDefault(meVm.Id);
                 int? uid = congDoan switch
                 {
-                    "lo_thoi"    => raw?.CapNhatBoi,
+                    "lo_thoi" => raw?.CapNhatBoi,
                     "tinh_luyen" => raw?.CapNhatBoiTL,
-                    "duc"        => raw?.CapNhatBoiDuc,
-                    _            => null
+                    "duc" => raw?.CapNhatBoiDuc,
+                    _ => null
                 };
                 if (uid.HasValue && userNames.TryGetValue(uid.Value, out var name))
                     meVm.TenCapNhatBoi = name;
@@ -140,19 +150,19 @@ namespace dataproduct.api.Services
 
             var vm = new HRC1_PhieuDataVm
             {
-                IdPhieu      = phieu.Idphieu,
-                SoPhieu      = phieu.SoPhieu,
-                MaBm         = phieu.MaBm,
-                CongDoan     = congDoan,
-                Scope        = phieu.Scope,
-                NgaySX       = phieu.NgaySX,
-                Ca           = phieu.Ca,
-                Kip          = phieu.Kip,
-                TinhTrang    = phieu.TinhTrang,
-                DanhSachMe   = danhSachMe,
+                IdPhieu = phieu.Idphieu,
+                SoPhieu = phieu.SoPhieu,
+                MaBm = phieu.MaBm,
+                CongDoan = congDoan,
+                Scope = phieu.Scope,
+                NgaySX = phieu.NgaySX,
+                Ca = phieu.Ca,
+                Kip = phieu.Kip,
+                TinhTrang = phieu.TinhTrang,
+                DanhSachMe = danhSachMe,
                 DanhSachMayDuc = mayDucs.Select(md => new HRC1_MayDucOptionVm
                 {
-                    Id        = md.Id,
+                    Id = md.Id,
                     TenMayDuc = md.TenMayDuc ?? string.Empty
                 }).ToList()
             };
@@ -161,13 +171,13 @@ namespace dataproduct.api.Services
                 vm.ChoNhan = (await _repo.GetChoNhanAsync())
                     .Select(m => new HRC1_ChoNhanMeVm
                     {
-                        MeId        = m.Id,
-                        MaMe        = m.MaMe,
-                        ThungSo     = m.ThungSo,
-                        LoSo        = m.LoSo,
-                        ThoiGian    = m.ThoiGian,
-                        KlThepLong  = m.KlThepLong,
-                        TLDichSo    = m.TLDichSo
+                        MeId = m.Id,
+                        MaMe = m.MaMe,
+                        ThungSo = m.ThungSo,
+                        LoSo = m.LoSo,
+                        ThoiGian = m.ThoiGian,
+                        KlThepLong = m.KlThepLong,
+                        TLDichSo = m.TLDichSo
                     }).ToList();
 
             return vm;
@@ -186,13 +196,13 @@ namespace dataproduct.api.Services
             (await _repo.GetChoNhanAsync())
                 .Select(m => new HRC1_ChoNhanMeVm
                 {
-                    MeId        = m.Id,
-                    MaMe        = m.MaMe,
-                    ThungSo     = m.ThungSo,
-                    LoSo        = m.LoSo,
-                    ThoiGian    = m.ThoiGian,
-                    KlThepLong  = m.KlThepLong,
-                    TLDichSo    = m.TLDichSo
+                    MeId = m.Id,
+                    MaMe = m.MaMe,
+                    ThungSo = m.ThungSo,
+                    LoSo = m.LoSo,
+                    ThoiGian = m.ThoiGian,
+                    KlThepLong = m.KlThepLong,
+                    TLDichSo = m.TLDichSo
                 }).ToList();
 
         // -------------------------------------------------------
@@ -212,9 +222,9 @@ namespace dataproduct.api.Services
             var oldDich = me.DichChuyen;
             var old = Snapshot(me);
 
-            me.ThungSo        = req.ThungSo        ?? me.ThungSo;
-            me.KLLFSauThep    = req.KLLFSauThep    ?? me.KLLFSauThep;
-            me.KlLan3         = req.KlLan3         ?? me.KlLan3;
+            me.ThungSo = req.ThungSo ?? me.ThungSo;
+            me.KLLFSauThep = req.KLLFSauThep ?? me.KLLFSauThep;
+            me.KlLan3 = req.KlLan3 ?? me.KlLan3;
             if (req.DichChuyen is not null)
             {
                 var previouslyLenThang = me.DichChuyen == "len_thang";
@@ -224,7 +234,7 @@ namespace dataproduct.api.Services
                 {
                     // Lên thẳng: lò thổi chỉ định máy đúc trực tiếp; xóa TL đích
                     me.IdMayDucDich = req.IdMayDucDich;
-                    me.TLDichSo     = null;
+                    me.TLDichSo = null;
                 }
                 else // "tinh_luyen"
                 {
@@ -234,38 +244,38 @@ namespace dataproduct.api.Services
                     if (previouslyLenThang)
                         me.IdMayDucDich = null;
                     // Xóa các trường chỉ dùng cho len_thang khi lưu về tinh_luyen
-                    me.ThoiGian   = null;
-                    me.KlLan2     = null;
+                    me.ThoiGian = null;
+                    me.KlLan2 = null;
                     me.KlThepLong = null;
                 }
             }
             else
             {
-                me.TLDichSo     = req.TLDichSo     ?? me.TLDichSo;
+                me.TLDichSo = req.TLDichSo ?? me.TLDichSo;
                 me.IdMayDucDich = req.IdMayDucDich ?? me.IdMayDucDich;
             }
             // Lò thổi tự nhập ThoiGian, KlLan2 & KlThepLong khi mẻ đi thẳng lên máy đúc (không qua TL)
             if (me.DichChuyen == "len_thang")
             {
-                me.ThoiGian   = req.ThoiGian   ?? me.ThoiGian;
-                me.KlLan2     = req.KlLan2     ?? me.KlLan2;
+                me.ThoiGian = req.ThoiGian ?? me.ThoiGian;
+                me.KlLan2 = req.KlLan2 ?? me.KlLan2;
                 me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
             }
-            me.IsThuNghiem       = req.IsThuNghiem       ?? me.IsThuNghiem;
-            me.IsTrungMeThoi     = req.IsTrungMeThoi     ?? me.IsTrungMeThoi;
-            me.GhiChuLo          = req.GhiChuLo          ?? me.GhiChuLo;
-            me.KLThepLongPhanBo  = req.KlThepLongPhanBo  ?? me.KLThepLongPhanBo;
-            me.CapNhatBoi        = userId;
-            me.CapNhatLuc     = DateTime.Now;
+            me.IsThuNghiem = req.IsThuNghiem ?? me.IsThuNghiem;
+            me.IsTrungMeThoi = req.IsTrungMeThoi ?? me.IsTrungMeThoi;
+            me.GhiChuLo = req.GhiChuLo ?? me.GhiChuLo;
+            me.KLThepLongPhanBo = req.KlThepLongPhanBo ?? me.KLThepLongPhanBo;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "chinh_sua",
-                DuLieuCu   = old,
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "chinh_sua",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
 
@@ -286,16 +296,16 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("Mẻ đã xác nhận.");
 
             me.TrangThaiLo = 1;
-            me.CapNhatBoi  = userId;
-            me.CapNhatLuc  = DateTime.Now;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "xac_nhan",
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "xac_nhan",
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
         }
@@ -310,16 +320,16 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("TL đã nhận mẻ, không thể bỏ xác nhận.");
 
             me.TrangThaiLo = 0;
-            me.CapNhatBoi  = userId;
-            me.CapNhatLuc  = DateTime.Now;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "bo_xac_nhan",
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "bo_xac_nhan",
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
         }
@@ -333,26 +343,26 @@ namespace dataproduct.api.Services
 
             var old = Snapshot(me);
 
-            me.KLLFSauThep   = null;
-            me.KlLan3        = null;
-            me.DichChuyen    = null;
-            me.TLDichSo      = null;
-            me.IdMayDucDich  = null;
-            me.IsThuNghiem   = null;
+            me.KLLFSauThep = null;
+            me.KlLan3 = null;
+            me.DichChuyen = null;
+            me.TLDichSo = null;
+            me.IdMayDucDich = null;
+            me.IsThuNghiem = null;
             me.IsTrungMeThoi = null;
-            me.GhiChuLo      = null;
-            me.TrangThaiLo   = null;
-            me.CapNhatBoi    = userId;
-            me.CapNhatLuc    = DateTime.Now;
+            me.GhiChuLo = null;
+            me.TrangThaiLo = null;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "lam_moi",
-                DuLieuCu   = old,
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "lam_moi",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
         }
@@ -374,32 +384,32 @@ namespace dataproduct.api.Services
             var phieuTL = await _repo.GetBmPhieuAsync(req.IdPhieu);
             if (phieuTL?.NgaySX.HasValue == true && phieuTL.Ca.HasValue)
             {
-                me.NgayNhanTL   = phieuTL.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
-                me.CaTinhLuyen  = phieuTL.Ca;
+                me.NgayNhanTL = phieuTL.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+                me.CaTinhLuyen = phieuTL.Ca;
                 me.KipTinhLuyen = phieuTL.Kip;
             }
 
             _repo.AddMePhanCong(new HRC1_MePhanCong
             {
-                MeId       = req.MeId,
-                IdPhieu    = req.IdPhieu,
-                CongDoan   = "tinh_luyen",
-                ThuTuTL    = null,
+                MeId = req.MeId,
+                IdPhieu = req.IdPhieu,
+                CongDoan = "tinh_luyen",
+                ThuTuTL = null,
                 ScopePhieu = req.ScopePhieu
             });
 
-            me.TrangThaiTL   = 1;
-            me.CapNhatBoi    = userId;
-            me.CapNhatLuc    = DateTime.Now;
-            me.CapNhatBoiTL  = userId;
+            me.TrangThaiTL = 1;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
+            me.CapNhatBoiTL = userId;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "nhan_me",
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "nhan_me",
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
 
@@ -420,38 +430,38 @@ namespace dataproduct.api.Services
 
             var old = Snapshot(me);
 
-            me.ThoiGian      = req.ThoiGian      ?? me.ThoiGian;
-            me.KlLan1        = req.KlLan1        ?? me.KlLan1;
-            me.KlLan2        = req.KlLan2        ?? me.KlLan2;
-            me.KlLan3        = req.KlLan3        ?? me.KlLan3;
-            me.KlThepLong    = req.KlThepLong    ?? me.KlThepLong;
-            me.IdMayDucDich  = req.IdMayDucDich  ?? me.IdMayDucDich;
-            me.PhanLoai      = req.PhanLoai      ?? me.PhanLoai;
-            me.MacThep       = req.MacThep       ?? me.MacThep;
-            me.MacThepBKMIS  = req.MacThepBKMIS  ?? me.MacThepBKMIS;
-            me.IdMacThep     = req.IdMacThep     ?? me.IdMacThep;
-            me.GhiChuTL      = req.GhiChuTL      ?? me.GhiChuTL;
+            me.ThoiGian = req.ThoiGian ?? me.ThoiGian;
+            me.KlLan1 = req.KlLan1 ?? me.KlLan1;
+            me.KlLan2 = req.KlLan2 ?? me.KlLan2;
+            me.KlLan3 = req.KlLan3 ?? me.KlLan3;
+            me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
+            me.IdMayDucDich = req.IdMayDucDich ?? me.IdMayDucDich;
+            me.PhanLoai = req.PhanLoai ?? me.PhanLoai;
+            me.MacThep = req.MacThep ?? me.MacThep;
+            me.MacThepBKMIS = req.MacThepBKMIS ?? me.MacThepBKMIS;
+            me.IdMacThep = req.IdMacThep ?? me.IdMacThep;
+            me.GhiChuTL = req.GhiChuTL ?? me.GhiChuTL;
             // Chỉ mẻ IsManualTL mới được TinhLuyen ghi các field thường do LoThoi nhập
             if (me.IsManualTL == true)
             {
-                me.ThungSo     = req.ThungSo     ?? me.ThungSo;
+                me.ThungSo = req.ThungSo ?? me.ThungSo;
                 me.KLLFSauThep = req.KllfSauThep ?? me.KLLFSauThep;
             }
-            me.CapNhatBoi    = userId;
-            me.CapNhatLuc    = DateTime.Now;
-            me.CapNhatBoiTL  = userId;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
+            me.CapNhatBoiTL = userId;
 
             // ChuyenVeMeId lưu trên MePhanCong — luôn ghi đè để cho phép xóa (set null)
             pc.ChuyenVeMeId = req.ChuyenVeMeId;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "chinh_sua",
-                DuLieuCu   = old,
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "chinh_sua",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
         }
@@ -470,19 +480,19 @@ namespace dataproduct.api.Services
 
             _repo.AddMePhanCong(new HRC1_MePhanCong
             {
-                MeId     = req.MeId,
-                IdPhieu  = req.IdPhieu,
+                MeId = req.MeId,
+                IdPhieu = req.IdPhieu,
                 CongDoan = "tinh_luyen",
-                ThuTuTL  = nextThuTu
+                ThuTuTL = nextThuTu
             });
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "chinh_sua",
-                DuLieuMoi  = $"{{\"them_dong_tl\":{nextThuTu}}}",
-                Luc        = DateTime.Now
+                HanhDong = "chinh_sua",
+                DuLieuMoi = $"{{\"them_dong_tl\":{nextThuTu}}}",
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
         }
@@ -508,34 +518,34 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("Không tìm thấy dòng nhận nào để hủy.");
             _repo.RemoveMePhanCongs(pcs);
 
-            me.TrangThaiTL   = null;
-            me.NgayNhanTL    = null;
-            me.CaTinhLuyen   = null;
-            me.KipTinhLuyen  = null;
-            me.ThoiGian      = null;
-            me.KlLan1        = null;
-            me.KlLan2        = null;
-            me.KlThepLong    = null;
-            me.PhanLoai      = null;
-            me.MacThep       = null;
-            me.MacThepBKMIS  = null;
-            me.IdMacThep     = null;
-            me.GhiChuTL      = null;
+            me.TrangThaiTL = null;
+            me.NgayNhanTL = null;
+            me.CaTinhLuyen = null;
+            me.KipTinhLuyen = null;
+            me.ThoiGian = null;
+            me.KlLan1 = null;
+            me.KlLan2 = null;
+            me.KlThepLong = null;
+            me.PhanLoai = null;
+            me.MacThep = null;
+            me.MacThepBKMIS = null;
+            me.IdMacThep = null;
+            me.GhiChuTL = null;
             me.IsTrungMeThoi = null;   // mẻ này rời khỏi TL — không còn là bên trùng
-            // if (me.DichChuyen == "tinh_luyen")
-                me.IdMayDucDich = null;
-            me.CapNhatBoi    = userId;
-            me.CapNhatLuc    = DateTime.Now;
-            me.CapNhatBoiTL  = userId;
+                                       // if (me.DichChuyen == "tinh_luyen")
+            me.IdMayDucDich = null;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
+            me.CapNhatBoiTL = userId;
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = me.Id,
+                MeId = me.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "huy_nhan_me",
-                DuLieuCu   = old,
-                DuLieuMoi  = Snapshot(me),
-                Luc        = DateTime.Now
+                HanhDong = "huy_nhan_me",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
 
@@ -558,18 +568,18 @@ namespace dataproduct.api.Services
             {
                 if (me.TrangThaiDuc >= 1) continue;
 
-                me.TrangThaiDuc  = 1;
-                me.CapNhatBoi    = userId;
-                me.CapNhatLuc    = now;
+                me.TrangThaiDuc = 1;
+                me.CapNhatBoi = userId;
+                me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
 
                 _repo.AddLichSu(new HRC1_LichSu
                 {
-                    MeId       = me.Id,
+                    MeId = me.Id,
                     TaiKhoanId = userId,
-                    HanhDong   = "xac_nhan",
-                    DuLieuMoi  = Snapshot(me),
-                    Luc        = now
+                    HanhDong = "xac_nhan",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
                 });
             }
             await _repo.SaveChangesAsync();
@@ -586,18 +596,18 @@ namespace dataproduct.api.Services
             {
                 if (me.TrangThaiDuc != 1) continue;
 
-                me.TrangThaiDuc  = 0;
-                me.CapNhatBoi    = userId;
-                me.CapNhatLuc    = now;
+                me.TrangThaiDuc = 0;
+                me.CapNhatBoi = userId;
+                me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
 
                 _repo.AddLichSu(new HRC1_LichSu
                 {
-                    MeId       = me.Id,
+                    MeId = me.Id,
                     TaiKhoanId = userId,
-                    HanhDong   = "bo_xac_nhan",
-                    DuLieuMoi  = Snapshot(me),
-                    Luc        = now
+                    HanhDong = "bo_xac_nhan",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
                 });
             }
             await _repo.SaveChangesAsync();
@@ -620,8 +630,8 @@ namespace dataproduct.api.Services
             {
                 gangMaMes = await _bbgnSvc.FetchMeThoiHRC1Async(new HRC1_FetchMeThoiRequest
                 {
-                    NgaySX   = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today),
-                    Ca       = phieu.Ca ?? 1,
+                    NgaySX = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today),
+                    Ca = phieu.Ca ?? 1,
                     IdLoThoi = loSo
                 });
             }
@@ -632,13 +642,13 @@ namespace dataproduct.api.Services
             }
 
             // Lấy mẻ hiện có trong phiếu cho lò này (filter by ScopePhieu = loSo)
-            var phanCongs   = await _repo.GetMePhanCongsByPhieuAsync(idPhieu, "lo_thoi", loSo);
+            var phanCongs = await _repo.GetMePhanCongsByPhieuAsync(idPhieu, "lo_thoi", loSo);
             var existingIds = phanCongs.Select(pc => pc.MeId).Distinct().ToList();
             var existingMes = existingIds.Count > 0
                 ? await _repo.GetMeThepsByIdsAsync(existingIds)
                 : new List<HRC1_MeThep>();
 
-            var gangSet        = new HashSet<string>(gangMaMes, StringComparer.OrdinalIgnoreCase);
+            var gangSet = new HashSet<string>(gangMaMes, StringComparer.OrdinalIgnoreCase);
             var existingByMaMe = existingMes
                 .Where(m => !string.IsNullOrEmpty(m.MaMe))
                 .ToDictionary(m => m.MaMe!, StringComparer.OrdinalIgnoreCase);
@@ -673,9 +683,9 @@ namespace dataproduct.api.Services
             foreach (var me in newMes)
                 _repo.AddMePhanCong(new HRC1_MePhanCong
                 {
-                    MeId       = me.Id,
-                    IdPhieu    = idPhieu,
-                    CongDoan   = "lo_thoi",
+                    MeId = me.Id,
+                    IdPhieu = idPhieu,
+                    CongDoan = "lo_thoi",
                     ScopePhieu = loSo
                 });
 
@@ -693,10 +703,10 @@ namespace dataproduct.api.Services
             _repo.SearchMeThepAsync(q.Trim(), 20)
                 .ContinueWith(t => t.Result.Select(m => new HRC1_MeThepSearchVm
                 {
-                    MeId    = m.Id,
-                    MaMe    = m.MaMe ?? string.Empty,
+                    MeId = m.Id,
+                    MaMe = m.MaMe ?? string.Empty,
                     ThungSo = m.ThungSo,
-                    LoSo    = m.LoSo
+                    LoSo = m.LoSo
                 }).ToList());
 
         public async Task<HRC1_ThemMeTayResult> ThemMeTayAsync(HRC1_ThemMeTayRequest req, int userId)
@@ -706,12 +716,12 @@ namespace dataproduct.api.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy mẻ '{req.MaMe}'.");
 
             // Check trùng: phiếu TL đã nhận + mẻ đang lên thẳng máy đúc
-            var trungTL       = await _repo.GetAllTinhLuyenPhieuByMaMeAsync(req.MaMe);
+            var trungTL = await _repo.GetAllTinhLuyenPhieuByMaMeAsync(req.MaMe);
             var trungLenThang = await _repo.GetLenThangMesByMaMeAsync(req.MaMe);
             var trungInfos = trungTL
                 .Concat(trungLenThang.Select(m => new HRC1_TrungMeInfo
                 {
-                    SoPhieu      = m.MaMe ?? $"ME-{m.Id}",
+                    SoPhieu = m.MaMe ?? $"ME-{m.Id}",
                     TenTinhLuyen = "Lên thẳng máy đúc"
                 }))
                 .ToList();
@@ -728,17 +738,17 @@ namespace dataproduct.api.Services
             // Tạo HRC1_MeThep mới — độc lập với mẻ gốc lò thổi
             var newMe = new HRC1_MeThep
             {
-                MaMe         = source.MaMe,
-                ThungSo      = source.ThungSo,
-                LoSo         = source.LoSo,
-                IsManualTL   = true,
-                TrangThaiTL  = 1,
-                NgayNhanTL   = ngayNhanTL,
-                CaTinhLuyen  = phieu.Ca,
+                MaMe = source.MaMe,
+                ThungSo = source.ThungSo,
+                LoSo = source.LoSo,
+                IsManualTL = true,
+                TrangThaiTL = 1,
+                NgayNhanTL = ngayNhanTL,
+                CaTinhLuyen = phieu.Ca,
                 KipTinhLuyen = phieu.Kip,
-                NgayTao      = ngayNhanTL,
-                CapNhatBoi   = userId,
-                CapNhatLuc   = DateTime.Now,
+                NgayTao = ngayNhanTL,
+                CapNhatBoi = userId,
+                CapNhatLuc = DateTime.Now,
                 CapNhatBoiTL = userId
             };
             _repo.AddMeThep(newMe);
@@ -746,20 +756,20 @@ namespace dataproduct.api.Services
 
             _repo.AddMePhanCong(new HRC1_MePhanCong
             {
-                MeId       = newMe.Id,
-                IdPhieu    = req.IdPhieu,
-                CongDoan   = "tinh_luyen",
+                MeId = newMe.Id,
+                IdPhieu = req.IdPhieu,
+                CongDoan = "tinh_luyen",
                 IsManualTL = true,
                 ScopePhieu = req.ScopePhieu
             });
 
             _repo.AddLichSu(new HRC1_LichSu
             {
-                MeId       = newMe.Id,
+                MeId = newMe.Id,
                 TaiKhoanId = userId,
-                HanhDong   = "them_me_tay",
-                DuLieuMoi  = Snapshot(newMe),
-                Luc        = DateTime.Now
+                HanhDong = "them_me_tay",
+                DuLieuMoi = Snapshot(newMe),
+                Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
 
@@ -809,17 +819,17 @@ namespace dataproduct.api.Services
             foreach (var me in meTheps)
             {
                 if (me.IsChot == true) continue;
-                me.IsChot        = true;
-                me.CapNhatBoi    = userId;
-                me.CapNhatLuc    = now;
+                me.IsChot = true;
+                me.CapNhatBoi = userId;
+                me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
                 _repo.AddLichSu(new HRC1_LichSu
                 {
-                    MeId       = me.Id,
+                    MeId = me.Id,
                     TaiKhoanId = userId,
-                    HanhDong   = "chot",
-                    DuLieuMoi  = Snapshot(me),
-                    Luc        = now
+                    HanhDong = "chot",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
                 });
             }
             await _repo.SaveChangesAsync();
@@ -835,17 +845,17 @@ namespace dataproduct.api.Services
             foreach (var me in meTheps)
             {
                 if (me.IsChot != true) continue;
-                me.IsChot        = false;
-                me.CapNhatBoi    = userId;
-                me.CapNhatLuc    = now;
+                me.IsChot = false;
+                me.CapNhatBoi = userId;
+                me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
                 _repo.AddLichSu(new HRC1_LichSu
                 {
-                    MeId       = me.Id,
+                    MeId = me.Id,
                     TaiKhoanId = userId,
-                    HanhDong   = "bo_chot",
-                    DuLieuMoi  = Snapshot(me),
-                    Luc        = now
+                    HanhDong = "bo_chot",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
                 });
             }
             await _repo.SaveChangesAsync();
@@ -896,45 +906,100 @@ namespace dataproduct.api.Services
 
                 var mes = await _repo.GetMeThepsByMayDucAsync(phieu.NgaySX.Value, phieu.Ca.Value, phieu.Scope.Value);
 
-                if (mes.Count == 0)
-                {
-                    result.ThatBai.Add(new HRC1_ChotPhieuBatchThatBai
-                    {
-                        IdPhieu = idPhieu,
-                        SoPhieu = phieu.SoPhieu ?? idPhieu.ToString(),
-                        LyDo = new List<string> { "Phiếu chưa có mẻ nào" }
-                    });
-                    continue;
-                }
+                // if (mes.Count == 0)
+                // {
+                //     result.ThatBai.Add(new HRC1_ChotPhieuBatchThatBai
+                //     {
+                //         IdPhieu = idPhieu,
+                //         SoPhieu = phieu.SoPhieu ?? idPhieu.ToString(),
+                //         LyDo = new List<string> { "Phiếu chưa có mẻ nào" }
+                //     });
+                //     continue;
+                // }
 
-                var chuaXacNhan = mes.Where(m => (m.TrangThaiDuc ?? 0) < 1).ToList();
-                if (chuaXacNhan.Count > 0)
-                {
-                    var dsMa = string.Join(", ", chuaXacNhan.Take(5).Select(m => m.MaMe ?? $"ID:{m.Id}"));
-                    result.ThatBai.Add(new HRC1_ChotPhieuBatchThatBai
-                    {
-                        IdPhieu = idPhieu,
-                        SoPhieu = phieu.SoPhieu ?? idPhieu.ToString(),
-                        LyDo = new List<string> { $"{chuaXacNhan.Count} mẻ chưa xác nhận: {dsMa}" }
-                    });
-                    continue;
-                }
+                // var chuaXacNhan = mes.Where(m => (m.TrangThaiDuc ?? 0) < 1).ToList();
+                // if (chuaXacNhan.Count > 0)
+                // {
+                //     var dsMa = string.Join(", ", chuaXacNhan.Take(5).Select(m => m.MaMe ?? $"ID:{m.Id}"));
+                //     result.ThatBai.Add(new HRC1_ChotPhieuBatchThatBai
+                //     {
+                //         IdPhieu = idPhieu,
+                //         SoPhieu = phieu.SoPhieu ?? idPhieu.ToString(),
+                //         LyDo = new List<string> { $"{chuaXacNhan.Count} mẻ chưa xác nhận: {dsMa}" }
+                //     });
+                //     continue;
+                // }
 
-                foreach (var me in mes)
+                // foreach (var me in mes)
+                // {
+                //     if (me.IsChot == true) continue;
+                //     me.IsChot = true;
+                //     me.CapNhatBoi = userId;
+                //     me.CapNhatLuc = now;
+                //     me.CapNhatBoiDuc = userId;
+                //     _repo.AddLichSu(new HRC1_LichSu
+                //     {
+                //         MeId = me.Id, TaiKhoanId = userId,
+                //         HanhDong = "chot", DuLieuMoi = Snapshot(me), Luc = now
+                //     });
+                // }
+                if (mes.Count > 0)
                 {
-                    if (me.IsChot == true) continue;
-                    me.IsChot = true;
-                    me.CapNhatBoi = userId;
-                    me.CapNhatLuc = now;
-                    me.CapNhatBoiDuc = userId;
-                    _repo.AddLichSu(new HRC1_LichSu
+                    var chuaXacNhan = mes.Where(m => (m.TrangThaiDuc ?? 0) < 1).ToList();
+
+                    if (chuaXacNhan.Count > 0)
                     {
-                        MeId = me.Id, TaiKhoanId = userId,
-                        HanhDong = "chot", DuLieuMoi = Snapshot(me), Luc = now
-                    });
+                        var dsMa = string.Join(", ",
+                            chuaXacNhan.Take(5).Select(m => m.MaMe ?? $"ID:{m.Id}"));
+
+                        result.ThatBai.Add(new HRC1_ChotPhieuBatchThatBai
+                        {
+                            IdPhieu = idPhieu,
+                            SoPhieu = phieu.SoPhieu ?? idPhieu.ToString(),
+                            LyDo = new List<string>
+                            {
+                                $"{chuaXacNhan.Count} mẻ chưa xác nhận: {dsMa}"
+                            }
+                        });
+
+                        continue;
+                    }
+
+                    foreach (var me in mes)
+                    {
+                        if (me.IsChot == true) continue;
+
+                        me.IsChot = true;
+                        me.CapNhatBoi = userId;
+                        me.CapNhatLuc = now;
+                        me.CapNhatBoiDuc = userId;
+
+                        _repo.AddLichSu(new HRC1_LichSu
+                        {
+                            MeId = me.Id,
+                            TaiKhoanId = userId,
+                            HanhDong = "chot",
+                            DuLieuMoi = Snapshot(me),
+                            Luc = now
+                        });
+                    }
+
+                    // await _repo.SaveChangesAsync();
+                }
+                else
+                {
+                    // Không có mẻ => vẫn cho chốt phiếu
+                    phieu.TinhTrang = 5;
                 }
                 await _repo.SaveChangesAsync();
-                await UpdateDucPhieuTinhTrangAsync(idPhieu, phieu.Scope.Value);
+                // await UpdateDucPhieuTinhTrangAsync(idPhieu, phieu.Scope.Value);
+
+                if (mes.Count > 0)
+                {
+                    await UpdateDucPhieuTinhTrangAsync(
+                        idPhieu,
+                        phieu.Scope.Value);
+                }
 
                 result.ThanhCong.Add(phieu.SoPhieu ?? idPhieu.ToString());
             }
@@ -963,20 +1028,54 @@ namespace dataproduct.api.Services
 
                 var mes = await _repo.GetMeThepsByMayDucAsync(phieu.NgaySX.Value, phieu.Ca.Value, phieu.Scope.Value);
 
-                foreach (var me in mes.Where(m => m.IsChot == true))
+                // foreach (var me in mes.Where(m => m.IsChot == true))
+                // {
+                //     me.IsChot = false;
+                //     me.CapNhatBoi = userId;
+                //     me.CapNhatLuc = now;
+                //     me.CapNhatBoiDuc = userId;
+                //     _repo.AddLichSu(new HRC1_LichSu
+                //     {
+                //         MeId = me.Id, TaiKhoanId = userId,
+                //         HanhDong = "bo_chot", DuLieuMoi = Snapshot(me), Luc = now
+                //     });
+                // }
+                // await _repo.SaveChangesAsync();
+                // await UpdateDucPhieuTinhTrangAsync(idPhieu, phieu.Scope.Value);
+                if (mes.Count > 0)
                 {
-                    me.IsChot = false;
-                    me.CapNhatBoi = userId;
-                    me.CapNhatLuc = now;
-                    me.CapNhatBoiDuc = userId;
-                    _repo.AddLichSu(new HRC1_LichSu
+                    foreach (var me in mes.Where(m => m.IsChot == true))
                     {
-                        MeId = me.Id, TaiKhoanId = userId,
-                        HanhDong = "bo_chot", DuLieuMoi = Snapshot(me), Luc = now
-                    });
+                        me.IsChot = false;
+                        me.CapNhatBoi = userId;
+                        me.CapNhatLuc = now;
+                        me.CapNhatBoiDuc = userId;
+
+                        _repo.AddLichSu(new HRC1_LichSu
+                        {
+                            MeId = me.Id,
+                            TaiKhoanId = userId,
+                            HanhDong = "bo_chot",
+                            DuLieuMoi = Snapshot(me),
+                            Luc = now
+                        });
+                    }
                 }
+                else
+                {
+                    // Không có mẻ => vẫn cho bỏ chốt phiếu
+                    phieu.TinhTrang = 0;
+                }
+
                 await _repo.SaveChangesAsync();
-                await UpdateDucPhieuTinhTrangAsync(idPhieu, phieu.Scope.Value);
+
+                if (mes.Count > 0)
+                {
+                    await UpdateDucPhieuTinhTrangAsync(
+                        idPhieu,
+                        phieu.Scope.Value);
+                }
+
 
                 result.ThanhCong.Add(phieu.SoPhieu ?? idPhieu.ToString());
             }
@@ -994,7 +1093,7 @@ namespace dataproduct.api.Services
             if (me.IsChot == true)
                 throw new InvalidOperationException("Mẻ đã chốt, không thể chỉnh sửa.");
 
-            me.GhiChuLo   = ghiChu;
+            me.GhiChuLo = ghiChu;
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             await _repo.SaveChangesAsync();
@@ -1067,43 +1166,43 @@ namespace dataproduct.api.Services
 
             return new HRC1_MeThepVm
             {
-                Id              = m.Id,
-                MePhanCongId    = pc.Id,
-                ThuTuTL         = pc.ThuTuTL,
-                MaMe            = m.MaMe,
-                ThungSo         = m.ThungSo,
-                LoSo            = m.LoSo,
-                ThoiGian        = m.ThoiGian,
-                KLLFSauThep     = m.KLLFSauThep,
-                KlLan1          = m.KlLan1,
-                KlLan2          = m.KlLan2,
-                KlLan3          = m.KlLan3,
-                KlThepLong          = m.KlThepLong,
-                KlThepLongPhanBo    = m.KLThepLongPhanBo,
-                DichChuyen          = m.DichChuyen,
-                TLDichSo        = m.TLDichSo,
-                IdMayDucDich    = m.IdMayDucDich,
-                TenMayDucDich   = tenMayDucDich,
-                IsThuNghiem     = m.IsThuNghiem,
-                IsTrungMeThoi   = m.IsTrungMeThoi,
-                IsGhost         = m.IsGhost,
-                IsChot          = m.IsChot,
-                IsManualTL      = m?.IsManualTL,
-                GhiChuLo        = m.GhiChuLo,
-                PhanLoai        = m.PhanLoai,
-                MacThep         = m.MacThep,
-                MacThepBKMIS    = m.MacThepBKMIS,
-                IdMacThep       = m.IdMacThep,
-                GhiChuTL        = m.GhiChuTL,
-                TrangThaiLo     = m.TrangThaiLo,
-                TrangThaiTL     = m.TrangThaiTL,
-                TrangThaiDuc    = m.TrangThaiDuc,
-                CapNhatBoi      = m.CapNhatBoi,
-                CapNhatLuc      = m.CapNhatLuc,
-                XacNhanBoi      = pc.XacNhanBoi,
-                XacNhanLuc      = pc.XacNhanLuc,
-                ChuyenVeMeId    = pc.ChuyenVeMeId,
-                ChuyenVeMaMe    = chuyenVeMaMe,
+                Id = m.Id,
+                MePhanCongId = pc.Id,
+                ThuTuTL = pc.ThuTuTL,
+                MaMe = m.MaMe,
+                ThungSo = m.ThungSo,
+                LoSo = m.LoSo,
+                ThoiGian = m.ThoiGian,
+                KLLFSauThep = m.KLLFSauThep,
+                KlLan1 = m.KlLan1,
+                KlLan2 = m.KlLan2,
+                KlLan3 = m.KlLan3,
+                KlThepLong = m.KlThepLong,
+                KlThepLongPhanBo = m.KLThepLongPhanBo,
+                DichChuyen = m.DichChuyen,
+                TLDichSo = m.TLDichSo,
+                IdMayDucDich = m.IdMayDucDich,
+                TenMayDucDich = tenMayDucDich,
+                IsThuNghiem = m.IsThuNghiem,
+                IsTrungMeThoi = m.IsTrungMeThoi,
+                IsGhost = m.IsGhost,
+                IsChot = m.IsChot,
+                IsManualTL = m?.IsManualTL,
+                GhiChuLo = m.GhiChuLo,
+                PhanLoai = m.PhanLoai,
+                MacThep = m.MacThep,
+                MacThepBKMIS = m.MacThepBKMIS,
+                IdMacThep = m.IdMacThep,
+                GhiChuTL = m.GhiChuTL,
+                TrangThaiLo = m.TrangThaiLo,
+                TrangThaiTL = m.TrangThaiTL,
+                TrangThaiDuc = m.TrangThaiDuc,
+                CapNhatBoi = m.CapNhatBoi,
+                CapNhatLuc = m.CapNhatLuc,
+                XacNhanBoi = pc.XacNhanBoi,
+                XacNhanLuc = pc.XacNhanLuc,
+                ChuyenVeMeId = pc.ChuyenVeMeId,
+                ChuyenVeMaMe = chuyenVeMaMe,
                 TenMayDucChuyen = tenMayDucChuyen,
             };
         }
@@ -1137,19 +1236,19 @@ namespace dataproduct.api.Services
             var p2 = new List<string>();
             if (query.TuNgay.HasValue || query.DenNgay.HasValue)
                 p2.Add($"Từ ngày: {query.TuNgay:dd/MM/yyyy}  –  Đến ngày: {query.DenNgay:dd/MM/yyyy}");
-            if (query.Ca.HasValue)    p2.Add($"Ca: {(query.Ca == 1 ? "Ca ngày" : "Ca đêm")}");
+            if (query.Ca.HasValue) p2.Add($"Ca: {(query.Ca == 1 ? "Ca ngày" : "Ca đêm")}");
             if (!string.IsNullOrEmpty(query.Kip)) p2.Add($"Kíp: {query.Kip}");
             ws.Cell(2, 1).Value = string.Join("   |   ", p2);
 
             ws.Range(3, 1, 3, TOTAL_COLS).Merge();
             var p3 = new List<string>();
-            if (query.LoSo.HasValue)     p3.Add($"Lò thổi: {query.LoSo}");
-            if (query.TlSo.HasValue)     p3.Add($"Tinh luyện: {query.TlSo}");
+            if (query.LoSo.HasValue) p3.Add($"Lò thổi: {query.LoSo}");
+            if (query.TlSo.HasValue) p3.Add($"Tinh luyện: {query.TlSo}");
             if (query.IdMayDuc.HasValue) p3.Add($"Máy đúc ID: {query.IdMayDuc}");
-            if (!string.IsNullOrEmpty(query.MaMe))     p3.Add($"Mẻ: {query.MaMe}");
-            if (!string.IsNullOrEmpty(query.ThungSo))  p3.Add($"Thùng: {query.ThungSo}");
+            if (!string.IsNullOrEmpty(query.MaMe)) p3.Add($"Mẻ: {query.MaMe}");
+            if (!string.IsNullOrEmpty(query.ThungSo)) p3.Add($"Thùng: {query.ThungSo}");
             if (!string.IsNullOrEmpty(query.PhanLoai)) p3.Add($"Phân loại: {query.PhanLoai}");
-            if (query.IsChot.HasValue)     p3.Add(query.IsChot.Value ? "Đã chốt" : "Chưa chốt");
+            if (query.IsChot.HasValue) p3.Add(query.IsChot.Value ? "Đã chốt" : "Chưa chốt");
             if (query.IsManualTL.HasValue) p3.Add($"Nhập tay: {(query.IsManualTL.Value ? "Có" : "Không")}");
             p3.Add($"Tổng: {data.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}");
             ws.Cell(3, 1).Value = string.Join("   |   ", p3);
@@ -1171,28 +1270,28 @@ namespace dataproduct.api.Services
                 hCell.Style.Fill.BackgroundColor = XLColor.FromHtml("#4472C4");
                 hCell.Style.Font.FontColor = XLColor.White;
                 hCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                hCell.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
-                hCell.Style.Alignment.WrapText   = true;
+                hCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                hCell.Style.Alignment.WrapText = true;
                 hCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             }
             ws.Row(HEADER_ROW).Height = 36;
 
-            static string FmtLo(int? v)  => v switch { 0 => "Chờ",       1 => "Đã nhập",  _ => "" };
-            static string FmtTL(int? v)  => v switch { 0 => "Chưa nhận", 1 => "Đã nhận",  _ => "" };
-            static string FmtDuc(int? v) => v switch { 0 => "Chờ",       1 => "Đã XN",    _ => "" };
+            static string FmtLo(int? v) => v switch { 0 => "Chờ", 1 => "Đã nhập", _ => "" };
+            static string FmtTL(int? v) => v switch { 0 => "Chưa nhận", 1 => "Đã nhận", _ => "" };
+            static string FmtDuc(int? v) => v switch { 0 => "Chờ", 1 => "Đã XN", _ => "" };
 
             int row = DATA_START, stt = 1;
             foreach (var item in data)
             {
-                ws.Cell(row,  1).Value = stt++;
-                ws.Cell(row,  2).Value = item.NgayTao.ToString("dd/MM/yyyy");
-                ws.Cell(row,  3).Value = item.Ca.HasValue ? (item.Ca == 1 ? "Ca ngày" : "Ca đêm") : "";
-                ws.Cell(row,  4).Value = item.Kip ?? "";
-                ws.Cell(row,  5).Value = item.TenMayDuc ?? "";
-                ws.Cell(row,  6).Value = item.MaMe ?? "";
-                ws.Cell(row,  7).Value = item.MacThep ?? "";
-                ws.Cell(row,  8).Value = item.ThungSo ?? "";
-                ws.Cell(row,  9).Value = item.ThoiGian ?? "";
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.NgayTao.ToString("dd/MM/yyyy");
+                ws.Cell(row, 3).Value = item.Ca.HasValue ? (item.Ca == 1 ? "Ca ngày" : "Ca đêm") : "";
+                ws.Cell(row, 4).Value = item.Kip ?? "";
+                ws.Cell(row, 5).Value = item.TenMayDuc ?? "";
+                ws.Cell(row, 6).Value = item.MaMe ?? "";
+                ws.Cell(row, 7).Value = item.MacThep ?? "";
+                ws.Cell(row, 8).Value = item.ThungSo ?? "";
+                ws.Cell(row, 9).Value = item.ThoiGian ?? "";
                 SetExcelNum(ws.Cell(row, 10), item.KLLFSauThep);
                 SetExcelNum(ws.Cell(row, 11), item.KlLan1);
                 SetExcelNum(ws.Cell(row, 12), item.KlLan2);
@@ -1222,7 +1321,7 @@ namespace dataproduct.api.Services
                 }
 
                 var rowRange = ws.Range(row, 1, row, TOTAL_COLS);
-                rowRange.Style.Border.InsideBorder  = XLBorderStyleValues.Thin;
+                rowRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 rowRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                 if (row % 2 == 0)
                     foreach (var cell in rowRange.Cells().Where(c2 => c2.Style.Fill.BackgroundColor == XLColor.NoColor))
@@ -1233,17 +1332,17 @@ namespace dataproduct.api.Services
             }
 
             ws.Columns().AdjustToContents();
-            ws.Column(1).Width  = 5;
+            ws.Column(1).Width = 5;
             ws.Column(17).Width = 28;
-            ws.Column(2).Width  = 14;
+            ws.Column(2).Width = 14;
             ws.Column(22).Width = 16;
 
             using var stream = new MemoryStream();
             wb.SaveAs(stream);
             return new ExportFileResult
             {
-                Content     = stream.ToArray(),
-                FileName    = $"ThongKe_HRC1_BBGN_TL_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                Content = stream.ToArray(),
+                FileName = $"ThongKe_HRC1_BBGN_TL_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             };
         }
@@ -1263,13 +1362,13 @@ namespace dataproduct.api.Services
             if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
                 throw new InvalidOperationException("Phiếu thiếu NgaySX hoặc Ca.");
 
-            var ca  = phieu.Ca.Value;
+            var ca = phieu.Ca.Value;
             var kip = phieu.Kip ?? "";
             var ngay = phieu.NgaySX.Value;
 
             string tuGio, denGio, tuNgay, denNgay;
             if (ca == 1) { tuGio = "08:00"; denGio = "20:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = tuNgay; }
-            else         { tuGio = "20:00"; denGio = "08:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
+            else { tuGio = "20:00"; denGio = "08:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
 
             var phieuData = await GetPhieuAsync(phieuId);
             var rows = phieuData.DanhSachMe;
@@ -1279,12 +1378,12 @@ namespace dataproduct.api.Services
             int stt = 1;
             foreach (var r in rows)
             {
-                var meStyle  = r.IsTrungMeThoi == true ? " style=\"color:red;font-weight:bold\"" : "";
+                var meStyle = r.IsTrungMeThoi == true ? " style=\"color:red;font-weight:bold\"" : "";
                 string dichDisp = r.DichChuyen switch
                 {
                     "tinh_luyen" => r.TLDichSo.HasValue ? $"TL {r.TLDichSo}" : "Tinh luyện",
-                    "len_thang"  => r.TenMayDucDich ?? "Lên thẳng",
-                    _            => "",
+                    "len_thang" => r.TenMayDucDich ?? "Lên thẳng",
+                    _ => "",
                 };
                 sb.Append($@"
                 <tr>
@@ -1293,9 +1392,9 @@ namespace dataproduct.api.Services
                   <td{meStyle}>{r.MacThepBKMIS ?? ""}</td>
                   <td>{r.ThungSo ?? ""}</td>
                   <td>{r.ThoiGian ?? ""}</td>
-                  <td>{(r.KlLan1.HasValue   ? r.KlLan1.Value.ToString("0.##")    : "")}</td>
-                  <td>{(r.KlLan2.HasValue   ? r.KlLan2.Value.ToString("0.##")    : "")}</td>
-                  <td>{(r.KlLan3.HasValue   ? r.KlLan3.Value.ToString("0.##")    : "")}</td>
+                  <td>{(r.DichChuyen == "len_thang" ? r.KLLFSauThep?.ToString("0.##") : r.KlLan1?.ToString("0.##")) ?? ""}</td>
+                  <td>{(r.KlLan2.HasValue ? r.KlLan2.Value.ToString("0.##") : "")}</td>
+                  <td>{(r.KlLan3.HasValue ? r.KlLan3.Value.ToString("0.##") : "")}</td>
                   <td>{(r.KlThepLong.HasValue ? r.KlThepLong.Value.ToString("0.##") : "")}</td>
                   <td>{r.GhiChuLo ?? ""}</td>
                   <td>{dichDisp}</td>
@@ -1303,7 +1402,7 @@ namespace dataproduct.api.Services
                 if (r.KlThepLong.HasValue) sumKl += r.KlThepLong.Value;
             }
 
-            var pheDuyets   = await _pheDuyetSvc.GetPheDuyetPhieuAsync(phieuId);
+            var pheDuyets = await _pheDuyetSvc.GetPheDuyetPhieuAsync(phieuId);
             var benGiaoList = pheDuyets.Where(x => x.CapDuyet == 0).ToList();
             var benNhanList = pheDuyets.Where(x => x.CapDuyet != 0).ToList();
 
@@ -1313,19 +1412,19 @@ namespace dataproduct.api.Services
             var html = await File.ReadAllTextAsync(templatePath);
 
             html = html
-                .Replace("{{LogoUrl}}",       logoUrl)
-                .Replace("{{BmCode}}",        "BM.16/QT.05.10<br/>Ngày hiệu lực: 01/09/2023")
-                .Replace("{{Kip}}",           kip)
-                .Replace("{{TuGio}}",         tuGio)
-                .Replace("{{TuNgay}}",        tuNgay)
-                .Replace("{{DenGio}}",        denGio)
-                .Replace("{{DenNgay}}",       denNgay)
-                .Replace("{{Rows}}",          sb.ToString())
-                .Replace("{{TongKl}}",        sumKl.ToString("0.##"))
-                .Replace("{{TenBenGiao}}",    benGiaoList.FirstOrDefault()?.HoVaTen ?? "")
+                .Replace("{{LogoUrl}}", logoUrl)
+                .Replace("{{BmCode}}", "BM.16/QT.05.10<br/>Ngày hiệu lực: 01/09/2023")
+                .Replace("{{Kip}}", kip)
+                .Replace("{{TuGio}}", tuGio)
+                .Replace("{{TuNgay}}", tuNgay)
+                .Replace("{{DenGio}}", denGio)
+                .Replace("{{DenNgay}}", denNgay)
+                .Replace("{{Rows}}", sb.ToString())
+                .Replace("{{TongKl}}", sumKl.ToString("0.##"))
+                .Replace("{{TenBenGiao}}", benGiaoList.FirstOrDefault()?.HoVaTen ?? "")
                 .Replace("{{ChucVuBenGiao}}", benGiaoList.FirstOrDefault()?.TenViTri ?? "")
                 .Replace("{{NhaMayBenGiao}}", benGiaoList.FirstOrDefault()?.TenPhongBan ?? "")
-                .Replace("{{TenBenNhan}}",    benNhanList.FirstOrDefault()?.HoVaTen ?? "")
+                .Replace("{{TenBenNhan}}", benNhanList.FirstOrDefault()?.HoVaTen ?? "")
                 .Replace("{{ChucVuBenNhan}}", benNhanList.FirstOrDefault()?.TenViTri ?? "")
                 .Replace("{{NhaMayBenNhan}}", benNhanList.FirstOrDefault()?.TenPhongBan ?? "");
 
@@ -1336,8 +1435,8 @@ namespace dataproduct.api.Services
             };
             return new ExportFileResult
             {
-                Content     = _pdfConverter.Convert(doc),
-                FileName    = $"HRC1_BBGN_ThepLong_{ngay:ddMMyyyy}_Ca{ca}.pdf",
+                Content = _pdfConverter.Convert(doc),
+                FileName = $"HRC1_BBGN_ThepLong_{ngay:ddMMyyyy}_Ca{ca}.pdf",
                 ContentType = "application/pdf",
             };
         }
