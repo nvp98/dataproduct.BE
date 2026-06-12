@@ -1289,7 +1289,7 @@ namespace dataproduct.api.Services
                 ws.Cell(row, 4).Value = item.Kip ?? "";
                 ws.Cell(row, 5).Value = item.TenMayDuc ?? "";
                 ws.Cell(row, 6).Value = item.MaMe ?? "";
-                ws.Cell(row, 7).Value = item.MacThep ?? "";
+                ws.Cell(row, 7).Value = item.MacThepBKMIS ?? "";
                 ws.Cell(row, 8).Value = item.ThungSo ?? "";
                 ws.Cell(row, 9).Value = item.ThoiGian ?? "";
                 SetExcelNum(ws.Cell(row, 10), item.KLLFSauThep);
