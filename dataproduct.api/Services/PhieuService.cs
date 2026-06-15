@@ -6,6 +6,7 @@ using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Services.Exporters;
 using dataproduct.api.Services.Initializers;
+using dataproduct.api.Services.PhieuEnrichers;
 using dataproduct.api.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Any;
@@ -27,6 +28,7 @@ namespace dataproduct.api.Business
         private readonly IEnumerable<IPhieuPdfExporter> _pdfExporters;
         private readonly IEnumerable<IPhieuExcelExporter> _excelExporters;
         private readonly PhieuDetailExcelService _detailExcelService;
+        private readonly Dictionary<string, IPhieuSearchEnricher> _enricherMap;
 
         public PhieuService(
             IPhieuRepository repo,
@@ -39,7 +41,8 @@ namespace dataproduct.api.Business
             IEnumerable<IPhieuJsonInitializer> jsonInitializers,
             IEnumerable<IPhieuPdfExporter> pdfExporters,
             IEnumerable<IPhieuExcelExporter> excelExporters,
-            PhieuDetailExcelService detailExcelService)
+            PhieuDetailExcelService detailExcelService,
+            IEnumerable<IPhieuSearchEnricher> enrichers)
         {
             _repo = repo;
             _std_nxt_hrc2Repo = std_nxt_hrc2Repo;
@@ -52,6 +55,7 @@ namespace dataproduct.api.Business
             _pdfExporters = pdfExporters;
             _excelExporters = excelExporters;
             _detailExcelService = detailExcelService;
+            _enricherMap = enrichers.ToDictionary(e => e.MaBm);
         }
 
         /// <summary>
@@ -247,9 +251,12 @@ namespace dataproduct.api.Business
             };
         }
 
-        public async Task<BmPhieu?> CreateAsync(JsonElement formData)
+        public async Task<BmPhieu?> CreateAsync(JsonElement formData, bool skipDuplicateCheck = false)
         {
-            await CheckDuplicateAsync(formData);
+            if (!skipDuplicateCheck)
+            {
+                await CheckDuplicateAsync(formData);
+            }
 
             try
             {
@@ -364,6 +371,34 @@ namespace dataproduct.api.Business
             return (existing, warnings);
         }
 
+        /// <summary>
+        /// Cập nhật chỉ dữ liệu bảng (DataJson) mà không kiểm tra ràng buộc tình trạng phiếu
+        /// Sử dụng cho phép cập nhật dữ liệu bảng khi phiếu ở trạng thái HoanThanh và người dùng có quyền Chốt
+        /// </summary>
+        public async Task<(BmPhieu? Phieu, List<string> Warnings)> UpdateTableDataOnlyAsync(Guid id, JsonElement formData)
+        {
+            // 1. Lấy phiếu hiện tại
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return (null, new List<string>());
+
+            // 2. Cho phép cập nhật cho các trạng thái: Chốt (5)
+            // Không kiểm tra ràng buộc như UpdateAsync - mục đích chỉ để update dữ liệu bảng
+            if (existing.TinhTrang == 5)
+                return (null, new List<string> { "Trạng thái phiếu không cho phép cập nhật dữ liệu bảng" });
+
+            // 3. Cập nhật DataJson (chỉ dữ liệu bảng, không cập nhật các field chính)
+            existing.DataJson = formData.GetRawText();
+            existing.NgayTao = existing.NgayTao; // giữ nguyên ngày tạo
+
+            // 4. Gọi repository để lưu
+            await _repo.UpdateAsync(existing);
+
+            // 5. Đồng bộ lại dữ liệu bảng chi tiết từ DataJson
+            var warnings = await RunJsonInitializersAsync(existing);
+
+            return (existing, warnings);
+        }
+
         public async Task<BmPhieu?> UpdateNguoiTaoAsync(Guid id, int? NguoiTaoID)
         {
             // 1. Lấy phiếu hiện tại
@@ -468,7 +503,7 @@ namespace dataproduct.api.Business
                 await _context.SaveChangesAsync();
 
                 // 3. Tạo phiếu clone từ formData (copy dữ liệu y như phiếu cũ)
-                var phieu = await CreateAsync(formData);
+                var phieu = await CreateAsync(formData, skipDuplicateCheck: true);
                 if (phieu == null) return null;
 
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
@@ -587,6 +622,25 @@ namespace dataproduct.api.Business
             }
         }
 
+        public async Task CheckNhieuPhieuAsync(List<Guid> idPhieus, int isCheck)
+        {
+            if (idPhieus == null || idPhieus.Count == 0)
+                throw new InvalidOperationException("Danh sách phiếu không được để trống.");
+
+            var phieus = await _context.BmPhieus
+                .Where(x => idPhieus.Contains(x.Idphieu))
+                .ToListAsync();
+
+            var notFound = idPhieus.Except(phieus.Select(p => p.Idphieu)).ToList();
+            if (notFound.Any())
+                throw new InvalidOperationException($"Không tìm thấy {notFound.Count} phiếu trong danh sách.");
+
+            foreach (var phieu in phieus)
+                phieu.IsCheck = isCheck;
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<bool> UpdateStatusExtendedAsync(Guid id, int? status, int? isLock, int? isDelete)
         {
             var existing = await _repo.GetByIdAsync(id);
@@ -633,9 +687,10 @@ namespace dataproduct.api.Business
             var (data, totalCount) = await _repo.SearchWithPagingByUserAsync(request);
             var dataList = data.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca).ThenBy(x => x.Scope).ToList();
 
-            foreach (var item in dataList.Where(x => x.MaBm == "HRC2_STD_NXT"))
+            foreach (var item in dataList)
             {
-                item.TinhTrang = await GetStatusHRC2_STD_NXT(item.NgaySX, item.Ca ?? 0);
+                if (_enricherMap.TryGetValue(item.MaBm ?? "", out var enricher))
+                    await enricher.EnrichAsync(item);
             }
 
             return new PagedResult<SearchPhieuResponseModel>
@@ -647,9 +702,9 @@ namespace dataproduct.api.Business
             };
         }
 
+
         public async Task<int> GetStatusHRC2_STD_NXT(DateOnly workDate, int shift)
         {
-            // Bước 1: kiểm tra hasPhanBo — phanBoComplete = không còn record nào có HasPhanBo = null
             var idPhieus = await _context.BmPhieus
                 .Where(p => p.MaBm == "HRC2_STD_NXT"
                          && p.NgaySX == workDate
@@ -663,7 +718,6 @@ namespace dataproduct.api.Business
                     .Where(r => idPhieus.Contains(r.Id_Phieu) && r.HasPhanBo == null)
                     .AnyAsync();
 
-            // Bước 2: kiểm tra trạng thái BOF/LF/RH — relatedComplete = tất cả phiếu có TinhTrang IN (2, 5)
             var nauLuyenMaBms = new[] { "HRC2_BB_NauLuyen_BOF", "HRC2_BB_NauLuyen_LF", "HRC2_BB_NauLuyen_RH" };
             var relatedStatuses = await _context.BmPhieus
                 .Where(p => nauLuyenMaBms.Contains(p.MaBm)
@@ -677,10 +731,8 @@ namespace dataproduct.api.Business
             bool relatedComplete = relatedStatuses.Any()
                 && relatedStatuses.All(t => t == 2 || t == 5);
 
-            // Bước 3: kết hợp — cả 2 điều kiện phải true mới là "Đã hoàn thành"
             return (phanBoComplete && relatedComplete) ? 2 : 1;
         }
-
 
         // Helper
         private double? TryGetDouble(JsonElement row, string key)
@@ -800,9 +852,54 @@ namespace dataproduct.api.Business
             }
         }
 
-        public async Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
+        public async Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             return await _repo.GetSoPhieuAsync(maBm, ngaySX, ca);
+        }
+
+        /// <summary>
+        /// Lấy dữ liệu ca kíp từ Tbl_Kip theo ngày và ca
+        /// </summary>
+        public async Task<dynamic?> GetKipByDateAndCaAsync(DateOnly ngayLamViec, int ca)
+        {
+            var kip = await _masterContext.Tbl_Kip
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.NgayLamViec == ngayLamViec
+                                       && x.TenCa == ca.ToString());
+
+            if (kip == null)
+                return null;
+
+            return new
+            {
+                id_kip = kip.ID_Kip,
+                ngayLamViec = kip.NgayLamViec,
+                tenCa = kip.TenCa,
+                tenKip = kip.TenKip
+            };
+        }
+
+        /// <summary>
+        /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)
+        /// </summary>
+        public async Task<BmPhieu?> ResetPhieuAsync(Guid id)
+        {
+            var phieu = await _repo.GetByIdAsync(id);
+            if (phieu == null)
+                return null;
+
+            EnsurePhieuOperable(phieu);
+
+            // Reset về trạng thái Đang lưu (0)
+            phieu.TinhTrang = 0;
+            phieu.IsLock = 0;
+            phieu.IsDelete = 0;
+            phieu.IsClone = false;
+            // phieu.NgayTao = DateTime.Now;
+
+            await _repo.UpdateAsync(phieu);
+
+            return phieu;
         }
 
     }

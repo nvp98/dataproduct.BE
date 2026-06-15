@@ -155,8 +155,8 @@ namespace dataproduct.api.Services
             var kipCa = $"{ca}{kip}";
 
             // Lấy người ký
-            var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
-            var nvVanHanh = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var nvVanHanh = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
 
             // Logo
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
@@ -350,7 +350,7 @@ namespace dataproduct.api.Services
                 phieuQuery = phieuQuery.Where(x => x.NgaySX <= toDate.Value);
 
             var phieus = await phieuQuery
-                .Select(x => new { x.Idphieu, x.SoPhieu, x.NgaySX, x.Ca, x.Kip, x.TinhTrang })
+                .Select(x => new { x.Idphieu, x.SoPhieu, x.NgaySX, x.Ca, x.Kip, x.TinhTrang, x.Scope })
                 .OrderBy(x => x.NgaySX).ThenBy(x => x.Ca).ThenBy(x => x.Kip)
                 .ToListAsync();
 
@@ -392,13 +392,13 @@ namespace dataproduct.api.Services
                 ws1.Cell(r, 1).Value = row.p.NgaySX?.ToDateTime(TimeOnly.MinValue);
                 ws1.Cell(r, 2).Value = row.p.Ca;
                 ws1.Cell(r, 3).Value = row.p.Kip;
-                ws1.Cell(r, 4).Value = row.d.LoaiMacPhoi switch { 1 => "I", 2 => "II", 3 => "III", _ => row.d.LoaiMacPhoi?.ToString() }; ;
+                ws1.Cell(r, 4).Value = "Xưởng cán" + row.p.Scope;
                 ws1.Cell(r, 5).Value = row.d.TenMacPhoi;
                 ws1.Cell(r, 6).Value = row.d.LoaiPhoi switch
                 {
-                    1 => "loại I",
-                    2 => "loại II",
-                    3 => "loại III",
+                    1 => "Phôi nóng",
+                    2 => "Phôi nguội",
+                    3 => "Khác",
                     _ => row.d.LoaiPhoi?.ToString()
                 };
                 ws1.Cell(r, 7).Value = row.d.KichThuoc;

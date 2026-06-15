@@ -34,6 +34,7 @@
       .header-left img {
         max-width: 250px;
         max-height: 100px;
+        width: 150px;
         vertical-align: middle;
         margin-right: 10px;
       }
@@ -110,17 +111,17 @@
         border: none !important;
         border-collapse: collapse;
       }
-	  thead {
-		  display: table-header-group;
-		}
+      thead {
+        display: table-header-group;
+      }
 
-		tfoot {
-		  display: table-footer-group;
-		}
+      tfoot {
+        display: table-footer-group;
+      }
 
-		tr {
-		  page-break-inside: avoid;
-		}
+      tr {
+        page-break-inside: avoid;
+      }
     </style>
   </head>
   <body>
@@ -142,36 +143,37 @@
     <div class="title">BẢNG THEO DÕI BEN PHẾ</div>
 
     <!-- INFO -->
-    <div class="sub-title">
-      Kíp: {{Ca}}{{Kip}} &nbsp; {{NgaySX}}
-    </div>
+    <div class="sub-title">Kíp: {{Ca}}{{Kip}} &nbsp; {{NgaySX}}</div>
 
     <!-- TABLE -->
     <table>
       <thead>
         <tr>
-          <th >STT</th>
-          <th >Ca</th>
-          <th >Ngày</th>
-          <th >Mã BSX</th>
-          <th >Số hiệu ben</th>
-          <th >Khối lượng <br /> tấn/ben</th>
-          <th >Ghi chú</th>
+          <th>STT</th>
+          <th>Ca</th>
+          <th>Ngày</th>
+          <th>Mã BSX</th>
+          <th>Số hiệu ben</th>
+          <th>
+            Khối lượng <br />
+            tấn/ben
+          </th>
+          <th>Ghi chú</th>
         </tr>
       </thead>
       <tbody>
         {{Rows}}
       </tbody>
       <!-- <tfoot> -->
-        <!-- <tr> -->
-          <!-- <td style="font-weight: bold">Tổng</td> -->
-          <!-- <td></td> -->
-          <!-- <td></td> -->
-          <!-- <td></td> -->
-		  <!-- <td></td> -->
-          <!-- <td><b>{{TongKL}}</b></td> -->
-          <!-- <td></td> -->
-        <!-- </tr> -->
+      <!-- <tr> -->
+      <!-- <td style="font-weight: bold">Tổng</td> -->
+      <!-- <td></td> -->
+      <!-- <td></td> -->
+      <!-- <td></td> -->
+      <!-- <td></td> -->
+      <!-- <td><b>{{TongKL}}</b></td> -->
+      <!-- <td></td> -->
+      <!-- </tr> -->
       <!-- </tfoot> -->
     </table>
 

@@ -426,6 +426,12 @@ namespace dataproduct.api.Services
                 ngaySX: NgaySX.Value.ToDateTime(TimeOnly.MinValue),
                 idPhieu: idPhieu
             );
+            // lay thong tin mayDuc tu BM_Phieu (de hien thi tren header)
+            var phieu = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(x => x.Idphieu == idPhieu.Value)
+                .Select(x => new { x.MayDuc })
+                .FirstOrDefaultAsync();
 
             var data = items.ToList();
 
@@ -526,8 +532,8 @@ namespace dataproduct.api.Services
                 </tr>");
             }
 
-            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
-            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
 
             // Convert logo và chữ ký sang base64
@@ -570,6 +576,7 @@ namespace dataproduct.api.Services
                 .Replace("{{NgaySX}}", NgaySX.Value.ToString("dd/MM/yyyy"))
                 .Replace("{{Ca}}", Ca.Value.ToString())
                 .Replace("{{Kip}}", Kip)
+                .Replace("MayDuc", phieu?.MayDuc.ToString() ?? "")
 
                 // Content
                 //.Replace("{{NguoiThamGia}}", nguoiThamGia.ToString())
@@ -790,7 +797,8 @@ namespace dataproduct.api.Services
                         x.NgaySX.Date == request.NgaySX.Date &&
                         x.Ca == request.Ca &&
                         NormalizeKeyValue(x.Me) == NormalizeKeyValue(row.Me) &&
-                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac));
+                        NormalizeKeyValue(x.Mac) == NormalizeKeyValue(row.Mac) &&
+                        NormalizeKeyValue(x.KichThuoc) == NormalizeKeyValue(row.KichThuoc));
 
                     if (match == null)
                     {
@@ -1007,8 +1015,20 @@ namespace dataproduct.api.Services
                     x.TinhTrangCap2 == 1
                 );
 
-                if (!allCapsApproved)
+                if (!allCapsApproved && tinhTrangChot == 1) // Nếu đang chốt mà chưa duyệt hết thì không cho chốt
                     throw new Exception("Không thể chốt! Vui lòng đảm bảo tất cả cấp đều đã duyệt");
+                // Nếu chốt thì check ở table BM_PheDuyet va update tinh trang xu ly cho cap duyet tuong ung
+                var pheDuyets = await _context.BmPheDuyets
+                   .Where(x => x.PhieuId == idPhieu && x.TinhTrang == 0) // chỉ lấy những phe duyệt đang ở trạng thái đã duyệt
+                   .ToListAsync();
+
+                if (tinhTrangChot == 1 && pheDuyets != null && pheDuyets.Count > 0) // chốt
+                {
+                    foreach (var pheDuyet in pheDuyets)
+                    {
+                        pheDuyet.TinhTrang = 1; // cập nhật thành đã xử lý
+                    }
+                }
 
                 // Bước 5: Khi chốt, cập nhật tình trạng rows = 1
                 foreach (var row in rowsToChot)
@@ -1080,7 +1100,8 @@ namespace dataproduct.api.Services
                 ca: request.Ca,
                 kip: request.Kip,
                 ngaySX: request.NgaySX,
-                idPhieu: request.IdPhieu
+                idPhieu: request.IdPhieu,
+                mayDuc: request.MayDuc
             );
             var data = items.ToList();
 
@@ -1175,6 +1196,7 @@ namespace dataproduct.api.Services
                 rows.Append($@"
                 <tr>
                     <td>{stt}</td>
+                    <td>{t.NgaySX:dd/MM/yyyy}</td>
                     <td>{t.Me}</td>
                     <td>{t.Mac}</td>
                     <td>{t.KichThuoc}</td>
@@ -1355,7 +1377,7 @@ namespace dataproduct.api.Services
             var phieu = await _repoPhieu.GetByIdAsync(phieuId);
             if (phieu == null)
                 throw new Exception("Không tìm thấy phiếu");
-            phieu.Kip = "A"; // Mặc định kíp A nếu chưa có, vì kíp là bắt buộc để xuất
+            // phieu.Kip = "A"; // Mặc định kíp A nếu chưa có, vì kíp là bắt buộc để xuất
             if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue || string.IsNullOrWhiteSpace(phieu.Kip))
                 throw new ArgumentException("Phiếu thiếu thông tin Ngày / Ca / Kíp");
 
@@ -2099,15 +2121,24 @@ namespace dataproduct.api.Services
                 if (phieu == null)
                     throw new ArgumentException($"Không tìm thấy phiếu với ID: {phieuId}");
 
+
+                var phoiNhapKhoData = await _repo.GetPhoiNhapKhoChiTietAsync(
+                            ca: phieu.Ca.Value,
+                            kip: phieu.Kip,
+                            ngaySX: phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue),
+                            idPhieu: phieu.Idphieu,
+                            mayDuc: phieu.MayDuc
+                        );
+
                 // ★ Lấy dữ liệu phôi nhập kho từ phiếu
-                var phoiNhapKhoData = await _context.BM_PhoiNhapKho
-                    .AsNoTracking()
-                    .Where(x => x.IdPhieu == phieuId)
-                    .OrderBy(x => x.NgaySX)
-                    .ThenBy(x => x.Ca)
-                    .ThenBy(x => x.Me)
-                    .ThenBy(x => x.Mac)
-                    .ToListAsync();
+                // var phoiNhapKhoData = await _context.BM_PhoiNhapKho
+                //     .AsNoTracking()
+                //     .Where(x => x.NgaySX.Date == phieu.NgaySX.Value.ToDateTime(TimeOnly.MinValue).Date && x.Ca == phieu.Ca && x.MayDuc == phieu.MayDuc) // Giới hạn dữ liệu theo ngày sản xuất và ca của phiếu
+                //     .OrderBy(x => x.NgaySX)
+                //     .ThenBy(x => x.Ca)
+                //     .ThenBy(x => x.Me)
+                //     .ThenBy(x => x.Mac)
+                //     .ToListAsync();
 
                 if (!phoiNhapKhoData.Any())
                     throw new ArgumentException($"Phiếu {phieuId} không có dữ liệu phôi nhập kho");

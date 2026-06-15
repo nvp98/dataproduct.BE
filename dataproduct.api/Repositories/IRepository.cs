@@ -55,7 +55,7 @@ namespace dataproduct.api.Repositories
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
         Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync();
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request);
-        Task<IEnumerable<string>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
+        Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
     }
     public interface IBMPheDuyetRepository
     {

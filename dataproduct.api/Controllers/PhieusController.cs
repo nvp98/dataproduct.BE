@@ -69,6 +69,25 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        /// <summary>
+        /// Cập nhật chỉ dữ liệu bảng mà không kiểm tra ràng buộc tình trạng phiếu
+        /// Sử dụng cho phép cập nhật khi phiếu ở trạng thái HoanThanh
+        /// </summary>
+        [HttpPut("{id}/update-table-data")]
+        public async Task<IActionResult> UpdateTableDataOnly(Guid id, [FromBody] JsonElement formData)
+        {
+            try
+            {
+                var (phieu, warnings) = await _service.UpdateTableDataOnlyAsync(id, formData);
+                if (phieu == null) return NotFound();
+                return Ok(new { success = true, warnings });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -157,7 +176,7 @@ namespace dataproduct.api.Controllers
                 {
                     success = true,
                     data = soPhieus,
-                    count = soPhieus.Count()
+                    count = soPhieus != null ? soPhieus.Max() : 100
                 });
             }
             catch (Exception ex)
@@ -169,8 +188,25 @@ namespace dataproduct.api.Controllers
         [HttpGet("{id:guid}/export-pdf")]
         public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] List<string>? filters = null)
         {
-            var file = await _service.ExportPdfDynamicAsync(id, filters);
-            return File(file.Content, file.ContentType, file.FileName);
+            try
+            {
+                var file = await _service.ExportPdfDynamicAsync(id, filters);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (NotSupportedException ex) { return StatusCode(501, ex.Message); }
+            catch (Exception ex)             { return StatusCode(500, ex.Message); }
+        }
+
+        [HttpGet("{id:guid}/export-excel-detail")]
+        public async Task<IActionResult> ExportExcelDetail(Guid id)
+        {
+            try
+            {
+                var file = await _service.ExportDetailExcelDynamicAsync(id);
+                return File(file.Content, file.ContentType, file.FileName);
+            }
+            catch (NotSupportedException ex) { return StatusCode(501, ex.Message); }
+            catch (Exception ex)             { return StatusCode(500, ex.Message); }
         }
 
         [HttpGet("export-excel-tonghop")]
@@ -220,6 +256,24 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpPost("check-nhieu-phieu")]
+        public async Task<IActionResult> CheckNhieuPhieu([FromBody] CheckNhieuPhieuRequest request)
+        {
+            try
+            {
+                await _service.CheckNhieuPhieuAsync(request.IdPhieus, request.IsCheck);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpGet("hrc2-std-nxt/status")]
         public async Task<IActionResult> GetStatusHRC2StdNxt([FromQuery] DateOnly ngaySX, [FromQuery] int ca)
         {
@@ -252,24 +306,63 @@ namespace dataproduct.api.Controllers
         }
     }
 
+        /// <summary>
+        /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)
+        /// Sử dụng khi cần đưa phiếu trở lại trạng thái chỉnh sửa
+        /// </summary>
+        [HttpPut("{id}/reset")]
+        public async Task<IActionResult> ResetPhieu(Guid id)
+        {
+            try
+            {
+                var result = await _service.ResetPhieuAsync(id);
+                if (result == null)
+                    return NotFound(new { success = false, message = "Không tìm thấy phiếu" });
 
-    public class ChangeStatusRequest
-    {
-        public int Status { get; set; }
-        public int? IdUser { get; set; }
-    }
-
-    public class UpdatePhieuStatusRequest
-    {
-        public int? Status { get; set; }
-        public int? IsLock { get; set; }
-        public int? IsDelete { get; set; }
-    }
-
-    public class ChotNhieuPhieuRequest
-    {
-        public List<Guid> IdPhieus { get; set; } = new();
-        public int? IdUser { get; set; }
-        public int Status { get; set; }
+                return Ok(new
+                {
+                    success = true,
+                    message = "Reset phiếu thành công",
+                    data = result,
+                    tinhTrang = result.TinhTrang
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = ex.Message });
+            }
+        }
     }
 }
+
+
+public class ChangeStatusRequest
+{
+    public int Status { get; set; }
+    public int? IdUser { get; set; }
+}
+
+public class UpdatePhieuStatusRequest
+{
+    public int? Status { get; set; }
+    public int? IsLock { get; set; }
+    public int? IsDelete { get; set; }
+}
+
+public class ChotNhieuPhieuRequest
+{
+    public List<Guid> IdPhieus { get; set; } = new();
+    public int? IdUser { get; set; }
+    public int Status { get; set; }
+}
+
+public class CheckNhieuPhieuRequest
+{
+    public List<Guid> IdPhieus { get; set; } = new();
+    public int IsCheck { get; set; }
+}
+

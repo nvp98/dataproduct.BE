@@ -615,7 +615,7 @@ namespace dataproduct.api.Services
                 var dateStr = $"Từ ngày: {fromDate:dd/MM/yyyy} đến ngày: {toDate:dd/MM/yyyy}";
                 worksheet.Cell("A5").Value = dateStr;
 
-                int row = 10; // Dữ liệu bắt đầu từ dòng 9 (dòng 8 là header)
+                int row = 9; // Dữ liệu bắt đầu từ dòng 9 (dòng 8 là header)
                 int stt = 1;
 
                 foreach (var item in data)
@@ -629,7 +629,7 @@ namespace dataproduct.api.Services
                     worksheet.Cell(row, 6).Value = item.CaXL;
                     worksheet.Cell(row, 7).Value = item.KipXL;
                     worksheet.Cell(row, 8).Value = item.LenhSanXuat;
-                    worksheet.Cell(row, 9).Value = item.MayDuc;
+                    worksheet.Cell(row, 9).Value = "Cán " + item.MayDuc;
 
                     // Thông tin sản phẩm đầu vào
                     worksheet.Cell(row, 10).Value = item.InSanPham;
@@ -664,6 +664,10 @@ namespace dataproduct.api.Services
 
                     row++;
                 }
+                // thêm border format cho toàn bộ vùng dữ liệu
+                var dataRange = worksheet.Range(10, 1, row - 1, 28);
+                dataRange.Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+                dataRange.Style.Border.SetInsideBorder(XLBorderStyleValues.Thin);
 
                 // Lưu vào memory stream
                 var ms = new MemoryStream();

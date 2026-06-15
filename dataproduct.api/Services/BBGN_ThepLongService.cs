@@ -319,6 +319,13 @@ namespace dataproduct.api.Services
             return await ExecuteGetMeThoiAsync("usp_GetMeThoi_ByNgayCaNhaMay", request.NgaySX, request.Ca, request.NhaMay);
         }
 
+        public async Task<List<string>> FetchMeThoiHRC1Async(HRC1_FetchMeThoiRequest request)
+        {
+            return await ExecuteGetMeThoiAsync(
+                "usp_GetMeThoi_ByNgayCaLoThoi",
+                request.NgaySX, request.Ca, nhaMay: 1, idLoThoi: request.IdLoThoi);
+        }
+
         public async Task<List<string>> SearchMeThoi(int nhaMay, string? searchStr, List<int>? ID_LoThois)
         {
             List<int> toHopLoThoi;
@@ -1038,7 +1045,8 @@ namespace dataproduct.api.Services
             string procedureName,
             DateOnly ngaySX,
             int ca,
-            int nhaMay)
+            int nhaMay,
+            int? idLoThoi = null)
         {
             var result = new List<string>();
 
@@ -1054,6 +1062,8 @@ namespace dataproduct.api.Services
                 command.Parameters.Add("@Ngay", SqlDbType.Date).Value = ngaySX.ToDateTime(TimeOnly.MinValue);
                 command.Parameters.Add("@Ca", SqlDbType.Int).Value = ca;
                 command.Parameters.Add("@NhaMay", SqlDbType.Int).Value = nhaMay;
+                if (idLoThoi.HasValue)
+                    command.Parameters.Add("@ID_LoThoi", SqlDbType.Int).Value = idLoThoi.Value;
 
                 await using var reader = await command.ExecuteReaderAsync();
 

@@ -4,9 +4,11 @@ using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Reflection;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,6 +58,9 @@ builder.Services.Scan(scan => scan
     .AddClasses(c => c.Where(t => t.Name.EndsWith("Exporter")))
         .AsImplementedInterfaces()
         .WithScopedLifetime()
+    .AddClasses(c => c.Where(t => t.Name.EndsWith("Enricher")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime()
 );
 
 
@@ -68,11 +73,41 @@ builder.Services.AddDbContext<ProductDataMasterDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MasterDbConnection")));
 
 builder.Services.AddControllers();
+// Add limit request API
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+
+    // GLOBAL LIMIT
+    options.GlobalLimiter =
+        PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        {
+            var ip = context.Connection
+                .RemoteIpAddress?
+                .ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: ip,
+
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 1000, // 1000 request
+                    Window = TimeSpan.FromMinutes(1),
+
+                    QueueProcessingOrder =
+                        QueueProcessingOrder.OldestFirst,
+
+                    QueueLimit = 0
+                });
+        });
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+// use limit request
+app.UseRateLimiter();
 
 // 🔑 1. STATIC FILES (React build)
 app.UseStaticFiles();

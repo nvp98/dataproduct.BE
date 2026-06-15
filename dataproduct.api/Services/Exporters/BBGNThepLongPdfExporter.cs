@@ -16,8 +16,7 @@ namespace dataproduct.api.Services.Exporters
             if (string.IsNullOrWhiteSpace(maBm))
                 return false;
 
-            return maBm.Equals("HRC1_BBGN_ThepLong", StringComparison.OrdinalIgnoreCase)
-                || maBm.Equals("HRC2_BBGN_ThepLong", StringComparison.OrdinalIgnoreCase);
+            return maBm.Equals("HRC2_BBGN_ThepLong", StringComparison.OrdinalIgnoreCase);
         }
 
         public Task<ExportFileResult> ExportPdfAsync(Guid phieuId)

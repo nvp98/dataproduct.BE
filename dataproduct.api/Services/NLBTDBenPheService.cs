@@ -426,7 +426,7 @@ namespace dataproduct.api.Services
 
             var phieuQuery = _context.BmPhieus
                 .AsNoTracking()
-                .Where(x => x.IsDelete != 1 && maBmList.Contains(x.MaBm));
+                .Where(x => x.IsDelete != 1 && x.IsLock != 1 && maBmList.Contains(x.MaBm));
 
             if (fromDate.HasValue)
                 phieuQuery = phieuQuery.Where(x => x.NgaySX >= fromDate.Value);

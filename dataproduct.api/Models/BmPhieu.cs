@@ -43,4 +43,5 @@ public partial class BmPhieu
     public int? VersionClone { get; set; }
     public Guid? ID_PhieuGoc { get; set; }
     public string? TenScope { get; set; }
+    public int? IsCheck { get; set; }
 }

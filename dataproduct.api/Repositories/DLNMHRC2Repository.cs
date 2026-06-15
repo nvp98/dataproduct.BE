@@ -291,7 +291,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkMe)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkMe.ThuTu_Excel_BOF : hkMe.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -572,7 +574,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGiaTotal = 0,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkRN)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkRN.ThuTu_Excel_BOF : hkRN.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 // Sum KLPhuGia
@@ -859,7 +863,9 @@ namespace dataproduct.api.Repositories
                                         KLPhuGia_Manual = phuLieuItem.KLPhuGia_Manual,
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
-                                        ThuTu = null
+                                        ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkId)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkId.ThuTu_Excel_BOF : hkId.ThuTu_Excel_LFRH)
+                                            : null
                                     };
                                 }
                                 else if (phuLieuItem.IsManual == true)
@@ -1254,6 +1260,77 @@ namespace dataproduct.api.Repositories
         /// Gọi stored procedure sp_GetHRC2GroupedByMaterial_Test để lấy dữ liệu phụ liệu theo ngày/ca.
         /// Sau đó map với Header_Mapping & Header_Key để quy đổi về HeaderKey và gộp những phụ liệu cùng HeaderKey.
         /// </summary>
+        //public async Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca)
+        //{
+        //    var raw = await _context.STD_NXT_Filters
+        //        .FromSqlRaw(
+        //            "EXEC sp_GetHRC2GroupedByMaterial @WorkDate, @Shift",
+        //            new SqlParameter("@WorkDate", ngaySX.Date),
+        //            new SqlParameter("@Shift", ca)
+        //        )
+        //        .ToListAsync();
+
+        //    if (!raw.Any())
+        //        return Enumerable.Empty<FilterSTD_NXTResponse>();
+
+        //    // Mapping
+        //    var phuLieuIds = raw.Select(x => (int)x.ID_PhuLieu).Distinct().ToList();
+
+        //    var mappings = await _context.Header_Mappings
+        //        .Where(m => phuLieuIds.Contains(m.ID_PhuLieu))
+        //        .ToListAsync();
+
+        //    var headerKeys = await _context.Header_Keys
+        //        .Where(h => mappings.Select(m => m.ID_HeaderKey).Contains(h.Id))
+        //        .ToListAsync();
+
+        //    var mapped = raw.Select(r =>
+        //    {
+        //        var map = mappings.FirstOrDefault(m => m.ID_PhuLieu == (int)r.ID_PhuLieu);
+        //        var hk = headerKeys.FirstOrDefault(h => h.Id == map?.ID_HeaderKey);
+
+        //        return new
+        //        {
+        //            Raw = r,
+        //            HeaderKeyId = map?.ID_HeaderKey,
+        //            HeaderKeyName = hk?.TenHienThi
+        //        };
+        //    });
+
+        //    // 🔥 GROUP ĐÚNG THEO TỔ HỢP
+        //    var grouped = mapped.GroupBy(x => new
+        //    {
+        //        x.Raw.BieuMau,
+        //        x.Raw.Scope,
+        //        Key = x.HeaderKeyId.HasValue
+        //            ? $"HK_{x.HeaderKeyId}"
+        //            : $"PL_{x.Raw.ID_PhuLieu}"
+        //    });
+
+        //    var result = grouped.Select(g =>
+        //    {
+        //        var first = g.First();
+
+        //        return new FilterSTD_NXTResponse
+        //        {
+        //            BieuMau = first.Raw.BieuMau,
+        //            Scope = (int)first.Raw.Scope,
+        //            HeaderKeyId = first.HeaderKeyId,
+        //            HeaderKeyName = first.HeaderKeyName,
+        //            TotalKLPhuGia = g.Sum(x => x.Raw.TotalKLPhuGia),
+        //            PhuLieus = g
+        //                .GroupBy(x => (int)x.Raw.ID_PhuLieu)
+        //                .Select(pl => new PhuLieuNM
+        //                {
+        //                    ID_PhuLieu = pl.Key,
+        //                    TenPhuLieu = pl.First().Raw.TenPhuLieu
+        //                })
+        //                .ToList()
+        //        };
+        //    }).ToList();
+
+        //    return result;
+        //}
         public async Task<IEnumerable<FilterSTD_NXTResponse>> GetHRC2GroupedByMaterialAsync(DateTime ngaySX, int ca)
         {
             var raw = await _context.STD_NXT_Filters
@@ -1267,62 +1344,59 @@ namespace dataproduct.api.Repositories
             if (!raw.Any())
                 return Enumerable.Empty<FilterSTD_NXTResponse>();
 
-            // Mapping
-            var phuLieuIds = raw.Select(x => (int)x.ID_PhuLieu).Distinct().ToList();
-
-            var mappings = await _context.Header_Mappings
-                .Where(m => phuLieuIds.Contains(m.ID_PhuLieu))
-                .ToListAsync();
-
-            var headerKeys = await _context.Header_Keys
-                .Where(h => mappings.Select(m => m.ID_HeaderKey).Contains(h.Id))
-                .ToListAsync();
-
-            var mapped = raw.Select(r =>
+            // SP đã trả về ID_HeaderKey, TenPhuLieu (fallback TenHienThi), TotalKLPhuGia
+            // Group theo BieuMau + Scope + ID_HeaderKey
+            var grouped = raw.GroupBy(x => new
             {
-                var map = mappings.FirstOrDefault(m => m.ID_PhuLieu == (int)r.ID_PhuLieu);
-                var hk = headerKeys.FirstOrDefault(h => h.Id == map?.ID_HeaderKey);
-
-                return new
-                {
-                    Raw = r,
-                    HeaderKeyId = map?.ID_HeaderKey,
-                    HeaderKeyName = hk?.TenHienThi
-                };
+                x.BieuMau,
+                x.Scope,
+                x.ID_HeaderKey
             });
 
-            // 🔥 GROUP ĐÚNG THEO TỔ HỢP
-            var grouped = mapped.GroupBy(x => new
-            {
-                x.Raw.BieuMau,
-                x.Raw.Scope,
-                Key = x.HeaderKeyId.HasValue
-                    ? $"HK_{x.HeaderKeyId}"
-                    : $"PL_{x.Raw.ID_PhuLieu}"
-            });
+            //var result = grouped.Select(g =>
+            //{
+            //    var first = g.First();
 
+            //    return new FilterSTD_NXTResponse
+            //    {
+            //        BieuMau = first.BieuMau,
+            //        Scope = (int)first.Scope,
+            //        HeaderKeyId = first.ID_HeaderKey,
+            //        HeaderKeyName = first.TenPhuLieu,  // SP đã fallback về TenHienThi nếu IsAddManual
+            //        TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia),
+            //        PhuLieus = g
+            //            .Where(x => (int)x.ID_PhuLieu > 0)  // bỏ dòng IsAddManual không có PhuLieu thật
+            //            .GroupBy(x => (int)x.ID_PhuLieu)
+            //            .Select(pl => new PhuLieuNM
+            //            {
+            //                ID_PhuLieu = pl.Key,
+            //                TenPhuLieu = pl.First().TenPhuLieu
+            //            })
+            //            .ToList()
+            //    };
+            //}).ToList();
             var result = grouped.Select(g =>
             {
                 var first = g.First();
 
                 return new FilterSTD_NXTResponse
                 {
-                    BieuMau = first.Raw.BieuMau,
-                    Scope = (int)first.Raw.Scope,
-                    HeaderKeyId = first.HeaderKeyId,
-                    HeaderKeyName = first.HeaderKeyName,
-                    TotalKLPhuGia = g.Sum(x => x.Raw.TotalKLPhuGia),
+                    BieuMau = first.BieuMau ?? "",
+                    Scope = first.Scope ?? 0,
+                    HeaderKeyId = first.ID_HeaderKey,
+                    HeaderKeyName = first.TenPhuLieu ?? "",
+                    TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia ?? 0),
                     PhuLieus = g
-                        .GroupBy(x => (int)x.Raw.ID_PhuLieu)
+                        .Where(x => (x.ID_PhuLieu ?? 0) > 0)
+                        .GroupBy(x => x.ID_PhuLieu ?? 0)
                         .Select(pl => new PhuLieuNM
                         {
                             ID_PhuLieu = pl.Key,
-                            TenPhuLieu = pl.First().Raw.TenPhuLieu
+                            TenPhuLieu = pl.First().TenPhuLieu ?? ""
                         })
                         .ToList()
                 };
             }).ToList();
-
             return result;
         }
 
