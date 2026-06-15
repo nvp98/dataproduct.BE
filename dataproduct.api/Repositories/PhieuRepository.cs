@@ -1,9 +1,11 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Utils;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -16,12 +18,14 @@ namespace dataproduct.api.Repositories
         private readonly ProductFormContext _context;
         private readonly PheDuyetService _pdservice;
         private readonly IPheDuyetRepository _pheDuyetRepo;
+        private readonly ProductDataMasterDbContext _mastercontext;
 
-        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo, ProductDataMasterDbContext mastercontext)
         {
             _context = context;
-            _pdservice = pdservice;
+            _pdservice = pdservice; 
             _pheDuyetRepo = pheDuyetRepo;
+            _mastercontext = mastercontext;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -562,6 +566,10 @@ namespace dataproduct.api.Repositories
             return (result, totalCount);
         }
 
+        public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()
+        {
+            return await _mastercontext.Tbl_LoCao.AsNoTracking().ToListAsync();
+        }
         public async Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca)
         {
             var query = _context.BmPhieus

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Nhật ký vận hành phun than lò cao</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 8mm 10mm;
+    }
+
+    body {
+      font-family: "Times New Roman", serif;
+      font-size: 8pt;
+      color: #000;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ─── HEADER ─────────────────────────────────────────── */
+    .header {
+      display: table;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+
+    .header-left,
+    .header-right {
+      display: table-cell;
+      vertical-align: top;
+    }
+
+    .header-left {
+      width: 60%;
+    }
+
+    .header-left img {
+      height: 36px;
+      margin-bottom: 2px;
+    }
+
+    .header-left .company {
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 8pt;
+      line-height: 1.4;
+    }
+
+    .header-right {
+      width: 40%;
+      text-align: right;
+      font-size: 8pt;
+      line-height: 1.5;
+    }
+
+    /* ─── TITLE ──────────────────────────────────────────── */
+    .title {
+      text-align: center;
+      font-size: 12pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin: 3px 0 2px 0;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-style: italic;
+      font-size: 8pt;
+      margin-bottom: 4px;
+    }
+
+    /* ─── MAIN TABLE ─────────────────────────────────────── */
+    table.main-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.main-tbl col.c-thoi-gian   { width: 3.2%; }
+    table.main-tbl col.c-sub         { width: 2.9%; }
+    table.main-tbl col.c-num         { width: 3.3%; }
+    table.main-tbl col.c-ghi-chu     { width: 5%;   }
+
+    table.main-tbl th,
+    table.main-tbl td {
+      border: 1px solid #000;
+      padding: 1px 2px;
+      font-size: 6.5pt;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+
+    table.main-tbl thead th {
+      background-color: #dce6f1;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+
+    table.main-tbl tbody td {
+      height: 12px;
+    }
+
+    table.main-tbl tbody td.td-left {
+      text-align: left;
+      padding-left: 2px;
+    }
+
+    /* ─── FOOTER ─────────────────────────────────────────── */
+    .footer-wrap {
+      margin-top: 4px;
+      display: table;
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .footer-left,
+    .footer-mid,
+    .footer-right {
+      display: table-cell;
+      vertical-align: top;
+      padding: 0 4px 0 0;
+    }
+
+    .footer-left  { width: 28%; }
+    .footer-mid   { width: 36%; }
+    .footer-right { width: 36%; }
+
+    .footer-section-title {
+      font-weight: bold;
+      font-size: 7.5pt;
+      margin-bottom: 2px;
+    }
+
+    .footer-section-text {
+      font-size: 7pt;
+      white-space: pre-wrap;
+      min-height: 24px;
+    }
+
+    table.sl-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7pt;
+    }
+
+    table.sl-tbl td {
+      border: 1px solid #000;
+      padding: 1px 3px;
+      vertical-align: middle;
+    }
+
+    table.sl-tbl td.label {
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .sap-xep-row {
+      margin-top: 4px;
+      font-size: 7.5pt;
+    }
+
+    /* ─── SIGNATURE ──────────────────────────────────────── */
+    table.sign-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    table.sign-table,
+    table.sign-table td {
+      border: none !important;
+    }
+
+    table.sign-table td {
+      text-align: center;
+      vertical-align: top;
+      padding: 0 6px;
+    }
+
+    .sign-title {
+      font-weight: bold;
+      font-size: 8pt;
+    }
+
+    .sign-note {
+      font-style: italic;
+      font-size: 7pt;
+    }
+
+    .sign-image {
+      height: 48px;
+      vertical-align: middle;
+    }
+
+    .sign-image img {
+      max-height: 44px;
+      max-width: 120px;
+    }
+
+    .sign-name {
+      font-size: 8pt;
+      padding-top: 2px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══ HEADER ════════════════════════════════════════════ -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{{LogoUrl}}" alt="Logo" /><br />
+      <div class="company">
+        CÔNG TY CỔ PHẦN THÉP<br />
+        HÒA PHÁT DUNG QUẤT
+      </div>
+    </div>
+    <div class="header-right">
+      <b>BM.10/QT.05.09</b><br />
+      <b><i>Ngày hiệu lực:</i> 10/04/2025</b><br />
+      <b><i>Lần sửa đổi:</i> 01</b>
+    </div>
+  </div>
+
+  <!-- ═══ TITLE ═════════════════════════════════════════════ -->
+  <div class="title">NHẬT KÝ VẬN HÀNH PHUN THAN LÒ CAO {{LoCao}}</div>
+  <div class="subtitle">{{NgaySX}}</div>
+
+  <!-- ═══ MAIN TABLE ════════════════════════════════════════ -->
+  <!--
+    29 leaf-columns:
+    1  : thoiGian
+    2-3: nhietDoSiloBotThan 1#, 2#
+    4-6: nhietDoBonPhunThoi 1#, 2#, 3#
+    7  : dongDienMayNghien
+    8  : dongDienQuatGioNguoc
+    9  : nhietDoDauVaoMayNghien
+    10 : nhietDoDauRaMayNghien
+    11 : nhietDoKhoangLo
+    12-13: mucLieuSiloBotThan 1#, 2#
+    14 : mucLieuSiloThanTho
+    15-17: trongLuongBonPhunThoi 1#, 2#, 3#
+    18 : apLucKhiThan
+    19 : apLucBonKhiN2
+    20 : nhietDoTramDauBoiTron
+    21 : nhietDoStatoDongCoMayNghien
+    22 : nhietDoTrucDongCoMayNghien
+    23 : apLucTrucNghien
+    24 : yeuCauTuLoCao
+    25 : luongThanPhunThucTe
+    26 : luyKeLuongPhunThanTrongCa
+    27 : soLuongSungPhun
+    28 : apLucGioLanhLoCao
+    29 : ghiChu
+  -->
+  <table class="main-tbl">
+    <colgroup>
+      <col class="c-thoi-gian" /><!-- 1 thoiGian -->
+      <col class="c-sub" /><col class="c-sub" /><!-- 2-3 silo -->
+      <col class="c-sub" /><col class="c-sub" /><col class="c-sub" /><!-- 4-6 bon -->
+      <col class="c-num" /><!-- 7 dongDienMayNghien -->
+      <col class="c-num" /><!-- 8 dongDienQuatGio -->
+      <col class="c-num" /><!-- 9 nhietDoDauVao -->
+      <col class="c-num" /><!-- 10 nhietDoDauRa -->
+      <col class="c-num" /><!-- 11 nhietDoKhoangLo -->
+      <col class="c-sub" /><col class="c-sub" /><!-- 12-13 mucLieu silo -->
+      <col class="c-num" /><!-- 14 mucLieuThanTho -->
+      <col class="c-sub" /><col class="c-sub" /><col class="c-sub" /><!-- 15-17 trongLuong -->
+      <col class="c-num" /><!-- 18 apLucKhiThan -->
+      <col class="c-num" /><!-- 19 apLucBonKhiN2 -->
+      <col class="c-num" /><!-- 20 nhietDoTramDau -->
+      <col class="c-num" /><!-- 21 nhietDoStato -->
+      <col class="c-num" /><!-- 22 nhietDoTrucDongCo -->
+      <col class="c-num" /><!-- 23 apLucTrucNghien -->
+      <col class="c-num" /><!-- 24 yeuCauTuLoCao -->
+      <col class="c-num" /><!-- 25 luongThanPhun -->
+      <col class="c-num" /><!-- 26 luyKe -->
+      <col class="c-num" /><!-- 27 soLuongSungPhun -->
+      <col class="c-num" /><!-- 28 apLucGioLanh -->
+      <col class="c-ghi-chu" /><!-- 29 ghiChu -->
+    </colgroup>
+
+    <thead>
+      <!-- Hàng tiêu đề cấp 1 -->
+      <tr>
+        <th rowspan="2">Thời<br />gian</th>
+        <th colspan="2">Nhiệt độ<br />Silo bột than<br />(°C)</th>
+        <th colspan="3">Nhiệt độ bồn<br />phun thổi<br />(°C)</th>
+        <th>Dòng điện<br />máy<br />nghiền</th>
+        <th>Dòng điện<br />quạt gió<br />thổi ngược</th>
+        <th>Nhiệt độ<br />đầu vào<br />máy nghiền</th>
+        <th>Nhiệt độ<br />đầu ra<br />máy nghiền</th>
+        <th>Nhiệt độ<br />khoang lò</th>
+        <th colspan="2">Mức liệu<br />silo bột than</th>
+        <th>Mức liệu<br />silo than thô</th>
+        <th colspan="3">Trọng lượng<br />bồn phun thổi<br />(t)</th>
+        <th>Áp lực<br />khí than</th>
+        <th>Áp lực<br />bồn khí N₂</th>
+        <th>Nhiệt độ<br />trạm dầu<br />bôi trơn</th>
+        <th>Nhiệt độ<br />stato động cơ<br />máy nghiền</th>
+        <th>Nhiệt độ ổ<br />trục động cơ<br />máy nghiền</th>
+        <th>Áp lực<br />trục nghiền</th>
+        <th>Yêu cầu<br />từ lò cao</th>
+        <th>Lượng than<br />phun thực tế</th>
+        <th>Lũy kế lượng<br />phun than<br />trong ca</th>
+        <th>Số lượng<br />súng phun</th>
+        <th>Áp lực gió<br />lạnh lò cao</th>
+        <th rowspan="2">Ghi<br />chú</th>
+      </tr>
+      <!-- Hàng tiêu đề cấp 2: sub-index và đơn vị -->
+      <tr>
+        <!-- thoiGian: rowspan đã xử lý -->
+        <th>1#</th><th>2#</th>
+        <th>1#</th><th>2#</th><th>3#</th>
+        <th>A</th>
+        <th>A</th>
+        <th>°C</th><th>°C</th><th>°C</th>
+        <th>1#</th><th>2#</th>
+        <th>m</th>
+        <th>1#</th><th>2#</th><th>3#</th>
+        <th>Kpa</th><th>Kpa</th>
+        <th>°C</th><th>°C</th><th>°C</th>
+        <th>Mpa</th>
+        <th>t/h</th><th>t/h</th>
+        <th>t</th>
+        <th>cái</th>
+        <th>Kpa</th>
+        <!-- ghiChu: rowspan đã xử lý -->
+      </tr>
+    </thead>
+
+    <tbody>
+      {{DataRows}}
+    </tbody>
+  </table>
+
+  <!-- ═══ FOOTER: Tình hình sản lượng + Tình trạng sản xuất ══ -->
+  <div class="footer-wrap">
+    <!-- Cột trái: Tình hình sản lượng -->
+    <div class="footer-left">
+      <div class="footer-section-title">Tình hình sản lượng</div>
+      <table class="sl-tbl">
+        <tr>
+          <td class="label">Kíp</td>
+          <td>{{Kip1}}</td>
+          <td>{{Kip2}}</td>
+          <td>{{Kip3}}</td>
+          <td class="label">Tổng</td>
+          <td>{{Tong}}</td>
+        </tr>
+        <tr>
+          <td class="label">SL nghiền (t)</td>
+          <td colspan="5">{{SanLuongNghien}}</td>
+        </tr>
+        <tr>
+          <td class="label">SL phun (t)</td>
+          <td colspan="5">{{SanLuongPhun}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Cột giữa: Tình trạng sản xuất ca ngày -->
+    <div class="footer-mid">
+      <div class="footer-section-title">1- Tình trạng sản xuất từ 8h00-20h00</div>
+      <div class="footer-section-text">{{TinhTrangSanXuatNgay}}</div>
+    </div>
+
+    <!-- Cột phải: Tình trạng sản xuất ca đêm -->
+    <div class="footer-right">
+      <div class="footer-section-title">2- Tình trạng sản xuất từ 20h00-8h00</div>
+      <div class="footer-section-text">{{TinhTrangSanXuatDem}}</div>
+    </div>
+  </div>
+
+  <!-- Sắp xếp sản xuất -->
+  <div class="sap-xep-row">
+    <b>Sắp xếp sản xuất:</b>&nbsp;&nbsp;{{SapXepSanXuat}}
+  </div>
+
+  <!-- ═══ SIGNATURES ════════════════════════════════════════ -->
+  <table class="sign-table">
+    <tr>
+      <td style="width:50%;">
+        <div class="sign-title">NV vận hành ca ngày</div>
+        <div class="sign-note">(Ký, ghi rõ họ tên)</div>
+      </td>
+      <td style="width:50%;">
+        <div class="sign-title">NV vận hành ca đêm</div>
+        <div class="sign-note">(Ký, ghi rõ họ tên)</div>
+      </td>
+    </tr>
+    <tr>
+      <td class="sign-image">{{Sign_NVVanHanhCaNgay}}</td>
+      <td class="sign-image">{{Sign_NVVanHanhCaDem}}</td>
+    </tr>
+    <tr>
+      <td class="sign-name">{{Ten_NVVanHanhCaNgay}}</td>
+      <td class="sign-name">{{Ten_NVVanHanhCaDem}}</td>
+    </tr>
+  </table>
+
+</body>
+</html>

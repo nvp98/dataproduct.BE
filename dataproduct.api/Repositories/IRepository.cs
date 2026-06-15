@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
+using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
@@ -52,6 +53,7 @@ namespace dataproduct.api.Repositories
 
         Task<bool> CheckExistsAsync(string maBm, DateOnly ngaySX, int ca, int? scope, int? mayduc);
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingAsync(SearchPhieuRequest request);
+        Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync();
         Task<(IEnumerable<SearchPhieuResponseModel> Data, int TotalCount)> SearchWithPagingByUserAsync(SearchPhieuByUserRequest request);
         Task<IEnumerable<int?>> GetSoPhieuAsync(string maBm, DateOnly? ngaySX, int? ca);
     }
@@ -272,6 +274,123 @@ namespace dataproduct.api.Repositories
             int nhaMay,
             string? bieuMau
         );
+
+        /*============= NMLG==================*/
+
+    }
+
+    // ─── LG_TSL: SiLo, NVL, Mapping (Tồn Silo Lò Cao) ──────────────────────────
+    public interface ILGTSLRepository
+    {
+        // SiLo
+        Task<List<LGTSSiLoDto>> GetSiLoListAsync(int? idLoCao);
+        Task<LG_TSL_SiLo?> GetSiLoByIdAsync(int id);
+        Task<LG_TSL_SiLo> AddSiLoAsync(LG_TSL_SiLo entity);
+        Task<LG_TSL_SiLo?> UpdateSiLoAsync(int id, LG_TSL_SiLo entity);
+        Task<bool> DeleteSiLoAsync(int id);
+
+        // NVL
+        Task<List<LGTSNvlDto>> GetNvlListAsync(int? idLoCao);
+        Task<LG_TSL_NVL?> GetNvlByIdAsync(int id);
+        Task<LG_TSL_NVL> AddNvlAsync(LG_TSL_NVL entity);
+        Task<LG_TSL_NVL?> UpdateNvlAsync(int id, LG_TSL_NVL entity);
+        Task<bool> DeleteNvlAsync(int id);
+        Task<bool> UpdateXacNhanAsync(int id, bool xacNhan);
+
+        // Mapping
+        Task<List<LGTSMappingDto>> GetMappingListAsync(int? idLoCao, DateTime? ngay, int? ca);
+        Task<LG_TSL_SiLo_Mapping?> GetMappingByIdAsync(int id);
+        Task<LG_TSL_SiLo_Mapping?> GetExistingMappingAsync(int thuTuCoDinh, int idLoCao, DateTime ngay, int ca);
+        Task<LG_TSL_SiLo_Mapping> AddMappingAsync(LG_TSL_SiLo_Mapping entity);
+        Task<LG_TSL_SiLo_Mapping?> UpdateMappingAsync(int id, LG_TSL_SiLo_Mapping entity);
+        Task<bool> DeleteMappingAsync(int id);
+
+        // Lấy ThuTuCoDinh của silo theo ID + IDLoCao (dùng để lưu ThuTuCoDinh vào IDSiLo của Mapping)
+        Task<int?> GetSiLoThuTuCoDinhAsync(int siloId, int idLoCao);
+
+        // View: SiLo + NVL theo Ngày/Ca/LoCao (dùng tạo phiếu tồn silo)
+        Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao, DateTime? ngay, int? ca);
+
+        // Chi tiết tồn silo theo phiếu
+        Task DeleteByPhieuIdAsync(Guid idPhieu);
+        Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto);
+        Task<List<LGTSChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+
+        // Lấy thông tin phiếu (để export PDF)
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
+    }
+
+    public interface ILGPTLCRepository
+    {
+        Task<List<LG_NKVHPT_DuLieuAuto>> GetAutoDataAsync(int idLoCao, DateTime ngayVanHanh, Guid? idPhieu = null);
+        Task<List<LGPTLCChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+        Task DeleteChiTietByPhieuAsync(Guid idPhieu);
+        Task AddChiTietRangeAsync(List<LG_NKVHPT_ChiTiet> entities);
+        Task UpdateManualValuesAsync(UpdateLGPTLCManualDto dto);
+        Task UpdatePhieuSummaryAsync(Guid idPhieu, UpdateLGPTLCSummaryDto dto);
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
+    }
+
+    public interface ILGNLRepository
+    {
+        // TS Mapping lookup
+        Task<List<LGNLTsMappingDto>> GetTsMappingListAsync();
+
+        Task<List<LG1_DuLieuNL>> GetDuLieuRawAsync(
+            IEnumerable<string> tagKeys, int idLoCao, DateTime timeFrom, DateTime timeTo);
+
+        // SiLo Master
+        Task<List<LG_NL_SiLo>> GetSiLoMasterListAsync(int? idLoCao);
+        Task<LG_NL_SiLo?> GetSiLoMasterByIdAsync(int id);
+        Task<LG_NL_SiLo> AddSiLoMasterAsync(LG_NL_SiLo entity);
+        Task<LG_NL_SiLo?> UpdateSiLoMasterAsync(int id, LG_NL_SiLo entity);
+        Task<bool> DeleteSiLoMasterAsync(int id);
+
+        // Mapping
+        Task<List<LGNLMappingDto>> GetMappingListAsync(DateTime? ngay, int? idCa, int? idLoCao);
+        Task<LG_NL_Mapping?> GetMappingByIdAsync(int id);
+        Task<LG_NL_Mapping> AddMappingAsync(LG_NL_Mapping entity);
+        Task<LG_NL_Mapping?> UpdateMappingAsync(int id, LG_NL_Mapping entity);
+        Task<bool> DeleteMappingAsync(int id);
+
+        // Nhóm NVL
+        Task<List<LG_NL_NhomNVL>> GetNhomNvlListAsync(int? idLoCao);
+        Task<LG_NL_NhomNVL?> GetNhomNvlByIdAsync(int id);
+        Task<LG_NL_NhomNVL> AddNhomNvlAsync(LG_NL_NhomNVL entity);
+        Task<LG_NL_NhomNVL?> UpdateNhomNvlAsync(int id, LG_NL_NhomNVL entity);
+        Task<bool> DeleteNhomNvlAsync(int id);
+
+        // NVL
+        Task<List<LGNLNvlDto>> GetNvlListAsync(int? idLoCao);
+        Task<LG_NL_NVL?> GetNvlByIdAsync(int id);
+        Task<LG_NL_NVL> AddNvlAsync(LG_NL_NVL entity);
+        Task<LG_NL_NVL?> UpdateNvlAsync(int id, LG_NL_NVL entity);
+        Task<bool> DeleteNvlAsync(int id);
+
+        // Dữ liệu SCADA filtered by LoCao, Ngày
+        Task<List<LGNLDuLieuScadaDto>> GetDataByFilterAsync(
+            int? idLoCao, DateTime? ngayBatDau, DateTime? ngayKetThuc);
+
+        // Pivot dữ liệu nạp liệu theo Silo mapping (ngày/ca/lò cao) — LO 1-4
+        Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(
+            DateTime ngay, int idCa, int idLoCao);
+
+        // Đổi NVL cho một silo tại thời điểm cụ thể trong ca (giữ data cũ đúng NVL)
+        Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
+            int idLoCao, DateTime ngay, int idCa, int idSiLo, int idNVLMoi,
+            DateTime thoiDiem, string? ghiChu);
+
+        // Snapshot trạng thái hiện tại của từng Silo (NVL đang chứa)
+        Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
+            int idLoCao, DateTime ngay, int idCa);
+
+        // Chi tiết nạp liệu theo phiếu
+        Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
+        Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);
+        Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
+
+        // Phiếu
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
     }
 
     public interface IBBGN_ThepLongRepository
