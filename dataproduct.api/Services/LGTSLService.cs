@@ -58,6 +58,7 @@ namespace dataproduct.api.Services
                 ID_LoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu = dto.ThuTu,
+                ThuTuCoDinh = dto.ThuTuCoDinh
             };
             var result = await _repo.AddSiLoAsync(entity);
             return MapSiLo(result);

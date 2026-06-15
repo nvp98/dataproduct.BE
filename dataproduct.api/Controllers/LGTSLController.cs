@@ -38,8 +38,6 @@ namespace dataproduct.api.Controllers
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
-
-        /// <summary>Tải SCADA mới nhất, merge ManualKL, lưu DB, trả mapping view. Gọi khi bấm "Tải dữ liệu" trên phiếu đã tồn tại.</summary>
         [HttpPost("post-sync-chitiet/{idPhieu}")]
         public async Task<IActionResult> SyncChiTiet(Guid idPhieu)
         {

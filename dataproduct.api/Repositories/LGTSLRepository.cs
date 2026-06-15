@@ -195,7 +195,7 @@ namespace dataproduct.api.Repositories
         {
             return await (
                 from m in _context.LG_TSL_SiLo_Mapping
-                // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
+                    // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
                 join s in _context.LG_TSL_SiLo
                     on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
                     equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
@@ -346,17 +346,79 @@ namespace dataproduct.api.Repositories
             ).ToListAsync();
         }
 
-        public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(
-            int? idLoCao,
-            DateTime? ngay,
-            int? ca)
+        //public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(
+        //    int? idLoCao,
+        //    DateTime? ngay,
+        //    int? ca)
+        //{
+        //    var fromDate = ngay?.Date;
+        //    var toDate = fromDate?.AddDays(1);
+
+        //    // SiLoTon được ghi vào ~phút 25-35 của giờ kết ca:
+        //    // Ca 1 (Ngày) kết lúc 19:30 → lấy khoảng 19:25 – 19:35 cùng ngày
+        //    // Ca 2 (Đêm) kết lúc 07:30 → lấy khoảng 07:25 – 07:35 ngày hôm sau
+        //    var tonFrom = ca == 1
+        //        ? fromDate?.AddHours(19).AddMinutes(25)
+        //        : fromDate?.AddDays(1).AddHours(7).AddMinutes(25);
+        //    var tonTo = ca == 1
+        //        ? fromDate?.AddHours(19).AddMinutes(35)
+        //        : fromDate?.AddDays(1).AddHours(7).AddMinutes(35);
+
+        //    // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
+        //    // để lấy đúng TenSiLo từ LG_TSL_SiLo và sắp xếp theo thứ tự vật lý (ThuTu).
+        //    var result = await (
+        //        from m in _context.LG_TSL_SiLo_Mapping.AsNoTracking()
+        //        where
+        //            (idLoCao == null || m.IDLoCao == idLoCao) &&
+        //            (ca == null || m.Ca == ca) &&
+        //            (fromDate == null || (m.Ngay >= fromDate && m.Ngay < toDate))
+
+        //        join s in _context.LG_TSL_SiLo.AsNoTracking()
+        //            on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
+        //            equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
+        //        from s in siloGroup.DefaultIfEmpty()
+
+        //        join nvl in _context.LG_TSL_NVL.AsNoTracking()
+        //            on m.IDNVL equals nvl.ID into nvlGroup
+        //        from nvl in nvlGroup.DefaultIfEmpty()
+
+        //        orderby s != null ? s.ThuTu : m.IDSiLo
+
+        //        select new LGTSSiLoMappingViewDto
+        //        {
+        //            IdMapping = m.ID,
+        //            IdSiLo = m.IDSiLo,
+        //            IdLoCao = m.IDLoCao,
+        //            IdNVL = m.IDNVL,
+        //            TenSiLo = s != null ? s.TenSiLo : null,
+        //            ThuTu = s != null ? s.ThuTu : m.IDSiLo,
+        //            TenNVL = nvl != null
+        //                          ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
+        //                          : null,
+        //            TenNVLTk = nvl != null ? nvl.TenNVL_Tk : null,
+        //            Ngay = m.Ngay,
+        //            Ca = m.Ca,
+        //            GhiChu = m.GhiChu,
+        //            // Lấy bản ghi mới nhất trong khung giờ của ca
+        //            Ton = _context.SiLoTon
+        //                .Where(t =>
+        //                    t.IDSiLo == m.IDSiLo &&
+        //                    t.IdLoCao == m.IDLoCao &&
+        //                    (tonFrom == null || t.Ngay >= tonFrom) &&
+        //                    (tonTo == null || t.Ngay < tonTo))
+        //                .OrderByDescending(t => t.Ngay)
+        //                .Select(t => (decimal?)t.Ton)
+        //                .FirstOrDefault() ?? 0
+        //        }
+        //    ).ToListAsync();
+
+        //    return result;
+        //}
+        public async Task<List<LGTSSiLoMappingViewDto>> GetSiLoByMappingAsync(int? idLoCao,DateTime? ngay,int? ca)
         {
             var fromDate = ngay?.Date;
             var toDate = fromDate?.AddDays(1);
 
-            // SiLoTon được ghi vào ~phút 25-35 của giờ kết ca:
-            // Ca 1 (Ngày) kết lúc 19:30 → lấy khoảng 19:25 – 19:35 cùng ngày
-            // Ca 2 (Đêm) kết lúc 07:30 → lấy khoảng 07:25 – 07:35 ngày hôm sau
             var tonFrom = ca == 1
                 ? fromDate?.AddHours(19).AddMinutes(25)
                 : fromDate?.AddDays(1).AddHours(7).AddMinutes(25);
@@ -364,53 +426,79 @@ namespace dataproduct.api.Repositories
                 ? fromDate?.AddHours(19).AddMinutes(35)
                 : fromDate?.AddDays(1).AddHours(7).AddMinutes(35);
 
-            // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
-            // để lấy đúng TenSiLo từ LG_TSL_SiLo và sắp xếp theo thứ tự vật lý (ThuTu).
-            var result = await (
+            // ✅ Bước 1: Load mapping + join SiLo + NVL (giữ nguyên query này)
+            var mappings = await (
                 from m in _context.LG_TSL_SiLo_Mapping.AsNoTracking()
                 where
                     (idLoCao == null || m.IDLoCao == idLoCao) &&
                     (ca == null || m.Ca == ca) &&
                     (fromDate == null || (m.Ngay >= fromDate && m.Ngay < toDate))
-
                 join s in _context.LG_TSL_SiLo.AsNoTracking()
                     on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
                     equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
-
                 join nvl in _context.LG_TSL_NVL.AsNoTracking()
                     on m.IDNVL equals nvl.ID into nvlGroup
                 from nvl in nvlGroup.DefaultIfEmpty()
-
                 orderby s != null ? s.ThuTu : m.IDSiLo
-
-                select new LGTSSiLoMappingViewDto
+                select new
                 {
-                    IdMapping = m.ID,
-                    IdSiLo = m.IDSiLo,
-                    IdLoCao = m.IDLoCao,
-                    IdNVL = m.IDNVL,
+                    m.ID,
+                    m.IDSiLo,
+                    m.IDLoCao,
+                    m.IDNVL,
+                    m.Ngay,
+                    m.Ca,
+                    m.GhiChu,
                     TenSiLo = s != null ? s.TenSiLo : null,
                     ThuTu = s != null ? s.ThuTu : m.IDSiLo,
                     TenNVL = nvl != null
-                                  ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
-                                  : null,
+                                    ? (nvl.XacNhan && nvl.TenNVL_Tk != null ? nvl.TenNVL_Tk : nvl.TenNVL)
+                                    : null,
                     TenNVLTk = nvl != null ? nvl.TenNVL_Tk : null,
-                    Ngay = m.Ngay,
-                    Ca = m.Ca,
-                    GhiChu = m.GhiChu,
-                    // Lấy bản ghi mới nhất trong khung giờ của ca
-                    Ton = _context.SiLoTon
-                        .Where(t =>
-                            t.IDSiLo == m.IDSiLo &&
-                            t.IdLoCao == m.IDLoCao &&
-                            (tonFrom == null || t.Ngay >= tonFrom) &&
-                            (tonTo == null || t.Ngay < tonTo))
-                        .OrderByDescending(t => t.Ngay)
-                        .Select(t => (decimal?)t.Ton)
-                        .FirstOrDefault() ?? 0
                 }
             ).ToListAsync();
+
+            // ✅ Bước 2: Load TẤT CẢ SiLoTon liên quan trong 1 query duy nhất
+            var siloIds = mappings.Select(m => m.IDSiLo).Distinct().ToList();
+            var loCaoIds = mappings.Select(m => m.IDLoCao).Distinct().ToList();
+
+            var tonQuery = _context.SiLoTon
+                .AsNoTracking()
+                .Where(t => siloIds.Contains(t.IDSiLo) && loCaoIds.Contains(t.IdLoCao));
+
+            if (tonFrom.HasValue) tonQuery = tonQuery.Where(t => t.Ngay >= tonFrom.Value);
+            if (tonTo.HasValue) tonQuery = tonQuery.Where(t => t.Ngay < tonTo.Value);
+
+            // Lấy bản ghi mới nhất cho mỗi (IDSiLo, IdLoCao)
+            var tonLookup = await tonQuery
+                .GroupBy(t => new { t.IDSiLo, t.IdLoCao })
+                .Select(g => new
+                {
+                    g.Key.IDSiLo,
+                    g.Key.IdLoCao,
+                    Ton = g.OrderByDescending(t => t.Ngay).Select(t => (decimal?)t.Ton).FirstOrDefault()
+                })
+                .ToDictionaryAsync(
+                    t => (t.IDSiLo, t.IdLoCao),
+                    t => t.Ton ?? 0m);
+
+            // ✅ Bước 3: Map kết quả — lookup O(1), không có thêm query nào
+            var result = mappings.Select(m => new LGTSSiLoMappingViewDto
+            {
+                IdMapping = m.ID,
+                IdSiLo = m.IDSiLo,
+                IdLoCao = m.IDLoCao,
+                IdNVL = m.IDNVL,
+                TenSiLo = m.TenSiLo,
+                ThuTu = m.ThuTu,
+                TenNVL = m.TenNVL,
+                TenNVLTk = m.TenNVLTk,
+                Ngay = m.Ngay,
+                Ca = m.Ca,
+                GhiChu = m.GhiChu,
+                Ton = tonLookup.TryGetValue((m.IDSiLo, m.IDLoCao), out var ton) ? ton : 0m
+            }).ToList();
 
             return result;
         }
