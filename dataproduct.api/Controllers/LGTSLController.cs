@@ -23,7 +23,7 @@ namespace dataproduct.api.Controllers
 
         // ─── SiLo + NVL view theo Ngày/Ca/LoCao (dùng trong tạo phiếu tồn silo) ──
 
-        [HttpGet("tonsilo-silo-mapping")]
+        [HttpGet("get-tonsilo-silo-mapping")]
         public async Task<IActionResult> GetSiLoByMapping(
             [FromQuery] int? idLoCao,
             [FromQuery] DateTime? ngay,
@@ -40,7 +40,7 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>Tải SCADA mới nhất, merge ManualKL, lưu DB, trả mapping view. Gọi khi bấm "Tải dữ liệu" trên phiếu đã tồn tại.</summary>
-        [HttpPost("sync-chitiet/{idPhieu}")]
+        [HttpPost("post-sync-chitiet/{idPhieu}")]
         public async Task<IActionResult> SyncChiTiet(Guid idPhieu)
         {
             try
@@ -54,14 +54,14 @@ namespace dataproduct.api.Controllers
 
         // ─── SiLo ────────────────────────────────────────────────────────────────
 
-        [HttpGet("tonsilo-silo")]
+        [HttpGet("get-tonsilo-silo")]
         public async Task<IActionResult> GetSiLoList([FromQuery] int? idLoCao)
         {
             try { return Ok(await _service.GetAllSiLoListAsync(idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("tonsilo-silo/{id}")]
+        [HttpGet("get-tonsilo-silo/{id}")]
         public async Task<IActionResult> GetSiLoById(int id)
         {
             try
@@ -72,7 +72,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("tonsilo-silo")]
+        [HttpPost("post-tonsilo-silo")]
         public async Task<IActionResult> CreateSiLo([FromBody] CreateLGTSSiLoDto dto)
         {
             try
@@ -83,7 +83,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("tonsilo-silo/{id}")]
+        [HttpPut("put-tonsilo-silo/{id}")]
         public async Task<IActionResult> UpdateSiLo(int id, [FromBody] UpdateLGTSSiLoDto dto)
         {
             try
@@ -94,7 +94,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("tonsilo-silo/{id}")]
+        [HttpDelete("delete-tonsilo-silo/{id}")]
         public async Task<IActionResult> DeleteSiLo(int id)
         {
             try
@@ -107,14 +107,14 @@ namespace dataproduct.api.Controllers
 
         // ─── NVL ─────────────────────────────────────────────────────────────────
 
-        [HttpGet("tonsilo-nvl")]
+        [HttpGet("get-tonsilo-nvl")]
         public async Task<IActionResult> GetNvlList([FromQuery] int? idLoCao)
         {
             try { return Ok(await _service.GetNvlListAsync(idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("tonsilo-nvl/{id}")]
+        [HttpGet("get-tonsilo-nvl/{id}")]
         public async Task<IActionResult> GetNvlById(int id)
         {
             try
@@ -125,7 +125,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("tonsilo-nvl")]
+        [HttpPost("post-tonsilo-nvl")]
         public async Task<IActionResult> CreateNvl([FromBody] CreateLGTSNvlDto dto)
         {
             try
@@ -143,7 +143,7 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        [HttpPut("tonsilo-nvl/{id}")]
+        [HttpPut("put-tonsilo-nvl/{id}")]
         public async Task<IActionResult> UpdateNvl(int id, [FromBody] UpdateLGTSNvlDto dto)
         {
             try
@@ -154,7 +154,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("tonsilo-nvl/{id}")]
+        [HttpDelete("delete-tonsilo-nvl/{id}")]
         public async Task<IActionResult> DeleteNvl(int id)
         {
             try
@@ -165,7 +165,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("tonsilo-nvl/xac-nhan")]
+        [HttpPut("put-tonsilo-nvl/xac-nhan")]
         public async Task<IActionResult> UpdateXacNhan([FromBody] UpdateLGTSXacNhanDto dto)
         {
             try
@@ -180,7 +180,7 @@ namespace dataproduct.api.Controllers
 
         // ─── Mapping ─────────────────────────────────────────────────────────────
 
-        [HttpGet("tonsilo-mapping")]
+        [HttpGet("get-tonsilo-mapping")]
         public async Task<IActionResult> GetMappingList(
             [FromQuery] int? idLoCao,
             [FromQuery] DateTime? ngay,
@@ -196,7 +196,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpGet("tonsilo-mapping/{id}")]
+        [HttpGet("get-tonsilo-mapping/{id}")]
         public async Task<IActionResult> GetMappingById(int id)
         {
             try
@@ -207,7 +207,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("tonsilo-mapping")]
+        [HttpPost("post-tonsilo-mapping")]
         public async Task<IActionResult> CreateMapping([FromBody] CreateLGTSMappingDto dto)
         {
             try
@@ -221,7 +221,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("tonsilo-mapping/{id}")]
+        [HttpPut("put-tonsilo-mapping/{id}")]
         public async Task<IActionResult> UpdateMapping(int id, [FromBody] UpdateLGTSMappingDto dto)
         {
             try
@@ -235,7 +235,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("tonsilo-mapping/{id}")]
+        [HttpDelete("delete-tonsilo-mapping/{id}")]
         public async Task<IActionResult> DeleteMapping(int id)
         {
             try
@@ -252,7 +252,7 @@ namespace dataproduct.api.Controllers
         /// Lưu chi tiết tồn silo theo phiếu (xóa cũ, insert mới theo IDPhieu).
         /// Gọi sau khi lưu phiếu thành công.
         /// </summary>
-        [HttpPost("chitiet/upsert")]
+        [HttpPost("post-chitiet/upsert")]
         public async Task<IActionResult> UpsertChiTiet([FromBody] UpsertLGTSChiTietDto dto)
         {
             try
@@ -266,7 +266,7 @@ namespace dataproduct.api.Controllers
         /// <summary>
         /// Lấy chi tiết tồn silo theo IDPhieu.
         /// </summary>
-        [HttpGet("chitiet/{idPhieu}")]
+        [HttpGet("get-chitiet/{idPhieu}")]
         public async Task<IActionResult> GetChiTietByPhieu(Guid idPhieu)
         {
             try
@@ -278,7 +278,7 @@ namespace dataproduct.api.Controllers
 
         // ─── Export PDF ───────────────────────────────────────────────────────────
 
-        [HttpGet("export-pdf/{idPhieu}")]
+        [HttpGet("get-export-pdf/{idPhieu}")]
         public async Task<IActionResult> ExportPdf(Guid idPhieu, [FromQuery] bool useKeHoachName = false)
         {
             try
@@ -292,7 +292,7 @@ namespace dataproduct.api.Controllers
 
         // ─── Export Excel ─────────────────────────────────────────────────────────
 
-        [HttpGet("export-excel/{idPhieu}")]
+        [HttpGet("get-export-excel/{idPhieu}")]
         public async Task<IActionResult> ExportExcel(Guid idPhieu)
         {
             try
