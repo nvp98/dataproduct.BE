@@ -34,12 +34,16 @@ namespace dataproduct.api.Repositories
                 query = query.Where(s => s.MayDuc == request.MayDuc);
             if (!string.IsNullOrWhiteSpace(request.MeThep))
                 query = query.Where(s => s.MeThep != null && s.MeThep.Contains(request.MeThep));
-            if (!string.IsNullOrWhiteSpace(request.IdSlab))
-                query = query.Where(s => s.IdSlab != null && s.IdSlab.Contains(request.IdSlab));
+            if (request.IdSlabs != null && request.IdSlabs.Count > 0)
+                query = query.Where(s => s.IdSlab != null && request.IdSlabs.Contains(s.IdSlab));
             if (!string.IsNullOrWhiteSpace(request.MacThep))
                 query = query.Where(s => s.MacThep != null && s.MacThep.Contains(request.MacThep));
             if (request.IsChot.HasValue)
                 query = query.Where(s => s.IsChot == request.IsChot);
+            if (request.IsTrungIDSlab.HasValue)
+                query = query.Where(s => s.IsTrungIDSlab == request.IsTrungIDSlab);
+            if (request.IsDiffMacThep.HasValue)
+                query = query.Where(s => s.IsDiffMacThep == request.IsDiffMacThep);
 
             // Filter theo trạng thái workflow
             if (request.TrangThaiKCS.HasValue)
@@ -85,6 +89,8 @@ namespace dataproduct.api.Repositories
                     SoLo = s.SoLo,
                     OrderId = s.OrderId,
                     MayDuc = s.MayDuc,
+                    IsTrungIDSlab = s.IsTrungIDSlab,
+                    IsDiffMacThep = s.IsDiffMacThep,
                     Line = s.Line,
                     SapLastTime = s.SapLastTime,
                     IsChot = s.IsChot,
@@ -283,6 +289,7 @@ namespace dataproduct.api.Repositories
                     KhoiLuong       = tt.Slab.KhoiLuong,
                     ChatLuongTPHH   = tt.Slab.ChatLuongTPHH,
                     LoaiPhoi        = tt.Slab.LoaiPhoi,
+                    MayDuc          = tt.Slab.MayDuc,
                     IsChot          = tt.Slab.IsChot,
                     TrangThaiKCS    = tt.TrangThaiKCS,
                     TrangThaiDuc    = tt.TrangThaiDuc,

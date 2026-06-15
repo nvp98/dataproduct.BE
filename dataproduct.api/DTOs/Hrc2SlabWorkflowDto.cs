@@ -37,9 +37,11 @@ namespace dataproduct.api.DTOs
         public string? Kip { get; set; }
         public int? MayDuc { get; set; }
         public string? MeThep { get; set; }
-        public string? IdSlab { get; set; }
+        public List<string>? IdSlabs { get; set; }
         public string? MacThep { get; set; }
         public bool? IsChot { get; set; }
+        public bool? IsTrungIDSlab { get; set; }
+        public bool? IsDiffMacThep { get; set; }
         public int? TrangThaiKCS { get; set; }
         public int? TrangThaiDuc { get; set; }
         public int? TrangThaiKho { get; set; }

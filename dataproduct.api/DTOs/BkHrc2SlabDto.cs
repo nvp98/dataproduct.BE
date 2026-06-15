@@ -33,6 +33,8 @@ namespace dataproduct.api.DTOs
         public string? SoLo { get; set; }
         public string? OrderId { get; set; }
         public int? MayDuc { get; set; }
+        public bool? IsTrungIDSlab { get; set; }
+        public bool? IsDiffMacThep { get; set; }
         public int? Line { get; set; }
         public DateOnly? SapLastTime { get; set; }
         public bool IsChot { get; set; }

@@ -54,6 +54,10 @@ public partial class BkHrc2Slab
 
     public int? MayDuc { get; set; }
 
+    public bool? IsTrungIDSlab { get; set; }
+
+    public bool? IsDiffMacThep { get; set; }
+
     public int? Line { get; set; }
 
     public DateOnly? SapLastTime { get; set; }
