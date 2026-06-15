@@ -11,5 +11,6 @@ namespace dataproduct.api.Models
         public int? ThuTu { get; set; }
         public DateTime? NgayTao { get; set; }
         public string? TagKey { get; set; }
+        public bool? IsDelete { get; set; } = false;
     }
 }

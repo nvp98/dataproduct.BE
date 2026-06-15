@@ -10,6 +10,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int? ThuTu { get; set; }
         public DateTime? NgayTao { get; set; }
         public string? TagKey { get; set; }
+        public bool? IsDelete { get; set; }
     }
 
     public class CreateLGNLSiLoMasterDto
@@ -26,6 +27,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string TenSiLo { get; set; } = string.Empty;
         public int? ThuTu { get; set; }
         public string? TagKey { get; set; }
+        public bool? IsDelete { get; set; }
     }
 
     // ─── TS Mapping Dto (lookup dropdown) ────────────────────────────────────

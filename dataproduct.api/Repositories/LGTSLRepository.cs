@@ -71,7 +71,7 @@ namespace dataproduct.api.Repositories
         public async Task<List<LGTSSiLoDto>> GetSiLoListAsync(int? idLoCao)
         {
             return await _context.LG_TSL_SiLo
-                .Where(s => idLoCao == null || s.ID_LoCao == idLoCao)
+                .Where(s => s.IsDelete != true && (idLoCao == null || s.ID_LoCao == idLoCao))
                 .OrderBy(s => s.ID_LoCao)
                 .ThenBy(s => s.ThuTu)
                 .AsNoTracking()
@@ -81,7 +81,8 @@ namespace dataproduct.api.Repositories
                     IdLoCao = s.ID_LoCao,
                     TenSiLo = s.TenSiLo,
                     ThuTu = s.ThuTu,
-                    ThuTuCoDinh = s.ThuTuCoDinh
+                    ThuTuCoDinh = s.ThuTuCoDinh,
+                    IsDelete = s.IsDelete
                 })
                 .ToListAsync();
         }
@@ -103,6 +104,7 @@ namespace dataproduct.api.Repositories
             existing.ID_LoCao = entity.ID_LoCao;
             existing.TenSiLo = entity.TenSiLo;
             existing.ThuTu = entity.ThuTu;
+            existing.IsDelete = entity.IsDelete;
 
             await _context.SaveChangesAsync();
             return existing;
@@ -112,7 +114,7 @@ namespace dataproduct.api.Repositories
         {
             var existing = await _context.LG_TSL_SiLo.FindAsync(id);
             if (existing == null) return false;
-            _context.LG_TSL_SiLo.Remove(existing);
+            existing.IsDelete = true;
             await _context.SaveChangesAsync();
             return true;
         }

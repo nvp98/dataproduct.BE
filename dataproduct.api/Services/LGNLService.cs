@@ -77,7 +77,8 @@ namespace dataproduct.api.Services
                 IDLoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu   = dto.ThuTu,
-                TagKey  = dto.TagKey
+                TagKey  = dto.TagKey,
+                IsDelete = dto.IsDelete,
             };
             var result = await _repo.UpdateSiLoMasterAsync(id, entity);
             return result == null ? null : MapSiLoMaster(result);
@@ -224,12 +225,13 @@ namespace dataproduct.api.Services
         }
         private static LGNLSiLoMasterDto MapSiLoMaster(LG_NL_SiLo e) => new()
         {
-            Id      = e.ID,
-            IdLoCao = e.IDLoCao,
-            TenSiLo = e.TenSiLo,
-            ThuTu   = e.ThuTu,
-            NgayTao = e.NgayTao,
-            TagKey  = e.TagKey
+            Id       = e.ID,
+            IdLoCao  = e.IDLoCao,
+            TenSiLo  = e.TenSiLo,
+            ThuTu    = e.ThuTu,
+            NgayTao  = e.NgayTao,
+            TagKey   = e.TagKey,
+            IsDelete = e.IsDelete,
         };
 
         private static LGNLMappingDto MapMapping(LG_NL_Mapping e) => new()

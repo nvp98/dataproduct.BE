@@ -63,6 +63,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
         public int? ThuTuCoDinh { get; set; }
+        public bool? IsDelete { get; set; }
     }
 
     public class CreateLGTSSiLoDto
@@ -73,7 +74,10 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int? ThuTuCoDinh { get; set; }
     }
 
-    public class UpdateLGTSSiLoDto : CreateLGTSSiLoDto { }
+    public class UpdateLGTSSiLoDto : CreateLGTSSiLoDto
+    {
+        public bool? IsDelete { get; set; }
+    }
 
     // ─── LG_TSL_SiLo_Mapping ─────────────────────────────────────────────────────
 

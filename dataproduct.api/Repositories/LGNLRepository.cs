@@ -50,7 +50,7 @@ namespace dataproduct.api.Repositories
         public async Task<List<LG_NL_SiLo>> GetSiLoMasterListAsync(int? idLoCao)
         {
             return await _context.LG_NL_SiLo
-                .Where(x => idLoCao == null || x.IDLoCao == idLoCao)
+                .Where(x => x.IsDelete != true && (idLoCao == null || x.IDLoCao == idLoCao))
                 .OrderBy(x => x.IDLoCao)
                 .ThenBy(x => x.ThuTu)
                 .AsNoTracking()
@@ -77,6 +77,7 @@ namespace dataproduct.api.Repositories
             existing.TenSiLo = entity.TenSiLo;
             existing.ThuTu = entity.ThuTu;
             existing.TagKey = entity.TagKey;
+            existing.IsDelete = entity.IsDelete;
 
             await _context.SaveChangesAsync();
             return existing;
@@ -86,7 +87,7 @@ namespace dataproduct.api.Repositories
         {
             var existing = await _context.LG_NL_SiLo.FindAsync(id);
             if (existing == null) return false;
-            _context.LG_NL_SiLo.Remove(existing);
+            existing.IsDelete = true;
             await _context.SaveChangesAsync();
             return true;
         }

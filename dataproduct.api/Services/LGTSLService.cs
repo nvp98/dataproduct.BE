@@ -71,6 +71,7 @@ namespace dataproduct.api.Services
                 ID_LoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu = dto.ThuTu,
+                IsDelete = dto.IsDelete,
             };
             var result = await _repo.UpdateSiLoAsync(id, entity);
             return result == null ? null : MapSiLo(result);
@@ -407,6 +408,7 @@ namespace dataproduct.api.Services
             IdLoCao = e.ID_LoCao,
             TenSiLo = e.TenSiLo,
             ThuTu = e.ThuTu,
+            IsDelete = e.IsDelete,
         };
 
         private static LGTSNvlDto MapNvl(LG_TSL_NVL e) => new()

@@ -10,5 +10,6 @@ namespace dataproduct.api.Models
         public string? TenSiLo { get; set; }
         public int? ThuTu { get; set; }
         public int? ThuTuCoDinh { get; set; }
+        public bool? IsDelete { get; set; } = false; 
     }
 }
