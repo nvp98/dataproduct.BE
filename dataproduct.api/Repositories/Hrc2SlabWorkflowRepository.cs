@@ -39,7 +39,9 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrWhiteSpace(request.MacThep))
                 query = query.Where(s => s.MacThep != null && s.MacThep.Contains(request.MacThep));
             if (request.IsChot.HasValue)
-                query = query.Where(s => s.IsChot == request.IsChot);
+                query = request.IsChot.Value
+                    ? query.Where(s => s.IsChot == true)
+                    : query.Where(s => s.IsChot != true);
             if (request.IsTrungIDSlab.HasValue)
                 query = query.Where(s => s.IsTrungIDSlab == request.IsTrungIDSlab);
             if (request.IsDiffMacThep.HasValue)
@@ -50,11 +52,14 @@ namespace dataproduct.api.Repositories
                 query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiKCS == request.TrangThaiKCS
                                       || request.TrangThaiKCS == 0 && s.TrangThai == null);
             if (request.TrangThaiDuc.HasValue)
-                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiDuc == request.TrangThaiDuc);
+                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiDuc == request.TrangThaiDuc
+                                      || request.TrangThaiDuc == 0 && s.TrangThai == null);
             if (request.TrangThaiKho.HasValue)
-                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiKho == request.TrangThaiKho);
+                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiKho == request.TrangThaiKho
+                                      || request.TrangThaiKho == 0 && s.TrangThai == null);
             if (request.TrangThaiPKH.HasValue)
-                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiPKH == request.TrangThaiPKH);
+                query = query.Where(s => s.TrangThai != null && s.TrangThai.TrangThaiPKH == request.TrangThaiPKH
+                                      || request.TrangThaiPKH == 0 && s.TrangThai == null);
 
             var totalCount = await query.CountAsync();
 

@@ -4,22 +4,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace dataproduct.api.Controllers
 {
-    [Route("api/hrc2-slab")]
+    [Route("api/hrc1-slab")]
     [ApiController]
-    public class Hrc2SlabController : ControllerBase
+    public class Hrc1SlabController : ControllerBase
     {
-        private readonly Hrc2SlabWorkflowService _svc;
+        private readonly Hrc1SlabService _svc;
 
-        public Hrc2SlabController(Hrc2SlabWorkflowService svc)
+        public Hrc1SlabController(Hrc1SlabService svc)
         {
             _svc = svc;
         }
 
         // ── Đọc dữ liệu ─────────────────────────────────────────────────────
 
-        /// <summary>Danh sách slab kèm trạng thái workflow</summary>
         [HttpPost("search")]
-        public async Task<IActionResult> Search([FromBody] HrcSlabSearchRequest request)
+        public async Task<IActionResult> Search([FromBody] Hrc1SlabSearchRequest request)
         {
             var (data, total) = await _svc.SearchAsync(request);
             return Ok(new
@@ -31,7 +30,6 @@ namespace dataproduct.api.Controllers
             });
         }
 
-        /// <summary>Tổng hợp GROUP BY 5 điều kiện</summary>
         [HttpGet("tong-hop")]
         public async Task<IActionResult> GetTongHop(
             [FromQuery] DateOnly? tuNgay,
@@ -43,7 +41,6 @@ namespace dataproduct.api.Controllers
             return Ok(data);
         }
 
-        /// <summary>Danh sách phiếu BBSL chưa chốt (để chọn khi KCS chuyển)</summary>
         [HttpGet("phieu-bbsl")]
         public async Task<IActionResult> GetPhieuBBSL(
             [FromQuery] string? kip,
@@ -53,7 +50,6 @@ namespace dataproduct.api.Controllers
             return Ok(data);
         }
 
-        /// <summary>Ruột phiếu — danh sách slab trong phiếu, GROUP BY 5 điều kiện</summary>
         [HttpGet("ruot-phieu/{idPhieu:guid}")]
         public async Task<IActionResult> GetRuotPhieu(Guid idPhieu)
         {
@@ -61,7 +57,6 @@ namespace dataproduct.api.Controllers
             return Ok(data);
         }
 
-        /// <summary>Danh sách slab cá nhân thuộc phiếu (đã chuyển KCS)</summary>
         [HttpGet("slabs-by-phieu/{idPhieu:guid}")]
         public async Task<IActionResult> GetSlabsByPhieu(Guid idPhieu)
         {
@@ -108,8 +103,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho" && request.LoaiXacNhan != "PKH")
-                return BadRequest("LoaiXacNhan phải là 'Duc', 'Kho' hoặc 'PKH'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
 
             await _svc.XacNhanAsync(request);
             return Ok(new WorkflowResult
@@ -125,8 +120,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho" && request.LoaiXacNhan != "PKH")
-                return BadRequest("LoaiXacNhan phải là 'Duc', 'Kho' hoặc 'PKH'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
 
             await _svc.HuyXacNhanAsync(request);
             return Ok(new WorkflowResult
@@ -163,20 +158,61 @@ namespace dataproduct.api.Controllers
             });
         }
 
-        // ── Sync BKMIS ──────────────────────────────────────────────────────
+        // ── Sync từ TSC API ──────────────────────────────────────────────────
 
         [HttpPost("sync")]
-        public async Task<IActionResult> Sync([FromBody] Hrc2SlabSyncRequest request)
+        public async Task<IActionResult> Sync([FromBody] Hrc1SlabSyncRequest request)
         {
-            var result = await _svc.SyncAsync(request.NgayBatDau, request.NgayKetThuc);
+            var result = await _svc.SyncAsync(request.NgaySX, request.CaSX);
             return Ok(result);
         }
 
-        [HttpGet("sync/status")]
-        public async Task<IActionResult> GetSyncStatus()
+        // ── Cập nhật MacThep từ HRC1_MeThep ─────────────────────────────────
+
+        [HttpPost("fill-mac-thep")]
+        public async Task<IActionResult> FillMacThep()
         {
-            var result = await _svc.GetSyncStatusAsync();
-            return result == null ? NoContent() : Ok(result);
+            var updated = await _svc.FillMacThepAsync();
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = updated > 0
+                    ? $"Đã cập nhật Mác thép cho {updated} slab."
+                    : "Không có slab nào cần cập nhật (tất cả đã có Mác thép, hoặc HRC1_MeThep chưa có dữ liệu).",
+                AffectedRows = updated
+            });
+        }
+
+        // ── Cập nhật GhiChu / MaVatTu per slab ──────────────────────────────
+
+        [HttpPatch("{id:int}")]
+        public async Task<IActionResult> UpdateSlab(int id, [FromBody] Hrc1SlabUpdateRequest req)
+        {
+            try
+            {
+                await _svc.UpdateSlabAsync(id, req);
+                return Ok(new WorkflowResult { Success = true, Message = "Đã cập nhật.", AffectedRows = 1 });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
+
+        [HttpGet("tonghop-ghi-chu/{idPhieu:guid}")]
+        public async Task<IActionResult> GetTongHopGhiChu(Guid idPhieu)
+        {
+            var data = await _svc.GetTongHopGhiChuAsync(idPhieu);
+            return Ok(data);
+        }
+
+        [HttpPost("tonghop-ghi-chu")]
+        public async Task<IActionResult> SaveTongHopGhiChu([FromBody] Hrc1SaveTongHopGhiChuRequest req)
+        {
+            await _svc.SaveTongHopGhiChuAsync(req);
+            return Ok(new WorkflowResult { Success = true, Message = "Đã lưu ghi chú.", AffectedRows = 1 });
         }
 
         // ── Export ────────────────────────────────────────────────────────────

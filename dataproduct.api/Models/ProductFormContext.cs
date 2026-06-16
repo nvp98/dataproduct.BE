@@ -84,6 +84,12 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
     public virtual DbSet<HRC1_MePhanCong> HRC1_MePhanCongs { get; set; }
     public virtual DbSet<HRC1_LichSu> HRC1_LichSus { get; set; }
+
+    // HRC1 Slab
+    public virtual DbSet<Hrc1Slab> Hrc1Slabs { get; set; }
+    public virtual DbSet<Hrc1SlabTrangThai> Hrc1SlabTrangThais { get; set; }
+    public virtual DbSet<Hrc1MaVatTu> Hrc1MaVatTus { get; set; }
+    public virtual DbSet<Hrc1BbslTongHopGhiChu> Hrc1BbslTongHopGhiChus { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
     //        => optionsBuilder.UseSqlServer("Server=192.168.240.3,1433;Database=PRODUCT_FORM;User Id=sa;Password=HPDQ@1234;TrustServerCertificate=True;");
@@ -771,6 +777,64 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.BatDauLuc).HasColumnType("datetime");
             entity.Property(e => e.KetThucLuc).HasColumnType("datetime");
+        });
+
+        // --- HRC1 Slab ---
+        modelBuilder.Entity<Hrc1Slab>(entity =>
+        {
+            entity.ToTable("HRC1_Slab");
+            entity.Property(e => e.IDSlab).HasColumnName("IDSlab").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.IDPiece).HasColumnName("IDPiece").HasMaxLength(50);
+            entity.Property(e => e.MaMe).HasMaxLength(50);
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.CaSX).HasMaxLength(5);
+            entity.Property(e => e.KipSX).HasMaxLength(5);
+            entity.Property(e => e.MayDuc).HasMaxLength(10);
+            entity.Property(e => e.CutDate).HasColumnType("datetime");
+            entity.Property(e => e.ChieuDay).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.ChieuRong).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.ChieuDai).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.KhoiLuong).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.NgayTao)
+                  .HasColumnType("datetime")
+                  .HasDefaultValueSql("GETDATE()")
+                  .ValueGeneratedOnAdd();
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.MaVatTu).HasMaxLength(100);
+
+            entity.HasOne(s => s.TrangThai)
+                  .WithOne(t => t.Slab)
+                  .HasForeignKey<Hrc1SlabTrangThai>(t => t.IdSlab);
+        });
+
+        modelBuilder.Entity<Hrc1MaVatTu>(entity =>
+        {
+            entity.ToTable("HRC1_MaVatTu");
+            entity.Property(e => e.MaVatTu).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.NgayTao)
+                  .HasColumnType("datetime")
+                  .HasDefaultValueSql("GETDATE()")
+                  .ValueGeneratedOnAdd();
+        });
+
+        modelBuilder.Entity<Hrc1BbslTongHopGhiChu>(entity =>
+        {
+            entity.ToTable("HRC1_BBSL_TongHop_GhiChu");
+            entity.Property(e => e.MacThep).HasMaxLength(50);
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Hrc1SlabTrangThai>(entity =>
+        {
+            entity.ToTable("HRC1_Slab_TrangThai");
+            entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.NgayChuyenKCS).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanKho).HasColumnType("datetime");
+            entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);
