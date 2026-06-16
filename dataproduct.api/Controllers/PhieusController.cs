@@ -304,7 +304,6 @@ namespace dataproduct.api.Controllers
             var data = await _service.GetAllLoCaoAsync();
             return Ok(data);
         }
-    }
 
         /// <summary>
         /// Reset phiếu về trạng thái "Đang lưu" (TinhTrang = 0)

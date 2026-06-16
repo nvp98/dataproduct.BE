@@ -176,6 +176,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public string Title { get; set; } = string.Empty;
         public string? DataIndex { get; set; }          // null nếu là nhóm cha
+        public bool IsEmpty { get; set; } = false;  // ← thêm
         public List<LGNLColumnDto>? Children { get; set; } // null nếu là lá
     }
 
