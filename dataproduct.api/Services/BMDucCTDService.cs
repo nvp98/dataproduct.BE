@@ -759,7 +759,8 @@ namespace dataproduct.api.Services
             var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x =>
                 x.NgaySX == ngay &&
                 x.Ca == request.Ca &&
-                x.MayDuc == request.MayDuc);
+                x.MayDuc == request.MayDuc &&
+                x.MaBm == "HRC1_BB_GiaoNhanPhoiNhapKho");
 
             // ★ Kiểm tra nếu phiếu đã chốt (TinhTrang = 5) thì không cho phép chuyển thanh
             if (phieu != null && phieu.TinhTrang == 5)
@@ -1240,9 +1241,9 @@ namespace dataproduct.api.Services
             await _context.SaveChangesAsync();
 
 
-            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
+            var xuongDuc = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
             var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1 && x.TinhTrang == 1);
-            var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
+            var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0 && x.TinhTrang == 1);
 
 
             // Convert logo và chữ ký sang base64
