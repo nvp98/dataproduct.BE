@@ -8,6 +8,8 @@ using DinkToPdf.Contracts;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
+using ClosedXML.Excel.Drawings;
+using dataproduct.api.Utils;
 
 namespace dataproduct.api.Services
 {
@@ -449,128 +451,299 @@ namespace dataproduct.api.Services
 
         public async Task<ExportFileResult> ExportExcelByPhieuAsync(Guid phieuId)
         {
+            var phieu = await _repoPhieu.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var data = (await _repo.GetByPhieuIdAsync(phieuId)).ToList();
+            if (!data.Any())
+                throw new Exception("Không có dữ liệu phôi nạp nguội để xuất Excel");
+
+            var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(phieuId);
+            var hrc1 = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var ctd = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2);
+
+            var ca = phieu.Ca ?? 1;
+            var kip = phieu.Kip ?? "";
+            var ngaySX = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today);
+            var xuongCan = phieu.Scope?.ToString() ?? "";
+
+            string tuGio, denGio;
+            var ngayKetThuc = ngaySX;
+            switch (ca)
+            {
+                case 1: tuGio = "08h00"; denGio = "20h00"; break;
+                case 2: tuGio = "20h00"; denGio = "08h00"; ngayKetThuc = ngaySX.AddDays(1); break;
+                default: tuGio = ""; denGio = ""; break;
+            }
+
+            var notesRecord = await _context.BmPhieuChiTiets
+                .FirstOrDefaultAsync(x => x.PhieuId == phieuId && x.ThongSo == "notes");
+            var notesText = notesRecord?.GiaTri ?? "";
+
+            // Logo
+            byte[]? logoBytes = null;
+            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
             try
             {
-                var maBmList = new[]
-             {
-                "CTD_BB_Phoinapnguoi",
-                "CTD_BB_Phoinapnguoi",
-                "CTD_BB_PhoiNguoi",
-                "BM.02-QT.05.13",
-                "BM.02/QT.05.13"
-            };
-
-                var phieuQuery = _context.BmPhieus
-                    .AsNoTracking()
-                    .Where(x => x.Idphieu == phieuId);
-
-                var phieus = await phieuQuery
-                    .Select(x => new
-                    {
-                        x.Idphieu,
-                        x.SoPhieu,
-                        x.NgaySX,
-                        x.Ca,
-                        x.Kip,
-                        x.MayDuc,
-                        x.TinhTrang,
-                        x.Scope,
-                        x.DataJson,
-                        x.MaBm,
-                    })
-                    .ToListAsync();
-
-                var phieuIds = phieus.Select(x => x.Idphieu).ToList();
-                var details = await _context.CtdPhoiNguois
-                    .AsNoTracking()
-                    .Where(x => x.PhieuId.HasValue && phieuIds.Contains(x.PhieuId.Value))
-                    .ToListAsync();
-
-                var rows = (from p in phieus
-                            join d in details on p.Idphieu equals d.PhieuId
-                            orderby p.NgaySX, p.Ca, p.Kip, p.SoPhieu
-                            select new
-                            {
-                                p.SoPhieu,
-                                p.NgaySX,
-                                p.Ca,
-                                p.Kip,
-                                p.MayDuc,
-                                d.Me,
-                                d.Mac,
-                                d.KichThuoc,
-                                d.SoThanh,
-                                d.TongKl,
-                                d.GhiChu,
-                                p.TinhTrang,
-                                p.Scope
-                            }).ToList();
-
-                var templatePath = Path.Combine(_env.WebRootPath, "templates", "BM_TongHopPhoiNapNguoi.xlsx");
-                if (!File.Exists(templatePath))
-                    throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
-
-                using var workbook = new XLWorkbook(templatePath);
-                var ws = workbook.Worksheet(1);
-
-
-
-                var startRow = 6;
-                var rowIndex = startRow;
-                foreach (var item in rows)
+                if (!string.IsNullOrWhiteSpace(logoUrl))
                 {
-                    if (rowIndex > startRow)
-                        ws.Row(startRow).CopyTo(ws.Row(rowIndex));
-
-                    ws.Cell(rowIndex, 1).Value = item.NgaySX?.ToDateTime(TimeOnly.MinValue);
-                    ws.Cell(rowIndex, 2).Value = item.Kip;
-                    ws.Cell(rowIndex, 3).Value = item.Ca;
-                    ws.Cell(rowIndex, 4).Value = item.Scope;
-                    ws.Cell(rowIndex, 5).Value = item.Me;
-                    ws.Cell(rowIndex, 6).Value = item.Mac;
-                    ws.Cell(rowIndex, 7).Value = item.KichThuoc;
-                    ws.Cell(rowIndex, 8).Value = item.SoThanh;
-                    ws.Cell(rowIndex, 9).Value = item.TongKl;
-                    ws.Cell(rowIndex, 10).Value = item.GhiChu;
-                    ws.Cell(rowIndex, 11).Value = item.SoPhieu;
-
-                    var statusCell = ws.Cell(rowIndex, 12);
-                    statusCell.Value = item.TinhTrang switch
-                    {
-                        0 => "Đang lưu",
-                        1 => "Đã gửi",
-                        2 => "Hoàn thành",
-                        3 => "Đã thu hồi",
-                        4 => "Không xác nhận",
-                        5 => "Đã chốt",
-                        6 => "Đang phê duyệt",
-                        7 => "Hiệu chỉnh",
-                        _ => "Không xác định"
-                    };
-                    rowIndex++;
+                    using var http = _httpClientFactory.CreateClient();
+                    http.Timeout = TimeSpan.FromSeconds(10);
+                    logoBytes = await http.GetByteArrayAsync(logoUrl);
                 }
-
-                if (rows.Count > 0)
-                {
-                    var lastRow = rowIndex - 1;
-                    ws.Range(startRow, 1, lastRow, 1).Style.DateFormat.Format = "dd/MM/yyyy";
-                    // ws.Range(startRow, 8, lastRow, 9).Style.NumberFormat.Format = "#,##0.##";
-                }
-
-                using var stream = new MemoryStream();
-                workbook.SaveAs(stream);
-
-                return new ExportFileResult
-                {
-                    Content = stream.ToArray(),
-                    FileName = $"PhoiNapNguoi_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
-                    ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                };
             }
-            catch (Exception ex)
+            catch { /* logo không bắt buộc */ }
+
+            var htmlPath02 = Path.Combine(_env.WebRootPath, "template_html", "BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi.html");
+            var bmHeaderText = await HtmlTemplateHelper.GetBmHeaderTextAsync(htmlPath02);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.AddWorksheet("Biên bản phôi nạp nguội");
+
+            // 7 cột: STT(1) Mẻ(2) Mác(3) KíchThước(4) SốThanh(5) TổngKL(6) GhiChú(7)
+            const int COLS = 7;
+            ws.Style.Font.FontName = "Times New Roman";
+            ws.Style.Font.FontSize = 12;
+
+            ws.Column(1).Width = 6;
+            ws.Column(2).Width = 14;
+            ws.Column(3).Width = 14;
+            ws.Column(4).Width = 14;
+            ws.Column(5).Width = 14;
+            ws.Column(6).Width = 16;
+            ws.Column(7).Width = 20;
+
+            int row = 1;
+
+            // ── HEADER: Logo (trái, 3 rows) | BM code (phải, merge 3 rows) ──
+            ws.Row(row).Height = 36;
+
+            if (logoBytes != null)
             {
-                throw new InvalidOperationException($"Lỗi khi export Excel phôi nguội: {ex.Message}", ex);
+                var ext = Path.GetExtension(logoUrl).TrimStart('.').ToLower();
+                var fmt = ext == "png" ? XLPictureFormat.Png : XLPictureFormat.Jpeg;
+                using var logoMs = new MemoryStream(logoBytes);
+                ws.AddPicture(logoMs, fmt)
+                    .MoveTo(ws.Cell(row, 1))
+                    .Scale(0.38);
             }
+
+            ws.Cell(row, 5).Value = bmHeaderText;
+            ws.Range(row, 5, row + 2, COLS).Merge().Style
+                .Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Right)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                .Alignment.SetWrapText(true);
+            row++;
+
+            ws.Row(row).Height = 16;
+            ws.Cell(row, 1).Value = "CÔNG TY CỔ PHẦN THÉP";
+            ws.Range(row, 1, row, 4).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(11)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            row++;
+
+            ws.Row(row).Height = 16;
+            ws.Cell(row, 1).Value = "HÒA PHÁT DUNG QUẤT";
+            ws.Range(row, 1, row, 4).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(11)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            row++;
+
+            // ── TITLE ────────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "BIÊN BẢN";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(16)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 24;
+            row++;
+
+            ws.Cell(row, 1).Value = "GIAO NHẬN PHÔI NẠP NGUỘI";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(16)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 24;
+            row++;
+
+            // ── SUB-TITLE ─────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = $"Xưởng cán: {xuongCan}";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetItalic(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 16;
+            row++;
+
+            ws.Cell(row, 1).Value = $"Kíp: {ca}{kip}   Từ {tuGio} Giờ {ngaySX:dd/MM/yyyy}   Đến {denGio} Giờ ngày {ngayKetThuc:dd/MM/yyyy}";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetItalic(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 16;
+            row++;
+
+            // ── NGƯỜI THAM GIA ───────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "Chúng tôi gồm:";
+            ws.Range(row, 1, row, COLS).Merge();
+            ws.Row(row).Height = 15;
+            row++;
+
+            void WriteNguoi(int r, int idx, string ten, string chucVu, string bp)
+            {
+                ws.Cell(r, 1).Value = $"{idx}. Ông/bà: {ten}     Chức vụ: {chucVu}     BP: {bp}";
+                ws.Range(r, 1, r, COLS).Merge().Style
+                    .Font.SetFontSize(12);
+                ws.Row(r).Height = 15;
+            }
+
+            WriteNguoi(row, 1, hrc1?.HoVaTen ?? "", hrc1?.TenViTri ?? "", hrc1?.TenPhongBan ?? ""); row++;
+            WriteNguoi(row, 2, qlcl?.HoVaTen ?? "", qlcl?.TenViTri ?? "", qlcl?.TenPhongBan ?? ""); row++;
+            WriteNguoi(row, 3, ctd?.HoVaTen ?? "", ctd?.TenViTri ?? "", ctd?.TenPhongBan ?? ""); row++;
+
+            // ── TABLE HEADER ─────────────────────────────────────────────────
+            string[] headers = ["STT", "Mẻ", "Mác", "Kích thước", "Tổng số thanh", "Tổng khối lượng", "Ghi chú"];
+            for (int c = 1; c <= COLS; c++)
+            {
+                ws.Cell(row, c).Value = headers[c - 1];
+                ws.Cell(row, c).Style
+                    .Font.SetBold(true).Font.SetFontSize(12)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#f0f0f0"))
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+            }
+            ws.Row(row).Height = 20;
+            row++;
+
+            // ── DATA ROWS ────────────────────────────────────────────────────
+            int stt = 1;
+            var tongST = 0;
+            double tongKL = 0;
+            foreach (var item in data)
+            {
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.Me ?? "";
+                ws.Cell(row, 3).Value = item.Mac ?? "";
+                ws.Cell(row, 4).Value = item.KichThuoc ?? "";
+                ws.Cell(row, 5).Value = item.SoThanh.HasValue ? (XLCellValue)item.SoThanh.Value : "";
+                ws.Cell(row, 6).Value = item.TongKl.HasValue ? (XLCellValue)item.TongKl.Value : "";
+                ws.Cell(row, 7).Value = item.GhiChu ?? "";
+
+                ws.Range(row, 1, row, COLS).Style
+                    .Font.SetFontSize(12)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                    .Border.SetInsideBorder(XLBorderStyleValues.Thin);
+                ws.Cell(row, 2).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Left);
+                ws.Cell(row, 7).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Left);
+
+                ws.Row(row).Height = 20;
+                tongST += item.SoThanh ?? 0;
+                tongKL += item.TongKl ?? 0;
+                row++;
+            }
+
+            // ── FOOTER: Tổng ─────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "Tổng";
+            ws.Range(row, 1, row, 2).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#f5f5f5"))
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                .Border.SetInsideBorder(XLBorderStyleValues.Thin);
+
+            ws.Cell(row, 3).Value = "";
+            ws.Cell(row, 4).Value = "";
+            ws.Cell(row, 5).Value = tongST;
+            ws.Cell(row, 5).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Cell(row, 6).Value = tongKL;
+            ws.Cell(row, 6).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .NumberFormat.SetFormat("#,##0");
+            ws.Cell(row, 7).Value = "";
+
+            ws.Range(row, 3, row, COLS).Style
+                .Font.SetBold(true)
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#f5f5f5"))
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                .Border.SetInsideBorder(XLBorderStyleValues.Thin);
+            ws.Row(row).Height = 20;
+            row += 2;
+
+            // ── GHI CHÚ ──────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "Ghi chú:";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(12);
+            ws.Row(row).Height = 15;
+            row++;
+
+            if (!string.IsNullOrWhiteSpace(notesText))
+            {
+                ws.Cell(row, 1).Value = notesText;
+                ws.Range(row, 1, row, COLS).Merge().Style
+                    .Font.SetFontSize(12)
+                    .Alignment.SetWrapText(true);
+                ws.Row(row).Height = 30;
+                row++;
+            }
+
+            row++;
+
+            // ── CHỮ KÝ: 3 cột NM.HRC1 | P.QLCL | NM.CT DAI ─────────────────
+            // Chia 7 cols thành 3 phần: cols 1-2 | cols 3-5 | cols 6-7
+            ws.Cell(row, 1).Value = "NM.HRC1";
+            ws.Range(row, 1, row, 2).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            ws.Cell(row, 3).Value = "P.QLCL";
+            ws.Range(row, 3, row, 5).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            ws.Cell(row, 6).Value = "NM.CT DAI";
+            ws.Range(row, 6, row, COLS).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            ws.Row(row).Height = 16;
+            row++;
+
+            ws.Row(row).Height = 60; // vùng chữ ký
+            row++;
+
+            ws.Cell(row, 1).Value = hrc1?.HoVaTen ?? "";
+            ws.Range(row, 1, row, 2).Merge().Style
+                .Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            ws.Cell(row, 3).Value = qlcl?.HoVaTen ?? "";
+            ws.Range(row, 3, row, 5).Merge().Style
+                .Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            ws.Cell(row, 6).Value = ctd?.HoVaTen ?? "";
+            ws.Range(row, 6, row, COLS).Merge().Style
+                .Font.SetFontSize(12)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+            // Page setup A4
+            ws.PageSetup.PaperSize = XLPaperSize.A4Paper;
+            ws.PageSetup.PageOrientation = XLPageOrientation.Portrait;
+            ws.PageSetup.Margins.Left = 0.8;
+            ws.PageSetup.Margins.Right = 0.6;
+            ws.PageSetup.Margins.Top = 0.8;
+            ws.PageSetup.Margins.Bottom = 0.6;
+
+            using var stream = new MemoryStream();
+            wb.SaveAs(stream);
+
+            return new ExportFileResult
+            {
+                Content = stream.ToArray(),
+                FileName = $"BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi_{ngaySX:yyyyMMdd}_Ca{ca}{kip}_{DateTime.Now:HHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
         }
 
         public async Task<ExportFileResult> ExportTongHopExcelByPhieuAsync(DateOnly? fromDate, DateOnly? toDate)

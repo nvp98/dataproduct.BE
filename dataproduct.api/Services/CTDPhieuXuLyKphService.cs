@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using dataproduct.api.Utils;
 
 namespace dataproduct.api.Services
 {
@@ -313,6 +314,354 @@ namespace dataproduct.api.Services
                 Content = pdfBytes,
                 FileName = $"BM.01C-QT.11_Phieu_xu_ly_KPH_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
                 ContentType = "application/pdf"
+            };
+        }
+
+        public async Task<ExportFileResult> ExportExcelChiTietKphAsync(Guid phieuId)
+        {
+            var phieu = await _repoPhieu.GetByIdAsync(phieuId);
+            if (phieu == null)
+                throw new Exception("Không tìm thấy phiếu");
+
+            var data = (await _repo.GetByIdPhieuAsync(phieuId)).ToList();
+            if (!data.Any())
+                throw new Exception("Không có dữ liệu KPH để xuất Excel");
+
+            // Parse thông tin từ SoPhieu
+            string ngayXL = "", thangXL = "", namXL = "", caXL = "", lenhSX = "";
+            try
+            {
+                var info = ParseSoPhieu(phieu.SoPhieu ?? "");
+                ngayXL = info.NgayXuLy?.Day.ToString("D2") ?? "";
+                thangXL = info.NgayXuLy?.Month.ToString("D2") ?? "";
+                namXL = info.NgayXuLy?.Year.ToString() ?? "";
+                caXL = info.CaXuLy ?? "";
+                lenhSX = info.LenhSanXuat ?? "";
+            }
+            catch { /* SoPhieu không đúng format thì bỏ qua */ }
+
+            var ngaySX = phieu.NgaySX?.Day.ToString("D2") ?? "";
+            var thangSX = phieu.NgaySX?.Month.ToString("D2") ?? "";
+            var namSX = phieu.NgaySX?.Year.ToString() ?? "";
+            var ca = phieu.Ca?.ToString() ?? "";
+            var kip = phieu.Kip ?? "";
+            var mayDuc = phieu.MayDuc?.ToString() ?? "";
+
+            var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(phieuId);
+            var qlcl = pheDuyets.FirstOrDefault(x => x.CapDuyet == 3);
+            var log = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2);
+            var bpLienQuan = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
+            var nguoiLap = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
+
+            // Logo
+            byte[]? logoBytes = null;
+            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(logoUrl))
+                {
+                    using var http = _httpClientFactory.CreateClient();
+                    http.Timeout = TimeSpan.FromSeconds(10);
+                    logoBytes = await http.GetByteArrayAsync(logoUrl);
+                }
+            }
+            catch { }
+
+            var htmlPath01C = Path.Combine(_env.WebRootPath, "template_html", "BM.01C-QT.11_Phieu_xu_ly_ban_thanh_pham_KPH.html");
+            var bmHeaderText = await HtmlTemplateHelper.GetBmHeaderTextAsync(htmlPath01C);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.AddWorksheet("Phiếu XL KPH");
+
+            const int COLS = 18;
+            ws.Style.Font.FontName = "Times New Roman";
+            ws.Style.Font.FontSize = 11;
+
+            // Độ rộng cột
+            ws.Column(1).Width = 5;    // TT
+            ws.Column(2).Width = 13;   // Sản phẩm (trước)
+            ws.Column(3).Width = 10;   // Mác thép
+            ws.Column(4).Width = 9;    // Chiều dài
+            ws.Column(5).Width = 10;   // Bó số/Mẻ số
+            ws.Column(6).Width = 8;    // Số thanh
+            ws.Column(7).Width = 10;   // Khối lượng
+            ws.Column(8).Width = 11;   // Ca/Ngày SX
+            ws.Column(9).Width = 8;    // Phân loại
+            ws.Column(10).Width = 16;   // Nguyên nhân
+            ws.Column(11).Width = 16;   // Biện pháp
+            ws.Column(12).Width = 13;   // Sản phẩm (sau)
+            ws.Column(13).Width = 10;   // Mác thép
+            ws.Column(14).Width = 9;    // Chiều dài
+            ws.Column(15).Width = 10;   // Bó số/Mẻ số
+            ws.Column(16).Width = 8;    // Số thanh
+            ws.Column(17).Width = 10;   // Khối lượng
+            ws.Column(18).Width = 8;    // Phân loại
+
+            int row = 1;
+
+            // ── HEADER: Logo (trái) | BM code (phải, merge rows 1-3) ─────────
+            ws.Row(row).Height = 36;
+
+            if (logoBytes != null)
+            {
+                var ext = Path.GetExtension(logoUrl).TrimStart('.').ToLower();
+                var fmt = ext == "png"
+                    ? ClosedXML.Excel.Drawings.XLPictureFormat.Png
+                    : ClosedXML.Excel.Drawings.XLPictureFormat.Jpeg;
+                using var logoMs = new MemoryStream(logoBytes);
+                ws.AddPicture(logoMs, fmt)
+                    .MoveTo(ws.Cell(row, 1))
+                    .Scale(0.38);
+            }
+
+            ws.Cell(row, 14).Value = bmHeaderText;
+            ws.Range(row, 14, row + 2, COLS).Merge().Style
+                .Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Right)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                .Alignment.SetWrapText(true);
+            row++;
+
+            ws.Row(row).Height = 16;
+            ws.Cell(row, 1).Value = "CÔNG TY CỔ PHẦN THÉP";
+            ws.Range(row, 1, row, 13).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(11)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            row++;
+
+            ws.Row(row).Height = 16;
+            ws.Cell(row, 1).Value = "HÒA PHÁT DUNG QUẤT";
+            ws.Range(row, 1, row, 13).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(11)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            row++;
+
+            // ── TITLE ────────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "PHIẾU XỬ LÝ BÁN THÀNH PHẨM/SẢN PHẨM KHÔNG PHÙ HỢP";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(14)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            ws.Row(row).Height = 22;
+            row++;
+
+            // ── SUB-TITLE 1: checkbox sx / lưu kho ───────────────────────────
+            ws.Cell(row, 1).Value = "☐ Trong quá trình sản xuất      ☐ Trong quá trình lưu kho";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 15;
+            row++;
+
+            // ── SUB-TITLE 2: kíp / ca / ngày ─────────────────────────────────
+            ws.Cell(row, 1).Value = $"Kíp: {ca}{kip} ngày {ngaySX} tháng {thangSX} năm {namSX}   xử lý về kíp {caXL} ngày {ngayXL} tháng {thangXL} năm {namXL}   - LSX: {lenhSX}";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            ws.Row(row).Height = 15;
+            row++;
+
+            // ── CONTENT ───────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = $"P.QLCL xác nhận việc xử lý sản phẩm KPH tại công đoạn Phân xưởng cán {mayDuc} như sau:";
+            ws.Range(row, 1, row, COLS).Merge().Style
+                .Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Left);
+            ws.Row(row).Height = 15;
+            row++;
+
+            // ── TABLE HEADER ROW 1 ────────────────────────────────────────────
+            void SetHeaderCell(IXLRange r, string v)
+            {
+                r.Merge().Value = v;
+                r.Style
+                    .Font.SetBold(true).Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Alignment.SetWrapText(true)
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#d9d9d9"))
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                    .Border.SetInsideBorder(XLBorderStyleValues.Thin);
+            }
+
+            SetHeaderCell(ws.Range(row, 1, row, 9), "SẢN PHẨM TRƯỚC SỬ LÝ");
+            SetHeaderCell(ws.Range(row, 10, row + 1, 10), "Nguyên nhân");
+            SetHeaderCell(ws.Range(row, 11, row + 1, 11), "Biện pháp xử lý");
+            SetHeaderCell(ws.Range(row, 12, row, 18), "SẢN PHẨM SAU SỬ LÝ");
+            ws.Row(row).Height = 20;
+            row++;
+
+            // ── TABLE HEADER ROW 2 ────────────────────────────────────────────
+            string[] sub1 = ["TT", "Sản phẩm", "Mác thép", "Chiều dài", "Bó số/Mẻ số", "Số thanh", "Khối lượng\n(kg)", "Ca/Ngày\nsản xuất", "Phân loại"];
+            for (int c = 1; c <= 9; c++)
+            {
+                ws.Cell(row, c).Value = sub1[c - 1];
+                ws.Cell(row, c).Style
+                    .Font.SetBold(true).Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Alignment.SetWrapText(true)
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#d9d9d9"))
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+            }
+            // Cols 10-11 đã được merge (rowspan 2) ở header row 1
+
+            string[] sub2 = ["Sản phẩm", "Mác thép", "Chiều dài", "Bó số/Mẻ số", "Số thanh", "Khối lượng\n(kg)", "Phân loại"];
+            for (int c = 12; c <= 18; c++)
+            {
+                ws.Cell(row, c).Value = sub2[c - 12];
+                ws.Cell(row, c).Style
+                    .Font.SetBold(true).Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Alignment.SetWrapText(true)
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#d9d9d9"))
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+            }
+            ws.Row(row).Height = 28;
+            row++;
+
+            // ── DATA ROWS ────────────────────────────────────────────────────
+            int stt = 1;
+            decimal inTongST = 0, inTongKL = 0, newTongST = 0, newTongKL = 0;
+
+            foreach (var item in data)
+            {
+                ws.Cell(row, 1).Value = stt++;
+                ws.Cell(row, 2).Value = item.InSanPham ?? "";
+                ws.Cell(row, 3).Value = item.InMacThep ?? "";
+                ws.Cell(row, 4).Value = item.InChieuDai ?? "";
+                ws.Cell(row, 5).Value = item.InSoMe ?? "";
+                ws.Cell(row, 6).Value = item.InSoThanh.HasValue ? (XLCellValue)item.InSoThanh.Value : "";
+                ws.Cell(row, 7).Value = item.InKhoiLuong.HasValue ? (XLCellValue)(double)item.InKhoiLuong.Value : "";
+                ws.Cell(row, 8).Value = item.InCaNgaySx ?? "";
+                ws.Cell(row, 9).Value = item.InLoai ?? "";
+                ws.Cell(row, 10).Value = item.Reason ?? "";
+                ws.Cell(row, 11).Value = item.Measures ?? "";
+                ws.Cell(row, 12).Value = item.NewSanPham ?? "";
+                ws.Cell(row, 13).Value = item.NewMacThep ?? "";
+                ws.Cell(row, 14).Value = item.NewChieuDai ?? "";
+                ws.Cell(row, 15).Value = item.NewSoMe ?? "";
+                ws.Cell(row, 16).Value = item.NewSoThanh.HasValue ? (XLCellValue)item.NewSoThanh.Value : "";
+                ws.Cell(row, 17).Value = item.NewKhoiLuong.HasValue ? (XLCellValue)(double)item.NewKhoiLuong.Value : "";
+                ws.Cell(row, 18).Value = item.NewLoai ?? "";
+
+                ws.Range(row, 1, row, COLS).Style
+                    .Font.SetFontSize(11)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                    .Border.SetInsideBorder(XLBorderStyleValues.Thin);
+
+                // STT + số lượng / khối lượng: center; còn lại: left
+                ws.Cell(row, 1).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                ws.Cell(row, 6).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                ws.Cell(row, 7).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .NumberFormat.SetFormat("#,##0");
+                ws.Cell(row, 9).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                ws.Cell(row, 16).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                ws.Cell(row, 17).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .NumberFormat.SetFormat("#,##0");
+                ws.Cell(row, 18).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+                ws.Row(row).Height = 20;
+                inTongST += item.InSoThanh ?? 0;
+                inTongKL += item.InKhoiLuong ?? 0;
+                newTongST += item.NewSoThanh ?? 0;
+                newTongKL += item.NewKhoiLuong ?? 0;
+                row++;
+            }
+
+            // ── FOOTER: Tổng ─────────────────────────────────────────────────
+            var footerStyle = new Action<IXLRange>(r => r.Merge().Style
+                .Font.SetBold(true).Font.SetFontSize(11)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Fill.SetBackgroundColor(XLColor.FromHtml("#f0f0f0"))
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin)
+                .Border.SetInsideBorder(XLBorderStyleValues.Thin));
+
+            footerStyle(ws.Range(row, 1, row, 5));
+            ws.Cell(row, 1).Value = "Tổng";
+
+            ws.Cell(row, 6).Value = inTongST;
+            ws.Cell(row, 6).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+
+            ws.Cell(row, 7).Value = inTongKL;
+            ws.Cell(row, 7).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .NumberFormat.SetFormat("#,##0")
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+
+            footerStyle(ws.Range(row, 8, row, 11));
+
+            footerStyle(ws.Range(row, 12, row, 15));
+            ws.Cell(row, 12).Value = "Tổng";
+
+            ws.Cell(row, 16).Value = newTongST;
+            ws.Cell(row, 16).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+
+            ws.Cell(row, 17).Value = newTongKL;
+            ws.Cell(row, 17).Style.Font.SetBold(true).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .NumberFormat.SetFormat("#,##0")
+                .Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+
+            ws.Cell(row, 18).Value = "";
+            ws.Cell(row, 18).Style.Border.SetOutsideBorder(XLBorderStyleValues.Thin);
+
+            ws.Row(row).Height = 20;
+            row += 2;
+
+            // ── NOTE ─────────────────────────────────────────────────────────
+            ws.Cell(row, 1).Value = "Tổng sản phẩm không phù hợp còn lại........(tấn)";
+            ws.Range(row, 1, row, COLS).Merge().Style.Font.SetFontSize(11);
+            ws.Row(row).Height = 15;
+            row += 2;
+
+            // ── CHỮ KÝ: 4 cột P.QLCL | BP.LOG | BP liên quan | Người lập ───
+            // Chia 18 col: 1-4 | 5-9 | 10-14 | 15-18
+            var signLabels = new[] { "P.QLCL", "BP.LOG", "BP liên quan", "Người lập" };
+            var signRanges = new[] { (1, 4), (5, 9), (10, 14), (15, 18) };
+            var signPeople = new[] { qlcl, log, bpLienQuan, nguoiLap };
+
+            for (int i = 0; i < 4; i++)
+            {
+                var (c1, c2) = signRanges[i];
+                ws.Cell(row, c1).Value = signLabels[i];
+                ws.Range(row, c1, row, c2).Merge().Style
+                    .Font.SetBold(true).Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            }
+            ws.Row(row).Height = 16;
+            row++;
+
+            ws.Row(row).Height = 60; // vùng chữ ký
+            row++;
+
+            for (int i = 0; i < 4; i++)
+            {
+                var (c1, c2) = signRanges[i];
+                ws.Cell(row, c1).Value = signPeople[i]?.HoVaTen ?? "";
+                ws.Range(row, c1, row, c2).Merge().Style
+                    .Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            }
+            ws.Row(row).Height = 16;
+
+            // ── Page setup A4 Landscape ───────────────────────────────────────
+            ws.PageSetup.PaperSize = XLPaperSize.A4Paper;
+            ws.PageSetup.PageOrientation = XLPageOrientation.Landscape;
+            ws.PageSetup.Margins.Left = 0.8;
+            ws.PageSetup.Margins.Right = 0.6;
+            ws.PageSetup.Margins.Top = 0.6;
+            ws.PageSetup.Margins.Bottom = 0.6;
+
+            using var stream = new MemoryStream();
+            wb.SaveAs(stream);
+
+            return new ExportFileResult
+            {
+                Content = stream.ToArray(),
+                FileName = $"BM.01C-QT.11_Phieu_xu_ly_KPH_{phieu.NgaySX:yyyyMMdd}_Ca{ca}{kip}_{DateTime.Now:HHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
 

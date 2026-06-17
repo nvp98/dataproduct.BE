@@ -26,5 +26,9 @@ namespace dataproduct.api.Services.Exporters
         {
             return _service.ExportTongHopExcelByPhieuAsync(fromDate, toDate);
         }
+        public Task<ExportFileResult> ExportDetailExcelAsync(Guid phieuId)
+        {
+            return _service.ExportChiTietExcelAsync(phieuId);
+        }
     }
 }
