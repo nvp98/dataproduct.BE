@@ -164,6 +164,24 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        [HttpPost("undo-doi-nvl")]
+        public async Task<IActionResult> UndoDoiNVLGiuaCa([FromBody] LGNLUndoChangeSiLoNVLDto dto)
+        {
+            try
+            {
+                if (dto.IdCa != 1 && dto.IdCa != 2)
+                    return BadRequest(new { message = "IdCa chỉ nhận giá trị 1 hoặc 2." });
+                if (dto.IdSiLo <= 0)
+                    return BadRequest(new { message = "IdSiLo phải lớn hơn 0." });
+
+                var deleted = await _service.UndoChangeSiLoNVLAsync(
+                    dto.IdLoCao, dto.Ngay, dto.IdCa, dto.IdSiLo);
+
+                return Ok(new { message = $"Đã hoàn tác {deleted} lần đổi NVL.", deleted });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         // ─── Nhóm NVL ─────────────────────────────────────────────────────────────
 
         [HttpGet("get-nhom-nvl")]

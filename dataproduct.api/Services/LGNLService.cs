@@ -301,6 +301,9 @@ namespace dataproduct.api.Services
                 idLoCao, ngay, idCa, idSiLo, idNVLMoi, thoiDiem, ghiChu);
         }
 
+        public Task<int> UndoChangeSiLoNVLAsync(int idLoCao, DateTime ngay, int idCa, int idSiLo)
+            => _repo.UndoChangeSiLoNVLAsync(idLoCao, ngay, idCa, idSiLo);
+
         // ─── Chi tiết nạp liệu theo phiếu ────────────────────────────────────────
 
         public Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
@@ -637,44 +640,69 @@ namespace dataproduct.api.Services
                 .GroupBy(n => n.IdNhomNVL ?? 0)
                 .ToDictionary(g => g.Key, g => g.OrderBy(n => n.ThuTu ?? 999).ToList());
 
-            // colSlots: 1 entry per NVL; nhóm không có NVL → 1 slot placeholder (Nvl = null)
+            // Số slot tối thiểu per nhóm (khớp với GetDuLieuSiloPivotAsync)
+            var slotConfig = new Dictionary<int, int>
+            {
+                { 1, 2 }, { 2, 2 }, { 3, 2 }, { 4, 2 }, { 5, 1 }, { 6, 2 },
+            };
+
+            // colSlots: NVL thực, sau đó pad null-slot đến min
             var colSlots = new List<(LGNLNhomNvlDto Nhom, LGNLNvlDto? Nvl)>();
             foreach (var nhom in nhomList)
             {
-                if (nvlByNhomId.TryGetValue(nhom.Id, out var nvls) && nvls.Count > 0)
-                    foreach (var n in nvls) colSlots.Add((nhom, n));
-                else
+                var nvls = nvlByNhomId.TryGetValue(nhom.Id, out var list) ? list : new List<LGNLNvlDto>();
+                foreach (var n in nvls) colSlots.Add((nhom, n));
+                var minSlots = slotConfig.GetValueOrDefault(nhom.ThuTu ?? 99, 1);
+                var current  = colSlots.Count(s => s.Nhom.Id == nhom.Id);
+                while (current++ < minSlots)
                     colSlots.Add((nhom, null));
             }
+
+            // Tính width cột NVL: chia đều phần còn lại sau khi trừ fixed cols
+            // A4 landscape ~997px usable (297mm @ 96dpi − 14mm×2 margins − 10px×2 body padding)
+            const int pageWidthPx   = 997;
+            const int fixedPrefixPx = 45 + 55 + 80 + 75 + 55 + 55; // 365px
+            const int ghiChuPx      = 80;
+            int nvlColWidth = colSlots.Count > 0
+                ? Math.Max(44, (pageWidthPx - fixedPrefixPx - ghiChuPx) / colSlots.Count)
+                : 60;
+
+            // Build colgroup — xác định width cố định mỗi cột, tránh cột trống bị co
+            var colGroup = new StringBuilder("<colgroup>");
+            colGroup.Append($@"<col style=""width:45px""/><col style=""width:55px""/><col style=""width:80px""/><col style=""width:75px""/><col style=""width:55px""/><col style=""width:55px""/>");
+            foreach (var _ in colSlots)
+                colGroup.Append($@"<col style=""width:{nvlColWidth}px""/>");
+            colGroup.Append($@"<col style=""width:{ghiChuPx}px""/>");
+            colGroup.Append("</colgroup>");
 
             // Build thead
             var th1 = new StringBuilder();
             var th2 = new StringBuilder();
-            th1.Append(@"<th rowspan=""2"" style=""width:45px"">Số mê</th>");
-            th1.Append(@"<th rowspan=""2"" style=""width:55px"">Mê/giờ</th>");
-            th1.Append(@"<th rowspan=""2"" style=""width:80px"">Thời gian nạp liệu</th>");
-            th1.Append(@"<th rowspan=""2"" style=""width:75px"">Chế độ nạp liệu</th>");
-            th1.Append(@"<th rowspan=""2"" style=""width:55px"">Thuốc thăm liệu 1 (m)</th>");
-            th1.Append(@"<th rowspan=""2"" style=""width:55px"">Thuốc thăm liệu 2 (m)</th>");
+            th1.Append(@"<th rowspan=""2"">Số mẻ</th>");
+            th1.Append(@"<th rowspan=""2"">Mê/giờ</th>");
+            th1.Append(@"<th rowspan=""2"">Thời gian nạp liệu</th>");
+            th1.Append(@"<th rowspan=""2"">Chế độ nạp liệu</th>");
+            th1.Append(@"<th rowspan=""2"">Thuốc thăm liệu 1 (m)</th>");
+            th1.Append(@"<th rowspan=""2"">Thuốc thăm liệu 2 (m)</th>");
 
             foreach (var nhom in nhomList)
             {
-                var nvlsInNhom = nvlByNhomId.TryGetValue(nhom.Id, out var nlist) ? nlist : new List<LGNLNvlDto>();
-                if (nvlsInNhom.Count == 0)
+                var slotsForNhom = colSlots.Where(s => s.Nhom.Id == nhom.Id).ToList();
+                var realCount    = slotsForNhom.Count(s => s.Nvl != null);
+                if (realCount == 0)
                 {
-                    // Nhóm chưa có NVL → 1 cột placeholder, rowspan=2
-                    th1.Append($@"<th rowspan=""2"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
+                    // Toàn placeholder → tên nhóm span tất cả slot, rowspan=2
+                    th1.Append($@"<th rowspan=""2"" colspan=""{slotsForNhom.Count}"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
                 }
                 else
                 {
-                    // Luôn hiển thị tên nhóm ở row 1, tên NVL ở row 2 (dù chỉ có 1 NVL)
-                    th1.Append($@"<th colspan=""{nvlsInNhom.Count}"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
-                    foreach (var n in nvlsInNhom)
-                        th2.Append($@"<th>{System.Net.WebUtility.HtmlEncode(NvlLabel(n))}</th>");
+                    th1.Append($@"<th colspan=""{slotsForNhom.Count}"">{System.Net.WebUtility.HtmlEncode(nhom.TenNhom ?? "")}</th>");
+                    foreach (var (_, nvl) in slotsForNhom)
+                        th2.Append($@"<th>{(nvl != null ? System.Net.WebUtility.HtmlEncode(NvlLabel(nvl)) : "")}</th>");
                 }
             }
 
-            th1.Append(@"<th rowspan=""2"" style=""width:80px"">Ghi chú</th>");
+            th1.Append(@"<th rowspan=""2"">Ghi chú</th>");
 
             // Build data rows grouped by ThuTu
             var rowsByThuTu = chiTiet
@@ -689,7 +717,7 @@ namespace dataproduct.api.Services
                 var nvlValues = grp.ToDictionary(x => x.IdNVL, x => x.GiaTri);
 
                 dataRows.Append("<tr>");
-                dataRows.Append($"<td class=\"text-center\">{sample.SoMe?.ToString("N0") ?? ""}</td>");
+                dataRows.Append($"<td class=\"text-center\">{sample.SoMe?.ToString("#,##0.###") ?? ""}</td>");
                 dataRows.Append($"<td class=\"text-center\">{System.Net.WebUtility.HtmlEncode(sample.MeGio ?? "")}</td>");
                 dataRows.Append($"<td class=\"text-center\">{System.Net.WebUtility.HtmlEncode(sample.ThoiGianNapLieu ?? "")}</td>");
                 dataRows.Append($"<td class=\"text-center\">{System.Net.WebUtility.HtmlEncode(sample.CheDo ?? "")}</td>");
@@ -700,7 +728,7 @@ namespace dataproduct.api.Services
                 {
                     if (nvl == null) { dataRows.Append("<td></td>"); continue; }
                     var val = nvlValues.TryGetValue(nvl.Id, out var v) ? v : null;
-                    dataRows.Append($"<td class=\"text-right\">{(val.HasValue ? val.Value.ToString("N0") : "")}</td>");
+                    dataRows.Append($"<td class=\"text-right\">{(val.HasValue ? val.Value.ToString("#,##0.###") : "")}</td>");
                 }
 
                 dataRows.Append($"<td>{System.Net.WebUtility.HtmlEncode(sample.GhiChu ?? "")}</td>");
@@ -714,7 +742,7 @@ namespace dataproduct.api.Services
             {
                 if (nvl == null) { tongRow.Append("<td></td>"); continue; }
                 var total = chiTiet.Where(x => x.IdNVL == nvl.Id).Sum(x => x.GiaTri ?? 0);
-                tongRow.Append($"<td class=\"text-right\"><b>{total.ToString("N0")}</b></td>");
+                tongRow.Append($"<td class=\"text-right\"><b>{total.ToString("#,##0.###")}</b></td>");
             }
             tongRow.Append("<td></td></tr>");
 
@@ -736,7 +764,7 @@ namespace dataproduct.api.Services
             {
                 if (nvl == null) { quyKhoRow.Append("<td></td>"); continue; }
                 var qk = chiTiet.FirstOrDefault(x => x.IdNVL == nvl.Id && x.QuyKho.HasValue)?.QuyKho;
-                quyKhoRow.Append($"<td class=\"text-right\">{(qk.HasValue ? qk.Value.ToString("N0") : "")}</td>");
+                quyKhoRow.Append($"<td class=\"text-right\">{(qk.HasValue ? qk.Value.ToString("#,##0.###") : "")}</td>");
             }
             quyKhoRow.Append("<td></td></tr>");
 
@@ -759,6 +787,7 @@ namespace dataproduct.api.Services
                 .Replace("{{LoCao}}", loCao)
                 .Replace("{{CaLabel}}", caLabel)
                 .Replace("{{NgaySX}}", ngayDisplay)
+                .Replace("{{ColGroup}}", colGroup.ToString())
                 .Replace("{{TheadRow1}}", th1.ToString())
                 .Replace("{{TheadRow2}}", th2.ToString())
                 .Replace("{{DataRows}}", dataRows.ToString())

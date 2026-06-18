@@ -14,5 +14,6 @@ namespace dataproduct.api.Models
         public bool XacNhan { get; set; } = false; 
         public DateTime? NgayXacNhan { get; set; }
         public int? IDNguoiXacNhan { get; set; }
+        public bool? IsDelete { get; set; }
     }
 }

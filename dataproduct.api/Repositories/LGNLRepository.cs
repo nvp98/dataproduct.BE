@@ -336,7 +336,26 @@ namespace dataproduct.api.Repositories
             int idLoCao, DateTime ngay, int idCa, int idSiLo, int idNVLMoi,
             DateTime thoiDiem, string? ghiChu)
         {
-            // Không xóa row cũ — giữ lại để data trước thời điểm này vẫn map đúng NVL cũ
+            // Nếu đã có row cùng ThoiDiemBD → đây là sửa lại (correction), update thay vì insert mới
+            var existing = await _context.LG_NL_Mapping
+                .Where(m => m.IDLoCao == idLoCao
+                         && m.Ngay == ngay.Date
+                         && m.IDCa == idCa
+                         && m.IDSiLo == idSiLo
+                         && m.ThoiDiemBD == thoiDiem
+                         && m.NgayHetHL == null)
+                .FirstOrDefaultAsync();
+
+            if (existing != null)
+            {
+                existing.IDNVL = idNVLMoi;
+                existing.GhiChu = ghiChu;
+                existing.NgayTao = DateTime.Now;
+                await _context.SaveChangesAsync();
+                return existing;
+            }
+
+            // ThoiDiemBD khác → đổi NVL lần mới, giữ nguyên row cũ (data trước thời điểm này vẫn map đúng NVL cũ)
             var newRow = new LG_NL_Mapping
             {
                 IDLoCao = idLoCao,
@@ -354,6 +373,24 @@ namespace dataproduct.api.Repositories
             await _context.LG_NL_Mapping.AddAsync(newRow);
             await _context.SaveChangesAsync();
             return newRow;
+        }
+
+        public async Task<int> UndoChangeSiLoNVLAsync(int idLoCao, DateTime ngay, int idCa, int idSiLo)
+        {
+            var midShiftRows = await _context.LG_NL_Mapping
+                .Where(m => m.IDLoCao == idLoCao
+                         && m.Ngay == ngay.Date
+                         && m.IDCa == idCa
+                         && m.IDSiLo == idSiLo
+                         && m.ThoiDiemBD != null
+                         && m.NgayHetHL == null)
+                .ToListAsync();
+
+            if (midShiftRows.Count == 0) return 0;
+
+            _context.LG_NL_Mapping.RemoveRange(midShiftRows);
+            await _context.SaveChangesAsync();
+            return midShiftRows.Count;
         }
 
         public async Task<bool> DeleteMappingAsync(int id)
@@ -418,7 +455,7 @@ namespace dataproduct.api.Repositories
                 join nh in _context.LG_NL_NhomNVL
                     on n.IDNhomNVL equals nh.ID into nhomGroup
                 from nh in nhomGroup.DefaultIfEmpty()
-                where idLoCao == null || n.IDLoCao == idLoCao
+                where (idLoCao == null || n.IDLoCao == idLoCao) && n.IsDelete != true
                 select new LGNLNvlDto
                 {
                     Id = n.ID,
@@ -468,7 +505,7 @@ namespace dataproduct.api.Repositories
         {
             var existing = await _context.LG_NL_NVL.FindAsync(id);
             if (existing == null) return false;
-            _context.LG_NL_NVL.Remove(existing);
+            existing.IsDelete = true;
             await _context.SaveChangesAsync();
             return true;
         }
@@ -924,6 +961,7 @@ namespace dataproduct.api.Repositories
                 where m.IDLoCao == idLoCao
                    && m.Ngay == configRef.Ngay
                    && s.TagKey != null
+                   && n.IsDelete != true
                 orderby nh != null ? nh.ThuTu : 999,
                         s.ThuTu,
                         m.ThoiDiemBD == null ? 0 : 1,
@@ -962,14 +1000,14 @@ namespace dataproduct.api.Repositories
 
             // Key = ThuTu của nhóm, Value = số slot cố định
             var slotConfig = new Dictionary<int, int>
-    {
-        { 1, 2 }, // Quặng thiêu kết → 2 slots
-        { 2, 2 }, // Quặng vê viên   → 2 slots
-        { 3, 2 }, // Quặng sống      → 2 slots
-        { 4, 2 }, // Than cốc        → 2 slots
-        { 5, 1 }, // Cốc vụn         → 1 slot
-        { 6, 2 }, // Loại khác       → 2 slots
-    };
+            {
+                { 1, 2 }, // Quặng thiêu kết → 2 slots
+                { 2, 2 }, // Quặng vê viên   → 2 slots
+                { 3, 2 }, // Quặng sống      → 2 slots
+                { 4, 2 }, // Than cốc        → 2 slots
+                { 5, 1 }, // Cốc vụn         → 1 slot
+                { 6, 2 }, // Loại khác       → 2 slots
+            };
 
             var columns = new List<LGNLColumnDto>();
 

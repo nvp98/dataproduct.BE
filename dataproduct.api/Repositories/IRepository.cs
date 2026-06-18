@@ -380,6 +380,9 @@ namespace dataproduct.api.Repositories
             int idLoCao, DateTime ngay, int idCa, int idSiLo, int idNVLMoi,
             DateTime thoiDiem, string? ghiChu);
 
+        // Hoàn tác đổi NVL giữa ca — xóa tất cả mid-shift row của silo trong ca này
+        Task<int> UndoChangeSiLoNVLAsync(int idLoCao, DateTime ngay, int idCa, int idSiLo);
+
         // Snapshot trạng thái hiện tại của từng Silo (NVL đang chứa)
         Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
             int idLoCao, DateTime ngay, int idCa);

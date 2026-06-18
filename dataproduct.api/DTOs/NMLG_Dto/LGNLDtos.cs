@@ -206,6 +206,14 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     }
 
 
+    public class LGNLUndoChangeSiLoNVLDto
+    {
+        public int IdLoCao { get; set; }
+        public DateTime Ngay { get; set; }
+        public int IdCa { get; set; }
+        public int IdSiLo { get; set; }
+    }
+
     /// </summary>
     public class LGNLDuLieuScadaDto
     {

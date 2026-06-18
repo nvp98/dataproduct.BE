@@ -78,7 +78,12 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
             margin-top: 6px;
+        }
+
+        table.sign-table {
+            table-layout: auto;
         }
 
         th, td {
@@ -189,6 +194,7 @@
 
         <!-- TABLE -->
         <table>
+            {{ColGroup}}
             <thead>
                 <tr>
                     {{TheadRow1}}

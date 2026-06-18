@@ -124,7 +124,7 @@ namespace dataproduct.api.Repositories
         public async Task<List<LGTSNvlDto>> GetNvlListAsync(int? idLoCao)
         {
             return await _context.LG_TSL_NVL
-                .Where(n => idLoCao == null || n.IDLoCao == idLoCao)
+                .Where(n => (idLoCao == null || n.IDLoCao == idLoCao) && n.IsDelete != true)
                 .OrderBy(n => n.IDLoCao)
                 .ThenBy(n => n.TenNVL)
                 .AsNoTracking()
@@ -174,7 +174,7 @@ namespace dataproduct.api.Repositories
         {
             var existing = await _context.LG_TSL_NVL.FindAsync(id);
             if (existing == null) return false;
-            _context.LG_TSL_NVL.Remove(existing);
+            existing.IsDelete = true;
             await _context.SaveChangesAsync();
             return true;
         }
