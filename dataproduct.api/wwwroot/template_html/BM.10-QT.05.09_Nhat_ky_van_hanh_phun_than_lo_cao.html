@@ -76,10 +76,9 @@
       table-layout: fixed;
     }
 
-    table.main-tbl col.c-thoi-gian   { width: 3.2%; }
-    table.main-tbl col.c-sub         { width: 2.9%; }
-    table.main-tbl col.c-num         { width: 3.3%; }
-    table.main-tbl col.c-ghi-chu     { width: 5%;   }
+    table.main-tbl col.c-thoi-gian { width: 3%;   }
+    table.main-tbl col.c-sub       { width: 2.8%; }
+    table.main-tbl col.c-num       { width: 3.2%; }
 
     table.main-tbl th,
     table.main-tbl td {
@@ -92,13 +91,13 @@
     }
 
     table.main-tbl thead th {
-      background-color: #dce6f1;
+      background-color: #fff;
       font-weight: bold;
       line-height: 1.2;
     }
 
     table.main-tbl tbody td {
-      height: 12px;
+      height: 10px;
     }
 
     table.main-tbl tbody td.td-left {
@@ -106,25 +105,26 @@
       padding-left: 2px;
     }
 
+    .shift-divider td {
+      height: 2px !important;
+      background: #fff;
+      border-top: 2px solid #000 !important;
+      border-bottom: none !important;
+    }
+
     /* ─── FOOTER ─────────────────────────────────────────── */
-    .footer-wrap {
-      margin-top: 4px;
-      display: table;
+    table.footer-tbl {
       width: 100%;
       border-collapse: collapse;
+      margin-top: 4px;
+      table-layout: fixed;
     }
 
-    .footer-left,
-    .footer-mid,
-    .footer-right {
-      display: table-cell;
+    table.footer-tbl > tbody > tr > td {
       vertical-align: top;
-      padding: 0 4px 0 0;
+      border: 1px solid #000;
+      padding: 2px 4px;
     }
-
-    .footer-left  { width: 28%; }
-    .footer-mid   { width: 36%; }
-    .footer-right { width: 36%; }
 
     .footer-section-title {
       font-weight: bold;
@@ -146,7 +146,7 @@
 
     table.sl-tbl td {
       border: 1px solid #000;
-      padding: 1px 3px;
+      padding: 2px 3px;
       vertical-align: middle;
     }
 
@@ -155,24 +155,38 @@
       white-space: nowrap;
     }
 
-    .sap-xep-row {
-      margin-top: 4px;
-      font-size: 7.5pt;
+    table.sl-tbl td.kip-header {
+      font-weight: bold;
+      text-align: center;
+      background-color: #f0f0f0;
     }
 
-    /* ─── SIGNATURE ──────────────────────────────────────── */
+    /* ─── SAP XEP + SIGNATURES ──────────────────────────── */
+    table.bottom-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      table-layout: fixed;
+    }
+
+    table.bottom-tbl > tbody > tr > td {
+      vertical-align: top;
+      border: 1px solid #000;
+      padding: 2px 4px;
+    }
+
+    .sap-xep-label {
+      font-weight: bold;
+      font-size: 8pt;
+    }
+
     table.sign-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 8px;
     }
 
-    table.sign-table,
     table.sign-table td {
       border: none !important;
-    }
-
-    table.sign-table td {
       text-align: center;
       vertical-align: top;
       padding: 0 6px;
@@ -202,6 +216,7 @@
       font-size: 8pt;
       padding-top: 2px;
     }
+
   </style>
 </head>
 
@@ -225,40 +240,39 @@
 
   <!-- ═══ TITLE ═════════════════════════════════════════════ -->
   <div class="title">NHẬT KÝ VẬN HÀNH PHUN THAN LÒ CAO {{LoCao}}</div>
-  <div class="subtitle">{{NgaySX}}</div>
+  <div class="subtitle">Ngày {{NgayDisplay}} tháng {{ThangDisplay}} năm {{NamDisplay}}</div>
 
   <!-- ═══ MAIN TABLE ════════════════════════════════════════ -->
   <!--
-    29 leaf-columns:
-    1  : thoiGian
+    28 leaf-columns:
+     1 : thoiGian
     2-3: nhietDoSiloBotThan 1#, 2#
     4-6: nhietDoBonPhunThoi 1#, 2#, 3#
-    7  : dongDienMayNghien
-    8  : dongDienQuatGioNguoc
-    9  : nhietDoDauVaoMayNghien
-    10 : nhietDoDauRaMayNghien
-    11 : nhietDoKhoangLo
+     7 : dongDienMayNghien (A)
+     8 : dongDienQuatGioNguoc (A)
+     9 : nhietDoDauVaoMayNghien (°C)
+    10 : nhietDoDauRaMayNghien (°C)
+    11 : nhietDoKhoangLo (°C)
     12-13: mucLieuSiloBotThan 1#, 2#
-    14 : mucLieuSiloThanTho
-    15-17: trongLuongBonPhunThoi 1#, 2#, 3#
-    18 : apLucKhiThan
-    19 : apLucBonKhiN2
-    20 : nhietDoTramDauBoiTron
-    21 : nhietDoStatoDongCoMayNghien
-    22 : nhietDoTrucDongCoMayNghien
-    23 : apLucTrucNghien
-    24 : yeuCauTuLoCao
-    25 : luongThanPhunThucTe
-    26 : luyKeLuongPhunThanTrongCa
-    27 : soLuongSungPhun
-    28 : apLucGioLanhLoCao
-    29 : ghiChu
+    14 : mucLieuSiloThanTho (m)
+    15-17: trongLuongBonPhunThoi 1#, 2#, 3# (t)
+    18 : apLucKhiThan (kPa)
+    19 : apLucBonKhiN2 (kPa)
+    20 : nhietDoTramDauBoiTron (°C)
+    21 : nhietDoStatoDongCoMayNghien (°C)
+    22 : nhietDoTrucDongCoMayNghien (°C)
+    23 : apLucTrucNghien (MPa)
+    24 : yeuCauTuLoCao (t/h)
+    25 : luongThanPhunThucTe (t/h)
+    26 : luyKeLuongPhunThanTrongCa (t)
+    27 : soLuongSungPhun (cái)
+    28 : apLucGioLanhLoCao (kPa)
   -->
   <table class="main-tbl">
     <colgroup>
       <col class="c-thoi-gian" /><!-- 1 thoiGian -->
-      <col class="c-sub" /><col class="c-sub" /><!-- 2-3 silo -->
-      <col class="c-sub" /><col class="c-sub" /><col class="c-sub" /><!-- 4-6 bon -->
+      <col class="c-sub" /><col class="c-sub" /><!-- 2-3 silo nhietDo -->
+      <col class="c-sub" /><col class="c-sub" /><col class="c-sub" /><!-- 4-6 bon nhietDo -->
       <col class="c-num" /><!-- 7 dongDienMayNghien -->
       <col class="c-num" /><!-- 8 dongDienQuatGio -->
       <col class="c-num" /><!-- 9 nhietDoDauVao -->
@@ -278,16 +292,14 @@
       <col class="c-num" /><!-- 26 luyKe -->
       <col class="c-num" /><!-- 27 soLuongSungPhun -->
       <col class="c-num" /><!-- 28 apLucGioLanh -->
-      <col class="c-ghi-chu" /><!-- 29 ghiChu -->
     </colgroup>
 
     <thead>
-      <!-- Hàng tiêu đề cấp 1 -->
       <tr>
         <th rowspan="2">Thời<br />gian</th>
         <th colspan="2">Nhiệt độ<br />Silo bột than<br />(°C)</th>
         <th colspan="3">Nhiệt độ bồn<br />phun thổi<br />(°C)</th>
-        <th>Dòng điện<br />máy<br />nghiền</th>
+        <th>Dòng<br />điện máy<br />nghiền</th>
         <th>Dòng điện<br />quạt gió<br />thổi ngược</th>
         <th>Nhiệt độ<br />đầu vào<br />máy nghiền</th>
         <th>Nhiệt độ<br />đầu ra<br />máy nghiền</th>
@@ -306,11 +318,8 @@
         <th>Lũy kế lượng<br />phun than<br />trong ca</th>
         <th>Số lượng<br />súng phun</th>
         <th>Áp lực gió<br />lạnh lò cao</th>
-        <th rowspan="2">Ghi<br />chú</th>
       </tr>
-      <!-- Hàng tiêu đề cấp 2: sub-index và đơn vị -->
       <tr>
-        <!-- thoiGian: rowspan đã xử lý -->
         <th>1#</th><th>2#</th>
         <th>1#</th><th>2#</th><th>3#</th>
         <th>A</th>
@@ -319,14 +328,13 @@
         <th>1#</th><th>2#</th>
         <th>m</th>
         <th>1#</th><th>2#</th><th>3#</th>
-        <th>Kpa</th><th>Kpa</th>
+        <th>kPa</th><th>kPa</th>
         <th>°C</th><th>°C</th><th>°C</th>
-        <th>Mpa</th>
+        <th>MPa</th>
         <th>t/h</th><th>t/h</th>
         <th>t</th>
         <th>cái</th>
-        <th>Kpa</th>
-        <!-- ghiChu: rowspan đã xử lý -->
+        <th>kPa</th>
       </tr>
     </thead>
 
@@ -336,68 +344,94 @@
   </table>
 
   <!-- ═══ FOOTER: Tình hình sản lượng + Tình trạng sản xuất ══ -->
-  <div class="footer-wrap">
-    <!-- Cột trái: Tình hình sản lượng -->
-    <div class="footer-left">
-      <div class="footer-section-title">Tình hình sản lượng</div>
-      <table class="sl-tbl">
-        <tr>
-          <td class="label">Kíp</td>
-          <td>{{Kip1}}</td>
-          <td>{{Kip2}}</td>
-          <td>{{Kip3}}</td>
-          <td class="label">Tổng</td>
-          <td>{{Tong}}</td>
-        </tr>
-        <tr>
-          <td class="label">SL nghiền (t)</td>
-          <td colspan="5">{{SanLuongNghien}}</td>
-        </tr>
-        <tr>
-          <td class="label">SL phun (t)</td>
-          <td colspan="5">{{SanLuongPhun}}</td>
-        </tr>
-      </table>
-    </div>
+  <table class="footer-tbl">
+    <colgroup>
+      <col style="width:32%" />
+      <col style="width:34%" />
+      <col style="width:34%" />
+    </colgroup>
+    <tbody>
+      <tr>
+        <!-- Cột trái: Tình hình sản lượng -->
+        <td>
+          <div class="footer-section-title">Tình hình sản lượng</div>
+          <table class="sl-tbl">
+            <tr>
+              <td class="label">Kíp</td>
+              <td class="kip-header">{{KipCaNgay}}</td>
+              <td class="kip-header">{{KipCaDem}}</td>
+              <td class="kip-header">Tổng</td>
+            </tr>
+            <tr>
+              <td class="label">SL nghiền (t)</td>
+              <td style="text-align:center;">{{SanLuongNghien_CaNgay}}</td>
+              <td style="text-align:center;">{{SanLuongNghien_CaDem}}</td>
+              <td style="text-align:center;">{{SanLuongNghien_Tong}}</td>
+            </tr>
+            <tr>
+              <td class="label">SL phun (t)</td>
+              <td style="text-align:center;">{{SanLuongPhun_CaNgay}}</td>
+              <td style="text-align:center;">{{SanLuongPhun_CaDem}}</td>
+              <td style="text-align:center;">{{SanLuongPhun_Tong}}</td>
+            </tr>
+            <tr>
+              <td class="label">Tồn than thô (t)</td>
+              <td style="text-align:center;">{{TonThanTho_CaNgay}}</td>
+              <td style="text-align:center;">{{TonThanTho_CaDem}}</td>
+              <td style="text-align:center;">{{TonThanTho_Tong}}</td>
+            </tr>
+            <tr>
+              <td class="label">Tồn than tinh (t)</td>
+              <td style="text-align:center;">{{TonThanTinh_CaNgay}}</td>
+              <td style="text-align:center;">{{TonThanTinh_CaDem}}</td>
+              <td style="text-align:center;">{{TonThanTinh_Tong}}</td>
+            </tr>
+          </table>
+        </td>
+        <!-- Cột giữa: Tình trạng sản xuất ca ngày -->
+        <td>
+          <div class="footer-section-title">1- Tình trạng sản xuất từ 8h00-20h00</div>
+          <div class="footer-section-text">{{TinhTrangSanXuatNgay}}</div>
+        </td>
+        <!-- Cột phải: Tình trạng sản xuất ca đêm -->
+        <td>
+          <div class="footer-section-title">2- Tình trạng sản xuất từ 20h00-8h00</div>
+          <div class="footer-section-text">{{TinhTrangSanXuatDem}}</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 
-    <!-- Cột giữa: Tình trạng sản xuất ca ngày -->
-    <div class="footer-mid">
-      <div class="footer-section-title">1- Tình trạng sản xuất từ 8h00-20h00</div>
-      <div class="footer-section-text">{{TinhTrangSanXuatNgay}}</div>
-    </div>
-
-    <!-- Cột phải: Tình trạng sản xuất ca đêm -->
-    <div class="footer-right">
-      <div class="footer-section-title">2- Tình trạng sản xuất từ 20h00-8h00</div>
-      <div class="footer-section-text">{{TinhTrangSanXuatDem}}</div>
-    </div>
-  </div>
-
-  <!-- Sắp xếp sản xuất -->
-  <div class="sap-xep-row">
-    <b>Sắp xếp sản xuất:</b>&nbsp;&nbsp;{{SapXepSanXuat}}
-  </div>
-
-  <!-- ═══ SIGNATURES ════════════════════════════════════════ -->
-  <table class="sign-table">
-    <tr>
-      <td style="width:50%;">
-        <div class="sign-title">NV vận hành ca ngày</div>
-        <div class="sign-note">(Ký, ghi rõ họ tên)</div>
-      </td>
-      <td style="width:50%;">
-        <div class="sign-title">NV vận hành ca đêm</div>
-        <div class="sign-note">(Ký, ghi rõ họ tên)</div>
-      </td>
-    </tr>
-    <tr>
-      <td class="sign-image">{{Sign_NVVanHanhCaNgay}}</td>
-      <td class="sign-image">{{Sign_NVVanHanhCaDem}}</td>
-    </tr>
-    <tr>
-      <td class="sign-name">{{Ten_NVVanHanhCaNgay}}</td>
-      <td class="sign-name">{{Ten_NVVanHanhCaDem}}</td>
-    </tr>
+  <!-- ═══ SẮP XẾP SẢN XUẤT + CHỮ KÝ ════════════════════════ -->
+  <table class="bottom-tbl">
+    <colgroup>
+      <col style="width:40%" />
+      <col style="width:60%" />
+    </colgroup>
+    <tbody>
+      <tr>
+        <td>
+          <div class="sap-xep-label">Sắp xếp sản xuất:</div>
+          <div style="font-size:7.5pt; white-space:pre-wrap; min-height:20px; margin-top:2px;">{{SapXepSanXuat}}</div>
+        </td>
+        <td>
+          <table class="sign-table">
+            <tr>
+              <td><div class="sign-title">NV vận hành ca ngày</div><div class="sign-note">(Ký, ghi rõ họ tên)</div></td>
+              <td><div class="sign-title">NV vận hành ca đêm</div><div class="sign-note">(Ký, ghi rõ họ tên)</div></td>
+            </tr>
+            <tr>
+              <td class="sign-image">{{Sign_NVVanHanhCaNgay}}</td>
+              <td class="sign-image">{{Sign_NVVanHanhCaDem}}</td>
+            </tr>
+            <tr>
+              <td class="sign-name">{{Ten_NVVanHanhCaNgay}}</td>
+              <td class="sign-name">{{Ten_NVVanHanhCaDem}}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </tbody>
   </table>
 
 </body>

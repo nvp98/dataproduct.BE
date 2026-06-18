@@ -659,8 +659,8 @@ namespace dataproduct.api.Services
             }
 
             // Tính width cột NVL: chia đều phần còn lại sau khi trừ fixed cols
-            // A4 landscape ~997px usable (297mm @ 96dpi − 14mm×2 margins − 10px×2 body padding)
-            const int pageWidthPx   = 997;
+            // A4 landscape ~994px usable (297mm @ 96dpi − 17mm×2 margins, no body padding)
+            const int pageWidthPx   = 994;
             const int fixedPrefixPx = 45 + 55 + 80 + 75 + 55 + 55; // 365px
             const int ghiChuPx      = 80;
             int nvlColWidth = colSlots.Count > 0

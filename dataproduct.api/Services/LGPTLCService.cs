@@ -190,7 +190,6 @@ namespace dataproduct.api.Services
                         SanLuongNghien = GetDecimalFromSummary(root, "tinhHinhSanLuong", "sanLuongNghien"),
                         SanLuongPhun = GetDecimalFromSummary(root, "tinhHinhSanLuong", "sanLuongPhun"),
 
-                        GhiChu = GetString(row, "ghiChu", "GhiChu"),
                         TinhTrangSanXuat = GetString(root, "tinhTrangSanXuat", "tinhTrangSanXuatNgay", "tinhTrangSanXuatDem"),
                         SapXepSanXuat = GetString(root, "sapXepSanXuat", "SapXepSanXuat"),
 
@@ -362,110 +361,205 @@ namespace dataproduct.api.Services
             var chiTiet = await _repo.GetChiTietByPhieuAsync(idPhieu);
             var firstRow = chiTiet.FirstOrDefault();
 
-            var ngay = firstRow?.NgayVanHanh ?? DateTime.MinValue;
-            var loCao = firstRow?.IdLoCao ?? 0;
-            var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
+            // Tổng lượng than phun tính từ chiTiet (dùng làm fallback nếu JSON chưa nhập)
+            var kip1Computed = chiTiet
+                .Where(x => { var h = x.ThoiGian.Hour; return h >= 8 && h < 20; })
+                .Sum(x => x.LuongThanPhunThucTe_Manual ?? x.LuongThanPhunThucTe_Auto ?? 0);
+            var kip2Computed = chiTiet
+                .Where(x => { var h = x.ThoiGian.Hour; return h >= 20 || h < 8; })
+                .Sum(x => x.LuongThanPhunThucTe_Manual ?? x.LuongThanPhunThucTe_Auto ?? 0);
+            var tongComputed = kip1Computed + kip2Computed;
+
+            var ngay   = firstRow?.NgayVanHanh ?? DateTime.MinValue;
+            var loCao  = firstRow?.IdLoCao ?? 0;
             var loCaoDisplay = loCao > 0 ? $"Lò cao {loCao}" : "";
 
-            // Lấy dữ liệu tổng hợp từ DataJson
-            string kip1 = "", kip2 = "", kip3 = "", tong = "";
-            string sanLuongNghien = "", sanLuongPhun = "";
+            // ── Helpers cục bộ ────────────────────────────────────────────────────
+            static string D(decimal? manual, decimal? auto) => (manual ?? auto)?.ToString("N1") ?? "";
+            static string I(int? manual, int? auto) => (manual ?? auto)?.ToString() ?? "";
+            static string Fd(decimal? v) => v.HasValue ? v.Value.ToString("N1") : "";
+
+            static decimal? NestedDec(JsonElement parent, string rowKey, string colKey)
+            {
+                if (!parent.TryGetProperty(rowKey, out var row) || row.ValueKind == JsonValueKind.Null) return null;
+                if (row.ValueKind == JsonValueKind.Number && row.TryGetDecimal(out var direct)) return direct;
+                if (row.ValueKind != JsonValueKind.Object)
+                {
+                    if (decimal.TryParse(row.ToString(), System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var p)) return p;
+                    return null;
+                }
+                if (!row.TryGetProperty(colKey, out var col) || col.ValueKind == JsonValueKind.Null) return null;
+                if (col.ValueKind == JsonValueKind.Number && col.TryGetDecimal(out var val)) return val;
+                if (decimal.TryParse(col.ToString(), System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var parsed)) return parsed;
+                return null;
+            }
+
+            static string SumFd(decimal? a, decimal? b) =>
+                (a.HasValue || b.HasValue) ? ((a ?? 0) + (b ?? 0)).ToString("N1") : "";
+
+            // ── Đọc DataJson ──────────────────────────────────────────────────────
+            string kipCaNgay = "Ca ngày", kipCaDem = "Ca đêm";
+            string slNghien_CN = "", slNghien_CD = "", slNghien_T = "";
+            string slPhun_CN   = "", slPhun_CD   = "", slPhun_T   = "";
+            string tonTho_CN   = "", tonTho_CD   = "", tonTho_T   = "";
+            string tonTinh_CN  = "", tonTinh_CD  = "", tonTinh_T  = "";
             string tinhTrangNgay = "", tinhTrangDem = "", sapXep = "";
+
             if (!string.IsNullOrWhiteSpace(phieu.DataJson))
             {
                 try
                 {
                     using var doc = JsonDocument.Parse(phieu.DataJson);
                     var root = doc.RootElement;
+
+                    kipCaNgay = GetString(root, "kipCaNgay") ?? "Ca ngày";
+                    kipCaDem  = GetString(root, "kipCaDem")  ?? "Ca đêm";
+
                     if (root.TryGetProperty("tinhHinhSanLuong", out var sl))
                     {
-                        kip1 = GetString(sl, "kip1") ?? "";
-                        kip2 = GetString(sl, "kip2") ?? "";
-                        kip3 = GetString(sl, "kip3") ?? "";
-                        tong = GetString(sl, "tong") ?? "";
-                        sanLuongNghien = GetString(sl, "sanLuongNghien") ?? "";
-                        sanLuongPhun = GetString(sl, "sanLuongPhun") ?? "";
+                        var nghienCN = NestedDec(sl, "sanLuongNghien", "caNgay");
+                        var nghienCD = NestedDec(sl, "sanLuongNghien", "caDem");
+                        slNghien_CN = Fd(nghienCN);
+                        slNghien_CD = Fd(nghienCD);
+                        slNghien_T  = SumFd(nghienCN, nghienCD);
+
+                        var phunCN = NestedDec(sl, "sanLuongPhun", "caNgay");
+                        var phunCD = NestedDec(sl, "sanLuongPhun", "caDem");
+                        slPhun_CN = Fd(phunCN);
+                        slPhun_CD = Fd(phunCD);
+                        slPhun_T  = SumFd(phunCN, phunCD);
+
+                        var thoCN = NestedDec(sl, "tonThanTho", "caNgay");
+                        var thoCD = NestedDec(sl, "tonThanTho", "caDem");
+                        tonTho_CN = Fd(thoCN);
+                        tonTho_CD = Fd(thoCD);
+                        tonTho_T  = SumFd(thoCN, thoCD);
+
+                        var tinhCN = NestedDec(sl, "tonThanTinh", "caNgay");
+                        var tinhCD = NestedDec(sl, "tonThanTinh", "caDem");
+                        tonTinh_CN = Fd(tinhCN);
+                        tonTinh_CD = Fd(tinhCD);
+                        tonTinh_T  = SumFd(tinhCN, tinhCD);
                     }
+
+                    // Fallback sản lượng phun từ tổng chiTiet nếu JSON chưa nhập
+                    if (string.IsNullOrEmpty(slPhun_CN) && kip1Computed != 0) slPhun_CN = kip1Computed.ToString("N1");
+                    if (string.IsNullOrEmpty(slPhun_CD) && kip2Computed != 0) slPhun_CD = kip2Computed.ToString("N1");
+                    if (string.IsNullOrEmpty(slPhun_T)  && tongComputed  != 0) slPhun_T  = tongComputed.ToString("N1");
+
                     tinhTrangNgay = GetString(root, "tinhTrangSanXuatNgay", "tinhTrangSanXuat") ?? "";
-                    tinhTrangDem = GetString(root, "tinhTrangSanXuatDem") ?? "";
-                    sapXep = GetString(root, "sapXepSanXuat") ?? "";
+                    tinhTrangDem  = GetString(root, "tinhTrangSanXuatDem") ?? "";
+                    sapXep        = GetString(root, "sapXepSanXuat") ?? "";
                 }
                 catch { /* ignore parse errors */ }
             }
-
-            // Xây dựng HTML rows (Manual ?? Auto)
-            static string Nd(decimal? m, decimal? a) => (m ?? a) is { } v ? v.ToString("N1") : "";
-            static string Ni2(int? m, int? a) => (m ?? a) is { } v ? v.ToString() : "";
-
-            var rows = new StringBuilder();
-            foreach (var c in chiTiet)
+            else
             {
-                var hour = c.ThoiGian.Hour;
-                var tg = $"{hour:D2}h";
-                rows.Append($@"<tr>
-<td>{tg}</td>
-<td>{Nd(c.NhietDoSiloBotThan1_Manual, c.NhietDoSiloBotThan1_Auto)}</td>
-<td>{Nd(c.NhietDoSiloBotThan2_Manual, c.NhietDoSiloBotThan2_Auto)}</td>
-<td>{Nd(c.NhietDoBonPhunThoi1_Manual, c.NhietDoBonPhunThoi1_Auto)}</td>
-<td>{Nd(c.NhietDoBonPhunThoi2_Manual, c.NhietDoBonPhunThoi2_Auto)}</td>
-<td>{Nd(c.NhietDoBonPhunThoi3_Manual, c.NhietDoBonPhunThoi3_Auto)}</td>
-<td>{Nd(c.DongDienMayNghien_Manual, c.DongDienMayNghien_Auto)}</td>
-<td>{Nd(c.DongDienQuatGioNguoc_Manual, c.DongDienQuatGioNguoc_Auto)}</td>
-<td>{Nd(c.NhietDoDauVaoMayNghien_Manual, c.NhietDoDauVaoMayNghien_Auto)}</td>
-<td>{Nd(c.NhietDoDauRaMayNghien_Manual, c.NhietDoDauRaMayNghien_Auto)}</td>
-<td>{Nd(c.NhietDoKhoangLo_Manual, c.NhietDoKhoangLo_Auto)}</td>
-<td>{Nd(c.MucLieuSiloBotThan1_Manual, c.MucLieuSiloBotThan1_Auto)}</td>
-<td>{Nd(c.MucLieuSiloBotThan2_Manual, c.MucLieuSiloBotThan2_Auto)}</td>
-<td>{Nd(c.MucLieuSiloThanTho_Manual, c.MucLieuSiloThanTho_Auto)}</td>
-<td>{Nd(c.TrongLuongBonPhunThoi1_Manual, c.TrongLuongBonPhunThoi1_Auto)}</td>
-<td>{Nd(c.TrongLuongBonPhunThoi2_Manual, c.TrongLuongBonPhunThoi2_Auto)}</td>
-<td>{Nd(c.TrongLuongBonPhunThoi3_Manual, c.TrongLuongBonPhunThoi3_Auto)}</td>
-<td>{Nd(c.ApLucKhiThan_Manual, c.ApLucKhiThan_Auto)}</td>
-<td>{Nd(c.ApLucBonKhiN2_Manual, c.ApLucBonKhiN2_Auto)}</td>
-<td>{Nd(c.NhietDoTramDauBoiTron_Manual, c.NhietDoTramDauBoiTron_Auto)}</td>
-<td>{Nd(c.NhietDoStatoDongCoMayNghien_Manual, c.NhietDoStatoDongCoMayNghien_Auto)}</td>
-<td>{Nd(c.NhietDoTrucDongCoMayNghien_Manual, c.NhietDoTrucDongCoMayNghien_Auto)}</td>
-<td>{Nd(c.ApLucTrucNghien_Manual, c.ApLucTrucNghien_Auto)}</td>
-<td>{Nd(c.YeuCauTuLoCao_Manual, c.YeuCauTuLoCao_Auto)}</td>
-<td>{Nd(c.LuongThanPhunThucTe_Manual, c.LuongThanPhunThucTe_Auto)}</td>
-<td>{Nd(c.LuyKeLuongPhunThanTrongCa_Manual, c.LuyKeLuongPhunThanTrongCa_Auto)}</td>
-<td>{Ni2(c.SoLuongSungPhun_Manual, c.SoLuongSungPhun_Auto)}</td>
-<td>{Nd(c.ApLucGioLanhLoCao_Manual, c.ApLucGioLanhLoCao_Auto)}</td>
-<td class=""td-left"">{System.Web.HttpUtility.HtmlEncode(c.GhiChu ?? "")}</td>
-</tr>");
+                // Không có JSON — dùng giá trị tính từ chiTiet
+                if (kip1Computed != 0) slPhun_CN = kip1Computed.ToString("N1");
+                if (kip2Computed != 0) slPhun_CD = kip2Computed.ToString("N1");
+                if (tongComputed  != 0) slPhun_T  = tongComputed.ToString("N1");
             }
 
+            // ── Build 24 dòng giờ cố định (08h→07h) ─────────────────────────────
+            var hours = Enumerable.Range(0, 24).Select(i => (8 + i) % 24).ToList();
+
+            var dataByHour = chiTiet
+                .GroupBy(x => x.ThoiGian.Hour)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ThoiGian).First());
+
+            var rows = new StringBuilder();
+            foreach (var hour in hours)
+            {
+                if (hour == 20)
+                    rows.Append("<tr class='shift-divider'><td colspan='28'></td></tr>");
+
+                dataByHour.TryGetValue(hour, out var c);
+
+                            rows.Append($@"<tr>
+            <td>{hour:D2}h</td>
+            <td>{D(c?.NhietDoSiloBotThan1_Manual, c?.NhietDoSiloBotThan1_Auto)}</td>
+            <td>{D(c?.NhietDoSiloBotThan2_Manual, c?.NhietDoSiloBotThan2_Auto)}</td>
+            <td>{D(c?.NhietDoBonPhunThoi1_Manual, c?.NhietDoBonPhunThoi1_Auto)}</td>
+            <td>{D(c?.NhietDoBonPhunThoi2_Manual, c?.NhietDoBonPhunThoi2_Auto)}</td>
+            <td>{D(c?.NhietDoBonPhunThoi3_Manual, c?.NhietDoBonPhunThoi3_Auto)}</td>
+            <td>{D(c?.DongDienMayNghien_Manual, c?.DongDienMayNghien_Auto)}</td>
+            <td>{D(c?.DongDienQuatGioNguoc_Manual, c?.DongDienQuatGioNguoc_Auto)}</td>
+            <td>{D(c?.NhietDoDauVaoMayNghien_Manual, c?.NhietDoDauVaoMayNghien_Auto)}</td>
+            <td>{D(c?.NhietDoDauRaMayNghien_Manual, c?.NhietDoDauRaMayNghien_Auto)}</td>
+            <td>{D(c?.NhietDoKhoangLo_Manual, c?.NhietDoKhoangLo_Auto)}</td>
+            <td>{D(c?.MucLieuSiloBotThan1_Manual, c?.MucLieuSiloBotThan1_Auto)}</td>
+            <td>{D(c?.MucLieuSiloBotThan2_Manual, c?.MucLieuSiloBotThan2_Auto)}</td>
+            <td>{D(c?.MucLieuSiloThanTho_Manual, c?.MucLieuSiloThanTho_Auto)}</td>
+            <td>{D(c?.TrongLuongBonPhunThoi1_Manual, c?.TrongLuongBonPhunThoi1_Auto)}</td>
+            <td>{D(c?.TrongLuongBonPhunThoi2_Manual, c?.TrongLuongBonPhunThoi2_Auto)}</td>
+            <td>{D(c?.TrongLuongBonPhunThoi3_Manual, c?.TrongLuongBonPhunThoi3_Auto)}</td>
+            <td>{D(c?.ApLucKhiThan_Manual, c?.ApLucKhiThan_Auto)}</td>
+            <td>{D(c?.ApLucBonKhiN2_Manual, c?.ApLucBonKhiN2_Auto)}</td>
+            <td>{D(c?.NhietDoTramDauBoiTron_Manual, c?.NhietDoTramDauBoiTron_Auto)}</td>
+            <td>{D(c?.NhietDoStatoDongCoMayNghien_Manual, c?.NhietDoStatoDongCoMayNghien_Auto)}</td>
+            <td>{D(c?.NhietDoTrucDongCoMayNghien_Manual, c?.NhietDoTrucDongCoMayNghien_Auto)}</td>
+            <td>{D(c?.ApLucTrucNghien_Manual, c?.ApLucTrucNghien_Auto)}</td>
+            <td>{D(c?.YeuCauTuLoCao_Manual, c?.YeuCauTuLoCao_Auto)}</td>
+            <td>{D(c?.LuongThanPhunThucTe_Manual, c?.LuongThanPhunThucTe_Auto)}</td>
+            <td>{D(c?.LuyKeLuongPhunThanTrongCa_Manual, c?.LuyKeLuongPhunThanTrongCa_Auto)}</td>
+            <td>{I(c?.SoLuongSungPhun_Manual, c?.SoLuongSungPhun_Auto)}</td>
+            <td>{D(c?.ApLucGioLanhLoCao_Manual, c?.ApLucGioLanhLoCao_Auto)}</td>
+            </tr>");
+            }
+
+            // ── Ký hiệu & logo ────────────────────────────────────────────────────
             var nvVanHanhCaNgay = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
             var nvVanHanhCaDem  = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
 
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
-                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl    = _configuration.GetValue<string>("AppSettings:LogoUrl")
+                             ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
             var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
             var signNgay   = await FormatChuKyBase64Async(nvVanHanhCaNgay?.ChuKy, nvVanHanhCaNgay?.TinhTrang == 1);
             var signDem    = await FormatChuKyBase64Async(nvVanHanhCaDem?.ChuKy,  nvVanHanhCaDem?.TinhTrang  == 1);
 
+            // ── Render HTML ───────────────────────────────────────────────────────
             var templatePath = Path.Combine(_env.WebRootPath, "template_html",
                 "BM.10-QT.05.09_Nhat_ky_van_hanh_phun_than_lo_cao.html");
 
             var html = await File.ReadAllTextAsync(templatePath);
             html = html
-                .Replace("{{LogoUrl}}", logoBase64)
-                .Replace("{{LoCao}}", loCaoDisplay)
-                .Replace("{{NgaySX}}", ngayDisplay)
-                .Replace("{{DataRows}}", rows.ToString())
-                .Replace("{{Kip1}}", kip1)
-                .Replace("{{Kip2}}", kip2)
-                .Replace("{{Kip3}}", kip3)
-                .Replace("{{Tong}}", tong)
-                .Replace("{{SanLuongNghien}}", sanLuongNghien)
-                .Replace("{{SanLuongPhun}}", sanLuongPhun)
+                .Replace("{{LogoUrl}}",        logoBase64)
+                .Replace("{{LoCao}}",          loCaoDisplay)
+                .Replace("{{NgayDisplay}}",    ngay != DateTime.MinValue ? ngay.Day.ToString() : "")
+                .Replace("{{ThangDisplay}}",   ngay != DateTime.MinValue ? ngay.Month.ToString() : "")
+                .Replace("{{NamDisplay}}",     ngay != DateTime.MinValue ? ngay.Year.ToString() : "")
+                .Replace("{{DataRows}}",       rows.ToString())
+                // Kíp names
+                .Replace("{{KipCaNgay}}",      System.Web.HttpUtility.HtmlEncode(kipCaNgay))
+                .Replace("{{KipCaDem}}",       System.Web.HttpUtility.HtmlEncode(kipCaDem))
+                // Sản lượng nghiền
+                .Replace("{{SanLuongNghien_CaNgay}}", slNghien_CN)
+                .Replace("{{SanLuongNghien_CaDem}}",  slNghien_CD)
+                .Replace("{{SanLuongNghien_Tong}}",   slNghien_T)
+                // Sản lượng phun
+                .Replace("{{SanLuongPhun_CaNgay}}", slPhun_CN)
+                .Replace("{{SanLuongPhun_CaDem}}",  slPhun_CD)
+                .Replace("{{SanLuongPhun_Tong}}",   slPhun_T)
+                // Tồn than thô
+                .Replace("{{TonThanTho_CaNgay}}", tonTho_CN)
+                .Replace("{{TonThanTho_CaDem}}",  tonTho_CD)
+                .Replace("{{TonThanTho_Tong}}",   tonTho_T)
+                // Tồn than tinh
+                .Replace("{{TonThanTinh_CaNgay}}", tonTinh_CN)
+                .Replace("{{TonThanTinh_CaDem}}",  tonTinh_CD)
+                .Replace("{{TonThanTinh_Tong}}",   tonTinh_T)
+                // Tình trạng & sắp xếp
                 .Replace("{{TinhTrangSanXuatNgay}}", System.Web.HttpUtility.HtmlEncode(tinhTrangNgay))
-                .Replace("{{TinhTrangSanXuatDem}}", System.Web.HttpUtility.HtmlEncode(tinhTrangDem))
-                .Replace("{{SapXepSanXuat}}", System.Web.HttpUtility.HtmlEncode(sapXep))
+                .Replace("{{TinhTrangSanXuatDem}}",  System.Web.HttpUtility.HtmlEncode(tinhTrangDem))
+                .Replace("{{SapXepSanXuat}}",        System.Web.HttpUtility.HtmlEncode(sapXep))
+                // Chữ ký
                 .Replace("{{Sign_NVVanHanhCaNgay}}", signNgay)
-                .Replace("{{Ten_NVVanHanhCaNgay}}", nvVanHanhCaNgay?.HoVaTen ?? "")
-                .Replace("{{Sign_NVVanHanhCaDem}}", signDem)
-                .Replace("{{Ten_NVVanHanhCaDem}}", nvVanHanhCaDem?.HoVaTen ?? "");
+                .Replace("{{Ten_NVVanHanhCaNgay}}",  nvVanHanhCaNgay?.HoVaTen ?? "")
+                .Replace("{{Sign_NVVanHanhCaDem}}",  signDem)
+                .Replace("{{Ten_NVVanHanhCaDem}}",   nvVanHanhCaDem?.HoVaTen ?? "");
 
             var pdfDoc = new HtmlToPdfDocument
             {
@@ -585,7 +679,6 @@ namespace dataproduct.api.Services
                 (26, "Lũy kế lượng\nphun than\ntrong ca",     1, 1, "t"),
                 (27, "Số lượng\nsúng phun",                   1, 1, "cái"),
                 (28, "Áp lực gió\nlạnh lò cao",               1, 1, "Kpa"),
-                (29, "Ghi chú",                               1, 2, ""),
             };
 
             // Sub-headers row 2 for grouped columns
@@ -664,15 +757,13 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 26).Value = (double?)Eff(c.LuyKeLuongPhunThanTrongCa_Manual, c.LuyKeLuongPhunThanTrongCa_Auto);
                 ws.Cell(r, 27).Value = EffI(c.SoLuongSungPhun_Manual, c.SoLuongSungPhun_Auto);
                 ws.Cell(r, 28).Value = (double?)Eff(c.ApLucGioLanhLoCao_Manual, c.ApLucGioLanhLoCao_Auto);
-                ws.Cell(r, 29).Value = c.GhiChu ?? "";
 
-                ws.Row(r).Cells(1, 29).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                ws.Cell(r, 29).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                ws.Row(r).Cells(1, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 r++;
             }
 
             // Border toàn bộ bảng
-            SetBorder(ws.Range(hdr1, 1, r - 1, 29));
+            SetBorder(ws.Range(hdr1, 1, r - 1, 28));
 
             // ── Tình hình sản lượng ──────────────────────────────────────────────
             r++;
