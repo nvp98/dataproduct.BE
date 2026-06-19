@@ -28,12 +28,16 @@
         font-weight: bold;
         font-size: 8.5pt;
         text-transform: uppercase;
+        text-align: left;
+      }
+
+      .header-left-inner {
+        display: inline-block;
+        text-align: center;
       }
 
       .header-left img {
         max-height: 60px;
-        vertical-align: middle;
-        margin-right: 8px;
       }
 
       .header-right {
@@ -78,15 +82,16 @@
     }
     .main-table th { font-weight: bold; background-color: #f0f0f0; }
     .col-tt    { width: 4%;    }
-    .col-may   { width: 13%;    }
-    .col-mac   { width: 14%;   }  /* Mác thép — rộng hơn */
+    .col-may   { width: 10%;   }
+    .col-me    { width: 9%;    }  /* Mẻ thổi */
+    .col-mac   { width: 12%;   }  /* Mác thép */
     .col-thung { width: 6%;    }
-    .col-tg    { width: 6%;    }  /* Thời gian — hẹp lại */
-    .col-a     { width: 8.5%;  }  /* KL a — nhỏ lại */
-    .col-b     { width: 7%;    }  /* KL b — nhỏ lại */
-    .col-c     { width: 8.5%;  }  /* KL c — nhỏ lại */
-    .col-kl    { width: 8%;    }  /* KL thép lỏng — nhỏ lại */
-    .col-gc    { width: 13.5%;  }
+    .col-tg    { width: 5%;    }  /* Thời gian — hẹp lại */
+    .col-a     { width: 7.5%;  }  /* KL a */
+    .col-b     { width: 6%;    }  /* KL b */
+    .col-c     { width: 7.5%;  }  /* KL c */
+    .col-kl    { width: 7%;    }  /* KL thép lỏng */
+    .col-gc    { width: 13.5%; }
     .col-tl    { width: 12.5%; }
     .sum-label { font-weight: bold; }
 
@@ -109,10 +114,11 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-left">
-      <img src="{{LogoUrl}}" alt="Logo" />
-      <br />
-      CÔNG TY CỔ PHẦN THÉP<br />
-      HÒA PHÁT DUNG QUẤT
+      <div class="header-left-inner">
+        <img src="{{LogoUrl}}" alt="Logo" /><br />
+        CÔNG TY CỔ PHẦN THÉP<br />
+        HÒA PHÁT DUNG QUẤT
+      </div>
     </div>
     <div class="header-right">
       {{BmCode}}
@@ -150,6 +156,7 @@
     <colgroup>
       <col class="col-tt"    />
       <col class="col-may"   />
+      <col class="col-me"    />
       <col class="col-mac"   />
       <col class="col-thung" />
       <col class="col-tg"    />
@@ -164,13 +171,14 @@
       <tr>
         <th rowspan="2">TT</th>
         <th rowspan="2">Máy đúc</th>
+        <th rowspan="2">Mẻ thổi</th>
         <th rowspan="2">Mác thép</th>
         <th rowspan="2">Thùng số</th>
         <th rowspan="2">Thời gian</th>
-        <th rowspan="2">KL. thùng &amp; thép lỏng vào bệ xoay (tấn) - lần 1</th>
-        <th rowspan="2">KL bì - Lần 2 (tấn)</th>
-        <th rowspan="2">KL bì - Lần 3 (tấn)</th>
-        <th rowspan="2">KL. thép lỏng (tấn)</th>
+        <th rowspan="2">KL thùng &amp; thép lỏng vào bệ xoay (tấn) - lần 1</th>
+        <th rowspan="2">KL thùng ( tấn) - lần 2</th>
+        <th rowspan="2">KL thùng thép lần 3 (tấn) (nếu có)</th>
+        <th rowspan="2">KL thép lỏng (tấn)</th>
         <th rowspan="2">Ghi chú</th>
         <th rowspan="2">Tinh luyện / Lên thẳng</th>
       </tr>
@@ -180,7 +188,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="8" class="sum-label">Tổng</td>
+        <td colspan="9" class="sum-label">Tổng</td>
         <td><strong>{{TongKl}}</strong></td>
         <td></td>
         <td></td>

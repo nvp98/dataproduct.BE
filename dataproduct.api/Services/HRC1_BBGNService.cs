@@ -160,11 +160,7 @@ namespace dataproduct.api.Services
                 Kip = phieu.Kip,
                 TinhTrang = phieu.TinhTrang,
                 DanhSachMe = danhSachMe,
-                DanhSachMayDuc = mayDucs.Select(md => new HRC1_MayDucOptionVm
-                {
-                    Id = md.Id,
-                    TenMayDuc = md.TenMayDuc ?? string.Empty
-                }).ToList()
+                DanhSachMayDuc = await BuildDanhSachMayDucAsync(congDoan, phieu.NgaySX, phieu.Ca, mayDucs)
             };
 
             if (congDoan == "tinh_luyen")
@@ -377,6 +373,10 @@ namespace dataproduct.api.Services
 
             if (me.DichChuyen == "len_thang")
                 throw new InvalidOperationException("Lò thổi đã chỉ định mẻ này lên thẳng máy đúc, không thể nhận vào tinh luyện.");
+
+            // Mẻ chưa được lò thổi chọn đích (DichChuyen = null) → tự động gán tinh_luyen khi TL nhận
+            if (string.IsNullOrEmpty(me.DichChuyen))
+                me.DichChuyen = "tinh_luyen";
 
             if (await _repo.ExistsMePhanCongAsync(req.MeId, "tinh_luyen"))
                 throw new InvalidOperationException("Mẻ đã được nhận vào tinh luyện.");
@@ -820,9 +820,8 @@ namespace dataproduct.api.Services
             {
                 if (me.IsChot == true) continue;
                 me.IsChot = true;
-                me.CapNhatBoi = userId;
                 me.CapNhatLuc = now;
-                me.CapNhatBoiDuc = userId;
+                me.CapNhatBoiChot = userId;
                 _repo.AddLichSu(new HRC1_LichSu
                 {
                     MeId = me.Id,
@@ -846,9 +845,8 @@ namespace dataproduct.api.Services
             {
                 if (me.IsChot != true) continue;
                 me.IsChot = false;
-                me.CapNhatBoi = userId;
                 me.CapNhatLuc = now;
-                me.CapNhatBoiDuc = userId;
+                me.CapNhatBoiChot = userId;
                 _repo.AddLichSu(new HRC1_LichSu
                 {
                     MeId = me.Id,
@@ -1086,14 +1084,19 @@ namespace dataproduct.api.Services
         // -------------------------------------------------------
         // GHI CHÚ — cập nhật ghi chú chung, dùng cho cả 3 công đoạn
         // -------------------------------------------------------
-        public async Task UpdateGhiChuAsync(int meId, string? ghiChu, int userId)
+        public async Task UpdateGhiChuAsync(int meId, string? ghiChu, string? field, int userId)
         {
             var me = await _repo.GetMeByIdAsync(meId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy mẻ {meId}");
             if (me.IsChot == true)
                 throw new InvalidOperationException("Mẻ đã chốt, không thể chỉnh sửa.");
 
-            me.GhiChuLo = ghiChu;
+            switch (field)
+            {
+                case "tl":  me.GhiChuTL  = ghiChu; break;
+                case "duc": me.GhiChuDuc = ghiChu; break;
+                default:    me.GhiChuLo  = ghiChu; break;
+            }
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             await _repo.SaveChangesAsync();
@@ -1125,6 +1128,27 @@ namespace dataproduct.api.Services
 
         public Task<HRC1_TongHopResult> TongHopAsync(HRC1_ThongKeQuery query) =>
             _repo.GetTongHopAsync(query);
+
+        // -------------------------------------------------------
+        // Helper — danh sách máy đúc cho dropdown
+        // Với tinh_luyen: chỉ trả máy đúc có phiếu cùng ngày/ca chưa chốt (TinhTrang != 5)
+        // -------------------------------------------------------
+        private async Task<List<HRC1_MayDucOptionVm>> BuildDanhSachMayDucAsync(
+            string congDoan, DateOnly? ngay, int? ca, List<MayDuc> mayDucs)
+        {
+            if (congDoan is "tinh_luyen" or "lo_thoi" && ngay.HasValue && ca.HasValue)
+            {
+                var activeScopes = await _repo.GetActiveDucPhieuScopesAsync(ngay.Value, ca.Value);
+                var scopeSet = new HashSet<int>(activeScopes);
+                return mayDucs
+                    .Where(md => scopeSet.Contains(md.Id))
+                    .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty })
+                    .ToList();
+            }
+            return mayDucs
+                .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty })
+                .ToList();
+        }
 
         // -------------------------------------------------------
         // IsTrungMeThoi helper
@@ -1193,7 +1217,8 @@ namespace dataproduct.api.Services
                 MacThep = m.MacThep,
                 MacThepBKMIS = m.MacThepBKMIS,
                 IdMacThep = m.IdMacThep,
-                GhiChuTL = m.GhiChuTL,
+                GhiChuTL  = m.GhiChuTL,
+                GhiChuDuc = m.GhiChuDuc,
                 TrangThaiLo = m.TrangThaiLo,
                 TrangThaiTL = m.TrangThaiTL,
                 TrangThaiDuc = m.TrangThaiDuc,
@@ -1217,10 +1242,97 @@ namespace dataproduct.api.Services
         {
             var data = await _repo.GetMeThepsForExportAsync(query);
 
+            var p2Parts = new List<string>();
+            if (query.TuNgay.HasValue || query.DenNgay.HasValue)
+                p2Parts.Add($"Từ ngày: {query.TuNgay:dd/MM/yyyy}  –  Đến ngày: {query.DenNgay:dd/MM/yyyy}");
+            if (query.Ca.HasValue) p2Parts.Add($"Ca: {(query.Ca == 1 ? "Ca ngày" : "Ca đêm")}");
+            if (!string.IsNullOrEmpty(query.Kip)) p2Parts.Add($"Kíp: {query.Kip}");
+
+            var p3Parts = new List<string>();
+            if (query.LoSo.HasValue) p3Parts.Add($"Lò thổi: {query.LoSo}");
+            if (query.TlSo.HasValue) p3Parts.Add($"Tinh luyện: {query.TlSo}");
+            if (query.IdMayDuc.HasValue) p3Parts.Add($"Máy đúc ID: {query.IdMayDuc}");
+            if (!string.IsNullOrEmpty(query.MaMe)) p3Parts.Add($"Mẻ: {query.MaMe}");
+            if (!string.IsNullOrEmpty(query.ThungSo)) p3Parts.Add($"Thùng: {query.ThungSo}");
+            if (!string.IsNullOrEmpty(query.PhanLoai)) p3Parts.Add($"Phân loại: {query.PhanLoai}");
+            if (query.IsChot.HasValue) p3Parts.Add(query.IsChot.Value ? "Đã chốt" : "Chưa chốt");
+            if (query.IsManualTL.HasValue) p3Parts.Add($"Nhập tay: {(query.IsManualTL.Value ? "Có" : "Không")}");
+            p3Parts.Add($"Tổng: {data.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}");
+
             using var wb = new XLWorkbook();
             var ws = wb.AddWorksheet("Thống kê");
+            WriteExcelSheet(ws, data, string.Join("   |   ", p2Parts), string.Join("   |   ", p3Parts));
 
-            const int TOTAL_COLS = 27;
+            using var stream = new MemoryStream();
+            wb.SaveAs(stream);
+            return new ExportFileResult
+            {
+                Content = stream.ToArray(),
+                FileName = $"ThongKe_HRC1_BBGN_TL_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            };
+        }
+
+        public async Task<ExportFileResult> ExportBulkExcelAsync(List<Guid> phieuIds)
+        {
+            var phieus = await _repo.GetBmPhieusByIdsAsync(phieuIds);
+
+            var merged = new List<HRC1_ExportRow>();
+            foreach (var phieu in phieus)
+            {
+                if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue) continue;
+                var query = new HRC1_ExportQuery
+                {
+                    TuNgay  = phieu.NgaySX,
+                    DenNgay = phieu.NgaySX,
+                    Ca      = phieu.Ca,
+                };
+                switch (phieu.MaBm)
+                {
+                    case "HRC1_TinhLuyen":     query.TlSo    = phieu.Scope; break;
+                    case "HRC1_BBGN_ThepLong": query.IdMayDuc = phieu.Scope; break;
+                    default:
+                        if (phieu.Scope.HasValue) query.LoSo = phieu.Scope;
+                        break;
+                }
+                var rows = await _repo.GetMeThepsForExportAsync(query);
+                merged.AddRange(rows);
+            }
+
+            merged = merged
+                .GroupBy(r => r.MeId)
+                .Select(g => g.First())
+                .OrderBy(r => r.NgayTao)
+                .ThenBy(r => r.Ca)
+                .ThenBy(r => r.TenMayDuc)
+                .ThenBy(r => r.MaMe)
+                .ToList();
+
+            var validPhieus = phieus.Where(p => p.NgaySX.HasValue).ToList();
+            var minDate = validPhieus.Count > 0 ? validPhieus.Min(p => p.NgaySX!.Value) : DateOnly.FromDateTime(DateTime.Today);
+            var maxDate = validPhieus.Count > 0 ? validPhieus.Max(p => p.NgaySX!.Value) : minDate;
+            var line2 = minDate == maxDate
+                ? $"Ngày: {minDate:dd/MM/yyyy}"
+                : $"Từ ngày: {minDate:dd/MM/yyyy}  –  Đến ngày: {maxDate:dd/MM/yyyy}";
+            var line3 = $"{phieuIds.Count} phiếu   |   Tổng: {merged.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}";
+
+            using var wb = new XLWorkbook();
+            var ws = wb.AddWorksheet("Thống kê");
+            WriteExcelSheet(ws, merged, line2, line3);
+
+            using var stream = new MemoryStream();
+            wb.SaveAs(stream);
+            return new ExportFileResult
+            {
+                Content = stream.ToArray(),
+                FileName = $"BulkExport_HRC1_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            };
+        }
+
+        private static void WriteExcelSheet(IXLWorksheet ws, List<HRC1_ExportRow> data, string line2, string line3)
+        {
+            const int TOTAL_COLS = 30;
             const int HEADER_ROW = 4;
             const int DATA_START = 5;
 
@@ -1233,25 +1345,10 @@ namespace dataproduct.api.Services
             ws.Row(1).Height = 22;
 
             ws.Range(2, 1, 2, TOTAL_COLS).Merge();
-            var p2 = new List<string>();
-            if (query.TuNgay.HasValue || query.DenNgay.HasValue)
-                p2.Add($"Từ ngày: {query.TuNgay:dd/MM/yyyy}  –  Đến ngày: {query.DenNgay:dd/MM/yyyy}");
-            if (query.Ca.HasValue) p2.Add($"Ca: {(query.Ca == 1 ? "Ca ngày" : "Ca đêm")}");
-            if (!string.IsNullOrEmpty(query.Kip)) p2.Add($"Kíp: {query.Kip}");
-            ws.Cell(2, 1).Value = string.Join("   |   ", p2);
+            ws.Cell(2, 1).Value = line2;
 
             ws.Range(3, 1, 3, TOTAL_COLS).Merge();
-            var p3 = new List<string>();
-            if (query.LoSo.HasValue) p3.Add($"Lò thổi: {query.LoSo}");
-            if (query.TlSo.HasValue) p3.Add($"Tinh luyện: {query.TlSo}");
-            if (query.IdMayDuc.HasValue) p3.Add($"Máy đúc ID: {query.IdMayDuc}");
-            if (!string.IsNullOrEmpty(query.MaMe)) p3.Add($"Mẻ: {query.MaMe}");
-            if (!string.IsNullOrEmpty(query.ThungSo)) p3.Add($"Thùng: {query.ThungSo}");
-            if (!string.IsNullOrEmpty(query.PhanLoai)) p3.Add($"Phân loại: {query.PhanLoai}");
-            if (query.IsChot.HasValue) p3.Add(query.IsChot.Value ? "Đã chốt" : "Chưa chốt");
-            if (query.IsManualTL.HasValue) p3.Add($"Nhập tay: {(query.IsManualTL.Value ? "Có" : "Không")}");
-            p3.Add($"Tổng: {data.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}");
-            ws.Cell(3, 1).Value = string.Join("   |   ", p3);
+            ws.Cell(3, 1).Value = line3;
             ws.Cell(3, 1).Style.Font.Italic = true;
 
             string[] headers =
@@ -1259,8 +1356,8 @@ namespace dataproduct.api.Services
                 "STT","Ngày tạo","Ca","Kíp","Máy đúc","Mẻ thổi","Mác thép","Thùng số","Thời gian",
                 "KL LF sau thép","KL lần 1","KL lần 2","KL lần 3","KL thép lỏng",
                 "TT Lò","TL / Lên thẳng","Ghi chú","Phân loại","Thử nghiệm","Mác BKMIS",
-                "Người sửa lò","Ngày nhận TL","TT Nhận","Người sửa TL",
-                "TT Xác nhận","Người xác nhận","Chốt",
+                "Người sửa lò","Ngày TL","Ca TL","TT Nhận","Người sửa TL",
+                "Ngày đúc","Ca đúc","TT Xác nhận","Người xác nhận","Chốt",
             };
             for (int c = 0; c < headers.Length; c++)
             {
@@ -1305,13 +1402,17 @@ namespace dataproduct.api.Services
                 ws.Cell(row, 20).Value = item.MacThepBKMIS ?? "";
                 ws.Cell(row, 21).Value = item.TenCapNhatBoiLo ?? "";
                 ws.Cell(row, 22).Value = item.NgayNhanTL.HasValue
-                    ? item.NgayNhanTL.Value.ToString("dd/MM/yyyy HH:mm") : "";
-                ws.Cell(row, 23).Value = FmtTL(item.TrangThaiTL);
-                ws.Cell(row, 24).Value = item.TenCapNhatBoiTL ?? "";
-                ws.Cell(row, 25).Value = FmtDuc(item.TrangThaiDuc);
-                ws.Cell(row, 26).Value = item.TenCapNhatBoiDuc ?? "";
+                    ? item.NgayNhanTL.Value.ToString("dd/MM/yyyy") : "";
+                ws.Cell(row, 23).Value = item.CaTinhLuyen.HasValue ? (item.CaTinhLuyen == 1 ? "Ca ngày" : "Ca đêm") : "";
+                ws.Cell(row, 24).Value = FmtTL(item.TrangThaiTL);
+                ws.Cell(row, 25).Value = item.TenCapNhatBoiTL ?? "";
+                ws.Cell(row, 26).Value = item.NgayDuc.HasValue
+                    ? item.NgayDuc.Value.ToString("dd/MM/yyyy") : "";
+                ws.Cell(row, 27).Value = item.CaDuc.HasValue ? (item.CaDuc == 1 ? "Ca ngày" : "Ca đêm") : "";
+                ws.Cell(row, 28).Value = FmtDuc(item.TrangThaiDuc);
+                ws.Cell(row, 29).Value = item.TenCapNhatBoiDuc ?? "";
 
-                var chotCell = ws.Cell(row, 27);
+                var chotCell = ws.Cell(row, 30);
                 if (item.IsChot == true)
                 {
                     chotCell.Value = "Đã chốt";
@@ -1335,16 +1436,8 @@ namespace dataproduct.api.Services
             ws.Column(1).Width = 5;
             ws.Column(17).Width = 28;
             ws.Column(2).Width = 14;
-            ws.Column(22).Width = 16;
-
-            using var stream = new MemoryStream();
-            wb.SaveAs(stream);
-            return new ExportFileResult
-            {
-                Content = stream.ToArray(),
-                FileName = $"ThongKe_HRC1_BBGN_TL_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
-                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            };
+            ws.Column(22).Width = 14;
+            ws.Column(26).Width = 14;
         }
 
         private static void SetExcelNum(IXLCell cell, decimal? v)
@@ -1389,6 +1482,7 @@ namespace dataproduct.api.Services
                 <tr>
                   <td>{stt++}</td>
                   <td>{r.TenMayDucDich ?? ""}</td>
+                  <td>{r.MaMe ?? ""}</td>
                   <td{meStyle}>{r.MacThepBKMIS ?? ""}</td>
                   <td>{r.ThungSo ?? ""}</td>
                   <td>{r.ThoiGian ?? ""}</td>

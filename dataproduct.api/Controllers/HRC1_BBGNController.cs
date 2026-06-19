@@ -371,7 +371,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                await _svc.UpdateGhiChuAsync(meId, req.GhiChu, LayUserId());
+                await _svc.UpdateGhiChuAsync(meId, req.GhiChu, req.Field, LayUserId());
                 return NoContent();
             }
             catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
@@ -414,6 +414,26 @@ namespace dataproduct.api.Controllers
             try
             {
                 var result = await _svc.ExportExcelAsync(query);
+                return File(result.Content, result.ContentType, result.FileName);
+            }
+            catch (Exception ex) { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/export/excel/bulk — xuất Excel nhiều phiếu gộp vào 1 file</summary>
+        [HttpPost("export/excel/bulk")]
+        public async Task<IActionResult> ExportExcelBulk([FromBody] List<string> idPhieuList)
+        {
+            try
+            {
+                if (idPhieuList is null || idPhieuList.Count == 0)
+                    return BadRequest("Danh sách phiếu không được rỗng.");
+                var guids = idPhieuList
+                    .Select(s => Guid.TryParse(s, out var g) ? g : (Guid?)null)
+                    .Where(g => g.HasValue)
+                    .Select(g => g!.Value)
+                    .ToList();
+                if (guids.Count == 0) return BadRequest("Không có ID phiếu hợp lệ.");
+                var result = await _svc.ExportBulkExcelAsync(guids);
                 return File(result.Content, result.ContentType, result.FileName);
             }
             catch (Exception ex) { return StatusCode(500, ex.Message); }

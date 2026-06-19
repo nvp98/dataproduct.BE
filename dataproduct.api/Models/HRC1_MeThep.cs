@@ -53,6 +53,9 @@ public class HRC1_MeThep
     [MaxLength(500)]
     public string? GhiChuTL { get; set; }
 
+    [MaxLength(500)]
+    public string? GhiChuDuc { get; set; }
+
     // LT/Đúc: 0=chờ xử lý, 1=đã xác nhận, 2=đã chốt
     // TL:     0=chờ xử lý, 1=đã nhận, 2=đã xác nhận, 3=đã chốt
     public int? TrangThaiLo { get; set; }
@@ -63,6 +66,7 @@ public class HRC1_MeThep
     public DateTime? CapNhatLuc { get; set; }
     public int? CapNhatBoiTL { get; set; }     // ID_TaiKhoan (tinh luyện cuối)
     public int? CapNhatBoiDuc { get; set; }    // ID_TaiKhoan (máy đúc cuối)
+    public int? CapNhatBoiChot { get; set; }   // ID_TaiKhoan (người chốt/bỏ chốt mẻ)
 
     public DateTime NgayTao { get; set; }      // set by SQL DEFAULT GETDATE() on insert; không thay đổi sau khi tạo
     public DateTime? NgayNhanTL { get; set; }  // ngày TL nhận mẻ (date-only; dùng để lọc ngày cho phiếu máy đúc)

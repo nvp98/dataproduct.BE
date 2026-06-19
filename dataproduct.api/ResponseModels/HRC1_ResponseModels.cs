@@ -36,6 +36,7 @@ namespace dataproduct.api.ResponseModels
         public string? MacThepBKMIS { get; set; }
         public int? IdMacThep { get; set; }
         public string? GhiChuTL { get; set; }
+        public string? GhiChuDuc { get; set; }
 
         // Trạng thái
         // LT/Đúc: 0=chờ, 1=đã xác nhận, 2=đã chốt
