@@ -195,6 +195,7 @@ namespace dataproduct.api.DTOs
         public decimal? KlLan2 { get; set; }
         public decimal? KlLan3 { get; set; }
         public decimal? KlThepLong { get; set; }
+        public decimal? KlThepLongChot { get; set; }
         public decimal? KLThepLongPhanBo { get; set; }
         public string? GhiChuLo { get; set; }
         public string? GhiChuTL { get; set; }
@@ -257,6 +258,7 @@ namespace dataproduct.api.DTOs
     public class HRC1_ThongKeQuery : HRC1_ExportQuery
     {
         public bool? IsTrungMeThoi { get; set; }
+        public bool? IsChuyenMe { get; set; }   // true = chỉ lấy mẻ đã chuyển sang mẻ khác
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }
@@ -269,6 +271,7 @@ namespace dataproduct.api.DTOs
         public List<HRC1_ExportRow> Items { get; set; } = new();
         public int TotalRecords { get; set; }
         public decimal? TotalKlThepLong { get; set; }
+        public decimal? TotalKlThepLongChot { get; set; }
         public decimal? TotalKlThepLongPhanBo { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }

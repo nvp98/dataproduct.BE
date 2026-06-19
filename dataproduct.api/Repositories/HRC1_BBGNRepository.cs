@@ -455,8 +455,8 @@ namespace dataproduct.api.Repositories
             string? tenNhom      = m.MacThepBKMIS != null    && nhomPhanLoai.TryGetValue(m.MacThepBKMIS, out var nh)     ? nh : null;
             bool isLenThang = m.DichChuyen == "len_thang";
             int? soTLNhan   = tlScopeDict.TryGetValue(m.Id, out var tlSc) ? tlSc : null;
-            string? tlLt = isLenThang                    ? "Lên thẳng"
-                         : m.DichChuyen == "tinh_luyen"  ? (soTLNhan.HasValue ? $"TL {soTLNhan}" : "Tinh luyện")
+            string? tlLt = isLenThang                   ? "Lên thẳng"
+                         : m.DichChuyen == "tinh_luyen" ? "Tinh luyện"
                          : null;
             DateOnly? ngayDuc = isLenThang
                 ? DateOnly.FromDateTime(m.NgayTao)
@@ -548,6 +548,14 @@ namespace dataproduct.api.Repositories
                 meQuery = meQuery.Where(m => m.IsTrungMeThoi == q.IsTrungMeThoi);
             if (q.IsManualTL.HasValue)
                 meQuery = meQuery.Where(m => m.IsManualTL == q.IsManualTL);
+            if (q.IsChuyenMe == true)
+            {
+                var chuyenMeIds = _ctx.HRC1_MePhanCongs
+                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                              && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
+                    .Select(pc => pc.MeId);
+                meQuery = meQuery.Where(m => chuyenMeIds.Contains(m.Id));
+            }
 
             // ── Aggregate trước khi lọc Ca/Kíp (để count/sum chính xác) ──
             // Note: Ca/Kíp lọc in-memory nên count bên dưới sẽ xử lý sau khi load
@@ -572,6 +580,58 @@ namespace dataproduct.api.Repositories
             decimal? totalKl       = allMes.Sum(m => m.KlThepLong);
             decimal? totalKlPhanBo = allMes.Sum(m => m.KLThepLongPhanBo);
 
+            // ── KlThepLongChot: mẻ chuyển đi → 0; mẻ đích → ownKl + sum(srcKl từ global) ──
+            var allMeIds = allMes.Select(m => m.Id).ToList();
+
+            // Mẻ trong tập lọc đã bị chuyển sang mẻ khác (ChuyenVeMeId != self)
+            var srcPcsInSet = await _ctx.HRC1_MePhanCongs
+                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                          && allMeIds.Contains(pc.MeId)
+                          && pc.ChuyenVeMeId.HasValue
+                          && pc.ChuyenVeMeId != pc.MeId)
+                .Select(pc => new { pc.MeId, ChuyenVeMeId = pc.ChuyenVeMeId!.Value })
+                .ToListAsync();
+            var sourceSet = srcPcsInSet.Select(pc => pc.MeId).ToHashSet();
+
+            // Với mẻ không phải source, tìm tất cả mẻ toàn cục (ngoài filter) đang trỏ vào
+            var nonSourceMeIds = allMeIds.Where(id => !sourceSet.Contains(id)).ToList();
+            var destToSrcKlSum = new Dictionary<int, decimal>();
+            if (nonSourceMeIds.Count > 0)
+            {
+                var incomingPcs = await _ctx.HRC1_MePhanCongs
+                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                              && pc.ChuyenVeMeId.HasValue
+                              && nonSourceMeIds.Contains(pc.ChuyenVeMeId!.Value)
+                              && pc.ChuyenVeMeId != pc.MeId)
+                    .Select(pc => new { pc.MeId, ChuyenVeMeId = pc.ChuyenVeMeId!.Value })
+                    .ToListAsync();
+
+                if (incomingPcs.Count > 0)
+                {
+                    var srcMeIds = incomingPcs.Select(pc => pc.MeId).Distinct().ToList();
+                    var srcKlById = await _ctx.HRC1_MeTheps
+                        .Where(m => srcMeIds.Contains(m.Id))
+                        .ToDictionaryAsync(m => m.Id, m => m.KlThepLong ?? 0m);
+
+                    foreach (var pc in incomingPcs)
+                    {
+                        destToSrcKlSum.TryAdd(pc.ChuyenVeMeId, 0m);
+                        if (srcKlById.TryGetValue(pc.MeId, out var kl))
+                            destToSrcKlSum[pc.ChuyenVeMeId] += kl;
+                    }
+                }
+            }
+
+            decimal? ComputeKlChot(HRC1_MeThep m)
+            {
+                if (sourceSet.Contains(m.Id)) return 0m;
+                var incoming = destToSrcKlSum.TryGetValue(m.Id, out var s) ? s : 0m;
+                if (m.KlThepLong == null && incoming == 0m) return null;
+                return (m.KlThepLong ?? 0m) + incoming;
+            }
+
+            decimal totalKlChot = allMes.Sum(m => ComputeKlChot(m) ?? 0m);
+
             var paged = allMes
                 .Skip((q.Page - 1) * q.PageSize)
                 .Take(q.PageSize)
@@ -579,9 +639,15 @@ namespace dataproduct.api.Repositories
 
             return new HRC1_ThongKeResult
             {
-                Items                   = paged.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict)).ToList(),
+                Items = paged.Select(m =>
+                {
+                    var row = MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict);
+                    row.KlThepLongChot = ComputeKlChot(m);
+                    return row;
+                }).ToList(),
                 TotalRecords            = total,
                 TotalKlThepLong         = totalKl,
+                TotalKlThepLongChot     = (decimal?)totalKlChot,
                 TotalKlThepLongPhanBo   = totalKlPhanBo,
                 Page                    = q.Page,
                 PageSize                = q.PageSize,

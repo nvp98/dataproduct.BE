@@ -100,6 +100,7 @@ namespace dataproduct.api.Services
             DateTime? ToDate,
             string? SortThuTu,
             int? IdNhom,
+            bool? chuaMappingNM,
             int page,
             int pageSize
         )
@@ -114,6 +115,7 @@ namespace dataproduct.api.Services
                 ToDate,
                 SortThuTu,
                 IdNhom,
+                chuaMappingNM,
                 page,
                 pageSize
             );

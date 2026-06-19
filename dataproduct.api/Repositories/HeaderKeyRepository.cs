@@ -148,6 +148,7 @@ namespace dataproduct.api.Repositories
             DateTime? ToDate,
             string? SortThuTu,
             int? IdNhom,
+            bool? chuaMappingNM,
             int page,
             int pageSize
         )
@@ -345,6 +346,10 @@ namespace dataproduct.api.Repositories
             // Filter theo nhóm
             if (IdNhom.HasValue)
                 query = query.Where(x => x.ID_NhomKey == IdNhom.Value);
+
+            // Filter phụ liệu NM chưa được mapping (có ID_PhuLieu nhưng không có ID_HeaderKey)
+            if (chuaMappingNM == true)
+                query = query.Where(x => x.ID_PhuLieu != null && x.ID_HeaderKey == null);
 
             // Đếm tổng số records
             var totalCount = await query.CountAsync();
