@@ -19,6 +19,9 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<PhongBan> Tbl_PhongBan { get; set; }
     public DbSet<ViTri> Tbl_ViTri { get; set; }
     public DbSet<Tbl_Kip> Tbl_Kip { get; set; }
+    public DbSet<Tbl_LoCao> Tbl_LoCao { get; set; }
+    public DbSet<TonSiLoLoCaResult> TonSiLoLoCaResults { get; set; }
+   
     public DbSet<Tbl_MeThoi> Tbl_MeThoi { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat> Tbl_BM_16_LoSanXuat { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat_TaiKhoan> Tbl_BM_16_LoSanXuat_TaiKhoan { get; set; }
@@ -42,6 +45,8 @@ public partial class ProductDataMasterDbContext : DbContext
             .WithMany(p => p.TaiKhoans)
             .HasForeignKey(t => t.ID_PhongBan);
             
+
+        modelBuilder.Entity<TonSiLoLoCaResult>().HasNoKey().ToView(null);
 
         // Cấu hình entity keyless cho stored procedure results
         modelBuilder.Entity<StoredProcedureScalarResult>(entity =>
