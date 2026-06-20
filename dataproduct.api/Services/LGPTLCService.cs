@@ -726,41 +726,101 @@ namespace dataproduct.api.Services
             static decimal? Eff(decimal? m, decimal? a) => m ?? a;
             static int? EffI(int? m, int? a) => m ?? a;
 
-            int r = dataStart;
-            foreach (var c in chiTiet)
-            {
-                ws.Cell(r, 1).Value  = $"{c.ThoiGian.Hour:D2}h";
-                ws.Cell(r, 2).Value  = (double?)Eff(c.NhietDoSiloBotThan1_Manual, c.NhietDoSiloBotThan1_Auto);
-                ws.Cell(r, 3).Value  = (double?)Eff(c.NhietDoSiloBotThan2_Manual, c.NhietDoSiloBotThan2_Auto);
-                ws.Cell(r, 4).Value  = (double?)Eff(c.NhietDoBonPhunThoi1_Manual, c.NhietDoBonPhunThoi1_Auto);
-                ws.Cell(r, 5).Value  = (double?)Eff(c.NhietDoBonPhunThoi2_Manual, c.NhietDoBonPhunThoi2_Auto);
-                ws.Cell(r, 6).Value  = (double?)Eff(c.NhietDoBonPhunThoi3_Manual, c.NhietDoBonPhunThoi3_Auto);
-                ws.Cell(r, 7).Value  = (double?)Eff(c.DongDienMayNghien_Manual, c.DongDienMayNghien_Auto);
-                ws.Cell(r, 8).Value  = (double?)Eff(c.DongDienQuatGioNguoc_Manual, c.DongDienQuatGioNguoc_Auto);
-                ws.Cell(r, 9).Value  = (double?)Eff(c.NhietDoDauVaoMayNghien_Manual, c.NhietDoDauVaoMayNghien_Auto);
-                ws.Cell(r, 10).Value = (double?)Eff(c.NhietDoDauRaMayNghien_Manual, c.NhietDoDauRaMayNghien_Auto);
-                ws.Cell(r, 11).Value = (double?)Eff(c.NhietDoKhoangLo_Manual, c.NhietDoKhoangLo_Auto);
-                ws.Cell(r, 12).Value = (double?)Eff(c.MucLieuSiloBotThan1_Manual, c.MucLieuSiloBotThan1_Auto);
-                ws.Cell(r, 13).Value = (double?)Eff(c.MucLieuSiloBotThan2_Manual, c.MucLieuSiloBotThan2_Auto);
-                ws.Cell(r, 14).Value = (double?)Eff(c.MucLieuSiloThanTho_Manual, c.MucLieuSiloThanTho_Auto);
-                ws.Cell(r, 15).Value = (double?)Eff(c.TrongLuongBonPhunThoi1_Manual, c.TrongLuongBonPhunThoi1_Auto);
-                ws.Cell(r, 16).Value = (double?)Eff(c.TrongLuongBonPhunThoi2_Manual, c.TrongLuongBonPhunThoi2_Auto);
-                ws.Cell(r, 17).Value = (double?)Eff(c.TrongLuongBonPhunThoi3_Manual, c.TrongLuongBonPhunThoi3_Auto);
-                ws.Cell(r, 18).Value = (double?)Eff(c.ApLucKhiThan_Manual, c.ApLucKhiThan_Auto);
-                ws.Cell(r, 19).Value = (double?)Eff(c.ApLucBonKhiN2_Manual, c.ApLucBonKhiN2_Auto);
-                ws.Cell(r, 20).Value = (double?)Eff(c.NhietDoTramDauBoiTron_Manual, c.NhietDoTramDauBoiTron_Auto);
-                ws.Cell(r, 21).Value = (double?)Eff(c.NhietDoStatoDongCoMayNghien_Manual, c.NhietDoStatoDongCoMayNghien_Auto);
-                ws.Cell(r, 22).Value = (double?)Eff(c.NhietDoTrucDongCoMayNghien_Manual, c.NhietDoTrucDongCoMayNghien_Auto);
-                ws.Cell(r, 23).Value = (double?)Eff(c.ApLucTrucNghien_Manual, c.ApLucTrucNghien_Auto);
-                ws.Cell(r, 24).Value = (double?)Eff(c.YeuCauTuLoCao_Manual, c.YeuCauTuLoCao_Auto);
-                ws.Cell(r, 25).Value = (double?)Eff(c.LuongThanPhunThucTe_Manual, c.LuongThanPhunThucTe_Auto);
-                ws.Cell(r, 26).Value = (double?)Eff(c.LuyKeLuongPhunThanTrongCa_Manual, c.LuyKeLuongPhunThanTrongCa_Auto);
-                ws.Cell(r, 27).Value = EffI(c.SoLuongSungPhun_Manual, c.SoLuongSungPhun_Auto);
-                ws.Cell(r, 28).Value = (double?)Eff(c.ApLucGioLanhLoCao_Manual, c.ApLucGioLanhLoCao_Auto);
+            // Tách ca ngày (8h-19h) và ca đêm (20h-7h)
+            var caNgayRows = chiTiet
+                .Where(c => c.ThoiGian.Hour >= 8 && c.ThoiGian.Hour <= 19)
+                .OrderBy(c => c.ThoiGian.Hour)
+                .ToList();
+            var caDemRows = chiTiet
+                .Where(c => c.ThoiGian.Hour >= 20 || c.ThoiGian.Hour <= 7)
+                .OrderBy(c => c.ThoiGian.Hour >= 20 ? c.ThoiGian.Hour : c.ThoiGian.Hour + 24)
+                .ToList();
 
-                ws.Row(r).Cells(1, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                r++;
+            void WriteDataRow(int rowIdx, LGPTLCChiTietDto c)
+            {
+                ws.Cell(rowIdx, 1).Value  = $"{c.ThoiGian.Hour:D2}h";
+                ws.Cell(rowIdx, 2).Value  = (double?)Eff(c.NhietDoSiloBotThan1_Manual, c.NhietDoSiloBotThan1_Auto);
+                ws.Cell(rowIdx, 3).Value  = (double?)Eff(c.NhietDoSiloBotThan2_Manual, c.NhietDoSiloBotThan2_Auto);
+                ws.Cell(rowIdx, 4).Value  = (double?)Eff(c.NhietDoBonPhunThoi1_Manual, c.NhietDoBonPhunThoi1_Auto);
+                ws.Cell(rowIdx, 5).Value  = (double?)Eff(c.NhietDoBonPhunThoi2_Manual, c.NhietDoBonPhunThoi2_Auto);
+                ws.Cell(rowIdx, 6).Value  = (double?)Eff(c.NhietDoBonPhunThoi3_Manual, c.NhietDoBonPhunThoi3_Auto);
+                ws.Cell(rowIdx, 7).Value  = (double?)Eff(c.DongDienMayNghien_Manual, c.DongDienMayNghien_Auto);
+                ws.Cell(rowIdx, 8).Value  = (double?)Eff(c.DongDienQuatGioNguoc_Manual, c.DongDienQuatGioNguoc_Auto);
+                ws.Cell(rowIdx, 9).Value  = (double?)Eff(c.NhietDoDauVaoMayNghien_Manual, c.NhietDoDauVaoMayNghien_Auto);
+                ws.Cell(rowIdx, 10).Value = (double?)Eff(c.NhietDoDauRaMayNghien_Manual, c.NhietDoDauRaMayNghien_Auto);
+                ws.Cell(rowIdx, 11).Value = (double?)Eff(c.NhietDoKhoangLo_Manual, c.NhietDoKhoangLo_Auto);
+                ws.Cell(rowIdx, 12).Value = (double?)Eff(c.MucLieuSiloBotThan1_Manual, c.MucLieuSiloBotThan1_Auto);
+                ws.Cell(rowIdx, 13).Value = (double?)Eff(c.MucLieuSiloBotThan2_Manual, c.MucLieuSiloBotThan2_Auto);
+                ws.Cell(rowIdx, 14).Value = (double?)Eff(c.MucLieuSiloThanTho_Manual, c.MucLieuSiloThanTho_Auto);
+                ws.Cell(rowIdx, 15).Value = (double?)Eff(c.TrongLuongBonPhunThoi1_Manual, c.TrongLuongBonPhunThoi1_Auto);
+                ws.Cell(rowIdx, 16).Value = (double?)Eff(c.TrongLuongBonPhunThoi2_Manual, c.TrongLuongBonPhunThoi2_Auto);
+                ws.Cell(rowIdx, 17).Value = (double?)Eff(c.TrongLuongBonPhunThoi3_Manual, c.TrongLuongBonPhunThoi3_Auto);
+                ws.Cell(rowIdx, 18).Value = (double?)Eff(c.ApLucKhiThan_Manual, c.ApLucKhiThan_Auto);
+                ws.Cell(rowIdx, 19).Value = (double?)Eff(c.ApLucBonKhiN2_Manual, c.ApLucBonKhiN2_Auto);
+                ws.Cell(rowIdx, 20).Value = (double?)Eff(c.NhietDoTramDauBoiTron_Manual, c.NhietDoTramDauBoiTron_Auto);
+                ws.Cell(rowIdx, 21).Value = (double?)Eff(c.NhietDoStatoDongCoMayNghien_Manual, c.NhietDoStatoDongCoMayNghien_Auto);
+                ws.Cell(rowIdx, 22).Value = (double?)Eff(c.NhietDoTrucDongCoMayNghien_Manual, c.NhietDoTrucDongCoMayNghien_Auto);
+                ws.Cell(rowIdx, 23).Value = (double?)Eff(c.ApLucTrucNghien_Manual, c.ApLucTrucNghien_Auto);
+                ws.Cell(rowIdx, 24).Value = (double?)Eff(c.YeuCauTuLoCao_Manual, c.YeuCauTuLoCao_Auto);
+                ws.Cell(rowIdx, 25).Value = (double?)Eff(c.LuongThanPhunThucTe_Manual, c.LuongThanPhunThucTe_Auto);
+                ws.Cell(rowIdx, 26).Value = (double?)Eff(c.LuyKeLuongPhunThanTrongCa_Manual, c.LuyKeLuongPhunThanTrongCa_Auto);
+                ws.Cell(rowIdx, 27).Value = EffI(c.SoLuongSungPhun_Manual, c.SoLuongSungPhun_Auto);
+                ws.Cell(rowIdx, 28).Value = (double?)Eff(c.ApLucGioLanhLoCao_Manual, c.ApLucGioLanhLoCao_Auto);
+                ws.Row(rowIdx).Cells(1, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             }
+
+            var summaryFill = XLColor.FromHtml("#FFFBE6");
+
+            void WriteSummaryRow(int rowIdx, IList<LGPTLCChiTietDto> rows)
+            {
+                decimal? Sum(Func<LGPTLCChiTietDto, decimal?> f) =>
+                    rows.Any(c => f(c) != null) ? rows.Sum(c => f(c) ?? 0) : null;
+                int? SumI(Func<LGPTLCChiTietDto, int?> f) =>
+                    rows.Any(c => f(c) != null) ? rows.Sum(c => f(c) ?? 0) : null;
+
+                ws.Cell(rowIdx, 1).Value = "Tổng";
+                ws.Cell(rowIdx, 2).Value  = (double?)Sum(c => Eff(c.NhietDoSiloBotThan1_Manual, c.NhietDoSiloBotThan1_Auto));
+                ws.Cell(rowIdx, 3).Value  = (double?)Sum(c => Eff(c.NhietDoSiloBotThan2_Manual, c.NhietDoSiloBotThan2_Auto));
+                ws.Cell(rowIdx, 4).Value  = (double?)Sum(c => Eff(c.NhietDoBonPhunThoi1_Manual, c.NhietDoBonPhunThoi1_Auto));
+                ws.Cell(rowIdx, 5).Value  = (double?)Sum(c => Eff(c.NhietDoBonPhunThoi2_Manual, c.NhietDoBonPhunThoi2_Auto));
+                ws.Cell(rowIdx, 6).Value  = (double?)Sum(c => Eff(c.NhietDoBonPhunThoi3_Manual, c.NhietDoBonPhunThoi3_Auto));
+                ws.Cell(rowIdx, 7).Value  = (double?)Sum(c => Eff(c.DongDienMayNghien_Manual, c.DongDienMayNghien_Auto));
+                ws.Cell(rowIdx, 8).Value  = (double?)Sum(c => Eff(c.DongDienQuatGioNguoc_Manual, c.DongDienQuatGioNguoc_Auto));
+                ws.Cell(rowIdx, 9).Value  = (double?)Sum(c => Eff(c.NhietDoDauVaoMayNghien_Manual, c.NhietDoDauVaoMayNghien_Auto));
+                ws.Cell(rowIdx, 10).Value = (double?)Sum(c => Eff(c.NhietDoDauRaMayNghien_Manual, c.NhietDoDauRaMayNghien_Auto));
+                ws.Cell(rowIdx, 11).Value = (double?)Sum(c => Eff(c.NhietDoKhoangLo_Manual, c.NhietDoKhoangLo_Auto));
+                ws.Cell(rowIdx, 12).Value = (double?)Sum(c => Eff(c.MucLieuSiloBotThan1_Manual, c.MucLieuSiloBotThan1_Auto));
+                ws.Cell(rowIdx, 13).Value = (double?)Sum(c => Eff(c.MucLieuSiloBotThan2_Manual, c.MucLieuSiloBotThan2_Auto));
+                ws.Cell(rowIdx, 14).Value = (double?)Sum(c => Eff(c.MucLieuSiloThanTho_Manual, c.MucLieuSiloThanTho_Auto));
+                ws.Cell(rowIdx, 15).Value = (double?)Sum(c => Eff(c.TrongLuongBonPhunThoi1_Manual, c.TrongLuongBonPhunThoi1_Auto));
+                ws.Cell(rowIdx, 16).Value = (double?)Sum(c => Eff(c.TrongLuongBonPhunThoi2_Manual, c.TrongLuongBonPhunThoi2_Auto));
+                ws.Cell(rowIdx, 17).Value = (double?)Sum(c => Eff(c.TrongLuongBonPhunThoi3_Manual, c.TrongLuongBonPhunThoi3_Auto));
+                ws.Cell(rowIdx, 18).Value = (double?)Sum(c => Eff(c.ApLucKhiThan_Manual, c.ApLucKhiThan_Auto));
+                ws.Cell(rowIdx, 19).Value = (double?)Sum(c => Eff(c.ApLucBonKhiN2_Manual, c.ApLucBonKhiN2_Auto));
+                ws.Cell(rowIdx, 20).Value = (double?)Sum(c => Eff(c.NhietDoTramDauBoiTron_Manual, c.NhietDoTramDauBoiTron_Auto));
+                ws.Cell(rowIdx, 21).Value = (double?)Sum(c => Eff(c.NhietDoStatoDongCoMayNghien_Manual, c.NhietDoStatoDongCoMayNghien_Auto));
+                ws.Cell(rowIdx, 22).Value = (double?)Sum(c => Eff(c.NhietDoTrucDongCoMayNghien_Manual, c.NhietDoTrucDongCoMayNghien_Auto));
+                ws.Cell(rowIdx, 23).Value = (double?)Sum(c => Eff(c.ApLucTrucNghien_Manual, c.ApLucTrucNghien_Auto));
+                ws.Cell(rowIdx, 24).Value = (double?)Sum(c => Eff(c.YeuCauTuLoCao_Manual, c.YeuCauTuLoCao_Auto));
+                ws.Cell(rowIdx, 25).Value = (double?)Sum(c => Eff(c.LuongThanPhunThucTe_Manual, c.LuongThanPhunThucTe_Auto));
+                ws.Cell(rowIdx, 26).Value = (double?)Sum(c => Eff(c.LuyKeLuongPhunThanTrongCa_Manual, c.LuyKeLuongPhunThanTrongCa_Auto));
+                ws.Cell(rowIdx, 27).Value = SumI(c => EffI(c.SoLuongSungPhun_Manual, c.SoLuongSungPhun_Auto));
+                ws.Cell(rowIdx, 28).Value = (double?)Sum(c => Eff(c.ApLucGioLanhLoCao_Manual, c.ApLucGioLanhLoCao_Auto));
+                var summaryRowStyle = ws.Row(rowIdx);
+                summaryRowStyle.Style.Font.Bold = true;
+                summaryRowStyle.Style.Fill.BackgroundColor = summaryFill;
+                summaryRowStyle.Cells(1, 28).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            }
+
+            int r = dataStart;
+
+            // Ca ngày: 8h–19h
+            foreach (var c in caNgayRows) { WriteDataRow(r, c); r++; }
+            WriteSummaryRow(r, caNgayRows); r++;
+
+            // Ca đêm: 20h–7h
+            foreach (var c in caDemRows) { WriteDataRow(r, c); r++; }
+            WriteSummaryRow(r, caDemRows); r++;
 
             // Border toàn bộ bảng
             SetBorder(ws.Range(hdr1, 1, r - 1, 28));
