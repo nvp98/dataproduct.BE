@@ -179,6 +179,8 @@ namespace dataproduct.api.DTOs
         public bool? IsManualTL { get; set; }
         public bool? ChuaCoNhomPhanLoai { get; set; } // true = chỉ lấy mẻ chưa có nhóm phân loại
         public int? IdNhomPhanLoai { get; set; }
+        public DateOnly? TuNgayLoThoi { get; set; }
+        public DateOnly? DenNgayLoThoi { get; set; }
     }
 
     // -------------------------------------------------------

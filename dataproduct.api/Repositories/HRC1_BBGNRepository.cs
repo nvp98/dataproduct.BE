@@ -314,6 +314,16 @@ namespace dataproduct.api.Repositories
                 q = q.Where(m => (m.DichChuyen == "len_thang" && m.NgayTao   < _denNgay)
                                || (m.DichChuyen != "len_thang" && m.NgayNhanTL < _denNgay));
             }
+            if (f.TuNgayLoThoi.HasValue)
+            {
+                var _tuNgayLo = f.TuNgayLoThoi.Value.ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => m.NgayTao >= _tuNgayLo);
+            }
+            if (f.DenNgayLoThoi.HasValue)
+            {
+                var _denNgayLo = f.DenNgayLoThoi.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => m.NgayTao < _denNgayLo);
+            }
             if (!string.IsNullOrEmpty(f.MaMe))
                 q = q.Where(m => m.MaMe != null && m.MaMe.Contains(f.MaMe));
             if (f.LoSo.HasValue)
