@@ -1037,7 +1037,7 @@ namespace dataproduct.api.Services
             // ===== HEADER PHỤ LIỆU ĐỘNG + CÁC CỘT CỐ ĐỊNH THEO MẪU =====
             // BOF: phụ liệu từ cột 6, LF/RH: phụ liệu từ cột 5 (dòng 7)
             int headerRow = 7;
-            int headerStartCol = loaiBmKey == "BOF" ? 6 : 5;
+            int headerStartCol = loaiBmKey == "BOF" ? 9 : 8;
 
             // Dòng 6: tiêu đề chung cho vùng phụ liệu
             if (headers.Count > 0)
@@ -1164,10 +1164,14 @@ namespace dataproduct.api.Services
 
                 ws.Cell(currentRow, 1).Value = currentRow - startRow + 1;
 
-                ws.Cell(currentRow, 2).Value = d.MeThoi;
-                ws.Cell(currentRow, 3).Value = d.MacThep;
-                ws.Cell(currentRow, 4).Value = d.KLGangLongCCT;
-                ws.Cell(currentRow, 5).Value = d.KLThepPhe;
+                ws.Cell(currentRow, 2).Value = d.Ngay.HasValue ? d.Ngay.Value.ToString("dd/MM/yyyy") : "";
+                ws.Cell(currentRow, 3).Value = d.Ca == 1 ? "Ca ngày" : d.Ca == 2 ? "Ca đêm" : "";
+                ws.Cell(currentRow, 4).Value = "";
+
+                ws.Cell(currentRow, 5).Value = d.MeThoi;
+                ws.Cell(currentRow, 6).Value = d.MacThep;
+                ws.Cell(currentRow, 7).Value = d.KLGangLongCCT;
+                ws.Cell(currentRow, 8).Value = d.KLThepPhe;
 
                 // Values đã được align theo thứ tự headers từ SearchThongKeApiAsync
                 var valueByHeaderKeyId = row.Values
@@ -1249,7 +1253,7 @@ namespace dataproduct.api.Services
             currentRow += 1;
             int totalRow = currentRow;
 
-            ws.Range(totalRow, 1, totalRow, 3).Merge();
+            ws.Range(totalRow, 1, totalRow, 6).Merge();
             ws.Cell(totalRow, 1).Value = "Tổng";
             ws.Cell(totalRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             ws.Cell(totalRow, 1).Style.Font.Bold = true;
@@ -1257,8 +1261,8 @@ namespace dataproduct.api.Services
             int lastDataRow = currentRow - 1;
             ws.Range(startRow, 1, lastDataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-            ws.Cell(totalRow, 4).FormulaA1 = $"SUM(D{startRow}:D{lastDataRow})";
-            ws.Cell(totalRow, 5).FormulaA1 = $"SUM(E{startRow}:E{lastDataRow})";
+            ws.Cell(totalRow, 7).FormulaA1 = $"SUM(G{startRow}:G{lastDataRow})";
+            ws.Cell(totalRow, 8).FormulaA1 = $"SUM(H{startRow}:H{lastDataRow})";
 
             int col = headerStartCol;
 

@@ -703,6 +703,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.MacThep).HasMaxLength(50);
             entity.Property(e => e.MacThepBKMIS).HasMaxLength(50);
             entity.Property(e => e.GhiChuTL).HasMaxLength(500);
+            entity.Property(e => e.GhiChuDuc).HasMaxLength(500);
             entity.Property(e => e.CapNhatLuc).HasColumnType("datetime");
             entity.Property(e => e.NgayTao)
                   .HasColumnType("datetime")

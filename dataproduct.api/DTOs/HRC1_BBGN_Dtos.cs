@@ -153,6 +153,8 @@ namespace dataproduct.api.DTOs
     public class HRC1_UpdateGhiChuRequest
     {
         public string? GhiChu { get; set; }
+        /// <summary>"lo" | "tl" | "duc" — mặc định "lo" nếu không truyền</summary>
+        public string? Field { get; set; }
     }
 
     // -------------------------------------------------------
@@ -193,14 +195,18 @@ namespace dataproduct.api.DTOs
         public decimal? KlLan2 { get; set; }
         public decimal? KlLan3 { get; set; }
         public decimal? KlThepLong { get; set; }
+        public decimal? KlThepLongChot { get; set; }
         public decimal? KLThepLongPhanBo { get; set; }
         public string? GhiChuLo { get; set; }
+        public string? GhiChuTL { get; set; }
+        public string? GhiChuDuc { get; set; }
         public bool? IsThuNghiem { get; set; }
         public string? TenMayDuc { get; set; }
         public string? MacThep { get; set; }
         public string? PhanLoai { get; set; }
         public string? MacThepBKMIS { get; set; }
         public string? TinhLuyenLenThang { get; set; }   // "Tinh luyện" | "Lên thẳng"
+        public int? SoTinhLuyenNhan { get; set; }        // TL số đã nhận mẻ (1–5)
         public bool? IsTrungMeThoi { get; set; }
         public bool? IsManualTL { get; set; }
         public int? TrangThaiLo { get; set; }
@@ -219,15 +225,17 @@ namespace dataproduct.api.DTOs
         public string? TenCapNhatBoiDuc { get; set; }  // người xác nhận máy đúc (CapNhatBoiDuc)
         public string? ChuyenVeMaMe { get; set; }       // mã mẻ đích khi TL chuyển mẻ
         public string? TenMayDucChuyen { get; set; }    // tên máy đúc của mẻ đích
+        public DateOnly? NgayDuc { get; set; }          // NgaySX của phiếu máy đúc chứa mẻ này
+        public int? CaDuc { get; set; }                 // Ca của phiếu máy đúc chứa mẻ này
     }
 
     // -------------------------------------------------------
-    // Tổng hợp — item nhóm (label + số mẻ)
+    // Tổng hợp — item nhóm (label + KL thép lỏng)
     // -------------------------------------------------------
     public class HRC1_TongHopItem
     {
         public string Label { get; set; } = string.Empty;
-        public int SoMe { get; set; }
+        public decimal KlThepLong { get; set; }
     }
 
     // -------------------------------------------------------
@@ -250,6 +258,7 @@ namespace dataproduct.api.DTOs
     public class HRC1_ThongKeQuery : HRC1_ExportQuery
     {
         public bool? IsTrungMeThoi { get; set; }
+        public bool? IsChuyenMe { get; set; }   // true = chỉ lấy mẻ đã chuyển sang mẻ khác
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }
@@ -262,6 +271,7 @@ namespace dataproduct.api.DTOs
         public List<HRC1_ExportRow> Items { get; set; } = new();
         public int TotalRecords { get; set; }
         public decimal? TotalKlThepLong { get; set; }
+        public decimal? TotalKlThepLongChot { get; set; }
         public decimal? TotalKlThepLongPhanBo { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }

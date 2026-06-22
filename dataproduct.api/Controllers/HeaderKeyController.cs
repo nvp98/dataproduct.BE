@@ -80,6 +80,7 @@ namespace dataproduct.api.Controllers
             DateTime? ToDate,
             string? SortThuTu,
             int? IdNhom,
+            bool? chuaMappingNM,
             int page = 1,
             int pageSize = 10
         )
@@ -98,6 +99,7 @@ namespace dataproduct.api.Controllers
                 ToDate,
                 SortThuTu,
                 IdNhom,
+                chuaMappingNM,
                 page,
                 pageSize
             );

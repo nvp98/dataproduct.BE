@@ -118,6 +118,7 @@ namespace dataproduct.api.Repositories
             DateTime? ToDate,
             string? SortThuTu,
             int? IdNhom,
+            bool? chuaMappingNM,
             int page,
             int pageSize
         );
