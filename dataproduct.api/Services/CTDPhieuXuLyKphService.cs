@@ -21,6 +21,7 @@ namespace dataproduct.api.Services
         private readonly IPhieuRepository _repoPhieu;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public CTDPhieuXuLyKphService(
             ICtdPhieuXuLyKphRepository repo,
@@ -29,7 +30,8 @@ namespace dataproduct.api.Services
             IConfiguration configuration,
             IPhieuRepository repoPhieu,
             PheDuyetService pheDuyetService,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _pdfConverter = pdfConverter;
@@ -38,6 +40,7 @@ namespace dataproduct.api.Services
             _repoPhieu = repoPhieu;
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
+            _bmConfig = bmConfig;
         }
 
         public async Task<int> InsertFromPhieuJsonAsync(BmPhieu phieu)
@@ -165,7 +168,7 @@ namespace dataproduct.api.Services
                 "BM.01C-QT.11_Phieu_xu_ly_ban_thanh_pham_KPH.html"
             );
 
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Tính toán thời gian ca kíp
             string tuGio = "", denGio = "";

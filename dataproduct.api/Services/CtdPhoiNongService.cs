@@ -28,8 +28,9 @@ namespace dataproduct.api.Services
         private readonly IBKPhoiThepRepository _repoBkPhoi;
         private readonly PheDuyetService _pdservice;
         private readonly IConfiguration _configuration;
+        private readonly BmConfigService _bmConfig;
 
-        public CtdPhoiNongService(ICtdPhoiNongRepository repo, IPhieuRepository repoPhieu, IBMPheDuyetRepository repoBmPheDuyet, IConverter pdfConverter, IWebHostEnvironment env, IBKPhoiThepRepository repoBkPhoi, PheDuyetService pdservice, IConfiguration configuration)
+        public CtdPhoiNongService(ICtdPhoiNongRepository repo, IPhieuRepository repoPhieu, IBMPheDuyetRepository repoBmPheDuyet, IConverter pdfConverter, IWebHostEnvironment env, IBKPhoiThepRepository repoBkPhoi, PheDuyetService pdservice, IConfiguration configuration, BmConfigService bmConfig)
         {
             _repo = repo;
             _pdfConverter = pdfConverter;
@@ -39,6 +40,7 @@ namespace dataproduct.api.Services
             _repoBmPheDuyet = repoBmPheDuyet;
             _pdservice = pdservice;
             _configuration = configuration;
+            _bmConfig = bmConfig;
         }
 
         public Task<IEnumerable<CtdPhoiNong>> GetAllAsync(DateOnly? NgaySX, int? Ca, string? Kip, int? Xuong, string? Me)
@@ -263,7 +265,7 @@ namespace dataproduct.api.Services
                 "BM.05-QT.05.11_Bien_ban_phoi_nong.html"
             );
 
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // 2️⃣ Build table rows
             var rows = new StringBuilder();

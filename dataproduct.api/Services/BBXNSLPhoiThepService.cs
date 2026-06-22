@@ -17,6 +17,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public BBXNSLPhoiThepService(
             ICtdBMDucCTDRepository repo,
@@ -25,7 +26,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration configuration,
             PheDuyetService pheDuyetService,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _repoPhieu = repoPhieu;
@@ -34,6 +36,7 @@ namespace dataproduct.api.Services
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
             _service = service;
+            _bmConfig = bmConfig;
         }
 
         public async Task<ExportFileResult> ExportChiTietExcelAsync(Guid phieuId)

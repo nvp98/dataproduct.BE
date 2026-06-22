@@ -1,0 +1,92 @@
+{
+  "BM.08-QT.05.13_Bien_ban_xac_nhan_san_luong_kcs": {
+    "MaBM": "BM.08/QT.05.13",
+    "NgayHieuLuc": "15/04/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM.05-QT.05.13_Bien_ban_giao_nhan_phoi": {
+    "MaBM": "BM.05/QT.05.13",
+    "NgayHieuLuc": "15/04/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho": {
+    "MaBM": "BM.12/QT.05.11",
+    "NgayHieuLuc": "01/05/2026",
+    "LanSuaDoi": "03"
+  },
+  "BM.11-QT.05.11_Bien_ban_xac_nhan_san_luong_phoi": {
+    "MaBM": "BM.11/QT.05.11",
+    "NgayHieuLuc": "05/09/2025",
+    "LanSuaDoi": "02"
+  },
+  "BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi": {
+    "MaBM": "BM.02/QT.05.13",
+    "NgayHieuLuc": "15/08/2025",
+    "LanSuaDoi": "03"
+  },
+  "BM.05-QT.05.11_Bien_ban_phoi_nong": {
+    "MaBM": "BM.06/QT.05.11",
+    "NgayHieuLuc": "10/05/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM.09-QT.05.13_So_theo_doi_san_xuat_hang_ngay_header": {
+    "MaBM": "BM.09/QT.05.13",
+    "NgayHieuLuc": "15/04/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM.09-QT.05.13_So_theo_doi_san_xuat_hang_ngay": {
+    "MaBM": "BM.09/QT.05.13",
+    "NgayHieuLuc": "15/04/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM.18-HD.25.08_Bang_theo_doi_ben_phe": {
+    "MaBM": "BM.18/HD.25.08",
+    "NgayHieuLuc": "15/10/2025",
+    "LanSuaDoi": "00"
+  },
+  "BM.01C-QT.11_Phieu_xu_ly_ban_thanh_pham_KPH": {
+    "MaBM": "BM.01C/QT.11",
+    "NgayHieuLuc": "20/11/2025",
+    "LanSuaDoi": "01"
+  },
+  "BM.05-QT.05.09_So_theo_doi_nap_lieu_lo_cao": {
+    "MaBM": "BM.05/QT.05.09",
+    "NgayHieuLuc": "01/06/2023",
+    "LanSuaDoi": ""
+  },
+  "BM.07-QT.05.09_So_giao_nhan_ton_silo_lo_cao": {
+    "MaBM": "BM.11/QT.05",
+    "NgayHieuLuc": "01/06/2023",
+    "LanSuaDoi": ""
+  },
+  "BM.10-QT.05.09_Nhat_ky_van_hanh_phun_than_lo_cao": {
+    "MaBM": "BM.10/QT.05.09",
+    "NgayHieuLuc": "10/04/2025",
+    "LanSuaDoi": "01"
+  },
+  "BBGN_ThepLong": {
+    "MaBM": "BM.16/QT.05.10",
+    "NgayHieuLuc": "01/09/2023",
+    "LanSuaDoi": ""
+  },
+  "HRC1_BBGN_ThepLong": {
+    "MaBM": "BM.16/QT.05.10",
+    "NgayHieuLuc": "01/09/2023",
+    "LanSuaDoi": ""
+  },
+  "HRC2_BB_NauLuyen_BOF": {
+    "MaBM": "BM.08/QT.05.15",
+    "NgayHieuLuc": "10/01/2025",
+    "LanSuaDoi": "00"
+  },
+  "HRC2_BB_NauLuyen_LF": {
+    "MaBM": "BM.14/QT.05.15",
+    "NgayHieuLuc": "10/01/2025",
+    "LanSuaDoi": "00"
+  },
+  "HRC2_BB_NauLuyen_RH": {
+    "MaBM": "BM.16/QT.05.15",
+    "NgayHieuLuc": "10/01/2025",
+    "LanSuaDoi": "00"
+  }
+}

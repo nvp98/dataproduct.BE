@@ -24,6 +24,7 @@ namespace dataproduct.api.Services
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ProductFormContext _context;
+        private readonly BmConfigService _bmConfig;
 
         public CTDSoTheoDoiService(
             ICtdSoTheoDoiRepository repo,
@@ -33,7 +34,8 @@ namespace dataproduct.api.Services
             IConfiguration configuration,
             PheDuyetService pheDuyetService,
             IHttpClientFactory httpClientFactory,
-            ProductFormContext context)
+            ProductFormContext context,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _repoPhieu = repoPhieu;
@@ -43,6 +45,7 @@ namespace dataproduct.api.Services
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
             _context = context;
+            _bmConfig = bmConfig;
         }
 
         public async Task<(int soTheoDoiCount, int dienBienCount)> InsertFromPhieuJsonAsync(BmPhieu phieu)
@@ -210,7 +213,7 @@ namespace dataproduct.api.Services
                 "template_html",
                 "BM.09-QT.05.13_So_theo_doi_san_xuat_hang_ngay.html"
             );
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Load header template and render dynamic values.
             var headerTemplatePath = Path.Combine(
@@ -218,7 +221,7 @@ namespace dataproduct.api.Services
                 "template_html",
                 "BM.09-QT.05.13_So_theo_doi_san_xuat_hang_ngay_header.html"
             );
-            var headerHtml = await File.ReadAllTextAsync(headerTemplatePath);
+            var headerHtml = await _bmConfig.LoadTemplateAsync(headerTemplatePath);
 
             headerHtml = headerHtml
                 .Replace("{{LogoUrl}}", logoBase64)

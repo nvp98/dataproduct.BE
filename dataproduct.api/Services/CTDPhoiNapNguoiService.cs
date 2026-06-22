@@ -23,6 +23,7 @@ namespace dataproduct.api.Services
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ProductFormContext _context;
+        private readonly BmConfigService _bmConfig;
 
         public CTDPhoiNapNguoiService(
             ICtdPhoiNguoiRepository repo,
@@ -32,7 +33,8 @@ namespace dataproduct.api.Services
             IConfiguration configuration,
             PheDuyetService pheDuyetService,
             IHttpClientFactory httpClientFactory,
-            ProductFormContext context)
+            ProductFormContext context,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _repoPhieu = repoPhieu;
@@ -42,6 +44,7 @@ namespace dataproduct.api.Services
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
             _context = context;
+            _bmConfig = bmConfig;
         }
 
         public async Task<IEnumerable<CtdPhoiNguoi>> GetByPhieuIdAsync(Guid phieuId)
@@ -352,7 +355,7 @@ namespace dataproduct.api.Services
                 "template_html",
                 "BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi.html"
             );
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Logo
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";

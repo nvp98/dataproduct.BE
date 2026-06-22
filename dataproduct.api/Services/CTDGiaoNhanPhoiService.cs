@@ -22,6 +22,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public CTDGiaoNhanPhoiService(
             ProductFormContext context,
@@ -30,7 +31,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration configuration,
             PheDuyetService pheDuyetService,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _context = context;
             _repoPhieu = repoPhieu;
@@ -38,6 +40,7 @@ namespace dataproduct.api.Services
             _env = env;
             _configuration = configuration;
             _pheDuyetService = pheDuyetService;
+            _bmConfig = bmConfig;
             _httpClientFactory = httpClientFactory;
         }
 
@@ -170,7 +173,7 @@ namespace dataproduct.api.Services
                 "template_html",
                 "BM.05-QT.05.13_Bien_ban_giao_nhan_phoi.html"
             );
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)

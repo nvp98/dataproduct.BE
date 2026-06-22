@@ -18,6 +18,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly PheDuyetService _pheDuyetService;
+        private readonly BmConfigService _bmConfig;
 
         public BkKcsBbxnSanLuongService(
             IBkKcsBbxnSanLuongRepository repo,
@@ -26,7 +27,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
-            PheDuyetService pheDuyetService)
+            PheDuyetService pheDuyetService,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _repoPhieu = repoPhieu;
@@ -35,6 +37,7 @@ namespace dataproduct.api.Services
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
             _pheDuyetService = pheDuyetService;
+            _bmConfig = bmConfig;
         }
 
         public async Task<IEnumerable<BkKcsBbxnSanLuong>> GetAllAsync(DateOnly? ngaySX, string? ca, string? sanPham, string? macThep, string? idXuongCan)
@@ -165,7 +168,7 @@ namespace dataproduct.api.Services
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy template: {templatePath}");
 
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Xây dựng dòng dữ liệu nhóm theo loại
             var rows = new StringBuilder();

@@ -29,9 +29,9 @@ namespace dataproduct.api.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IPhieuRepository _repoPhieu;
         private readonly ProductFormContext _context;
+        private readonly BmConfigService _bmConfig;
 
-
-        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu, ProductFormContext context)
+        public BMDucCTDService(ICtdBMDucCTDRepository repo, IConverter pdfConverter, IWebHostEnvironment env, IConfiguration configuration, PheDuyetService pheDuyetService, IHttpClientFactory httpClientFactory, IPhieuRepository repoPhieu, ProductFormContext context, BmConfigService bmConfig)
         {
             _repo = repo;
             _pdfConverter = pdfConverter;
@@ -41,6 +41,7 @@ namespace dataproduct.api.Services
             _httpClientFactory = httpClientFactory;
             _repoPhieu = repoPhieu;
             _context = context;
+            _bmConfig = bmConfig;
         }
 
         private static string NormalizeKeyValue(string? value)
@@ -472,7 +473,7 @@ namespace dataproduct.api.Services
                 "BM.11-QT.05.11_Bien_ban_xac_nhan_san_luong_phoi.html"
             );
 
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
 
 
@@ -1144,7 +1145,7 @@ namespace dataproduct.api.Services
                 "BM12-QT.05.11_Bien_ban_giao_nhan_phoi_nhap_kho.html"
             );
 
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
             var nguoiThamGia = new StringBuilder();
             int indexNguoi = 1;
 
