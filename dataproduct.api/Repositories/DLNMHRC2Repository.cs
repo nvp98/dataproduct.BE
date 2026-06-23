@@ -167,6 +167,7 @@ namespace dataproduct.api.Repositories
                         IsNM = baseRecord.IsNM,
                         KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
                         KLGangLongCR = FormatNumber( baseRecord.KLGangLongCR),
+                        KLThepPheGang = FormatNumber(baseRecord.KLThepPheGang),
                         KLThepLong = FormatNumber(baseRecord.KLThepLong),
                         QueLayMau = baseRecord.QueLayMau,
                         QueDoNhiet = baseRecord.QueDoNhiet,
@@ -455,6 +456,7 @@ namespace dataproduct.api.Repositories
                         KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
                         KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
                         KLGangLongCR = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepPheGang = FormatNumber(baseRecord.KLThepPheGang),
                         KLThepLong = FormatNumber(baseRecord.KLThepLong),
                         QueLayMau = baseRecord.QueLayMau,
                         QueDoNhiet = baseRecord.QueDoNhiet,
@@ -742,6 +744,7 @@ namespace dataproduct.api.Repositories
                         KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
                         KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
                         KLGangLongCR = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepPheGang = FormatNumber(baseRecord.KLThepPheGang),
                         KLThepLong = FormatNumber(baseRecord.KLThepLong)
                     },
                     mappedPhulieus = groupedMappedPhuLieus.Values.ToList(),
@@ -1037,6 +1040,7 @@ namespace dataproduct.api.Repositories
                         KLThepPhe = FormatNumber(baseRecord.KLThepPhe),
                         KLGangLongCCT = FormatNumber(baseRecord.KLGangLongCCT),
                         KLGangLongCR = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepPheGang = FormatNumber(baseRecord.KLThepPheGang),
                         KLThepLong = FormatNumber(baseRecord.KLThepLong),
                         IsTrungMeThoi = baseRecord.IsTrungMeThoi,
                         QueLayMau = baseRecord.QueLayMau,
@@ -1054,6 +1058,270 @@ namespace dataproduct.api.Repositories
                 throw new ApplicationException($"Error while getting grouped report {id}", ex);
             }
         }
+        /// <summary>
+        /// Batch version của GetByIdGroupedAsync: thay vì gọi 6 query × N records,
+        /// load toàn bộ phụ liệu / mapping / headerKey trong 4 query rồi assemble trong memory.
+        /// </summary>
+        public async Task<List<HRC2GroupedByReportNoModel>> GetAllGroupedBatchAsync(IEnumerable<DLNM_HRC2> baseList)
+        {
+            var bases = baseList.ToList();
+            if (bases.Count == 0) return new List<HRC2GroupedByReportNoModel>();
+
+            var ids = bases.Select(x => x.ID).ToList();
+
+            // === Query 1: Toàn bộ PhuLieu thực tế (IsPhanBo != true) cho tất cả IDs ===
+            // Kéo cả ID_HeaderKey / IsAddManual để dùng lại cho ManualAdjust mà không cần query thêm.
+            var allActualRaw = await _context.PhuLieu_HRC2s
+                .Where(x => ids.Contains(x.ID_MeThoi) && x.IsPhanBo != true)
+                .Select(x => new
+                {
+                    x.ID_MeThoi,
+                    x.ID_PhuLieu,
+                    x.TenPhuLieu,
+                    x.KLPhuGia,
+                    x.IsManual,
+                    x.IsAddManual,
+                    x.KLPhuGia_Manual,
+                    x.ID_HeaderKey,
+                    x.TenHienThi,
+                })
+                .ToListAsync();
+
+            // === Query 2: Toàn bộ PhanBo (IsPhanBo == true) ===
+            var allPhanBoRaw = await _context.PhuLieu_HRC2s
+                .Where(x => ids.Contains(x.ID_MeThoi) && x.IsPhanBo == true && x.ID_HeaderKey.HasValue)
+                .Select(x => new
+                {
+                    x.ID_MeThoi,
+                    x.ID_HeaderKey,
+                    x.KLPhuGia,
+                    x.KLPhuGia_Manual,
+                    x.IsManual,
+                    x.TenHienThi,
+                })
+                .ToListAsync();
+
+            // === Query 3: Header_Mappings cho toàn bộ ID_PhuLieu xuất hiện ===
+            var allPhuLieuIds = allActualRaw
+                .Where(x => x.ID_PhuLieu.HasValue)
+                .Select(x => x.ID_PhuLieu!.Value)
+                .Distinct()
+                .ToList();
+
+            var allMappings = allPhuLieuIds.Count > 0
+                ? await _context.Header_Mappings.Where(m => allPhuLieuIds.Contains(m.ID_PhuLieu)).ToListAsync()
+                : new List<Header_Mapping>();
+
+            // === Query 4: Header_Keys cho toàn bộ ID_HeaderKey cần dùng ===
+            var allHeaderKeyIds = allMappings.Select(m => m.ID_HeaderKey).Distinct().ToList();
+            var allHeaderKeys = allHeaderKeyIds.Count > 0
+                ? await _context.Header_Keys.Where(k => allHeaderKeyIds.Contains(k.Id)).ToDictionaryAsync(k => k.Id)
+                : new Dictionary<int, Header_Key>();
+
+            // === Build mapping lookup: ID_PhuLieu → entries ===
+            var mappingLookup = allMappings
+                .GroupBy(m => m.ID_PhuLieu)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(m =>
+                    {
+                        allHeaderKeys.TryGetValue(m.ID_HeaderKey, out var hk);
+                        return new
+                        {
+                            m.Id,
+                            m.ID_HeaderKey,
+                            m.TenNguonDuLieu,
+                            KeyGuid = hk?.KeyGuid,
+                            TenHienThi = hk?.TenHienThi,
+                            LoaiPhieu = hk?.LoaiPhieu,
+                            IsActive = hk?.IsActive ?? false,
+                        };
+                    }).ToList());
+
+            // === Group by ID_MeThoi để assemble per-record ===
+            var actualByMeThoi  = allActualRaw .GroupBy(x => x.ID_MeThoi).ToDictionary(g => g.Key, g => g.ToList());
+            var phanBoByMeThoi  = allPhanBoRaw .GroupBy(x => x.ID_MeThoi).ToDictionary(g => g.Key, g => g.ToList());
+
+            var result = new List<HRC2GroupedByReportNoModel>(bases.Count);
+
+            foreach (var baseRecord in bases)
+            {
+                var id    = baseRecord.ID;
+                var isBof = string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase);
+
+                // ---- Mapped + Unmapped ----
+                var groupedMapped   = new Dictionary<int,    HeaderKeyGroupedByReportNoModel>();
+                var groupedUnmapped = new Dictionary<string, HeaderKeyGroupedByReportNoModel>();
+
+                if (actualByMeThoi.TryGetValue(id, out var actualItems))
+                {
+                    foreach (var pl in actualItems.Where(x => x.ID_PhuLieu.HasValue))
+                    {
+                        var plId = pl.ID_PhuLieu!.Value;
+                        if (mappingLookup.TryGetValue(plId, out var mapEntries) && mapEntries.Any())
+                        {
+                            var activeMaps = mapEntries.Where(m => m.IsActive && m.KeyGuid.HasValue).ToList();
+                            if (activeMaps.Any())
+                            {
+                                foreach (var map in activeMaps)
+                                {
+                                    var hkId = map.ID_HeaderKey;
+                                    var fmt  = hkId == 5
+                                        ? (pl.KLPhuGia.HasValue
+                                            ? (double?)Math.Round(pl.KLPhuGia.Value / 0.055, 0, MidpointRounding.AwayFromZero)
+                                            : null)
+                                        : FormatNumber(pl.KLPhuGia);
+
+                                    if (!groupedMapped.ContainsKey(hkId))
+                                    {
+                                        groupedMapped[hkId] = new HeaderKeyGroupedByReportNoModel
+                                        {
+                                            ID_HeaderKey   = map.ID_HeaderKey,
+                                            KeyGuid        = map.KeyGuid,
+                                            TenHienThi     = map.TenHienThi,
+                                            TenNguonDuLieu = map.TenNguonDuLieu,
+                                            ID_PhuLieu     = plId,
+                                            TenPhuLieu     = pl.TenPhuLieu,
+                                            KLPhuGia       = fmt,
+                                            KLPhuGiaTotal  = 0,
+                                            IsManual       = pl.IsManual,
+                                            KLPhuGia_Manual = pl.KLPhuGia_Manual,
+                                            LoaiPhuLieu    = map.LoaiPhieu,
+                                            MappingId      = map.Id,
+                                            ThuTu          = allHeaderKeys.TryGetValue(hkId, out var hkInfo)
+                                                ? (isBof ? hkInfo.ThuTu_Excel_BOF : hkInfo.ThuTu_Excel_LFRH)
+                                                : null
+                                        };
+                                    }
+                                    else if (pl.IsManual == true)
+                                    {
+                                        groupedMapped[hkId].IsManual       = true;
+                                        groupedMapped[hkId].KLPhuGia_Manual = pl.KLPhuGia_Manual;
+                                    }
+                                    groupedMapped[hkId].KLPhuGiaTotal = (groupedMapped[hkId].KLPhuGiaTotal ?? 0) + (fmt ?? 0);
+                                }
+                                continue;
+                            }
+                            // Có mapping nhưng toàn inactive → bỏ qua
+                            continue;
+                        }
+
+                        // Unmapped
+                        var groupKey = (pl.TenPhuLieu ?? $"PL_{plId}")?.Trim() ?? $"PL_{plId}";
+                        if (!groupedUnmapped.ContainsKey(groupKey))
+                        {
+                            groupedUnmapped[groupKey] = new HeaderKeyGroupedByReportNoModel
+                            {
+                                ID_HeaderKey   = null,
+                                KeyGuid        = null,
+                                TenHienThi     = null,
+                                TenNguonDuLieu = pl.TenPhuLieu,
+                                ID_PhuLieu     = plId,
+                                TenPhuLieu     = pl.TenPhuLieu,
+                                KLPhuGia       = FormatNumber(pl.KLPhuGia),
+                                KLPhuGiaTotal  = 0,
+                                LoaiPhuLieu    = null
+                            };
+                        }
+                        groupedUnmapped[groupKey].KLPhuGiaTotal = (groupedUnmapped[groupKey].KLPhuGiaTotal ?? 0) + (FormatNumber(pl.KLPhuGia) ?? 0);
+                    }
+                }
+
+                foreach (var item in groupedMapped  .Values) { item.KLPhuGia = FormatNumber(item.KLPhuGia); item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal); }
+                foreach (var item in groupedUnmapped.Values) { item.KLPhuGia = FormatNumber(item.KLPhuGia); item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal); }
+
+                // ---- PhanBo ----
+                var groupedPhanBo = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                if (phanBoByMeThoi.TryGetValue(id, out var phanBoItems))
+                {
+                    foreach (var pb in phanBoItems)
+                    {
+                        if (!pb.ID_HeaderKey.HasValue) continue;
+                        var hkId = pb.ID_HeaderKey.Value;
+                        var fmt  = FormatNumber(pb.KLPhuGia);
+                        if (!groupedPhanBo.ContainsKey(hkId))
+                        {
+                            groupedPhanBo[hkId] = new HeaderKeyGroupedByReportNoModel
+                            {
+                                ID_HeaderKey    = hkId,
+                                TenHienThi      = pb.TenHienThi,
+                                KLPhuGia        = fmt,
+                                KLPhuGia_Manual = FormatNumber(pb.KLPhuGia_Manual),
+                                IsManual        = pb.IsManual,
+                                KLPhuGiaTotal   = 0,
+                            };
+                        }
+                        groupedPhanBo[hkId].KLPhuGiaTotal = (groupedPhanBo[hkId].KLPhuGiaTotal ?? 0) + (fmt ?? 0);
+                    }
+                }
+                foreach (var item in groupedPhanBo.Values) { item.KLPhuGia = FormatNumber(item.KLPhuGia); item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal); }
+
+                // ---- ManualAdjust (lọc từ actualByMeThoi, không cần query riêng) ----
+                var groupedManual = new Dictionary<int, HeaderKeyGroupedByReportNoModel>();
+                if (actualByMeThoi.TryGetValue(id, out var actualForManual))
+                {
+                    foreach (var ma in actualForManual.Where(x => x.IsManual == true && x.IsAddManual == true && x.ID_HeaderKey.HasValue))
+                    {
+                        var hkId = ma.ID_HeaderKey!.Value;
+                        var fmt  = FormatNumber(ma.KLPhuGia_Manual);
+                        if (!groupedManual.ContainsKey(hkId))
+                        {
+                            groupedManual[hkId] = new HeaderKeyGroupedByReportNoModel
+                            {
+                                ID_HeaderKey    = hkId,
+                                TenHienThi      = ma.TenHienThi,
+                                KLPhuGia        = null,
+                                KLPhuGia_Manual = fmt,
+                                IsManual        = true,
+                                KLPhuGiaTotal   = 0,
+                            };
+                        }
+                        groupedManual[hkId].KLPhuGiaTotal = (groupedManual[hkId].KLPhuGiaTotal ?? 0) + (fmt ?? 0);
+                    }
+                }
+                foreach (var item in groupedManual.Values) { item.KLPhuGia_Manual = FormatNumber(item.KLPhuGia_Manual); item.KLPhuGiaTotal = FormatNumber(item.KLPhuGiaTotal); }
+
+                result.Add(new HRC2GroupedByReportNoModel
+                {
+                    data = new DLNM_HRC2_ResponseModels
+                    {
+                        ID              = baseRecord.ID,
+                        REPORT_NO       = baseRecord.REPORT_NO,
+                        NgaySx          = baseRecord.NgaySx,
+                        Ngay            = baseRecord.Ngay,
+                        Ca              = baseRecord.Ca,
+                        BieuMau         = baseRecord.BieuMau,
+                        Scope           = baseRecord.Scope,
+                        MeThoi          = baseRecord.MeThoi,
+                        MacThep         = baseRecord.MacThep,
+                        IsNM            = baseRecord.IsNM,
+                        IsChuyenCa      = baseRecord.IsChuyenCa,
+                        O2              = FormatNumber(baseRecord.O2),
+                        AR_RH           = FormatNumber(baseRecord.AR_RH),
+                        N2              = FormatNumber(baseRecord.N2),
+                        AR_BOF          = FormatNumber(baseRecord.AR_BOF),
+                        AR_LF           = FormatNumber(baseRecord.AR_LF),
+                        KLGangLong      = FormatNumber(baseRecord.KLGangLong),
+                        KLThepPhe       = FormatNumber(baseRecord.KLThepPhe),
+                        KLGangLongCCT   = FormatNumber(baseRecord.KLGangLongCCT),
+                        KLGangLongCR    = FormatNumber(baseRecord.KLGangLongCR),
+                        KLThepPheGang   = FormatNumber(baseRecord.KLThepPheGang),
+                        KLThepLong      = FormatNumber(baseRecord.KLThepLong),
+                        IsTrungMeThoi   = baseRecord.IsTrungMeThoi,
+                        QueLayMau       = baseRecord.QueLayMau,
+                        QueDoNhiet      = baseRecord.QueDoNhiet,
+                        GhiChu          = baseRecord.GhiChu
+                    },
+                    mappedPhulieus       = groupedMapped  .Values.ToList(),
+                    unmappedPhulieus     = groupedUnmapped.Values.ToList(),
+                    phanBoPhulieus       = groupedPhanBo  .Values.ToList(),
+                    manualAdjustPhulieus = groupedManual  .Values.ToList()
+                });
+            }
+
+            return result;
+        }
+
         public async Task AddAsync(DLNM_HRC2 entity)
         {
             var existing = await _context.DLNM_HRC2s.Where(x => x.MeThoi == entity.MeThoi && x.BieuMau == entity.BieuMau && x.IsDelete != true).ToListAsync();
@@ -2082,6 +2350,7 @@ namespace dataproduct.api.Repositories
                         KLThepPhe = FormatNumber(x.KLThepPhe),
                         KLGangLongCCT = FormatNumber(x.KLGangLongCCT),
                         KLGangLongCR = FormatNumber(x.KLGangLongCR),
+                        KLThepPheGang = FormatNumber(x.KLThepPheGang),
                         KLThepLong = FormatNumber(x.KLThepLong),
                         IsNM = x.IsNM,
                         IsChuyenCa = x.IsChuyenCa,

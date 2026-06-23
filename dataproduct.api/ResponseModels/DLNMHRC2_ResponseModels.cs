@@ -24,6 +24,7 @@ namespace dataproduct.api.ResponseModels
         public bool? IsChuyenCa { get; set; }
         public double? KLGangLongCCT { get; set; }
         public double? KLGangLongCR { get; set; }
+        public double? KLThepPheGang { get; set; }
         public double? KLThepLong { get; set; }
         public bool? IsTrungMeThoi { get; set; }
         public int? QueLayMau { get; set; }

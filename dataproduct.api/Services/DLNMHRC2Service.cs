@@ -5,6 +5,7 @@ using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 
@@ -16,6 +17,21 @@ namespace dataproduct.api.Services
         private readonly HRC2_NMSyncService _hrc2NMSyncService;
         private readonly ISTD_NXT_HRC2Repository _stdNxtRepo;
         private readonly ProductFormContext _context;
+
+        // Debounce sync: mỗi key (ngaySX_ca_loaiBM_scope) chỉ sync tối đa 1 lần / 2 phút.
+        // Dùng static để giữ state qua các request trong cùng process.
+        private static readonly ConcurrentDictionary<string, DateTime> _lastSyncTimes = new();
+        private static readonly TimeSpan SyncCooldown = TimeSpan.FromMinutes(2);
+
+        private static bool ShouldSync(SyncFromNM_HRC2_Request req)
+        {
+            var key = $"{req.NgaySX:yyyy-MM-dd}_{req.Ca}_{req.LoaiBM}_{req.Scope}";
+            var now = DateTime.UtcNow;
+            if (_lastSyncTimes.TryGetValue(key, out var last) && now - last < SyncCooldown)
+                return false;
+            _lastSyncTimes[key] = now;
+            return true;
+        }
         public DLNMHRC2Service(
             IDLNMHRC2Repository repo,
             HRC2_NMSyncService hrc2NMSyncService,
@@ -146,7 +162,11 @@ namespace dataproduct.api.Services
 
                 if (isNMRow)
                 {
-                    if (!phuLieus.Any()) continue;
+                    var nmKlThepPhe = TryGetDouble(row, "klThepPhe");
+                    var nmGhiChu = row.TryGetProperty("ghiChu", out var nmGcProp) && nmGcProp.ValueKind == JsonValueKind.String
+                        ? nmGcProp.GetString() : null;
+
+                    if (!phuLieus.Any() && nmKlThepPhe == null && nmGhiChu == null) continue;
 
                     result.Add(new HRC2InsertModel
                     {
@@ -159,6 +179,8 @@ namespace dataproduct.api.Services
                         MacThep = row.TryGetProperty("macThep", out var mct) ? mct.GetString() : null,
                         IsNM = true,
                         IsChuyenCa = false,
+                        KLThepPhe = nmKlThepPhe,
+                        GhiChu = nmGhiChu,
                         RowKey = Guid.NewGuid(),
                         hRC2_PhuLieus = phuLieus
                     });
@@ -443,9 +465,15 @@ namespace dataproduct.api.Services
                     ? existingDLNMs.FirstOrDefault(x => x.ID == model.Id)
                     : null;
 
-                // IsNM=true: chỉ map, không sửa
+                // IsNM=true: chỉ cho phép sửa KLThepPhe và GhiChu, không sửa các field NM khác
                 if (existing?.IsNM == true)
                 {
+                    if (model.KLThepPhe.HasValue)
+                        existing.KLThepPhe = model.KLThepPhe;
+                    if (model.GhiChu != null)
+                        existing.GhiChu = model.GhiChu;
+                    if (model.KLThepPhe.HasValue || model.GhiChu != null)
+                        _context.DLNM_HRC2s.Update(existing);
                     dlnmMap[model.RowKey] = existing;
                     continue;
                 }
@@ -822,29 +850,45 @@ namespace dataproduct.api.Services
         public async Task<IEnumerable<HRC2GroupedByReportNoModel>> FilterGroupedAsync(SyncFromNM_HRC2_Request request)
         {
             if (request == null)
-            {
                 throw new ArgumentNullException(nameof(request));
-            }
 
-            await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
+            // Debounce: chỉ sync nếu chưa sync trong vòng SyncCooldown (2 phút) cho cùng key.
+            // Gọi /api/DLNMHRC2/force-sync để ép sync ngay lập tức.
+            if (ShouldSync(request))
+                await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
+
+            // --- TRƯỚC: sync mỗi request, N+1 query (comment lại để revert nếu cần) ---
+            // await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
+            // var allData = await _repo.GetAllAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
+            // var ids = allData
+            //     .Select(x => (int?)x.ID)
+            //     .Where(x => x.HasValue && x.Value != 0)
+            //     .Select(x => x!.Value)
+            //     .ToList();
+            // var result = new List<HRC2GroupedByReportNoModel>();
+            // foreach (var id in ids)
+            // {
+            //     var detail = await _repo.GetByIdGroupedAsync(id);
+            //     if (detail != null) result.Add(detail);
+            // }
+            // return result;
+
+            // --- SAU: load toàn bộ base records rồi batch trong 4 query ---
             var allData = await _repo.GetAllAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
-            var ids = allData
-                .Select(x => (int?)x.ID)
-                .Where(x => x.HasValue && x.Value != 0)
-                .Select(x => x!.Value)
-                .ToList();
+            var validRecords = allData.Where(x => x.ID != 0).ToList();
+            return await _repo.GetAllGroupedBatchAsync(validRecords);
+        }
 
-            var result = new List<HRC2GroupedByReportNoModel>();
-            foreach (var id in ids)
-            {
-                var detail = await _repo.GetByIdGroupedAsync(id);
-                if (detail != null)
-                {
-                    result.Add(detail);
-                }
-            }
-
-            return result;
+        /// <summary>
+        /// Force sync ngay lập tức, bỏ qua cooldown. Dùng cho nút "Đồng bộ lại" phía FE.
+        /// </summary>
+        public async Task ForceSyncAsync(SyncFromNM_HRC2_Request request)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            // Reset cooldown để lần filter tiếp theo cũng không bị block
+            var key = $"{request.NgaySX:yyyy-MM-dd}_{request.Ca}_{request.LoaiBM}_{request.Scope}";
+            _lastSyncTimes[key] = DateTime.MinValue;
+            await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
         }
 
         public async Task<DLNM_HRC2> CreateAsync(DLNM_HRC2 entity)
@@ -1171,7 +1215,10 @@ namespace dataproduct.api.Services
                 ws.Cell(currentRow, 5).Value = d.MeThoi;
                 ws.Cell(currentRow, 6).Value = d.MacThep;
                 ws.Cell(currentRow, 7).Value = d.KLGangLongCCT;
-                ws.Cell(currentRow, 8).Value = d.KLThepPhe;
+                // BOF: cột KL thép phế = thép phế NM + thép phế từ gang
+                ws.Cell(currentRow, 8).Value = loaiBmKey == "BOF"
+                    ? (d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0)
+                    : d.KLThepPhe;
 
                 // Values đã được align theo thứ tự headers từ SearchThongKeApiAsync
                 var valueByHeaderKeyId = row.Values
@@ -1204,10 +1251,12 @@ namespace dataproduct.api.Services
                         // ws.Cell(currentRow, noteCol.Value).Value = d.GhiChu; // nếu sau này có field
                     }
 
-                    // KL thép phế trong thùng gang (tấn)
-                    if (scrapCol.HasValue && d.KLThepPhe.HasValue)
+                    // KL thép phế trong thùng gang (tấn) = thép phế NM + thép phế từ gang
+                    if (scrapCol.HasValue)
                     {
-                        ws.Cell(currentRow, scrapCol.Value).Value = d.KLThepPhe.Value;
+                        var sumThepPhe = (d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0);
+                        if (sumThepPhe != 0)
+                            ws.Cell(currentRow, scrapCol.Value).Value = sumThepPhe;
                     }
                 }
                 else
