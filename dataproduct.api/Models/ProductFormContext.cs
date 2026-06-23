@@ -396,6 +396,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.AR_LF).HasColumnName("AR_LF");
             entity.Property(e => e.KLGangLong).HasColumnName("KLGangLong");
             entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe");
+            entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang");
         });
 
         modelBuilder.Entity<Header_Key>(entity =>

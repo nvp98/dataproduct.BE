@@ -300,6 +300,7 @@ namespace dataproduct.api.Services
                             AR_LF = RoundNumber(x.AR_LF),
                             KLGangLong = RoundNumber(x.KLGangLong),
                             KLThepPhe = RoundNumber(x.KLThepPhe),
+                            KLThepPheGang = RoundNumber(x.KLThepPheGang),
                             KLGangLongCCT = RoundNumber(x.KLGangLongCCT),
                             KLGangLongCR = RoundNumber(x.KLGangLongCR),
                             KLThepLong = RoundNumber(x.KLThepLong),
@@ -410,19 +411,14 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Orchestrator: cập nhật merge rows 1-3 → render rows 4-5 (info) → rows 6-7 (headers) → rows 8+ (data).
         /// </summary>
-        public void RenderBodyFromDb(IXLWorksheet ws, string bieuMau,
+        public async Task RenderBodyFromDbAsync(IXLWorksheet ws, string bieuMau,
             List<PhuLieuHeaderTable> headers, List<HRC2ThongKeRow> rows,
             int? scope = null, string gioBatDau = "", string gioKetThuc = "",
-            DateOnly? ngayPhieu = null, int? caPhieu = null, string kip = "")
+            DateOnly? ngayPhieu = null, int? caPhieu = null, string kip = "",
+            Guid? idPhieu = null)
         {
-            // Derive phân bổ headers từ data (headers có KLPhanBo != null/0)
-            var phanBoKeyIds = rows
-                .SelectMany(r => r.Values)
-                .Where(v => v.KLPhanBo.HasValue && v.KLPhanBo != 0)
-                .Select(v => v.IDHeaderKey)
-                .Distinct()
-                .ToHashSet();
-            var phanBoHeaders = headers.Where(h => phanBoKeyIds.Contains(h.IDHeaderKey)).ToList();
+            // Phân bổ đã được gộp vào TotalKLPhuGia — không render cột riêng
+            var phanBoHeaders = new List<PhuLieuHeaderTable>();
 
             int lastCol = ComputeLastCol(bieuMau, headers.Count, phanBoHeaders.Count);
             ws.Column(2).Width = 25;
@@ -439,6 +435,29 @@ namespace dataproduct.api.Services
             int dataEndRow   = dataStartRow + rows.Count - 1;
             int totalRow     = dataEndRow + 1;
 
+            List<STD_XUAT_NHAP_TON_HRC2>? footerData = null;
+            string? truongKipName = null, nguoiLapName = null;
+
+            // Footer data lấy từ phiếu HRC2_STD_NXT (khác phiếu biên bản) → filter bằng (Ca, NgaySX, STD_Scope)
+            if (ngayPhieu.HasValue && caPhieu.HasValue && scope.HasValue)
+            {
+                int? stdScope = GetStdScope(bieuMau, scope.Value);
+                if (stdScope.HasValue)
+                {
+                    var ngaySxDt = ngayPhieu.Value.ToDateTime(TimeOnly.MinValue);
+                    footerData = await _context.STD_XUAT_NHAP_TON_HRC2s
+                        .Where(x => x.Ca == caPhieu.Value && x.NgaySX.Date == ngaySxDt.Date && x.Scope == stdScope.Value)
+                        .OrderBy(x => x.ViTri)
+                        .ToListAsync();
+                }
+            }
+            if (idPhieu.HasValue)
+            {
+                var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu.Value);
+                truongKipName = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1)?.HoVaTen;
+                nguoiLapName  = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0)?.HoVaTen;
+            }
+
             int tableLastRow;
             switch (bieuMau)
             {
@@ -446,22 +465,22 @@ namespace dataproduct.api.Services
                     RenderColumnHeaders_BOF(ws, headers, phanBoHeaders);
                     RenderDataRows_BOF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_BOF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
-                    tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, BofFooterConfig);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig);
+                    tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, BofFooterConfig, footerData);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_LF":
                     RenderColumnHeaders_LF(ws, headers, phanBoHeaders);
                     RenderDataRows_LF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_LF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
-                   tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig);
+                    tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_RH":
                     RenderColumnHeaders_RH(ws, headers, phanBoHeaders);
                     RenderDataRows_RH(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_RH(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
-                    tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig);
+                    tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
                     break;
                 default:
                     tableLastRow = totalRow;
@@ -955,14 +974,14 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
                 ws.Cell(r, 2).Value = d.MeThoi  ?? "";
                 ws.Cell(r, 3).Value = d.MacThep ?? "";
                 ws.Cell(r, 4).Value = Num(d.KLGangLongCCT);
-                ws.Cell(r, 5).Value = Num(d.KLThepPhe);
+                ws.Cell(r, 5).Value = Num((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0));
 
                 for (int i = 0; i < headers.Count; i++)
                     ws.Cell(r, s + i).Value = vm.TryGetValue(headers[i].IDHeaderKey, out var kl) ? Num(kl) : Blank.Value;
@@ -990,7 +1009,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
@@ -1025,7 +1044,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
 
                 ws.Cell(r, 1).Value = n++;
@@ -1067,13 +1086,13 @@ namespace dataproduct.api.Services
             ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
             ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => x.Data?.KLGangLongCCT ?? 0);
-            ws.Cell(r, 5).Value = (XLCellValue)rows.Sum(x => x.Data?.KLThepPhe  ?? 0);
+            ws.Cell(r, 5).Value = (XLCellValue)rows.Sum(x => (x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0));
 
             for (int i = 0; i < headers.Count; i++)
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1107,7 +1126,7 @@ namespace dataproduct.api.Services
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1141,7 +1160,7 @@ namespace dataproduct.api.Services
             {
                 var hId = headers[i].IDHeaderKey;
                 ws.Cell(r, s + i).Value = (XLCellValue)rows.Sum(x =>
-                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.EffectiveKL ?? 0);
+                    x.Values.FirstOrDefault(v => v.IDHeaderKey == hId)?.TotalKLPhuGia ?? 0);
             }
 
             int a = s + headers.Count;
@@ -1197,39 +1216,8 @@ namespace dataproduct.api.Services
         // Footer configs (BOF / RH)
         // -------------------------------------------------------
 
-        private static readonly FooterConfig BofFooterConfig = new()
-        {
-            LuongTonLabels = new List<string>
-            {
-                "Lượng Vôi",
-                "Lượng Dolomite",
-                "Lượng Quặng",
-                "Lượng FeSi",
-                "Lượng SiMn",
-                "Lượng FeMn",
-                "Lượng LDSF",
-                "Lượng Than",
-                "Lượng AL",
-                "Lượng Chất tăng cacbon",
-                "Lượng HC-FeMn75",
-                "Nguyên liệu khác:"
-            }
-        };
-
-        private static readonly FooterConfig RhFooterConfig = new()
-        {
-            LuongTonLabels = new List<string>
-            {
-                "Lượng SiMn (kg)",
-                "Lượng FeSi (kg)",
-                "Lượng Vôi (kg)",
-                "Lượng Than (kg)",
-                "Lượng FeMn (kg)",
-                "Lượng Huỳnh thạch (kg)",
-                "Lượng Nhôm (kg)",
-                "Khác"
-            }
-        };
+        private static readonly FooterConfig BofFooterConfig = new();
+        private static readonly FooterConfig RhFooterConfig  = new();
 
         /// <summary>
         /// Render phần footer POST-BODY (sau data + 1 dòng trắng) gồm 3 phần:
@@ -1242,7 +1230,8 @@ namespace dataproduct.api.Services
             IXLWorksheet ws,
             int startRow,
             int lastCol,
-            FooterConfig config)
+            FooterConfig config,
+            List<STD_XUAT_NHAP_TON_HRC2>? footerData = null)
         {
             int N = lastCol;
 
@@ -1275,24 +1264,48 @@ namespace dataproduct.api.Services
             r++;
 
             // ── Label rows ────────────────────────────────────────────────
-            // Mỗi dòng: đúng 4 vùng merge, không có ô đơn lẻ nào.
-            // Nhóm 0 (silo): merge cột 1 → g1s-1, hiển thị label căn trái.
-            // Nhóm 1,2,3: merge 4 cột, ô trống, có border.
-            foreach (var label in config.LuongTonLabels)
+            if (footerData?.Count > 0)
             {
-                ws.Range(r, 1,   r, g1s - 1).Merge();
-                ws.Cell(r, 1).Value                      = label;
-                ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-                ws.Cell(r, 1).Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
-                ApplyBorderOnly(ws.Cell(r, 1));
+                foreach (var item in footerData)
+                {
+                    ws.Range(r, 1, r, g1s - 1).Merge();
+                    ws.Cell(r, 1).Value                      = item.TenNguyenLieu ?? "";
+                    ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                    ws.Cell(r, 1).Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+                    ApplyBorderOnly(ws.Cell(r, 1));
 
-                ws.Range(r, g1s, r, g1e).Merge();
-                ApplyBorderOnly(ws.Cell(r, g1s));
-                ws.Range(r, g2s, r, g2e).Merge();
-                ApplyBorderOnly(ws.Cell(r, g2s));
-                ws.Range(r, g3s, r, g3e).Merge();
-                ApplyBorderOnly(ws.Cell(r, g3s));
-                r++;
+                    ws.Range(r, g1s, r, g1e).Merge();
+                    if (item.TonDauCa.HasValue) ws.Cell(r, g1s).Value = (double)item.TonDauCa.Value;
+                    ApplyBorderOnly(ws.Cell(r, g1s));
+
+                    ws.Range(r, g2s, r, g2e).Merge();
+                    if (item.NhapVaoTrongCa.HasValue) ws.Cell(r, g2s).Value = (double)item.NhapVaoTrongCa.Value;
+                    ApplyBorderOnly(ws.Cell(r, g2s));
+
+                    ws.Range(r, g3s, r, g3e).Merge();
+                    if (item.TonCuoiCa.HasValue) ws.Cell(r, g3s).Value = (double)item.TonCuoiCa.Value;
+                    ApplyBorderOnly(ws.Cell(r, g3s));
+                    r++;
+                }
+            }
+            else
+            {
+                foreach (var label in config.LuongTonLabels)
+                {
+                    ws.Range(r, 1,   r, g1s - 1).Merge();
+                    ws.Cell(r, 1).Value                      = label;
+                    ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                    ws.Cell(r, 1).Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+                    ApplyBorderOnly(ws.Cell(r, 1));
+
+                    ws.Range(r, g1s, r, g1e).Merge();
+                    ApplyBorderOnly(ws.Cell(r, g1s));
+                    ws.Range(r, g2s, r, g2e).Merge();
+                    ApplyBorderOnly(ws.Cell(r, g2s));
+                    ws.Range(r, g3s, r, g3e).Merge();
+                    ApplyBorderOnly(ws.Cell(r, g3s));
+                    r++;
+                }
             }
             // Footer block kết thúc ở dòng ngay trước dòng chữ ký.
             return Math.Max(startRow, r - 1);
@@ -1301,14 +1314,14 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Render dòng chữ ký ở ngoài khối footer bảng (không nằm trong range apply border chung).
         /// </summary>
-        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config)
+        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config,
+            string? truongKipName = null, string? nguoiLapName = null)
         {
             int N = lastCol;
             int g3s = N - 3; // Tồn cuối kíp: start
             int g3e = N;     // Tồn cuối kíp: end
-
-            // Trưởng kíp: col 1 → g3s-1
             int leftEnd = g3s - 1;
+
             if (leftEnd >= 1)
             {
                 ws.Range(signRow, 1, signRow, leftEnd).Merge();
@@ -1316,10 +1329,8 @@ namespace dataproduct.api.Services
                 ws.Cell(signRow, 1).Style.Font.Bold = true;
                 ws.Cell(signRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 ws.Cell(signRow, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                // ApplyBorderOnly(ws.Cell(signRow, 1));
             }
 
-            // Người lập: g3s → N
             if (g3s <= g3e)
             {
                 ws.Range(signRow, g3s, signRow, g3e).Merge();
@@ -1327,7 +1338,25 @@ namespace dataproduct.api.Services
                 ws.Cell(signRow, g3s).Style.Font.Bold = true;
                 ws.Cell(signRow, g3s).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 ws.Cell(signRow, g3s).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                // ApplyBorderOnly(ws.Cell(signRow, g3s));
+            }
+
+            if (!string.IsNullOrWhiteSpace(truongKipName) || !string.IsNullOrWhiteSpace(nguoiLapName))
+            {
+                int nameRow = signRow + 1;
+                if (leftEnd >= 1 && !string.IsNullOrWhiteSpace(truongKipName))
+                {
+                    ws.Range(nameRow, 1, nameRow, leftEnd).Merge();
+                    ws.Cell(nameRow, 1).Value = truongKipName;
+                    ws.Cell(nameRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    ws.Cell(nameRow, 1).Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+                }
+                if (g3s <= g3e && !string.IsNullOrWhiteSpace(nguoiLapName))
+                {
+                    ws.Range(nameRow, g3s, nameRow, g3e).Merge();
+                    ws.Cell(nameRow, g3s).Value = nguoiLapName;
+                    ws.Cell(nameRow, g3s).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    ws.Cell(nameRow, g3s).Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+                }
             }
         }
 
@@ -1364,16 +1393,29 @@ namespace dataproduct.api.Services
             var nguoiLap = imageSignsDto?.FirstOrDefault(x => x.CapDuyet == 0);
             string chuKyTruongKipHtml = _pheDuyetService.FormatChuKy(truongKip?.ChuKy);
             string chuKyNguoiLapHtml = _pheDuyetService.FormatChuKy(nguoiLap?.ChuKy);
+            string? truongKipName = truongKip?.HoVaTen;
+            string? nguoiLapName  = nguoiLap?.HoVaTen;
+
+            // Footer data lấy từ phiếu HRC2_STD_NXT (khác phiếu biên bản) → filter bằng (Ca, NgaySX, STD_Scope)
+            int? stdScope = GetStdScope(bieuMau, scope);
+            List<STD_XUAT_NHAP_TON_HRC2> footerData;
+            if (stdScope.HasValue)
+            {
+                var ngaySxDt = ngay.ToDateTime(TimeOnly.MinValue);
+                footerData = await _context.STD_XUAT_NHAP_TON_HRC2s
+                    .Where(x => x.Ca == ca && x.NgaySX.Date == ngaySxDt.Date && x.Scope == stdScope.Value)
+                    .OrderBy(x => x.ViTri)
+                    .ToListAsync();
+            }
+            else
+            {
+                footerData = new List<STD_XUAT_NHAP_TON_HRC2>();
+            }
 
             bool isBof = bieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase);
             var headers = isBof ? headersBOF : headersLFRH;
-            var phanBoKeyIds = rows
-                .SelectMany(r => r.Values)
-                .Where(v => v.KLPhanBo.HasValue && v.KLPhanBo != 0)
-                .Select(v => v.IDHeaderKey)
-                .Distinct()
-                .ToHashSet();
-            var phanBoHeaders = headers.Where(h => phanBoKeyIds.Contains(h.IDHeaderKey)).ToList();
+            // Phân bổ đã được gộp vào TotalKLPhuGia — không render cột riêng
+            var phanBoHeaders = new List<PhuLieuHeaderTable>();
 
             string templateName = bieuMau.ToUpperInvariant() switch
             {
@@ -1394,7 +1436,10 @@ namespace dataproduct.api.Services
                 phanBoHeaders,
                 rows,
                 chuKyTruongKipHtml,
-                chuKyNguoiLapHtml);
+                chuKyNguoiLapHtml,
+                footerData,
+                truongKipName,
+                nguoiLapName);
 
             var doc = new HtmlToPdfDocument
             {
@@ -1428,7 +1473,10 @@ namespace dataproduct.api.Services
             List<PhuLieuHeaderTable> headers, List<PhuLieuHeaderTable> phanBoHeaders,
             List<HRC2ThongKeRow> rows,
             string chuKyTruongKipHtml,
-            string chuKyNguoiLapHtml)
+            string chuKyNguoiLapHtml,
+            List<STD_XUAT_NHAP_TON_HRC2>? footerData = null,
+            string? truongKipName = null,
+            string? nguoiLapName = null)
         {
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
                           ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
@@ -1489,7 +1537,10 @@ namespace dataproduct.api.Services
                     N,
                     key.Contains("BOF") ? BofFooterConfig : RhFooterConfig,
                     chuKyTruongKipHtml,
-                    chuKyNguoiLapHtml)
+                    chuKyNguoiLapHtml,
+                    footerData,
+                    truongKipName,
+                    nguoiLapName)
                 : "";
 
             // Load template và replace placeholder
@@ -1611,11 +1662,11 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
-                sb.Append($"<td>{PFmt(d.KLGangLongCCT)}</td><td>{PFmt(d.KLThepPhe)}</td>");
+                sb.Append($"<td>{PFmt(d.KLGangLongCCT)}</td><td>{PFmt((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0))}</td>");
                 foreach (var hx in headers)
                     sb.Append($"<td>{PFmt(vm.TryGetValue(hx.IDHeaderKey, out var kl) ? kl : null)}</td>");
                 sb.Append($"<td>{PFmt(d.O2)}</td><td>{PFmt(d.N2)}</td>");
@@ -1627,8 +1678,8 @@ namespace dataproduct.api.Services
             // Tổng cộng
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLGangLongCCT ?? 0))}</td>");
-            sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepPhe  ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
+            sb.Append($"<td>{PFmt(rows.Sum(x => (x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0)))}</td>");
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2 ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2 ?? 0))}</td>");
             sb.Append("<td></td>");
@@ -1646,7 +1697,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
@@ -1662,7 +1713,7 @@ namespace dataproduct.api.Services
             }
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepLong ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR_LF     ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.QueLayMau  ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.QueDoNhiet ?? 0))}</td>");
@@ -1681,7 +1732,7 @@ namespace dataproduct.api.Services
             foreach (var row in rows)
             {
                 var d   = row.Data!;
-                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.EffectiveKL);
+                var vm  = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.TotalKLPhuGia);
                 var pbm = row.Values.ToDictionary(v => v.IDHeaderKey, v => v.KLPhanBo);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
@@ -1697,7 +1748,7 @@ namespace dataproduct.api.Services
             }
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.KLThepLong ?? 0))}</td>");
-            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.EffectiveKL ?? 0))}</td>"); }
+            foreach (var hx in headers) { var id = hx.IDHeaderKey; sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.IDHeaderKey == id)?.TotalKLPhuGia ?? 0))}</td>"); }
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR_RH      ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2         ?? 0))}</td>");
             sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2         ?? 0))}</td>");
@@ -1715,7 +1766,10 @@ namespace dataproduct.api.Services
             int N,
             FooterConfig config,
             string chuKyTruongKipHtml,
-            string chuKyNguoiLapHtml)
+            string chuKyNguoiLapHtml,
+            List<STD_XUAT_NHAP_TON_HRC2>? footerData = null,
+            string? truongKipName = null,
+            string? nguoiLapName = null)
         {
             // Theo spec: 3 nhóm cuối mỗi nhóm 4 cột, silo chiếm phần còn lại
             int g3Span   = 4;
@@ -1733,15 +1787,30 @@ namespace dataproduct.api.Services
             sb.Append($"<th colspan=\"{g3Span}\">{config.LabelTonCuoiKip}</th>");
             sb.Append("</tr>");
 
-            // Label rows — 4 vùng merge mỗi dòng
-            foreach (var label in config.LuongTonLabels)
+            // Label rows — render động từ STD_XUAT_NHAP_TON_HRC2 nếu có, ngược lại dùng config tĩnh
+            if (footerData?.Count > 0)
             {
-                sb.Append("<tr>");
-                sb.Append($"<td colspan=\"{siloSpan}\" class=\"td-left\">{label}</td>");
-                sb.Append($"<td colspan=\"{g1Span}\"></td>");
-                sb.Append($"<td colspan=\"{g2Span}\"></td>");
-                sb.Append($"<td colspan=\"{g3Span}\"></td>");
-                sb.Append("</tr>");
+                foreach (var item in footerData)
+                {
+                    sb.Append("<tr>");
+                    sb.Append($"<td colspan=\"{siloSpan}\" class=\"td-left\">{System.Net.WebUtility.HtmlEncode(item.TenNguyenLieu ?? "")}</td>");
+                    sb.Append($"<td colspan=\"{g1Span}\">{PFmt(item.TonDauCa)}</td>");
+                    sb.Append($"<td colspan=\"{g2Span}\">{PFmt(item.NhapVaoTrongCa)}</td>");
+                    sb.Append($"<td colspan=\"{g3Span}\">{PFmt(item.TonCuoiCa)}</td>");
+                    sb.Append("</tr>");
+                }
+            }
+            else
+            {
+                foreach (var label in config.LuongTonLabels)
+                {
+                    sb.Append("<tr>");
+                    sb.Append($"<td colspan=\"{siloSpan}\" class=\"td-left\">{label}</td>");
+                    sb.Append($"<td colspan=\"{g1Span}\"></td>");
+                    sb.Append($"<td colspan=\"{g2Span}\"></td>");
+                    sb.Append($"<td colspan=\"{g3Span}\"></td>");
+                    sb.Append("</tr>");
+                }
             }
 
             // Close footer table: sign row render tách riêng để không chịu border ngoài (outer medium) của footer.
@@ -1755,19 +1824,35 @@ namespace dataproduct.api.Services
                 $"<td colspan=\"{truongKipSpan}\" style=\"text-align:center;font-weight:bold;border:none;vertical-align:middle;\">"
                 + $"<div style=\"text-align:center;font-weight:bold;\">{config.LabelTruongKip}</div>"
                 + $"{(string.IsNullOrWhiteSpace(chuKyTruongKipHtml) ? "" : chuKyTruongKipHtml)}"
+                + $"{(string.IsNullOrWhiteSpace(truongKipName) ? "" : $"<div style=\"text-align:center;\">{truongKipName}</div>")}"
                 + $"</td>");
             sb.Append(
                 $"<td colspan=\"{g3Span}\" style=\"text-align:center;font-weight:bold;border:none;vertical-align:middle;\">"
                 + $"<div style=\"text-align:center;font-weight:bold;\">{config.LabelNguoiLap}</div>"
                 + $"{(string.IsNullOrWhiteSpace(chuKyNguoiLapHtml) ? "" : chuKyNguoiLapHtml)}"
+                + $"{(string.IsNullOrWhiteSpace(nguoiLapName) ? "" : $"<div style=\"text-align:center;\">{nguoiLapName}</div>")}"
                 + $"</td>");
             sb.Append("</tr>");
             sb.Append("</table>");
             return sb.ToString();
         }
 
-        private static string PFmt(double? v) => v.HasValue ? v.Value.ToString("0.##") : "";
-        private static string PFmt(int? v)    => v.HasValue ? v.Value.ToString() : "";
+        private static string PFmt(double? v)   => v.HasValue ? v.Value.ToString("0.##") : "";
+        private static string PFmt(int? v)      => v.HasValue ? v.Value.ToString() : "";
+        private static string PFmt(decimal? v)  => v.HasValue ? v.Value.ToString("0.##") : "";
+
+        /// <summary>
+        /// Map (bieuMau, phieuScope) → Scope trong STD_XUAT_NHAP_TON_HRC2.
+        /// 1=BOF/6, 2=BOF/7, 3=LF/6, 4=RH/1, 5=RH/2
+        /// </summary>
+        private static int? GetStdScope(string bieuMau, int phieuScope)
+        {
+            string bm = bieuMau.ToUpperInvariant();
+            if (bm.Contains("BOF")) return phieuScope == 6 ? 1 : phieuScope == 7 ? 2 : (int?)null;
+            if (bm.Contains("LF"))  return 3;
+            if (bm.Contains("RH"))  return phieuScope == 1 ? 4 : phieuScope == 2 ? 5 : (int?)null;
+            return null;
+        }
     }
 
     public class FooterConfig

@@ -79,11 +79,29 @@ namespace dataproduct.api.Controllers
             try
             {
                 if (request == null)
-                {
                     return BadRequest("Thiếu dữ liệu bộ lọc.");
-                }
                 var result = await _service.FilterGroupedAsync(request);
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Ép đồng bộ dữ liệu từ NM ngay lập tức, bỏ qua cooldown 2 phút.
+        /// Dùng cho nút "Đồng bộ lại" ở FE khi user muốn lấy dữ liệu mới nhất ngay.
+        /// </summary>
+        [HttpPost("force-sync")]
+        public async Task<IActionResult> ForceSync([FromBody] SyncFromNM_HRC2_Request request)
+        {
+            try
+            {
+                if (request == null)
+                    return BadRequest("Thiếu dữ liệu bộ lọc.");
+                await _service.ForceSyncAsync(request);
+                return Ok(new { message = "Đồng bộ thành công." });
             }
             catch (Exception ex)
             {
@@ -311,7 +329,7 @@ namespace dataproduct.api.Controllers
                     using (var workbook = new XLWorkbook(templatePath))
                     {
                         var ws = workbook.Worksheets.First();
-                        _excelService.RenderBodyFromDb(
+                        await _excelService.RenderBodyFromDbAsync(
                             ws,
                             templateName,
                             headers,
@@ -319,7 +337,8 @@ namespace dataproduct.api.Controllers
                             scopePhieu,
                             ngayPhieu: ngayPhieu,
                             caPhieu: caPhieu,
-                            kip: kipPhieu);
+                            kip: kipPhieu,
+                            idPhieu: idPhieu);
                         workbook.SaveAs(tempPath);
                     }
                     var bytes = System.IO.File.ReadAllBytes(tempPath);
@@ -405,7 +424,7 @@ namespace dataproduct.api.Controllers
                             ? headersBOF
                             : headersLFRH;
 
-                        _excelService.RenderBodyFromDb(
+                        await _excelService.RenderBodyFromDbAsync(
                             ws,
                             item.MaBmFull,
                             headers,
@@ -413,7 +432,8 @@ namespace dataproduct.api.Controllers
                             item.Scope,
                             ngayPhieu: ngay,
                             caPhieu: ca,
-                            kip: kip);
+                            kip: kip,
+                            idPhieu: phieu?.Idphieu);
                     }
 
                     workbook.SaveAs(tempPath);

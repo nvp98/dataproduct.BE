@@ -138,22 +138,20 @@ namespace dataproduct.api.Services
                     x.MeThoi != null)
                 .ToListAsync();
 
-            var needMeThoi = rows
-                .Where(x => x.KLGangLongCCT == null || x.KLGangLongCCT == 0)
+            if (rows.Count == 0) return;
+
+            var allMeThoi = rows
                 .Select(x => x.MeThoi!)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (needMeThoi.Count == 0) return;
-
-            // Gọi 1 lần, lấy toàn bộ
-            var cache = await ExecuteGangLongStoredProcBatchAsync("usp_Sum_KL_GangLong_By_MeThoi_CCT", needMeThoi);
+            // Gọi 1 lần, lấy toàn bộ — luôn overwrite để phản ánh thay đổi từ gang
+            var cache = await ExecuteGangLongStoredProcBatchAsync("usp_Sum_KL_GangLong_By_MeThoi_CCT", allMeThoi);
 
             foreach (var row in rows)
             {
                 if (string.IsNullOrWhiteSpace(row.MeThoi)) continue;
-                if (row.KLGangLongCCT != null && row.KLGangLongCCT != 0) continue;
                 if (!cache.TryGetValue(row.MeThoi, out var kl)) continue;
 
                 row.KLGangLongCCT = kl;
@@ -165,7 +163,8 @@ namespace dataproduct.api.Services
 
         private async Task<Dictionary<string, double?>> ExecuteGangLongStoredProcBatchAsync(
             string procedureName,
-            IEnumerable<string> listMeThoi)
+            IEnumerable<string> listMeThoi,
+            string resultColumnName = "TotalKL")
         {
             var result = new Dictionary<string, double?>(StringComparer.OrdinalIgnoreCase);
 
@@ -192,7 +191,7 @@ namespace dataproduct.api.Services
                 while (await reader.ReadAsync())
                 {
                     var meThoi = reader["MaMeThoi"]?.ToString();
-                    var kl = reader["TotalKL"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["TotalKL"]);
+                    var kl = reader[resultColumnName] == DBNull.Value ? (double?)null : Convert.ToDouble(reader[resultColumnName]);
 
                     if (!string.IsNullOrWhiteSpace(meThoi))
                         result[meThoi] = kl;
@@ -206,6 +205,43 @@ namespace dataproduct.api.Services
                     $"Error executing {procedureName}: {ex.Message}", ex);
             }
         }
+        private async Task EnsureThepPheGangAsync(SyncFromNM_HRC2_Request request)
+        {
+            if (!string.Equals(request.LoaiBM, "BOF", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var rows = await _context.DLNM_HRC2s
+                .Where(x =>
+                    x.IsNM == true &&
+                    x.IsDelete != true &&
+                    x.Ngay == request.NgaySX &&
+                    x.Ca == request.Ca &&
+                    x.Scope == request.Scope &&
+                    x.BieuMau == request.LoaiBM &&
+                    x.MeThoi != null)
+                .ToListAsync();
+
+            if (rows.Count == 0) return;
+
+            var allMeThoi = rows
+                .Select(x => x.MeThoi!)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var cache = await ExecuteGangLongStoredProcBatchAsync(
+                "usp_Get_KLThepPhe_By_MeThoi", allMeThoi, "KLThepPhe");
+
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrWhiteSpace(row.MeThoi)) continue;
+                if (!cache.TryGetValue(row.MeThoi, out var kl)) continue;
+                row.KLThepPheGang = kl;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         private static bool AreEqual(string? value1, string? value2)
         {
             return string.Equals(value1 ?? string.Empty, value2 ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -223,6 +259,9 @@ namespace dataproduct.api.Services
 
             // 2) Bổ sung GangLong metrics (DB khác) khi cần
             await EnsureGangLongMetricsAsync(request);
+
+            // 3) Đồng bộ thép phế từ gang (luôn ghi đè)
+            await EnsureThepPheGangAsync(request);
         }
         public async Task DeleteRowByKeyAsync(int rowKey)
         {

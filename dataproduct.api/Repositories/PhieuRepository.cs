@@ -368,7 +368,34 @@ namespace dataproduct.api.Repositories
 
                     var userId = request.UserId.Value;
 
-                    // HRC1_LoThoi/TinhLuyen: phiếu không có scope, chỉ cần quyền cho maBm bất kỳ scope
+                    // Hiển thị TẤT CẢ phiếu user có quyền 1|4 (như vùng 3 nhưng quyền khác).
+                    // FE tự kiểm tra TinhTrang + NguoiTaoId để ẩn/hiện nút thao tác:
+                    //   - TinhTrang ∈ {0, 3, 7} → mọi user có quyền được thao tác
+                    //   - TinhTrang khác → chỉ NguoiTaoId hoặc người phê duyệt CapDuyet=0 mới được thao tác
+
+                    // --- TRƯỚC: chỉ hiển thị phiếu tinhTrang 0|3|7 hoặc là người tạo (comment để revert) ---
+                    // var hrc1LoTLQuery1 = _context.BmPhieus
+                    //     .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                    //              && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
+                    //     .Where(x => _context.BmQuyenXls.Any(q =>
+                    //         q.IdTaiKhoan == userId &&
+                    //         q.MaBm == x.MaBm &&
+                    //         (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                    //     ) && (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+                    // var regularQuery1 = _context.BmPhieus
+                    //     .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                    //              && x.MaBm != "HRC1_LoThoi" && x.MaBm != "HRC1_TinhLuyen")
+                    //     .Where(x =>
+                    //         x.MaBm != null &&
+                    //         _context.BmQuyenXls.Any(q =>
+                    //             q.IdTaiKhoan == userId &&
+                    //             q.MaBm == x.MaBm &&
+                    //             (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                    //             (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                    //         ) &&
+                    //         (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+
+                    // HRC1_LoThoi/TinhLuyen: không có scope
                     var hrc1LoTLQuery1 = _context.BmPhieus
                         .Where(x => x.IsDelete != 1 && x.IsLock != 1
                                  && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
@@ -376,7 +403,7 @@ namespace dataproduct.api.Repositories
                             q.IdTaiKhoan == userId &&
                             q.MaBm == x.MaBm &&
                             (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
-                        ) && (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+                        ));
 
                     var regularQuery1 = _context.BmPhieus
                         .Where(x => x.IsDelete != 1 && x.IsLock != 1
@@ -388,8 +415,7 @@ namespace dataproduct.api.Repositories
                                 q.MaBm == x.MaBm &&
                                 (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
                                 (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
-                            ) &&
-                            (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+                            ));
 
                     query = regularQuery1.Union(hrc1LoTLQuery1);
                     break;

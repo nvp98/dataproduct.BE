@@ -90,6 +90,7 @@ namespace dataproduct.api.Repositories
         Task<HRC2GroupedByReportNoModel?> GetByReportNoGroupedAsync(int reportNo);
         Task<HRC2GroupedByReportNoModel?> GetByMeThoiGroupedAsync(string meThoi);
         Task<HRC2GroupedByReportNoModel?> GetByIdGroupedAsync(int id);
+        Task<List<HRC2GroupedByReportNoModel>> GetAllGroupedBatchAsync(IEnumerable<DLNM_HRC2> baseList);
         Task AddAsync(DLNM_HRC2 entity);
         Task UpdateAsync(DLNM_HRC2 entity);
         Task DeleteAsync(long id);
