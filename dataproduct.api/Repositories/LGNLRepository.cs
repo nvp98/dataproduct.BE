@@ -938,20 +938,17 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .ToListAsync();
 
-            // 2. Tìm config hiệu lực
-            var configRef = await _context.LG_NL_Mapping
-                .Where(m => m.IDLoCao == idLoCao
-                         && m.ThoiDiemBD == null
-                         && m.Ngay <= ngay
-                         && (m.NgayHetHL == null || m.NgayHetHL >= ngay))
-                .OrderByDescending(m => m.Ngay)
-                .Select(m => new { m.Ngay })
-                .FirstOrDefaultAsync();
+            // 2. Kiểm tra có mapping đúng ngày/ca này không (không fallback sang ngày/ca khác)
+            var hasMapping = await _context.LG_NL_Mapping
+                .AnyAsync(m => m.IDLoCao == idLoCao
+                            && m.ThoiDiemBD == null
+                            && m.Ngay == ngay.Date
+                            && m.IDCa == idCa);
 
-            if (configRef == null)
+            if (!hasMapping)
                 return new LGNLDuLieuSiLoResult { Columns = new(), Rows = new() };
 
-            // 3. Lấy mapping
+            // 3. Lấy mapping đúng ngày/ca
             var mappings = await (
                 from m in _context.LG_NL_Mapping
                 join s in _context.LG_NL_SiLo.Where(x => x.IsDelete != true) on m.IDSiLo equals s.ID
@@ -959,7 +956,8 @@ namespace dataproduct.api.Repositories
                 join nh in _context.LG_NL_NhomNVL on n.IDNhomNVL equals nh.ID into nhg
                 from nh in nhg.DefaultIfEmpty()
                 where m.IDLoCao == idLoCao
-                   && m.Ngay == configRef.Ngay
+                   && m.Ngay == ngay.Date
+                   && m.IDCa == idCa
                    && s.TagKey != null
                    && n.IsDelete != true
                 orderby nh != null ? nh.ThuTu : 999,
@@ -985,7 +983,7 @@ namespace dataproduct.api.Repositories
                 {
                     Columns = new(),
                     Rows = new(),
-                    NgayHieuLuc = configRef.Ngay
+                    NgayHieuLuc = ngay.Date
                 };
 
             // 4. Build NVL từ mapping
@@ -1113,7 +1111,7 @@ namespace dataproduct.api.Repositories
             {
                 Columns = columns,
                 Rows = rows,
-                NgayHieuLuc = configRef.Ngay
+                NgayHieuLuc = ngay.Date
             };
         }
         private static void FillEmptyPlaceholders(List<LGNLColumnDto> columns)
