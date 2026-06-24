@@ -90,6 +90,29 @@ namespace dataproduct.api.Controllers
         }
 
         /// <summary>
+        /// Làm mới KLGangLongCCT và KLThepPheGang cho danh sách phiếu BOF đã chọn.
+        /// Tối đa 10 phiếu mỗi lần. Chỉ áp dụng cho HRC2_BB_NauLuyen_BOF.
+        /// </summary>
+        [HttpPost("refresh-gang-metrics")]
+        public async Task<IActionResult> RefreshGangMetrics([FromBody] RefreshGangMetricsRequest request)
+        {
+            try
+            {
+                if (request?.PhieuIds == null || request.PhieuIds.Count == 0)
+                    return BadRequest("Danh sách phiếu không được để trống.");
+                if (request.PhieuIds.Count > 10)
+                    return BadRequest("Tối đa 10 phiếu mỗi lần làm mới.");
+
+                var result = await _service.RefreshGangMetricsByPhieuIdsAsync(request.PhieuIds);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Ép đồng bộ dữ liệu từ NM ngay lập tức, bỏ qua cooldown 2 phút.
         /// Dùng cho nút "Đồng bộ lại" ở FE khi user muốn lấy dữ liệu mới nhất ngay.
         /// </summary>

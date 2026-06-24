@@ -21,6 +21,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? KlLan2 { get; set; }       // TL nhập
         public decimal? KlLan3 { get; set; }       // LT nhập
         public decimal? KlThepLong { get; set; }   // Auto-tính
+        public decimal? KlThepLongChot { get; set; }
         public decimal? KlThepLongPhanBo { get; set; }
         public string? DichChuyen { get; set; }
         public int? TLDichSo { get; set; }

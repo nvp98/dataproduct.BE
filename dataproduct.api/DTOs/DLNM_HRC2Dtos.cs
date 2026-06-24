@@ -104,6 +104,18 @@ namespace dataproduct.api.DTOs
         public List<int>? HeaderKeyIds { get; set; }
     }
 
+    public class RefreshGangMetricsRequest
+    {
+        public List<Guid> PhieuIds { get; set; } = new();
+    }
+
+    public class RefreshGangMetricsResult
+    {
+        public int UpdatedRows { get; set; }
+        public int SkippedPhieu { get; set; }
+        public string Message { get; set; } = "";
+    }
+
     public class SearchThongKe
     {
         public DateTime? TuNgay { get; set; }

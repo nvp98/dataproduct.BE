@@ -891,6 +891,67 @@ namespace dataproduct.api.Services
             await _hrc2NMSyncService.SyncHRC2FromNMAsync(request);
         }
 
+        /// <summary>
+        /// Làm mới KLGangLongCCT và KLThepPheGang cho các phiếu BOF được chọn.
+        /// Từ idPhieu → tìm slot (Ngay/Ca/Scope) → load DLNM_HRC2 rows → gọi RefreshGangMetricsForRowsAsync.
+        /// </summary>
+        public async Task<RefreshGangMetricsResult> RefreshGangMetricsByPhieuIdsAsync(List<Guid> phieuIds)
+        {
+            // Chỉ lấy phiếu BOF, lấy distinct slot
+            var slots = await _context.BmPhieus
+                .Where(p => phieuIds.Contains(p.Idphieu) && p.MaBm == "HRC2_BB_NauLuyen_BOF")
+                .Select(p => new { p.NgaySX, p.Ca, p.Scope })
+                .Distinct()
+                .ToListAsync();
+
+            int skippedPhieu = phieuIds.Count - slots.Count;
+
+            if (slots.Count == 0)
+                return new RefreshGangMetricsResult
+                {
+                    UpdatedRows = 0,
+                    SkippedPhieu = skippedPhieu,
+                    Message = "Không có phiếu HRC2_BB_NauLuyen_BOF nào trong danh sách."
+                };
+
+            // Load toàn bộ rows cho các slot, deduplicate theo ID
+            var allRowsById = new Dictionary<long, DLNM_HRC2>();
+            foreach (var slot in slots)
+            {
+                if (slot.NgaySX == null || slot.Ca == null || slot.Scope == null) continue;
+                var ngay = slot.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
+                var slotRows = await _context.DLNM_HRC2s
+                    .Where(x =>
+                        x.IsNM == true &&
+                        x.IsDelete != true &&
+                        x.Ngay == ngay &&
+                        x.Ca == slot.Ca.Value &&
+                        x.Scope == slot.Scope.Value &&
+                        x.BieuMau == "BOF" &&
+                        x.MeThoi != null)
+                    .ToListAsync();
+                foreach (var r in slotRows)
+                    allRowsById[r.ID] = r;
+            }
+
+            var rows = allRowsById.Values.ToList();
+            if (rows.Count == 0)
+                return new RefreshGangMetricsResult
+                {
+                    UpdatedRows = 0,
+                    SkippedPhieu = skippedPhieu,
+                    Message = "Không tìm thấy dữ liệu mẻ NM nào."
+                };
+
+            int updated = await _hrc2NMSyncService.RefreshGangMetricsForRowsAsync(rows);
+            return new RefreshGangMetricsResult
+            {
+                UpdatedRows = updated,
+                SkippedPhieu = skippedPhieu,
+                Message = $"Đã làm mới {updated} mẻ từ {slots.Count} slot ({phieuIds.Count} phiếu)."
+            };
+        }
+
         public async Task<DLNM_HRC2> CreateAsync(DLNM_HRC2 entity)
         {
             await _repo.AddAsync(entity);

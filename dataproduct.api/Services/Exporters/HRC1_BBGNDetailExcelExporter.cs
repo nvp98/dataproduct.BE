@@ -46,14 +46,19 @@ namespace dataproduct.api.Services.Exporters
 
             switch (phieu.MaBm)
             {
-                case "HRC1_TinhLuyen":     query.TlSo    = phieu.Scope; break;
-                case "HRC1_BBGN_ThepLong": query.IdMayDuc = phieu.Scope; break;
+                case "HRC1_TinhLuyen":
+                    query.TlSo = phieu.Scope;
+                    return await _svc.ExportExcelAsync(query);
+
+                case "HRC1_BBGN_ThepLong":
+                    query.IdMayDuc = phieu.Scope;
+                    query.Kip      = phieu.Kip;
+                    return await _svc.ExportThepLongISOAsync(query);
+
                 default:
                     if (phieu.Scope.HasValue) query.LoSo = phieu.Scope;
-                    break;
+                    return await _svc.ExportExcelAsync(query);
             }
-
-            return await _svc.ExportExcelAsync(query);
         }
     }
 }
