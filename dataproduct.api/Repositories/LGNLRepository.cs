@@ -98,10 +98,10 @@ namespace dataproduct.api.Repositories
         {
             return await (
                 from m in _context.LG_NL_Mapping
-                join s in _context.LG_NL_SiLo
+                join s in _context.LG_NL_SiLo.Where(x => x.IsDelete != true)
                     on m.IDSiLo equals s.ID into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
-                join n in _context.LG_NL_NVL
+                join n in _context.LG_NL_NVL.Where(x => x.IsDelete != true)
                     on m.IDNVL equals n.ID into nvlGroup
                 from n in nvlGroup.DefaultIfEmpty()
                 join nh in _context.LG_NL_NhomNVL
@@ -205,11 +205,11 @@ namespace dataproduct.api.Repositories
             var mappings = await (
                 from m in _context.LG_NL_Mapping
 
-                join s in _context.LG_NL_SiLo
+                join s in _context.LG_NL_SiLo.Where(x => x.IsDelete != true)
                     on m.IDSiLo equals s.ID into sg
                 from s in sg.DefaultIfEmpty()
 
-                join n in _context.LG_NL_NVL
+                join n in _context.LG_NL_NVL.Where(x => x.IsDelete != true)
                     on m.IDNVL equals n.ID into ng
                 from n in ng.DefaultIfEmpty()
 
@@ -954,7 +954,7 @@ namespace dataproduct.api.Repositories
             // 3. Lấy mapping
             var mappings = await (
                 from m in _context.LG_NL_Mapping
-                join s in _context.LG_NL_SiLo on m.IDSiLo equals s.ID
+                join s in _context.LG_NL_SiLo.Where(x => x.IsDelete != true) on m.IDSiLo equals s.ID
                 join n in _context.LG_NL_NVL on m.IDNVL equals n.ID
                 join nh in _context.LG_NL_NhomNVL on n.IDNhomNVL equals nh.ID into nhg
                 from nh in nhg.DefaultIfEmpty()
