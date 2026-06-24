@@ -31,6 +31,7 @@ namespace dataproduct.api.Repositories
         Task<List<HRC1_MeThep>> GetActiveConflictMesByMaMeAsync(string maMe);
         Task<List<HRC1_MeThep>> GetLenThangMesByMaMeAsync(string maMe);
         Task<Dictionary<int, int?>> GetTLScopesByMeIdsAsync(IEnumerable<int> meIds);
+        Task<Dictionary<int, (string? MaMe, int? IdMayDucDich)>> GetChuyenVeByMeIdsAsync(IEnumerable<int> meIds);
         Task<Dictionary<int, string?>> GetUserNamesByIdsAsync(IEnumerable<int> ids);
         Task<List<HRC1_MePhanCong>> GetTLPhanCongsByMePhieuAsync(int meId, Guid idPhieu, int? scopePhieu = null);
         Task<List<HRC1_ExportRow>> GetMeThepsForExportAsync(HRC1_ExportQuery query);
@@ -300,6 +301,35 @@ namespace dataproduct.api.Repositories
             _ctx.HRC1_MePhanCongs
                 .Where(pc => meIds.Contains(pc.MeId) && pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null)
                 .ToDictionaryAsync(pc => pc.MeId, pc => pc.ScopePhieu);
+
+        // Trả về {sourceMeId → (MaMe đích, IdMayDucDich đích)} cho DucPanel — chỉ lấy chuyển thật sự (ChuyenVeMeId != MeId)
+        public async Task<Dictionary<int, (string? MaMe, int? IdMayDucDich)>> GetChuyenVeByMeIdsAsync(IEnumerable<int> meIds)
+        {
+            var meIdList = meIds.ToList();
+            if (meIdList.Count == 0) return new();
+
+            var tlPcs = await _ctx.HRC1_MePhanCongs
+                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                          && meIdList.Contains(pc.MeId)
+                          && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
+                .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
+                .ToListAsync();
+
+            if (tlPcs.Count == 0) return new();
+
+            var chuyenVeMeIds = tlPcs.Select(pc => pc.ChuyenVeMeId!.Value).Distinct().ToList();
+            var chuyenVeMes = await _ctx.HRC1_MeTheps
+                .Where(m => chuyenVeMeIds.Contains(m.Id))
+                .Select(m => new { m.Id, m.MaMe, m.IdMayDucDich })
+                .ToDictionaryAsync(m => m.Id);
+
+            var result = new Dictionary<int, (string? MaMe, int? IdMayDucDich)>();
+            foreach (var pc in tlPcs)
+                if (chuyenVeMes.TryGetValue(pc.ChuyenVeMeId!.Value, out var cvm))
+                    result[pc.MeId] = (cvm.MaMe, cvm.IdMayDucDich);
+
+            return result;
+        }
 
         // ── Helper: áp dụng filter trực tiếp lên HRC1_MeThep ──────────────────────
         private IQueryable<HRC1_MeThep> ApplyMeThepFilters(IQueryable<HRC1_MeThep> q, HRC1_ExportQuery f)
