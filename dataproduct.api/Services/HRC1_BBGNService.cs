@@ -78,14 +78,27 @@ namespace dataproduct.api.Services
                     .Select(m => MapToVm(m, new HRC1_MePhanCong { MeId = m.Id, IdPhieu = idPhieu, CongDoan = "duc" }, mayDucs))
                     .ToList();
 
-                // Load TL nào đã nhận mẻ để hiển thị cột "Tinh luyện/Lên thẳng"
+                // Load TL nào đã nhận mẻ + chuyenVe info cho DucPanel
                 if (danhSachMe.Count > 0)
                 {
                     var ducMeIds = danhSachMe.Select(m => m.Id).ToList();
+
                     var tlScopes = await _repo.GetTLScopesByMeIdsAsync(ducMeIds);
                     foreach (var meVm in danhSachMe)
                         if (tlScopes.TryGetValue(meVm.Id, out var scope))
                             meVm.SoTinhLuyenNhan = scope;
+
+                    var chuyenVeByMeId = await _repo.GetChuyenVeByMeIdsAsync(ducMeIds);
+                    foreach (var meVm in danhSachMe)
+                    {
+                        if (chuyenVeByMeId.TryGetValue(meVm.Id, out var cv))
+                        {
+                            meVm.ChuyenVeMaMe = cv.MaMe;
+                            meVm.TenMayDucChuyen = cv.IdMayDucDich.HasValue
+                                ? mayDucs.FirstOrDefault(d => d.Id == cv.IdMayDucDich.Value)?.TenMayDuc
+                                : null;
+                        }
+                    }
                 }
             }
             else
