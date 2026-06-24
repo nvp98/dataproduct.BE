@@ -104,6 +104,7 @@ namespace dataproduct.api.Repositories
             existing.ID_LoCao = entity.ID_LoCao;
             existing.TenSiLo = entity.TenSiLo;
             existing.ThuTu = entity.ThuTu;
+            existing.ThuTuCoDinh = entity.ThuTuCoDinh;
             existing.IsDelete = entity.IsDelete;
 
             await _context.SaveChangesAsync();
@@ -198,11 +199,11 @@ namespace dataproduct.api.Repositories
             return await (
                 from m in _context.LG_TSL_SiLo_Mapping
                     // IDSiLo trong Mapping lưu ThuTuCoDinh → join qua ThuTuCoDinh + IDLoCao
-                join s in _context.LG_TSL_SiLo
+                join s in _context.LG_TSL_SiLo.Where(x => x.IsDelete != true)
                     on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
                     equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
-                join n in _context.LG_TSL_NVL
+                join n in _context.LG_TSL_NVL.Where(x => x.IsDelete != true)
                     on m.IDNVL equals n.ID into nvlGroup
                 from n in nvlGroup.DefaultIfEmpty()
                 where
@@ -320,7 +321,7 @@ namespace dataproduct.api.Repositories
             return await (
                 from c in _context.LG_TSL_ChiTiet.AsNoTracking()
                 where c.IDPhieu == idPhieu
-                join nvl in _context.LG_TSL_NVL.AsNoTracking()
+                join nvl in _context.LG_TSL_NVL.AsNoTracking().Where(x => x.IsDelete != true)
                     on c.IDNVL equals nvl.ID into nvlGroup
                 from nvl in nvlGroup.DefaultIfEmpty()
                 orderby c.ThuTu
@@ -435,11 +436,11 @@ namespace dataproduct.api.Repositories
                     (idLoCao == null || m.IDLoCao == idLoCao) &&
                     (ca == null || m.Ca == ca) &&
                     (fromDate == null || (m.Ngay >= fromDate && m.Ngay < toDate))
-                join s in _context.LG_TSL_SiLo.AsNoTracking()
+                join s in _context.LG_TSL_SiLo.AsNoTracking().Where(x => x.IsDelete != true)
                     on new { ThuTuCoDinh = (int?)m.IDSiLo, LoCao = (int?)m.IDLoCao }
                     equals new { s.ThuTuCoDinh, LoCao = s.ID_LoCao } into siloGroup
                 from s in siloGroup.DefaultIfEmpty()
-                join nvl in _context.LG_TSL_NVL.AsNoTracking()
+                join nvl in _context.LG_TSL_NVL.AsNoTracking().Where(x => x.IsDelete != true)
                     on m.IDNVL equals nvl.ID into nvlGroup
                 from nvl in nvlGroup.DefaultIfEmpty()
                 orderby s != null ? s.ThuTu : m.IDSiLo

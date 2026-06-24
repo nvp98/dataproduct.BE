@@ -71,6 +71,7 @@ namespace dataproduct.api.Services
                 ID_LoCao = dto.IdLoCao,
                 TenSiLo = dto.TenSiLo,
                 ThuTu = dto.ThuTu,
+                ThuTuCoDinh = dto.ThuTuCoDinh,
                 IsDelete = dto.IsDelete,
             };
             var result = await _repo.UpdateSiLoAsync(id, entity);
@@ -139,12 +140,8 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto> AddMappingAsync(CreateLGTSMappingDto dto)
         {
-            // IdSiLo trong Mapping lưu ThuTuCoDinh (không phải ID) → tra cứu ThuTuCoDinh từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IdSiLo, dto.IdLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IdSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
-
-            // Kiểm tra trùng: silo đã có mapping NVL cho cùng ngày/ca/lò cao chưa?
-            var duplicate = await _repo.GetExistingMappingAsync(thuTu, dto.IdLoCao, dto.Ngay, dto.Ca);
+            // dto.IdSiLo đã là ThuTuCoDinh — FE truyền trực tiếp, không cần lookup từ actual ID.
+            var duplicate = await _repo.GetExistingMappingAsync(dto.IdSiLo, dto.IdLoCao, dto.Ngay, dto.Ca);
             if (duplicate != null)
             {
                 var currentNvl = await _repo.GetNvlByIdAsync(duplicate.IDNVL);
@@ -154,7 +151,7 @@ namespace dataproduct.api.Services
             var entity = new LG_TSL_SiLo_Mapping
             {
                 IDLoCao = dto.IdLoCao,
-                IDSiLo  = thuTu,
+                IDSiLo  = dto.IdSiLo,
                 IDNVL   = dto.IdNVL,
                 Ngay    = dto.Ngay,
                 Ca      = dto.Ca,
@@ -166,25 +163,11 @@ namespace dataproduct.api.Services
 
         public async Task<LGTSMappingDto?> UpdateMappingAsync(int id, UpdateLGTSMappingDto dto)
         {
-            // IdSiLo trong Mapping lưu ThuTuCoDinh → tra cứu ThuTuCoDinh từ silo ID
-            var thuTu = await _repo.GetSiLoThuTuCoDinhAsync(dto.IdSiLo, dto.IdLoCao)
-                        ?? throw new InvalidOperationException($"Silo ID={dto.IdSiLo} không tồn tại hoặc chưa có ThuTuCoDinh.");
-
-            //// Khi không có force=true: kiểm tra NVL hiện tại, ném NvlConflictException nếu đang thay NVL khác
-            //if (!force)
-            //{
-            //    var existing = await _repo.GetMappingByIdAsync(id);
-            //    if (existing != null && existing.IDNVL != dto.IdNVL)
-            //    {
-            //        var currentNvl = await _repo.GetNvlByIdAsync(existing.IDNVL);
-            //        throw new NvlConflictException(existing.IDNVL, currentNvl?.TenNVL);
-            //    }
-            //}
-
+            // dto.IdSiLo đã là ThuTuCoDinh — FE truyền trực tiếp, không cần lookup từ actual ID.
             var entity = new LG_TSL_SiLo_Mapping
             {
                 IDLoCao = dto.IdLoCao,
-                IDSiLo  = thuTu,
+                IDSiLo  = dto.IdSiLo,
                 IDNVL   = dto.IdNVL,
                 Ngay    = dto.Ngay,
                 Ca      = dto.Ca,
@@ -408,6 +391,7 @@ namespace dataproduct.api.Services
             IdLoCao = e.ID_LoCao,
             TenSiLo = e.TenSiLo,
             ThuTu = e.ThuTu,
+            ThuTuCoDinh = e.ThuTuCoDinh,
             IsDelete = e.IsDelete,
         };
 
