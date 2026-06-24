@@ -247,6 +247,41 @@ namespace dataproduct.api.Services
             return string.Equals(value1 ?? string.Empty, value2 ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Làm mới KLGangLongCCT và KLThepPheGang cho danh sách rows đã tải sẵn.
+        /// Dùng 2 TVP stored proc batch → 1 SaveChanges, không phụ thuộc vào filter slot.
+        /// </summary>
+        public async Task<int> RefreshGangMetricsForRowsAsync(List<DLNM_HRC2> rows)
+        {
+            var validRows = rows.Where(x => !string.IsNullOrWhiteSpace(x.MeThoi)).ToList();
+            if (validRows.Count == 0) return 0;
+
+            var allMeThoi = validRows
+                .Select(x => x.MeThoi!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var gangLongCache = await ExecuteGangLongStoredProcBatchAsync(
+                "usp_Sum_KL_GangLong_By_MeThoi_CCT", allMeThoi);
+
+            var thepPheCache = await ExecuteGangLongStoredProcBatchAsync(
+                "usp_Get_KLThepPhe_By_MeThoi", allMeThoi, "KLThepPhe");
+
+            foreach (var row in validRows)
+            {
+                if (gangLongCache.TryGetValue(row.MeThoi!, out var kl))
+                {
+                    row.KLGangLongCCT = kl;
+                    row.KLGangLongCR = 0;
+                }
+                if (thepPheCache.TryGetValue(row.MeThoi!, out var thepPhe))
+                    row.KLThepPheGang = thepPhe;
+            }
+
+            await _context.SaveChangesAsync();
+            return validRows.Count;
+        }
+
         public async Task SyncHRC2FromNMAsync(SyncFromNM_HRC2_Request request)
         {
             if (request == null)
