@@ -285,21 +285,7 @@ namespace dataproduct.api.Repositories
             entity.NgayTao = DateTime.Now;
             entity.ThoiDiemBD = null; // config đầu ca
 
-            // Đóng TẤT CẢ silo đang active của lò này (ngoại trừ đúng ngày/ca đang lưu)
-            // Khi thêm config mới cho bất kỳ silo nào → toàn bộ lò chuyển sang batch mới
-            var actives = await _context.LG_NL_Mapping
-                .Where(m => m.IDLoCao == entity.IDLoCao
-                         && m.NgayHetHL == null
-                         && m.ThoiDiemBD == null
-                         && !(m.Ngay == entity.Ngay && m.IDCa == entity.IDCa))
-                .ToListAsync();
-
-            foreach (var m in actives)
-            {
-                m.NgayHetHL = entity.Ngay;
-                m.IDCaHetHL = entity.IDCa;
-            }
-
+            // Mỗi (Ngay, IDCa) là batch độc lập — không expire batch khác.
             // Xóa config cũ của đúng silo này trong cùng (Ngay, IDCa) nếu đang ghi đè
             // Không xóa silo khác → nhiều silo có thể cùng 1 batch (Ngay, IDCa)
             var existing = await _context.LG_NL_Mapping
