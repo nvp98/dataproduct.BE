@@ -358,8 +358,7 @@ namespace dataproduct.api.Services
             var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Logo
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             // Format chữ ký
             var signHRC1 = await FormatChuKyBase64Async(hrc1?.ChuKy, hrc1?.TinhTrang == 1);
@@ -486,18 +485,8 @@ namespace dataproduct.api.Services
             var notesText = notesRecord?.GiaTri ?? "";
 
             // Logo
-            byte[]? logoBytes = null;
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(logoUrl))
-                {
-                    using var http = _httpClientFactory.CreateClient();
-                    http.Timeout = TimeSpan.FromSeconds(10);
-                    logoBytes = await http.GetByteArrayAsync(logoUrl);
-                }
-            }
-            catch { /* logo không bắt buộc */ }
+            var _logoPath = Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png");
+            byte[]? logoBytes = File.Exists(_logoPath) ? await File.ReadAllBytesAsync(_logoPath) : null;
 
             var htmlPath02 = Path.Combine(_env.WebRootPath, "template_html", "BM.02-QT.05.13_Bien_ban_phoi_nap_nguoi.html");
             var bmHeaderText = await HtmlTemplateHelper.GetBmHeaderTextAsync(htmlPath02);
@@ -525,8 +514,7 @@ namespace dataproduct.api.Services
 
             if (logoBytes != null)
             {
-                var ext = Path.GetExtension(logoUrl).TrimStart('.').ToLower();
-                var fmt = ext == "png" ? XLPictureFormat.Png : XLPictureFormat.Jpeg;
+                var fmt = XLPictureFormat.Png;
                 using var logoMs = new MemoryStream(logoBytes);
                 ws.AddPicture(logoMs, fmt)
                     .MoveTo(ws.Cell(row, 1))

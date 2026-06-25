@@ -538,8 +538,7 @@ namespace dataproduct.api.Services
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
 
             // Convert logo và chữ ký sang base64
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
 
             var nguoiGiao = xuongDuc?.HoVaTen;
@@ -1248,8 +1247,7 @@ namespace dataproduct.api.Services
 
 
             // Convert logo và chữ ký sang base64
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             var nguoiGiao = xuongDuc?.HoVaTen;
             var chucVuGiao = xuongDuc?.TenViTri;

@@ -214,9 +214,7 @@ namespace dataproduct.api.Services
             var html = await File.ReadAllTextAsync(templatePath);
 
             // Logo
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
-                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             // Format chữ ký
             var signHRC1 = await FormatChuKyBase64Async(nguoiNhanHRC1?.ChuKy, nguoiNhanHRC1?.TinhTrang == 1);

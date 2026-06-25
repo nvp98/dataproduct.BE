@@ -771,9 +771,7 @@ namespace dataproduct.api.Services
             // Signatures
             var nguoiTheoDoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
 
-            var logoUrl    = _configuration.GetValue<string>("AppSettings:LogoUrl")
-                             ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var signTheoDoi = await FormatChuKyBase64Async(nguoiTheoDoi?.ChuKy, nguoiTheoDoi?.TinhTrang == 1);
 
             var templatePath = Path.Combine(

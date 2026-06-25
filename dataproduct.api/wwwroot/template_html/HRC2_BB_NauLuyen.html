@@ -6,7 +6,7 @@
     <style>
       @page {
         size: A4 landscape;
-        margin: 10mm;
+        margin: 18mm;
       }
 
       body {
@@ -18,22 +18,13 @@
       .header {
         display: table;
         width: 100%;
-        margin-bottom: 6px;
+        margin-bottom: 18mm;
       }
 
       .header-left {
         display: table-cell;
         width: 50%;
         vertical-align: middle;
-        font-weight: bold;
-        font-size: 8.5pt;
-        text-transform: uppercase;
-        text-align: left;
-      }
-
-      .header-left-inner {
-        display: inline-block;
-        text-align: center;
       }
 
       .header-left img {
@@ -138,11 +129,7 @@
     <!-- HEADER (rows 1-3 equivalent) -->
     <div class="header">
       <div class="header-left">
-        <div class="header-left-inner">
-          <img src="{{LogoUrl}}" alt="Logo" /><br />
-          Công ty cổ phần thép<br />
-          Hòa Phát Dung Quất
-        </div>
+        <img src="{{LogoUrl}}" alt="Logo" />
       </div>
       <div class="header-right">
         {{BmCode}}

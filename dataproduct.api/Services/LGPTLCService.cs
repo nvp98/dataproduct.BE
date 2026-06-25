@@ -514,9 +514,7 @@ namespace dataproduct.api.Services
             var nvVanHanhCaNgay = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
             var nvVanHanhCaDem  = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
 
-            var logoUrl    = _configuration.GetValue<string>("AppSettings:LogoUrl")
-                             ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
-            var logoBase64 = await ConvertImageUrlToBase64Async(logoUrl);
+            var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var signNgay   = await FormatChuKyBase64Async(nvVanHanhCaNgay?.ChuKy, nvVanHanhCaNgay?.TinhTrang == 1);
             var signDem    = await FormatChuKyBase64Async(nvVanHanhCaDem?.ChuKy,  nvVanHanhCaDem?.TinhTrang  == 1);
 

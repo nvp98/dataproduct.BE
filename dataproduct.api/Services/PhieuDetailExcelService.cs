@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using System.Text;
+using System.Text.Json;
 using PaperKind = DinkToPdf.PaperKind;
 
 namespace dataproduct.api.Services
@@ -73,7 +74,7 @@ namespace dataproduct.api.Services
         /// Params: ngay (DateOnly), ca, bieuMau, scope — tương tự SearchThongKeApiAsync nhưng không phân trang.
         /// </summary>
         public async Task<(List<PhuLieuHeaderTable> HeadersBOF, List<PhuLieuHeaderTable> HeadersLFRH, List<HRC2ThongKeRow> Rows)> GetExportDataAsync(
-            DateOnly ngay, int ca, string bieuMau, int scope)
+            DateOnly ngay, int ca, string bieuMau, int scope, Guid? idPhieu = null)
         {
             // 1. Lấy tất cả header Excel trong 1 query, split thành 2 list trong memory
             var allExcelHeaders = await _context.Header_Keys
@@ -115,7 +116,9 @@ namespace dataproduct.api.Services
 
             var usedHeaderKeyIds = headers.Select(x => x.IDHeaderKey).ToHashSet();
 
-            // 2. Lấy tất cả bản ghi DLNM_HRC2 theo filter (một bản ghi/REPORT_NO, lấy ID lớn nhất)
+            // 2. Lấy tất cả bản ghi DLNM_HRC2 theo filter
+            // - NM có REPORT_NO: group by REPORT_NO, lấy ID lớn nhất
+            // - Nhập tay IsNM=false không REPORT_NO: lấy trực tiếp từng bản ghi
             var ngayDateTime = ngay.ToDateTime(TimeOnly.MinValue);
 
             var baseQuery = _context.DLNM_HRC2s
@@ -125,38 +128,79 @@ namespace dataproduct.api.Services
                     x.Ngay.Value.Date == ngayDateTime.Date &&
                     x.Ca == ca &&
                     x.BieuMau == bieuMau &&
-                    x.Scope == scope &&
-                    x.REPORT_NO.HasValue);
+                    x.Scope == scope);
 
             var groupedIds = baseQuery
+                .Where(x => x.REPORT_NO.HasValue)
                 .GroupBy(x => x.REPORT_NO)
                 .Select(g => g.Max(x => x.ID));
 
+            var manualIds = baseQuery
+                .Where(x => !x.REPORT_NO.HasValue && x.IsNM == false)
+                .Select(x => x.ID);
+
+            var selectedIds = groupedIds.Union(manualIds);
+
             var items = await _context.DLNM_HRC2s
-                .Where(x => groupedIds.Contains(x.ID))
+                .Where(x => selectedIds.Contains(x.ID))
                 .OrderBy(x => x.REPORT_NO)
+                .ThenBy(x => x.ID)
                 .AsNoTracking()
                 .ToListAsync();
 
             if (!items.Any())
                 return (headersBOF, headersLFRH, new List<HRC2ThongKeRow>());
 
-            var reportNos = items
+            // Lấy DataJson overrides từ phiếu (nếu có idPhieu) để ưu tiên giá trị user đã sửa tay.
+            // DataJson là nguồn sự thật cho manual overrides trên UI.
+            var dataJsonOverrides = await LoadDataJsonOverridesAsync(idPhieu);
+
+            // Map: mọi DLNM_HRC2.ID trong cùng REPORT_NO group → display item ID (max ID đã chọn).
+            // Mục đích: bắt cả phụ liệu được lưu theo ID khác (không phải max) trong cùng REPORT_NO.
+            var reportNoToDisplayId = items
                 .Where(x => x.REPORT_NO.HasValue)
-                .Select(x => x.REPORT_NO!.Value)
-                .ToList();
+                .ToDictionary(x => x.REPORT_NO!.Value, x => x.ID);
+
+            var idToDisplayId = new Dictionary<long, long>();
+
+            // Với NM rows: tìm tất cả DLNM_HRC2 IDs trong cùng REPORT_NO → map về display item ID
+            if (reportNoToDisplayId.Count > 0)
+            {
+                var reportNosInItems = reportNoToDisplayId.Keys.ToHashSet();
+                var allNMEntries = await _context.DLNM_HRC2s
+                    .Where(x => x.REPORT_NO.HasValue
+                             && reportNosInItems.Contains(x.REPORT_NO!.Value)
+                             && x.IsDelete != true)
+                    .Select(x => new { x.ID, ReportNo = x.REPORT_NO!.Value })
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                foreach (var entry in allNMEntries)
+                {
+                    if (reportNoToDisplayId.TryGetValue(entry.ReportNo, out var dispId))
+                        idToDisplayId[entry.ID] = dispId;
+                }
+            }
+
+            // Với manual rows: map về chính nó
+            foreach (var mid in items.Where(x => !x.REPORT_NO.HasValue).Select(x => x.ID))
+                idToDisplayId[mid] = mid;
+
+            // Dùng ID_MeThoi (= DLNM_HRC2.ID) thay vì REPORT_NO để fetch phụ liệu,
+            // vì PhuLieu_HRC2 của mẻ nhập tay (IsNM=false) không có REPORT_NO.
+            var itemIds = idToDisplayId.Keys.ToList();
 
             // 3. Batch load mapped phụ liệu (có ID_PhuLieu → Header_Mappings → Header_Keys)
             var mappedRaw = await (
                 from pl in _context.PhuLieu_HRC2s
-                where pl.REPORT_NO.HasValue && reportNos.Contains(pl.REPORT_NO.Value)
+                where itemIds.Contains(pl.ID_MeThoi)
                       && (pl.IsPhanBo != true) && pl.ID_PhuLieu.HasValue
                 join hm in _context.Header_Mappings on pl.ID_PhuLieu.Value equals hm.ID_PhuLieu
                 join hk in _context.Header_Keys on hm.ID_HeaderKey equals hk.Id
                 where hk.IsActive && usedHeaderKeyIds.Contains(hk.Id)
                 select new
                 {
-                    ReportNo = pl.REPORT_NO!.Value,
+                    ItemId = pl.ID_MeThoi,
                     ID_HeaderKey = hk.Id,
                     pl.KLPhuGia,
                     pl.KLPhuGia_Manual,
@@ -164,18 +208,17 @@ namespace dataproduct.api.Services
                 }
             ).ToListAsync();
 
-            // 3b. Manual-only (ID_PhuLieu = NULL, chỉ có ID_HeaderKey)
+            // 3b. Manual-only (ID_PhuLieu = NULL, chỉ có ID_HeaderKey — cột điều chỉnh tay)
             var manualOnlyRaw = await _context.PhuLieu_HRC2s
                 .Where(pl =>
-                    pl.REPORT_NO.HasValue &&
-                    reportNos.Contains(pl.REPORT_NO.Value) &&
+                    itemIds.Contains(pl.ID_MeThoi) &&
                     (pl.IsPhanBo != true) &&
                     !pl.ID_PhuLieu.HasValue &&
                     pl.ID_HeaderKey.HasValue &&
                     usedHeaderKeyIds.Contains(pl.ID_HeaderKey.Value))
                 .Select(pl => new
                 {
-                    ReportNo = pl.REPORT_NO!.Value,
+                    ItemId = pl.ID_MeThoi,
                     ID_HeaderKey = pl.ID_HeaderKey!.Value,
                     KLPhuGia = (double?)0,
                     pl.KLPhuGia_Manual,
@@ -185,31 +228,46 @@ namespace dataproduct.api.Services
 
             mappedRaw.AddRange(manualOnlyRaw);
 
-            // Group: reportNo → headerKeyId → (KLPhuGiaTotal, KLPhuGia_Manual, IsManual)
-            var mappedByReportNo = mappedRaw
-                .GroupBy(x => x.ReportNo)
+            // Remap ItemId → display item ID (gộp phụ liệu của mọi ID trong cùng REPORT_NO về 1 display row)
+            var mappedRemapped = mappedRaw.Select(x => new
+            {
+                ItemId = idToDisplayId.GetValueOrDefault(x.ItemId, x.ItemId),
+                x.ID_HeaderKey,
+                x.KLPhuGia,
+                x.KLPhuGia_Manual,
+                x.IsManual
+            }).ToList();
+
+            // Group: displayId → headerKeyId → (KLPhuGiaTotal, KLPhuGia_Manual, IsManual)
+            // Ưu tiên record có IsManual=true khi lấy KLPhuGia_Manual để không bỏ sót giá trị sửa tay.
+            var mappedByItemId = mappedRemapped
+                .GroupBy(x => x.ItemId)
                 .ToDictionary(
                     g => g.Key,
                     g => g.GroupBy(x => x.ID_HeaderKey)
                           .ToDictionary(
                               hg => hg.Key,
-                              hg => (
-                                  KLPhuGiaTotal: (double?)hg.Sum(x => x.KLPhuGia ?? 0),
-                                  KLPhuGia_Manual: hg.First().KLPhuGia_Manual,
-                                  IsManual: hg.First().IsManual
-                              )
+                              hg =>
+                              {
+                                  var manualRec = hg.FirstOrDefault(x => x.IsManual == true);
+                                  return (
+                                      KLPhuGiaTotal: (double?)hg.Sum(x => x.KLPhuGia ?? 0),
+                                      KLPhuGia_Manual: manualRec?.KLPhuGia_Manual,
+                                      IsManual: manualRec != null
+                                  );
+                              }
                           )
                 );
 
             // 4. Batch load phanBo
             var phanBoRaw = await _context.PhuLieu_HRC2s
                 .Where(x =>
-                    x.REPORT_NO.HasValue && reportNos.Contains(x.REPORT_NO.Value) &&
+                    itemIds.Contains(x.ID_MeThoi) &&
                     x.IsPhanBo == true &&
                     x.ID_HeaderKey.HasValue && usedHeaderKeyIds.Contains(x.ID_HeaderKey.Value))
                 .Select(x => new
                 {
-                    ReportNo = x.REPORT_NO!.Value,
+                    ItemId = x.ID_MeThoi,
                     ID_HeaderKey = x.ID_HeaderKey!.Value,
                     x.KLPhuGia,
                     x.KLPhuGia_Manual,
@@ -217,8 +275,17 @@ namespace dataproduct.api.Services
                 })
                 .ToListAsync();
 
-            var phanBoByReportNo = phanBoRaw
-                .GroupBy(x => x.ReportNo)
+            var phanBoRemapped = phanBoRaw.Select(x => new
+            {
+                ItemId = idToDisplayId.GetValueOrDefault(x.ItemId, x.ItemId),
+                x.ID_HeaderKey,
+                x.KLPhuGia,
+                x.KLPhuGia_Manual,
+                x.IsManual
+            }).ToList();
+
+            var phanBoByItemId = phanBoRemapped
+                .GroupBy(x => x.ItemId)
                 .ToDictionary(
                     g => g.Key,
                     g => g.GroupBy(x => x.ID_HeaderKey)
@@ -232,14 +299,13 @@ namespace dataproduct.api.Services
                           )
                 );
 
-            // 5. Assemble rows
+            // 5. Assemble rows (bao gồm cả mẻ nhập tay IsNM=false không có REPORT_NO)
             var rows = items
-                .Where(x => x.REPORT_NO.HasValue)
                 .Select(x =>
                 {
-                    var reportNo = x.REPORT_NO!.Value;
-                    mappedByReportNo.TryGetValue(reportNo, out var mappedDict);
-                    phanBoByReportNo.TryGetValue(reportNo, out var phanBoDict);
+                    // Lookup theo DLNM_HRC2.ID (= ID_MeThoi trong PhuLieu_HRC2), áp dụng cả NM và nhập tay
+                    mappedByItemId.TryGetValue(x.ID, out var mappedDict);
+                    phanBoByItemId.TryGetValue(x.ID, out var phanBoDict);
 
                     var values = headers.Select(h =>
                     {
@@ -255,6 +321,18 @@ namespace dataproduct.api.Services
                         }
 
                         var effectiveKL = klPhuGia_Manual ?? klPhuGia;
+
+                        // Ưu tiên DataJson: giá trị user đã sửa tay trên UI (nguồn sự thật cao nhất).
+                        // Dùng meThoi để match vì id trong DataJson có thể khác id export pick.
+                        if (!string.IsNullOrEmpty(x.MeThoi) &&
+                            dataJsonOverrides.TryGetValue(x.MeThoi, out var meThOiOverrides) &&
+                            meThOiOverrides.TryGetValue(h.IDHeaderKey, out var jsonOverrideVal))
+                        {
+                            effectiveKL = jsonOverrideVal;
+                            klPhuGia_Manual = jsonOverrideVal;
+                            isManual = true;
+                        }
+
                         double? klPhanBo = null;
                         double? totalKLPhuGia;
 
@@ -317,6 +395,75 @@ namespace dataproduct.api.Services
                 .ToList();
 
             return (headersBOF, headersLFRH, rows);
+        }
+
+        /// <summary>
+        /// Đọc DataJson của phiếu và trích xuất manual overrides:
+        /// meThoi → headerKeyId → giá trị user đã sửa.
+        /// </summary>
+        private async Task<Dictionary<string, Dictionary<int, double?>>> LoadDataJsonOverridesAsync(Guid? idPhieu)
+        {
+            var result = new Dictionary<string, Dictionary<int, double?>>(StringComparer.OrdinalIgnoreCase);
+            if (!idPhieu.HasValue) return result;
+
+            var dataJson = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(p => p.Idphieu == idPhieu.Value)
+                .Select(p => p.DataJson)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrWhiteSpace(dataJson)) return result;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(dataJson);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("table1", out var table1) || table1.ValueKind != JsonValueKind.Array)
+                    return result;
+
+                foreach (var row in table1.EnumerateArray())
+                {
+                    if (!row.TryGetProperty("meThoi", out var meProp) || meProp.ValueKind != JsonValueKind.String)
+                        continue;
+                    var meThoi = meProp.GetString();
+                    if (string.IsNullOrWhiteSpace(meThoi)) continue;
+
+                    var rowOverrides = new Dictionary<int, double?>();
+
+                    foreach (var prop in row.EnumerateObject())
+                    {
+                        if (!prop.Name.EndsWith("__IsManual", StringComparison.Ordinal)) continue;
+                        if (prop.Value.ValueKind != JsonValueKind.True) continue;
+
+                        var baseKey = prop.Name[..^"__IsManual".Length]; // e.g. "phuLieu_5"
+                        if (!baseKey.StartsWith("phuLieu_", StringComparison.Ordinal)) continue;
+                        if (!int.TryParse(baseKey["phuLieu_".Length..], out var headerKeyId)) continue;
+
+                        double? val = null;
+                        if (row.TryGetProperty(baseKey, out var valProp))
+                        {
+                            if (valProp.ValueKind == JsonValueKind.Number)
+                                val = valProp.GetDouble();
+                            else if (valProp.ValueKind == JsonValueKind.String &&
+                                     double.TryParse(valProp.GetString(),
+                                         System.Globalization.NumberStyles.Any,
+                                         System.Globalization.CultureInfo.InvariantCulture, out var d))
+                                val = d;
+                        }
+                        rowOverrides[headerKeyId] = val;
+                    }
+
+                    if (rowOverrides.Count > 0)
+                        result[meThoi] = rowOverrides;
+                }
+            }
+            catch
+            {
+                // DataJson parse failure → trả về empty, không ảnh hưởng export
+            }
+
+            return result;
         }
 
         private static double? RoundNumber(double? value)
@@ -1383,7 +1530,7 @@ namespace dataproduct.api.Services
             DateOnly ngay, int ca, string bieuMau, int scope, Guid idPhieu,
             string gioBatDau = "", string gioKetThuc = "")
         {
-            var (headersBOF, headersLFRH, rows) = await GetExportDataAsync(ngay, ca, bieuMau, scope);
+            var (headersBOF, headersLFRH, rows) = await GetExportDataAsync(ngay, ca, bieuMau, scope, idPhieu);
             var imageSignsDto = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
 
             // Footer HRC2_BB_NauLuyen có 2 vị trí ký:
@@ -1478,8 +1625,7 @@ namespace dataproduct.api.Services
             string? truongKipName = null,
             string? nguoiLapName = null)
         {
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
-                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             string key   = bieuMau.ToUpperInvariant();
             string tenBm = key.Contains("BOF") ? $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}"
