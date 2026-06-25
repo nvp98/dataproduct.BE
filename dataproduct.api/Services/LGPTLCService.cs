@@ -190,6 +190,15 @@ namespace dataproduct.api.Services
                         SanLuongNghien = GetDecimalFromSummary(root, "tinhHinhSanLuong", "sanLuongNghien"),
                         SanLuongPhun = GetDecimalFromSummary(root, "tinhHinhSanLuong", "sanLuongPhun"),
 
+                        DoAm_Nghien_Kip1 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "sanLuongNghien", "doAmKip1"),
+                        DoAm_Nghien_Kip2 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "sanLuongNghien", "doAmKip2"),
+                        DoAm_Phun_Kip1 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "sanLuongPhun", "doAmKip1"),
+                        DoAm_Phun_Kip2 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "sanLuongPhun", "doAmKip2"),
+                        DoAm_ThanTho_Kip1 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "tonThanTho", "doAmKip1"),
+                        DoAm_ThanTho_Kip2 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "tonThanTho", "doAmKip2"),
+                        DoAm_ThanTinh_Kip1 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "tonThanTinh", "doAmKip1"),
+                        DoAm_ThanTinh_Kip2 = GetDecimalFromSummary3(root, "tinhHinhSanLuong", "tonThanTinh", "doAmKip2"),
+
                         TinhTrangSanXuat = GetString(root, "tinhTrangSanXuat", "tinhTrangSanXuatNgay", "tinhTrangSanXuatDem"),
                         SapXepSanXuat = GetString(root, "sapXepSanXuat", "SapXepSanXuat"),
 
@@ -321,6 +330,14 @@ namespace dataproduct.api.Services
             }
 
             return GetDecimal(root, fieldKey);
+        }
+
+        private static decimal? GetDecimalFromSummary3(JsonElement root, string key1, string key2, string key3)
+        {
+            if (root.TryGetProperty(key1, out var l1) && l1.ValueKind == JsonValueKind.Object)
+                if (l1.TryGetProperty(key2, out var l2) && l2.ValueKind == JsonValueKind.Object)
+                    return GetDecimal(l2, key3);
+            return null;
         }
 
         private static DateTime ParseRowTime(JsonElement row, DateTime ngay, int ca, int index)

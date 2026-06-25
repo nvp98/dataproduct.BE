@@ -108,6 +108,15 @@ namespace dataproduct.api.Models
         [Column(TypeName = "decimal(18,3)")] public decimal? SanLuongNghien { get; set; }
         [Column(TypeName = "decimal(18,3)")] public decimal? SanLuongPhun { get; set; }
 
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_Nghien_Kip1 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_Nghien_Kip2 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_Phun_Kip1 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_Phun_Kip2 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_ThanTho_Kip1 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_ThanTho_Kip2 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_ThanTinh_Kip1 { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? DoAm_ThanTinh_Kip2 { get; set; }
+
         public string? GhiChu { get; set; }
         public string? TinhTrangSanXuat { get; set; }
         public string? SapXepSanXuat { get; set; }

@@ -729,6 +729,14 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Luc).HasColumnType("datetime");
         });
 
+        modelBuilder.Entity<LG_NL_ChiTiet>(entity =>
+        {
+            entity.ToTable("LG_NL_ChiTiet");
+            entity.Property(e => e.GiaTri).HasPrecision(18, 3);
+            entity.Property(e => e.GiaTri_Goc).HasPrecision(18, 3);
+            entity.Property(e => e.QuyKho).HasPrecision(18, 3);
+        });
+
         OnModelCreatingPartial(modelBuilder);
     }
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
