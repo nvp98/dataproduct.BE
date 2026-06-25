@@ -869,7 +869,7 @@ namespace dataproduct.api.Services
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "BBGN_ThepLong.html");
             var html = await File.ReadAllTextAsync(templatePath);
 
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
                 .Replace("{{Ca}}", ca.ToString())
