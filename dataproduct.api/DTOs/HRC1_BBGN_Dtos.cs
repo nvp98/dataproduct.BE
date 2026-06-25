@@ -181,6 +181,7 @@ namespace dataproduct.api.DTOs
         public int? IdNhomPhanLoai { get; set; }
         public DateOnly? TuNgayLoThoi { get; set; }
         public DateOnly? DenNgayLoThoi { get; set; }
+        public string? MaMeChuyenVe { get; set; }  // chỉ lấy mẻ đã chuyển sang mẻ khác
     }
 
     // -------------------------------------------------------

@@ -403,6 +403,15 @@ namespace dataproduct.api.Repositories
                     select m2.Id;
                 q = q.Where(m => nhomMeIds.Contains(m.Id));
             }
+            if(f.MaMeChuyenVe != null)
+            {
+                var chuyenVeMeIds =
+                    from m2 in _ctx.HRC1_MeTheps
+                    where m2.MaMe == f.MaMeChuyenVe
+                    join pc in _ctx.HRC1_MePhanCongs on m2.Id equals pc.ChuyenVeMeId
+                    select pc.MeId;
+                q = q.Where(m => chuyenVeMeIds.Contains(m.Id));
+            }
             return q;
         }
 
