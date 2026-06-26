@@ -61,18 +61,8 @@ namespace dataproduct.api.Services
             var khoPhoi = pheDuyets.FirstOrDefault(x => x.CapDuyet == 2 && x.TinhTrang == 1);
 
             // Logo
-            byte[]? logoBytes = null;
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(logoUrl))
-                {
-                    using var http = _httpClientFactory.CreateClient();
-                    http.Timeout = TimeSpan.FromSeconds(10);
-                    logoBytes = await http.GetByteArrayAsync(logoUrl);
-                }
-            }
-            catch { /* logo không bắt buộc */ }
+            var _logoPath = Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png");
+            byte[]? logoBytes = File.Exists(_logoPath) ? await File.ReadAllBytesAsync(_logoPath) : null;
 
             // BM header từ HTML template
             var htmlPath = Path.Combine(_env.WebRootPath, "template_html",
@@ -112,8 +102,7 @@ namespace dataproduct.api.Services
             ws.Row(row).Height = 36;
             if (logoBytes != null)
             {
-                var ext = Path.GetExtension(logoUrl).TrimStart('.').ToLower();
-                var fmt = ext == "png" ? XLPictureFormat.Png : XLPictureFormat.Jpeg;
+                var fmt = XLPictureFormat.Png;
                 using var logoMs = new MemoryStream(logoBytes);
                 ws.AddPicture(logoMs, fmt).MoveTo(ws.Cell(row, 1)).Scale(0.38);
             }

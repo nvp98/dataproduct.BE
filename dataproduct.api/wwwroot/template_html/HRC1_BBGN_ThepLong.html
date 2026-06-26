@@ -4,36 +4,29 @@
   <meta charset="utf-8" />
   <title>Biên bản giao nhận thép lỏng - HRC1</title>
   <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Times New Roman", serif; font-size: 11pt; color: #000; }
 
     .page {
-      width: 210mm;
-      min-height: 297mm;
-      padding: 12mm 12mm 10mm 12mm;
-      margin: 0 auto;
-      background: #fff;
+      margin: 0;
+      padding: 0;
     }
 
     .header {
         display: table;
         width: 100%;
-        margin-bottom: 6px;
+        margin-bottom: 18mm;
       }
 
       .header-left {
         display: table-cell;
         width: 50%;
         vertical-align: middle;
-        font-weight: bold;
-        font-size: 8.5pt;
-        text-transform: uppercase;
-        text-align: left;
-      }
-
-      .header-left-inner {
-        display: inline-block;
-        text-align: center;
       }
 
       .header-left img {
@@ -114,11 +107,7 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-left">
-      <div class="header-left-inner">
-        <img src="{{LogoUrl}}" alt="Logo" /><br />
-        CÔNG TY CỔ PHẦN THÉP<br />
-        HÒA PHÁT DUNG QUẤT
-      </div>
+      <img src="{{LogoUrl}}" alt="Logo" />
     </div>
     <div class="header-right">
       {{BmCode}}

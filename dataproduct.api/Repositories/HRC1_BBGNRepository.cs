@@ -403,6 +403,15 @@ namespace dataproduct.api.Repositories
                     select m2.Id;
                 q = q.Where(m => nhomMeIds.Contains(m.Id));
             }
+            if(f.MaMeChuyenVe != null)
+            {
+                var chuyenVeMeIds =
+                    from m2 in _ctx.HRC1_MeTheps
+                    where m2.MaMe == f.MaMeChuyenVe
+                    join pc in _ctx.HRC1_MePhanCongs on m2.Id equals pc.ChuyenVeMeId
+                    select pc.MeId;
+                q = q.Where(m => chuyenVeMeIds.Contains(m.Id));
+            }
             return q;
         }
 
@@ -573,7 +582,15 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrEmpty(q.Kip))
                 mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
-            return mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict)).ToList();
+            var rows = mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict)).ToList();
+
+            var meIds = rows.Select(r => r.MeId).ToList();
+            var klChotMap = await ComputeKlThepLongChotAsync(meIds);
+            foreach (var row in rows)
+                if (klChotMap.TryGetValue(row.MeId, out var klChot))
+                    row.KlThepLongChot = klChot;
+
+            return rows;
         }
 
         public async Task<HRC1_ThongKeResult> GetMeThepsPagedAsync(HRC1_ThongKeQuery q)

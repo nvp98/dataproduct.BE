@@ -323,7 +323,7 @@ namespace dataproduct.api.Services
             }
 
             // 3️⃣ Replace placeholder
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)

@@ -235,8 +235,7 @@ namespace dataproduct.api.Services
                 <td></td>
             </tr>");
 
-            // Lấy logo URL
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             // Lấy thông tin phê duyệt từ PheDuyetService
             var pheDuyetList = await _pheDuyetService.GetPheDuyetPhieuAsync(phieuId);
@@ -539,18 +538,8 @@ namespace dataproduct.api.Services
             var (tuGio, denGio, tuNgay, denNgay) = ThoiGianHelper.CalculateCaKipTime(phieu.NgaySX, phieu.Ca);
 
             // Logo
-            byte[]? logoBytes = null;
-            var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl") ?? "";
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(logoUrl))
-                {
-                    using var http = _httpClientFactory.CreateClient();
-                    http.Timeout = TimeSpan.FromSeconds(10);
-                    logoBytes = await http.GetByteArrayAsync(logoUrl);
-                }
-            }
-            catch { }
+            var _logoPath = Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png");
+            byte[]? logoBytes = File.Exists(_logoPath) ? await File.ReadAllBytesAsync(_logoPath) : null;
 
             var htmlPath08 = Path.Combine(_env.WebRootPath, "template_html", "BM.08-QT.05.13_Bien_ban_xac_nhan_san_luong_kcs.html");
             var bmHeaderText = await HtmlTemplateHelper.GetBmHeaderTextAsync(htmlPath08);
@@ -578,10 +567,7 @@ namespace dataproduct.api.Services
 
             if (logoBytes != null)
             {
-                var ext = Path.GetExtension(logoUrl).TrimStart('.').ToLower();
-                var fmt = ext == "png"
-                    ? ClosedXML.Excel.Drawings.XLPictureFormat.Png
-                    : ClosedXML.Excel.Drawings.XLPictureFormat.Jpeg;
+                var fmt = ClosedXML.Excel.Drawings.XLPictureFormat.Png;
                 using var logoMs = new MemoryStream(logoBytes);
                 ws.AddPicture(logoMs, fmt)
                     .MoveTo(ws.Cell(row, 1))

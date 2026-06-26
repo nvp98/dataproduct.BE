@@ -336,7 +336,7 @@ namespace dataproduct.api.Controllers
                         $"Chưa có template Excel cho '{templateName}'. Đặt file tại: wwwroot/templates/{templateName}.xlsx");
 
                 var (headersBOF, headersLFRH, rows) =
-                    await _excelService.GetExportDataAsync(ngayPhieu, caPhieu, bieuMau, scopePhieu);
+                    await _excelService.GetExportDataAsync(ngayPhieu, caPhieu, bieuMau, scopePhieu, idPhieu);
 
                 bool isBof = bieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase);
                 var headers = isBof ? headersBOF : headersLFRH;

@@ -1353,7 +1353,7 @@ namespace dataproduct.api.Services
         // query != null → render dòng 2 (xuất 1 phiếu); null → bỏ dòng 2 (xuất nhiều phiếu)
         private static void RenderThepLongISOHeader(IXLWorksheet ws, HRC1_ExportQuery? query = null)
         {
-            const int TOTAL_COLS = 15;
+            const int TOTAL_COLS = 17;
 
             // Dòng 1: tiêu đề biên bản
             ws.Range(1, 1, 1, TOTAL_COLS).Merge();
@@ -1395,7 +1395,7 @@ namespace dataproduct.api.Services
             c2.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
         }
 
-        private static readonly int[] _centerCols = { 1, 2, 3, 4, 5, 7, 8, 14, 15 };
+        private static readonly int[] _centerCols = { 1, 2, 3, 4, 5, 7, 8, 14, 15, 16 };
 
         private static void ApplyDataRowStyle(IXLWorksheet ws, int row, int totalCols)
         {
@@ -1411,9 +1411,9 @@ namespace dataproduct.api.Services
 
         private static void FillThepLongISOSheet(IXLWorksheet ws, List<HRC1_ExportRow> data, int startRow)
         {
-            const int TOTAL_COLS = 15;
+            const int TOTAL_COLS = 17;
             int row = startRow, stt = 1;
-            decimal sumKlThepLong = 0;
+            decimal sumKlThepLong = 0, sumKlThepLongChot = 0;
 
             foreach (var item in data)
             {
@@ -1446,8 +1446,16 @@ namespace dataproduct.api.Services
                 ws.Cell(row, 13).Value = item.GhiChuDuc ?? "";
                 ws.Cell(row, 14).Value = item.TinhLuyenLenThang ?? "";
                 ws.Cell(row, 15).Value = item.PhanLoai ?? "";
+                if (item.KlThepLongChot.HasValue)
+                {
+                    ws.Cell(row, 16).Value = (double)item.KlThepLongChot.Value;
+                    sumKlThepLongChot += item.KlThepLongChot.Value;
+                }
+                ws.Cell(row, 17).Value = item.ChuyenVeMaMe ?? "";
 
                 ApplyDataRowStyle(ws, row, TOTAL_COLS);
+                if (!string.IsNullOrEmpty(item.ChuyenVeMaMe) && item.ChuyenVeMaMe != item.MaMe)
+                    ws.Range(row, 1, row, TOTAL_COLS).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
                 row++;
             }
 
@@ -1461,6 +1469,10 @@ namespace dataproduct.api.Services
             sumCell.Value = (double)sumKlThepLong;
             sumCell.Style.Font.Bold = true;
             sumCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            var sumChotCell = ws.Cell(row, 16);
+            sumChotCell.Value = (double)sumKlThepLongChot;
+            sumChotCell.Style.Font.Bold = true;
+            sumChotCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             ApplyDataRowStyle(ws, row, TOTAL_COLS);
             row++;
 
@@ -1488,11 +1500,75 @@ namespace dataproduct.api.Services
         public async Task<ExportFileResult> ExportBulkExcelAsync(List<Guid> phieuIds)
         {
             var phieus = await _repo.GetBmPhieusByIdsAsync(phieuIds);
+            bool allThepLong = phieus.Count > 0 && phieus.All(p => p.MaBm == "HRC1_BBGN_ThepLong");
 
-            var merged = new List<HRC1_ExportRow>();
+            var mayDucs = await _repo.GetMayDucsHRC1Async();
+            var mayDucDict = mayDucs.ToDictionary(m => m.Id, m => m.TenMayDuc ?? $"MD{m.Id}");
+
+            if (allThepLong)
+            {
+                const string TEMPLATE_FILE = "HRC1_BBGN_ThepLong.xlsx";
+                const int DATA_START_ROW   = 5;
+                var templatePath = Path.Combine(_env.WebRootPath, "templates", TEMPLATE_FILE);
+                if (!File.Exists(templatePath))
+                    throw new FileNotFoundException(
+                        $"Chưa có template Excel. Đặt file tại: wwwroot/templates/{TEMPLATE_FILE}");
+
+                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
+                try
+                {
+                    using var wb = new XLWorkbook(templatePath);
+                    var templateWs = wb.Worksheets.First();
+                    var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var phieu in phieus)
+                    {
+                        if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue) continue;
+
+                        var rows = await _repo.GetMeThepsForExportAsync(new HRC1_ExportQuery
+                        {
+                            TuNgay   = phieu.NgaySX,
+                            DenNgay  = phieu.NgaySX,
+                            Ca       = phieu.Ca,
+                            IdMayDuc = phieu.Scope,
+                        });
+
+                        var sheetName = UniqueSheetName(
+                            BuildPhieuSheetLabel(phieu, mayDucDict), usedNames);
+                        var ws = templateWs.CopyTo(sheetName);
+                        RenderThepLongISOHeader(ws, new HRC1_ExportQuery
+                        {
+                            TuNgay = phieu.NgaySX,
+                            Ca     = phieu.Ca,
+                            Kip    = phieu.Kip,
+                        });
+                        FillThepLongISOSheet(ws, rows, DATA_START_ROW);
+                    }
+
+                    templateWs.Delete();
+                    if (!wb.Worksheets.Any()) wb.AddWorksheet("Trống");
+                    wb.SaveAs(tempPath);
+                    return new ExportFileResult
+                    {
+                        Content     = File.ReadAllBytes(tempPath),
+                        FileName    = $"BulkExport_HRC1_ThepLong_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                        ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    };
+                }
+                finally
+                {
+                    if (File.Exists(tempPath)) File.Delete(tempPath);
+                }
+            }
+
+            // Mixed / non-ThepLong: mỗi phiếu 1 sheet
+            using var wbFallback = new XLWorkbook();
+            var usedNamesFb = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var phieu in phieus)
             {
                 if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue) continue;
+
                 var query = new HRC1_ExportQuery
                 {
                     TuNgay  = phieu.NgaySX,
@@ -1508,63 +1584,21 @@ namespace dataproduct.api.Services
                         break;
                 }
                 var rows = await _repo.GetMeThepsForExportAsync(query);
-                merged.AddRange(rows);
+                rows = rows.GroupBy(r => r.MeId).Select(g => g.First())
+                           .OrderBy(r => r.NgayTao).ThenBy(r => r.MaMe).ToList();
+
+                var sheetName = UniqueSheetName(
+                    BuildPhieuSheetLabel(phieu, mayDucDict), usedNamesFb);
+                var ws = wbFallback.AddWorksheet(sheetName);
+
+                var ngayStr = phieu.NgaySX.Value.ToString("dd/MM/yyyy");
+                var caStr   = phieu.Ca == 1 ? "Ca ngày" : "Ca đêm";
+                var line2   = $"{ngayStr}  {caStr}  {phieu.Kip ?? ""}".TrimEnd();
+                var line3   = $"Tổng: {rows.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}";
+                WriteExcelSheet(ws, rows, line2, line3);
             }
 
-            merged = merged
-                .GroupBy(r => r.MeId)
-                .Select(g => g.First())
-                .OrderBy(r => r.NgayTao)
-                .ThenBy(r => r.Ca)
-                .ThenBy(r => r.TenMayDuc)
-                .ThenBy(r => r.MaMe)
-                .ToList();
-
-            // Nếu toàn bộ phiếu chọn đều là máy đúc → dùng ISO template, bỏ dòng 2
-            bool allThepLong = phieus.Count > 0 && phieus.All(p => p.MaBm == "HRC1_BBGN_ThepLong");
-            if (allThepLong)
-            {
-                const string TEMPLATE_FILE = "HRC1_BBGN_ThepLong.xlsx";
-                const int DATA_START_ROW   = 5;
-                var templatePath = Path.Combine(_env.WebRootPath, "templates", TEMPLATE_FILE);
-                if (!File.Exists(templatePath))
-                    throw new FileNotFoundException(
-                        $"Chưa có template Excel. Đặt file tại: wwwroot/templates/{TEMPLATE_FILE}");
-
-                var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
-                try
-                {
-                    using (var wb = new XLWorkbook(templatePath))
-                    {
-                        var ws = wb.Worksheets.First();
-                        RenderThepLongISOHeader(ws);           // query = null → bỏ dòng 2
-                        FillThepLongISOSheet(ws, merged, DATA_START_ROW);
-                        wb.SaveAs(tempPath);
-                    }
-                    return new ExportFileResult
-                    {
-                        Content     = File.ReadAllBytes(tempPath),
-                        FileName    = $"BulkExport_HRC1_ThepLong_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
-                        ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    };
-                }
-                finally
-                {
-                    if (File.Exists(tempPath)) File.Delete(tempPath);
-                }
-            }
-
-            var validPhieus = phieus.Where(p => p.NgaySX.HasValue).ToList();
-            var minDate = validPhieus.Count > 0 ? validPhieus.Min(p => p.NgaySX!.Value) : DateOnly.FromDateTime(DateTime.Today);
-            var maxDate = validPhieus.Count > 0 ? validPhieus.Max(p => p.NgaySX!.Value) : minDate;
-            var line2 = minDate == maxDate
-                ? $"Ngày: {minDate:dd/MM/yyyy}"
-                : $"Từ ngày: {minDate:dd/MM/yyyy}  –  Đến ngày: {maxDate:dd/MM/yyyy}";
-            var line3 = $"{phieuIds.Count} phiếu   |   Tổng: {merged.Count} mẻ   |   Xuất lúc: {DateTime.Now:dd/MM/yyyy HH:mm}";
-
-            using var wbFallback = new XLWorkbook();
-            var wsFallback = wbFallback.AddWorksheet("Thống kê");
-            WriteExcelSheet(wsFallback, merged, line2, line3);
+            if (!wbFallback.Worksheets.Any()) wbFallback.AddWorksheet("Trống");
 
             using var stream = new MemoryStream();
             wbFallback.SaveAs(stream);
@@ -1574,6 +1608,41 @@ namespace dataproduct.api.Services
                 FileName = $"BulkExport_HRC1_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             };
+        }
+
+        // Format: {TenMayDuc/TL{n}/Lo{n}}_C{ca}-{kip}_{ddMMyy}
+        private static string BuildPhieuSheetLabel(BmPhieu phieu, Dictionary<int, string> mayDucDict)
+        {
+            string prefix = phieu.MaBm switch
+            {
+                "HRC1_BBGN_ThepLong" when phieu.Scope.HasValue =>
+                    mayDucDict.TryGetValue(phieu.Scope.Value, out var ten) ? ten : $"MD{phieu.Scope}",
+                "HRC1_TinhLuyen" when phieu.Scope.HasValue => $"TL{phieu.Scope}",
+                _ when phieu.Scope.HasValue => $"Lo{phieu.Scope}",
+                _ => phieu.SoPhieu ?? "Phieu",
+            };
+
+            var ca   = phieu.Ca.HasValue ? $"C{phieu.Ca}" : "";
+            var kip  = string.IsNullOrWhiteSpace(phieu.Kip) ? "" : $"-{phieu.Kip.Trim()}";
+            var ngay = phieu.NgaySX.HasValue ? phieu.NgaySX.Value.ToString("ddMMyy") : "";
+
+            return $"{prefix}_{ca}{kip}_{ngay}";
+        }
+
+        private static string UniqueSheetName(string raw, HashSet<string> used)
+        {
+            var invalid = new[] { ':', '\\', '/', '?', '*', '[', ']' };
+            var clean = new string(raw.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+            if (clean.Length > 31) clean = clean[..31];
+            if (used.Add(clean)) return clean;
+            for (int i = 2; ; i++)
+            {
+                var suffix = $"_{i}";
+                var candidate = clean.Length + suffix.Length > 31
+                    ? clean[..(31 - suffix.Length)] + suffix
+                    : clean + suffix;
+                if (used.Add(candidate)) return candidate;
+            }
         }
 
         private static void WriteExcelSheet(IXLWorksheet ws, List<HRC1_ExportRow> data, string line2, string line3)
@@ -1837,8 +1906,7 @@ namespace dataproduct.api.Services
             var benNhanKyHtml   = await BuildSigHtmlAsync(benNhanIds);
 
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BBGN_ThepLong.html");
-            var logoUrl = _config.GetValue<string>("AppSettings:LogoUrl")
-                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var html = await File.ReadAllTextAsync(templatePath);
 
             html = html
