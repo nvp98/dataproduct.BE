@@ -21,6 +21,7 @@ namespace dataproduct.api.Services
         private readonly PheDuyetService _pheDuyetService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ProductFormContext _context;
+        private readonly BmConfigService _bmConfig;
 
         public NLBTDBenPheService(
             INL_BTDBenPheRepository repo,
@@ -30,7 +31,8 @@ namespace dataproduct.api.Services
             IConfiguration configuration,
             PheDuyetService pheDuyetService,
             IHttpClientFactory httpClientFactory,
-            ProductFormContext context)
+            ProductFormContext context,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _repoPhieu = repoPhieu;
@@ -40,6 +42,7 @@ namespace dataproduct.api.Services
             _pheDuyetService = pheDuyetService;
             _httpClientFactory = httpClientFactory;
             _context = context;
+            _bmConfig = bmConfig;
         }
 
         public async Task<int> InsertNLBTDBenPheFromPhieuJsonAsync(BmPhieu phieu)
@@ -211,7 +214,7 @@ namespace dataproduct.api.Services
                 "template_html",
                 "BM.18-HD.25.08_Bang_theo_doi_ben_phe.html"
             );
-            var html = await File.ReadAllTextAsync(templatePath);
+            var html = await _bmConfig.LoadTemplateAsync(templatePath);
 
             // Logo
             var logoUrl = _configuration.GetValue<string>("AppSettings:LogoUrl")
@@ -465,6 +468,77 @@ namespace dataproduct.api.Services
             {
                 ws.Cell("C3").Value = $"Đến ngày: {toDate:dd/MM/yyyy}";
             }
+
+            // Xây dựng dữ liệu
+            var rows = (from p in phieus
+                        join d in dataList on p.Idphieu equals d.IDPhieu
+                        orderby p.NgaySX, p.Ca, p.Kip, p.SoPhieu
+                        select new { p, d }).ToList();
+
+            const int startRow = 3; // Dòng bắt đầu chèn dữ liệu (sau 2 dòng tiêu đề)
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var row = rows[i];
+                var r = startRow + i;
+
+                // Copy style từ dòng template
+                if (i > 0)
+                    ws.Row(startRow).CopyTo(ws.Row(r));
+
+                ws.Cell(r, 1).Value = r - startRow + 1; // STT
+                ws.Cell(r, 2).Value = row.p.NgaySX?.ToDateTime(TimeOnly.MinValue);
+                ws.Cell(r, 3).Value = row.p.Ca;
+                ws.Cell(r, 4).Value = row.p.Kip;
+                ws.Cell(r, 5).Value = row.d.MaBSX;
+                ws.Cell(r, 6).Value = row.d.SoHieuBen;
+                ws.Cell(r, 7).Value = row.d.KhoiLuong.HasValue ? row.d.KhoiLuong.Value.ToString("N2") : "";
+                ws.Cell(r, 8).Value = row.d.GhiChu;
+                ws.Cell(r, 9).Value = row.p.SoPhieu;
+                ws.Cell(r, 10).Value = PhieuStatusDisplay.GetText(row.p.TinhTrang);
+            }
+
+            // Format cột ngày
+            if (rows.Count > 0)
+                ws.Range(startRow, 2, startRow + rows.Count - 1, 2)
+                   .Style.DateFormat.Format = "dd/MM/yyyy";
+
+            // Save to bytes
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
+
+        public async Task<byte[]> ExportDetailExcelAsync(Guid phieuId)
+        {
+            var maBmList = new[]
+            {
+                "NL_BB_TheoDoiBenPhe",
+                "BM.18-HD.25.08",
+                "BM.18/HD.25.08"
+            };
+
+            var phieuQuery = _context.BmPhieus
+                .AsNoTracking()
+                .Where(x => x.IsDelete != 1 && x.Idphieu == phieuId && x.IsLock != 1 && maBmList.Contains(x.MaBm));
+
+            var phieus = await phieuQuery
+                .Select(x => new { x.Idphieu, x.SoPhieu, x.NgaySX, x.Ca, x.Kip, x.TinhTrang })
+                .OrderBy(x => x.NgaySX).ThenBy(x => x.Ca).ThenBy(x => x.Kip)
+                .ToListAsync();
+
+            var phieuIds = phieus.Select(x => x.Idphieu).ToList();
+
+            var dataList = await _context.NL_BTDBenPhes
+                .AsNoTracking()
+                .Where(x => x.IDPhieu.HasValue && phieuIds.Contains(x.IDPhieu.Value))
+                .ToListAsync();
+
+            var templatePath = Path.Combine(_env.WebRootPath, "templates", "BM_TongHopTheoDoiBenPhe.xlsx");
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var workbook = new XLWorkbook(templatePath);
+            var ws = workbook.Worksheet(1);
 
             // Xây dựng dữ liệu
             var rows = (from p in phieus

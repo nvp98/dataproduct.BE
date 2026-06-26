@@ -29,5 +29,15 @@ namespace dataproduct.api.Services.Exporters
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
+        public async Task<ExportFileResult> ExportExcelPhieuAsync(Guid phieuId)
+        {
+            var content = await _service.ExportDetailExcelAsync(phieuId);
+            return new ExportFileResult
+            {
+                Content = content,
+                FileName = $"BM.18-HD.25.08_ChiTietTheoDoiBenPhe_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
+        }
     }
 }
