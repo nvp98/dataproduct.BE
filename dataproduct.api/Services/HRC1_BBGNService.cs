@@ -1409,13 +1409,21 @@ namespace dataproduct.api.Services
                 ws.Cell(row, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
 
+        private static string MeSortKey(HRC1_ExportRow r)
+        {
+            if (string.IsNullOrEmpty(r.ThoiGian)) return "9999-12-31 99:99";
+            var baseDate = r.NgayDuc ?? DateOnly.FromDateTime(r.NgayTao);
+            var isNextDay = r.CaDuc == 2 && string.Compare(r.ThoiGian, "20:00", StringComparison.Ordinal) < 0;
+            return $"{(isNextDay ? baseDate.AddDays(1) : baseDate):yyyy-MM-dd} {r.ThoiGian}";
+        }
+
         private static void FillThepLongISOSheet(IXLWorksheet ws, List<HRC1_ExportRow> data, int startRow)
         {
             const int TOTAL_COLS = 17;
             int row = startRow, stt = 1;
             decimal sumKlThepLong = 0, sumKlThepLongChot = 0;
 
-            foreach (var item in data)
+            foreach (var item in data.OrderBy(MeSortKey))
             {
                 ws.Cell(row, 1).Value = stt++;
 
@@ -1425,7 +1433,7 @@ namespace dataproduct.api.Services
                     : item.NgayNhanTL.Value;
                 ws.Cell(row, 2).Value = ngayCot2.ToString("dd/MM/yyyy");
 
-                ws.Cell(row, 3).Value = item.Ca.HasValue ? (item.Ca == 1 ? "Ca ngày" : "Ca đêm") : "";
+                ws.Cell(row, 3).Value = item.CaDuc.HasValue ? (item.CaDuc == 1 ? "Ca ngày" : "Ca đêm") : "";
                 ws.Cell(row, 4).Value = item.TenMayDuc ?? "";
                 ws.Cell(row, 5).Value = item.MaMe ?? "";
                 ws.Cell(row, 6).Value = item.MacThepBKMIS ?? "";
@@ -1819,7 +1827,14 @@ namespace dataproduct.api.Services
             else { tuGio = "20:00"; denGio = "08:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
 
             var phieuData = await GetPhieuAsync(phieuId);
-            var rows = phieuData.DanhSachMe;
+            var rows = phieuData.DanhSachMe
+                .OrderBy(r =>
+                {
+                    if (string.IsNullOrEmpty(r.ThoiGian)) return "9999-12-31 99:99";
+                    var isNextDay = ca == 2 && string.Compare(r.ThoiGian, "20:00", StringComparison.Ordinal) < 0;
+                    return $"{(isNextDay ? ngay.AddDays(1) : ngay):yyyy-MM-dd} {r.ThoiGian}";
+                })
+                .ToList();
 
             var sb = new StringBuilder();
             decimal sumKl = 0;
