@@ -1454,7 +1454,7 @@ namespace dataproduct.api.Services
                 ws.Cell(row, 17).Value = item.ChuyenVeMaMe ?? "";
 
                 ApplyDataRowStyle(ws, row, TOTAL_COLS);
-                if (!string.IsNullOrEmpty(item.ChuyenVeMaMe))
+                if (!string.IsNullOrEmpty(item.ChuyenVeMaMe) && item.ChuyenVeMaMe != item.MaMe)
                     ws.Range(row, 1, row, TOTAL_COLS).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
                 row++;
             }
