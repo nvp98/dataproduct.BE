@@ -803,9 +803,6 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.MaVatTu).HasMaxLength(100);
 
-            entity.HasOne(s => s.TrangThai)
-                  .WithOne(t => t.Slab)
-                  .HasForeignKey<Hrc1SlabTrangThai>(t => t.IdSlab);
         });
 
         modelBuilder.Entity<Hrc1MaVatTu>(entity =>
@@ -830,8 +827,9 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<Hrc1SlabTrangThai>(entity =>
         {
             entity.ToTable("HRC1_Slab_TrangThai");
+            entity.HasIndex(e => e.IdSlab).IsUnique();
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
-            entity.Property(e => e.NgayChuyenKCS).HasColumnType("datetime");
+            entity.Property(e => e.NgayChuyen).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanKho).HasColumnType("datetime");
             entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");

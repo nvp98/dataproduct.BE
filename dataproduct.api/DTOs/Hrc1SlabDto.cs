@@ -55,7 +55,6 @@ namespace dataproduct.api.DTOs
         public string? MacThep { get; set; }
         /// <summary>null = tất cả, true = đã chốt (CutDate IS NOT NULL), false = chưa</summary>
         public bool? IsChot { get; set; }
-        public int? TrangThaiKCS { get; set; }
         public int? TrangThaiDuc { get; set; }
         public int? TrangThaiKho { get; set; }
         public int? TrangThaiPKH { get; set; }
@@ -87,17 +86,29 @@ namespace dataproduct.api.DTOs
         public string? MaVatTu { get; set; }
 
         // Workflow (LEFT JOIN HRC1_Slab_TrangThai)
-        public int TrangThaiKCS { get; set; }
+        public bool IsChuyenCa { get; set; }
+        public Guid? IdPhieuGoc { get; set; }
         public int TrangThaiDuc { get; set; }
         public int TrangThaiKho { get; set; }
         public int TrangThaiPKH { get; set; }
         public Guid? IdPhieuBBSL { get; set; }
         public string? SoPhieuBBSL { get; set; }
 
-        // Phiếu BBSL info (join BM_Phieu khi slab đã được chuyển)
+        // Phiếu BBSL info (join BM_Phieu khi slab được chuyển ca)
         public DateOnly? NgayXuLy { get; set; }
         public int? CaBBSL { get; set; }
         public string? KipBBSL { get; set; }
+    }
+
+    // ── Chuyển phôi sang ca kề ────────────────────────────────────────────────
+
+    public class Hrc1ChuyenPhoiRequest
+    {
+        public List<int> IdSlabs { get; set; } = new();
+        public Guid IdPhieuNguon { get; set; }
+        /// <summary>"truoc" | "sau"</summary>
+        public string Huong { get; set; } = "";
+        public int NguoiChuyen { get; set; }
     }
 
     // ── Ghi chú per-slab ─────────────────────────────────────────────────────
@@ -105,6 +116,12 @@ namespace dataproduct.api.DTOs
     public class Hrc1SlabUpdateRequest
     {
         public string? GhiChu { get; set; }
+        public string? MaVatTu { get; set; }
+    }
+
+    public class Hrc1BulkUpdateMaVatTuRequest
+    {
+        public List<int> Ids { get; set; } = [];
         public string? MaVatTu { get; set; }
     }
 
@@ -131,11 +148,15 @@ namespace dataproduct.api.DTOs
     {
         public int Id { get; set; }
         public string MaVatTu { get; set; } = "";
+        public string TenVatTu { get; set; } = "";
+        public bool? IsLock { get; set; }
     }
 
     public class Hrc1MaVatTuUpsertDto
     {
         public string MaVatTu { get; set; } = "";
+        public string? TenVatTu { get; set; }
+        public bool? IsLock { get; set; }
     }
 
     public class Hrc1MaVatTuSearchRequest

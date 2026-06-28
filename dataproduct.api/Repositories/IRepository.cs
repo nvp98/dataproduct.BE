@@ -341,8 +341,7 @@ namespace dataproduct.api.Repositories
         Task<IEnumerable<Hrc1PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
         Task<IEnumerable<Hrc1SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
         Task<IEnumerable<Hrc1SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu);
-        Task ChuyenBBSLAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien);
-        Task ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
+        Task<int> ChuyenPhoiAsync(List<int> idSlabs, Guid idPhieuNguon, string huong, int nguoiChuyen);
         Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
         Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
         Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
@@ -350,6 +349,7 @@ namespace dataproduct.api.Repositories
         Task<Hrc1SlabSyncResult> UpsertFromApiAsync(List<TscSlabItem> items);
         Task<int> FillMacThepAsync();
         Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req);
+        Task<int> BulkUpdateMaVatTuAsync(Hrc1BulkUpdateMaVatTuRequest req);
         Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu);
         Task SaveTongHopGhiChuAsync(Hrc1SaveTongHopGhiChuRequest req);
     }

@@ -64,39 +64,33 @@ namespace dataproduct.api.Controllers
             return Ok(data);
         }
 
-        // ── KCS Workflow ─────────────────────────────────────────────────────
+        // ── Chuyển phôi sang ca kề ──────────────────────────────────────────
 
-        [HttpPost("chuyen-bbsl")]
-        public async Task<IActionResult> ChuyenBBSL([FromBody] ChuyenBBSLRequest request)
+        [HttpPost("chuyen-phoi")]
+        public async Task<IActionResult> ChuyenPhoi([FromBody] Hrc1ChuyenPhoiRequest request)
         {
-            if (request.IdSlabs.Count == 0)
-                return BadRequest("Danh sách slab không được rỗng.");
+            if (request.Huong != "truoc" && request.Huong != "sau")
+                return BadRequest("Huong phải là 'truoc' hoặc 'sau'.");
+            if (request.IdSlabs == null || request.IdSlabs.Count == 0)
+                return BadRequest("Phải có ít nhất 1 slab.");
 
-            await _svc.ChuyenBBSLAsync(request);
-            return Ok(new WorkflowResult
+            try
             {
-                Success = true,
-                Message = $"Đã chuyển {request.IdSlabs.Count} slab lên phiếu.",
-                AffectedRows = request.IdSlabs.Count
-            });
+                var affected = await _svc.ChuyenPhoiAsync(request);
+                return Ok(new WorkflowResult
+                {
+                    Success = true,
+                    Message = $"Đã chuyển {affected} slab thành công.",
+                    AffectedRows = affected
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        [HttpPost("thu-hoi")]
-        public async Task<IActionResult> ThuHoi([FromBody] ThuHoiRequest request)
-        {
-            if (request.IdSlabs.Count == 0)
-                return BadRequest("Danh sách slab không được rỗng.");
-
-            await _svc.ThuHoiAsync(request);
-            return Ok(new WorkflowResult
-            {
-                Success = true,
-                Message = $"Đã thu hồi {request.IdSlabs.Count} slab.",
-                AffectedRows = request.IdSlabs.Count
-            });
-        }
-
-        // ── Đúc/Kho Workflow ─────────────────────────────────────────────────
+        // ── Cán Tấm / PKH Workflow ───────────────────────────────────────────
 
         [HttpPost("xac-nhan")]
         public async Task<IActionResult> XacNhan([FromBody] XacNhanRequest request)
@@ -197,6 +191,13 @@ namespace dataproduct.api.Controllers
             {
                 return NotFound(new { message = ex.Message });
             }
+        }
+
+        [HttpPatch("bulk-ma-vat-tu")]
+        public async Task<IActionResult> BulkUpdateMaVatTu([FromBody] Hrc1BulkUpdateMaVatTuRequest req)
+        {
+            var updated = await _svc.BulkUpdateMaVatTuAsync(req);
+            return Ok(new WorkflowResult { Success = true, Message = $"Đã cập nhật {updated} slab.", AffectedRows = updated });
         }
 
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────

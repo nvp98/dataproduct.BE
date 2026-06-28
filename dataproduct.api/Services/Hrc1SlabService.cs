@@ -54,7 +54,11 @@ namespace dataproduct.api.Services
             if (!response.Success)
                 throw new Exception($"TSC API báo lỗi (count={response.Count})");
 
-            var items = response.Data ?? [];
+            var items = (response.Data ?? [])
+                .Where(x => !string.IsNullOrEmpty(x.PIECE_ID)
+                         && (x.LENGTH == null || x.LENGTH >= 16000)
+                         && (x.SLAB_ID == null || !x.SLAB_ID.Contains("GHOST", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
             var result = await _repo.UpsertFromApiAsync(items);
 
             // Fill MacThep cho các slab cũ chưa có (batch hiện tại đã được fill trong UpsertFromApiAsync)
@@ -82,11 +86,8 @@ namespace dataproduct.api.Services
         public Task<IEnumerable<Hrc1SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu)
             => _repo.GetSlabsByPhieuAsync(idPhieu);
 
-        public Task ChuyenBBSLAsync(ChuyenBBSLRequest req)
-            => _repo.ChuyenBBSLAsync(req.IdSlabs, req.IdPhieu, req.NguoiThucHien);
-
-        public Task ThuHoiAsync(ThuHoiRequest req)
-            => _repo.ThuHoiAsync(req.IdSlabs, req.NguoiThucHien);
+        public Task<int> ChuyenPhoiAsync(Hrc1ChuyenPhoiRequest req)
+            => _repo.ChuyenPhoiAsync(req.IdSlabs, req.IdPhieuNguon, req.Huong, req.NguoiChuyen);
 
         public Task XacNhanAsync(XacNhanRequest req)
             => _repo.XacNhanAsync(req.IdSlabs, req.LoaiXacNhan, req.NguoiThucHien);
@@ -103,6 +104,8 @@ namespace dataproduct.api.Services
         public Task<int> FillMacThepAsync() => _repo.FillMacThepAsync();
 
         public Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req) => _repo.UpdateSlabAsync(id, req);
+
+        public Task<int> BulkUpdateMaVatTuAsync(Hrc1BulkUpdateMaVatTuRequest req) => _repo.BulkUpdateMaVatTuAsync(req);
 
         public Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
             => _repo.GetTongHopGhiChuAsync(idPhieu);
@@ -365,16 +368,14 @@ namespace dataproduct.api.Services
 
         private async Task<List<Hrc1Slab>> GetSlabsForExportAsync(Guid idPhieu)
         {
-            return await _context.Hrc1SlabTrangThais
+            var phieu = await _context.BmPhieus
                 .AsNoTracking()
-                .Include(t => t.Slab)
-                .Where(t => t.IdPhieuBBSL == idPhieu)
-                .OrderByDescending(t => t.Slab.NgaySX)
-                .ThenByDescending(t => t.Slab.CaSX)
-                .ThenBy(t => t.Slab.MayDuc)
-                .ThenBy(t => t.Slab.IDSlab)
-                .Select(t => t.Slab)
-                .ToListAsync();
+                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC1_BBGN_PhoiTam");
+            if (phieu == null) return [];
+
+            // Reuse repository helper
+            var repo = (Hrc1SlabRepository)_repo;
+            return await repo.LoadPhieuSlabsAsync(phieu);
         }
 
         private record TongHopRow(int Stt, string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL, string? GhiChu);

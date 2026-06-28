@@ -20,6 +20,4 @@ public class Hrc1Slab
     public DateTime? NgayCapNhat { get; set; }
     public string? GhiChu { get; set; }
     public string? MaVatTu { get; set; }
-
-    public virtual Hrc1SlabTrangThai? TrangThai { get; set; }
 }
