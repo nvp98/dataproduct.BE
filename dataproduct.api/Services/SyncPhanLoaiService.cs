@@ -138,6 +138,21 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
+        /// Trả về map MaMe → MacThep (GradeCode) từ Linked Server cho HRC1.
+        /// </summary>
+        public async Task<Dictionary<string, string?>> GetMacThepMapAsync(List<string> maMes)
+        {
+            if (maMes == null || maMes.Count == 0)
+                return new Dictionary<string, string?>();
+
+            var phanLoaiMap = await QueryViaStoredProcAsync("view_dq1_nmlt_nuocthep", maMes);
+            return phanLoaiMap.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.GradeCode,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Lấy danh sách mã mẻ có PhanLoai IS NULL trong N ngày gần nhất.
         /// Dùng cho Background Service.
         /// </summary>
