@@ -3,7 +3,7 @@ namespace dataproduct.api.Models;
 public class Hrc1Slab
 {
     public int Id { get; set; }
-    public string IDSlab { get; set; } = null!;
+    public string IDSlab { get; set; } = "";
     public string? IDPiece { get; set; }
     public string? MaMe { get; set; }
     public string? MacThep { get; set; }

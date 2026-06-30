@@ -75,20 +75,21 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
     public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
 
-    // HRC1
-    public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
-    public virtual DbSet<HRC1_MePhanCong> HRC1_MePhanCongs { get; set; }
-    public virtual DbSet<HRC1_LichSu> HRC1_LichSus { get; set; }
-
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
     public virtual DbSet<BkHrc2SlabTrangThai> BkHrc2SlabTrangThais { get; set; }
     public virtual DbSet<BkSyncHrc2SlabControl> BkSyncHrc2SlabControls { get; set; }
 
+    // HRC1
+    public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
+    public virtual DbSet<HRC1_MePhanCong> HRC1_MePhanCongs { get; set; }
+    public virtual DbSet<HRC1_LichSu> HRC1_LichSus { get; set; }
+
     // HRC1 Slab
     public virtual DbSet<Hrc1Slab> Hrc1Slabs { get; set; }
     public virtual DbSet<Hrc1SlabTrangThai> Hrc1SlabTrangThais { get; set; }
     public virtual DbSet<MaVatTu> MaVatTus { get; set; }
+    public virtual DbSet<Hrc1MaVatTu> Hrc1MaVatTus { get; set; }
     public virtual DbSet<Hrc1BbslTongHopGhiChu> Hrc1BbslTongHopGhiChus { get; set; }
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     //#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -752,7 +753,7 @@ public partial class ProductFormContext : DbContext
             entity.ToTable("BK_HRC2_Slab");
 
             entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
-            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat").HasColumnType("datetime");
+            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
             entity.Property(e => e.IdSlab).HasColumnName("IDSlab").HasMaxLength(100);
             entity.Property(e => e.ShiftName).HasMaxLength(50);
             entity.Property(e => e.CaSanXuat).HasColumnType("nchar(1)");
@@ -852,6 +853,16 @@ public partial class ProductFormContext : DbContext
                   .HasDefaultValueSql("GETDATE()")
                   .ValueGeneratedOnAdd();
             entity.HasIndex(e => new { e.NhaMay, e.MacThep }).IsUnique();
+        });
+
+        modelBuilder.Entity<Hrc1MaVatTu>(entity =>
+        {
+            entity.ToTable("HRC1_MaVatTu");
+            entity.Property(e => e.MaVatTu).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.NgayTao)
+                  .HasColumnType("datetime")
+                  .HasDefaultValueSql("GETDATE()")
+                  .ValueGeneratedOnAdd();
         });
 
         modelBuilder.Entity<Hrc1BbslTongHopGhiChu>(entity =>

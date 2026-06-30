@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -97,8 +97,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Can" && request.LoaiXacNhan != "PKH")
-                return BadRequest("LoaiXacNhan phải là 'Duc', 'Can' hoặc 'PKH'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
 
             await _svc.XacNhanAsync(request);
             return Ok(new WorkflowResult
@@ -114,8 +114,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Can" && request.LoaiXacNhan != "PKH")
-                return BadRequest("LoaiXacNhan phải là 'Duc', 'Can' hoặc 'PKH'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
 
             await _svc.HuyXacNhanAsync(request);
             return Ok(new WorkflowResult

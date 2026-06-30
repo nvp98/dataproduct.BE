@@ -199,6 +199,7 @@ namespace dataproduct.api.Controllers
                 {
                     maBm = x.MaBm,
                     quyenChucNang = x.QuyenChucNang,
+                    khuVucPhu = x.KhuVucPhu,
                 })
                 .ToListAsync();
 

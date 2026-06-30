@@ -39,9 +39,9 @@ namespace dataproduct.api.Repositories
                 query = query.Where(s => s.IsDiffMacThep == req.IsDiffMacThep.Value);
 
             // Date filter via NgaySanXuat
-            if (DateTime.TryParse(req.TuNgay, out var tuNgay))
+            if (DateOnly.TryParse(req.TuNgay, out var tuNgay))
                 query = query.Where(s => s.NgaySanXuat >= tuNgay);
-            if (DateTime.TryParse(req.DenNgay, out var denNgay))
+            if (DateOnly.TryParse(req.DenNgay, out var denNgay))
                 query = query.Where(s => s.NgaySanXuat < denNgay.AddDays(1));
 
             // Workflow filter
@@ -83,9 +83,9 @@ namespace dataproduct.api.Repositories
 
             if (!string.IsNullOrEmpty(ca))  query = query.Where(s => s.CaSanXuat == ca);
             if (!string.IsNullOrEmpty(kip)) query = query.Where(s => s.KipSanXuat == kip);
-            if (DateTime.TryParse(tuNgay, out var fromDt))
+            if (DateOnly.TryParse(tuNgay, out var fromDt))
                 query = query.Where(s => s.NgaySanXuat >= fromDt);
-            if (DateTime.TryParse(denNgay, out var toDt))
+            if (DateOnly.TryParse(denNgay, out var toDt))
                 query = query.Where(s => s.NgaySanXuat < toDt.AddDays(1));
 
             return await query

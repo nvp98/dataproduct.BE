@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
@@ -180,8 +180,7 @@ namespace dataproduct.api.Services
             var soPhieu = phieu?.SoPhieu ?? "";
             var ngaySX = phieu?.NgaySX?.ToString("dd/MM/yyyy") ?? "";
 
-            var maVatTuLookup = await BuildMaVatTuLookupAsync(slabs);
-            var tongHopRows = BuildTongHopRows(slabs, ghiChus, maVatTuLookup);
+            var tongHopRows = BuildTongHopRows(slabs, ghiChus);
 
             var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC1_BBXNSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
@@ -199,7 +198,7 @@ namespace dataproduct.api.Services
                 if (rowIndex > startRow)
                     ws.Row(startRow).CopyTo(ws.Row(rowIndex));
 
-                var label = BuildSanPhamLabel(row.TenVatTu, row.MacThep);
+                var label = BuildSanPhamLabel(row.MacThep, row.KichThuoc);
 
                 ws.Cell(rowIndex, 1).Value = stt;
                 ws.Cell(rowIndex, 2).Value = label;
@@ -256,13 +255,12 @@ namespace dataproduct.api.Services
             var ca = phieu?.Ca == 1 ? "Ca ngày" : phieu?.Ca == 2 ? "Ca đêm" : "";
             var kip = phieu?.Kip ?? "";
 
-            var maVatTuLookup = await BuildMaVatTuLookupAsync(slabs);
-            var tongHopRows = BuildTongHopRows(slabs, ghiChus, maVatTuLookup);
+            var tongHopRows = BuildTongHopRows(slabs, ghiChus);
 
             var rowsHtml = new StringBuilder();
             foreach (var row in tongHopRows)
             {
-                var label = BuildSanPhamLabel(row.TenVatTu, row.MacThep);
+                var label = BuildSanPhamLabel(row.MacThep, row.KichThuoc);
                 rowsHtml.Append("<tr>");
                 rowsHtml.Append($"<td style=\"text-align:center\">{row.Stt}</td>");
                 rowsHtml.Append($"<td>{label}</td>");
@@ -346,11 +344,12 @@ namespace dataproduct.api.Services
             return string.Join(" ", parts);
         }
 
-        private static string BuildSanPhamLabel(string? tenVatTu, string? macThep)
+        private static string BuildSanPhamLabel(string? macThep, string kichThuoc)
         {
-            if (!string.IsNullOrWhiteSpace(tenVatTu)) return tenVatTu;
-            if (!string.IsNullOrWhiteSpace(macThep)) return macThep;
-            return "-";
+            var parts = new[] { "Phôi tấm", !string.IsNullOrEmpty(kichThuoc) ? $"{kichThuoc}mm" : null, macThep }
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToArray();
+            return parts.Length > 0 ? string.Join(" ", parts) : "-";
         }
 
         private static void SetThinBorders(IXLWorksheet ws, int fromRow, int toRow, int lastCol)
@@ -358,17 +357,6 @@ namespace dataproduct.api.Services
             var range = ws.Range(fromRow, 1, toRow, lastCol);
             range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
-        }
-
-        private async Task<Dictionary<string, (string VatTuCode, string TenVatTu)>> BuildMaVatTuLookupAsync(List<Hrc1Slab> slabs)
-        {
-            var macTheps = slabs.Select(s => s.MacThep).Where(m => m != null).Distinct().ToList()!;
-            if (macTheps.Count == 0) return new Dictionary<string, (string, string)>();
-
-            return await _context.MaVatTus
-                .AsNoTracking()
-                .Where(m => m.NhaMay == "HRC1" && macTheps.Contains(m.MacThep))
-                .ToDictionaryAsync(m => m.MacThep, m => (m.VatTuCode, m.TenVatTu));
         }
 
         private async Task<BmPhieu?> GetPhieuForExportAsync(Guid idPhieu)
@@ -390,26 +378,23 @@ namespace dataproduct.api.Services
             return await repo.LoadPhieuSlabsAsync(phieu);
         }
 
-        private record TongHopRow(int Stt, string? MacThep, string? MaVatTu, string? TenVatTu, int SoPhoi, decimal TongKL, string? GhiChu);
+        private record TongHopRow(int Stt, string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL, string? GhiChu);
 
-        private static List<TongHopRow> BuildTongHopRows(List<Hrc1Slab> slabs, List<Hrc1BbslTongHopGhiChu> ghiChus,
-            Dictionary<string, (string VatTuCode, string TenVatTu)> maVatTuLookup)
+        private static List<TongHopRow> BuildTongHopRows(List<Hrc1Slab> slabs, List<Hrc1BbslTongHopGhiChu> ghiChus)
         {
-            var map = new Dictionary<string, (string? MacThep, string? MaVatTu, string? TenVatTu, int SoPhoi, decimal TongKL)>();
+            var map = new Dictionary<string, (string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL)>();
 
             foreach (var slab in slabs)
             {
-                var maVatTu = slab.MaVatTu ?? "";
-                var key = $"{slab.MacThep ?? ""}|{maVatTu}";
+                var hasKt = slab.ChieuDay != null && slab.ChieuRong != null && slab.ChieuDai != null;
+                var kt = hasKt ? $"{slab.ChieuDay}x{slab.ChieuRong}x{slab.ChieuDai}" : "";
+                var key = $"{slab.MacThep ?? ""}|{kt}";
 
                 if (!map.ContainsKey(key))
-                {
-                    maVatTuLookup.TryGetValue(slab.MacThep ?? "", out var mvtInfo);
-                    map[key] = (slab.MacThep, slab.MaVatTu, mvtInfo.TenVatTu, 0, 0);
-                }
+                    map[key] = (slab.MacThep, kt, 0, 0);
 
                 var cur = map[key];
-                map[key] = (cur.MacThep, cur.MaVatTu, cur.TenVatTu, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
+                map[key] = (cur.MacThep, cur.KichThuoc, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
             }
 
             var ghiChuDict = ghiChus.ToDictionary(
@@ -419,7 +404,7 @@ namespace dataproduct.api.Services
             return map.Select((kvp, i) =>
             {
                 var ghiChu = ghiChuDict.TryGetValue(kvp.Key, out var gc) ? gc : null;
-                return new TongHopRow(i + 1, kvp.Value.MacThep, kvp.Value.MaVatTu, kvp.Value.TenVatTu, kvp.Value.SoPhoi, kvp.Value.TongKL, ghiChu);
+                return new TongHopRow(i + 1, kvp.Value.MacThep, kvp.Value.KichThuoc, kvp.Value.SoPhoi, kvp.Value.TongKL, ghiChu);
             }).ToList();
         }
 

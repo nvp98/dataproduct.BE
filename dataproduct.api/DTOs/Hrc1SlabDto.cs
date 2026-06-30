@@ -1,4 +1,4 @@
-﻿namespace dataproduct.api.DTOs
+namespace dataproduct.api.DTOs
 {
     // ── Sync ──────────────────────────────────────────────────────────────────
 
@@ -35,9 +35,9 @@
         public string? HEAT_ID { get; set; }
         public DateTime? CUT_DATE { get; set; }
         public decimal? THICKNESS { get; set; }
-        public decimal? LENGTH { get; set; }     // API có thể trả decimal (vd: 22199.0)
-        public decimal? WEIGHT { get; set; }     // API có thể trả decimal
-        public decimal? WIDTH_HEAD { get; set; } // API có thể trả decimal
+        public decimal? LENGTH { get; set; }
+        public decimal? WEIGHT { get; set; }
+        public decimal? WIDTH_HEAD { get; set; }
         public string? TSC_NO { get; set; }
     }
 
@@ -84,7 +84,6 @@
         public DateTime? NgayCapNhat { get; set; }
         public string? GhiChu { get; set; }
         public string? MaVatTu { get; set; }
-        public string? TenVatTu { get; set; }
 
         // Workflow (LEFT JOIN HRC1_Slab_TrangThai)
         public bool IsChuyenCa { get; set; }
@@ -131,7 +130,7 @@
     public class Hrc1TongHopGhiChuItem
     {
         public string? MacThep { get; set; }
-        public string? MaVatTu { get; set; }
+        public string? KichThuoc { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -139,11 +138,47 @@
     {
         public Guid IdPhieuBBSL { get; set; }
         public string? MacThep { get; set; }
-        public string? MaVatTu { get; set; }
+        public string? KichThuoc { get; set; }
         public string? GhiChu { get; set; }
     }
 
-    // ── MaVatTu ──────────────────────────────────────────────────────────────
+    // ── Hrc1MaVatTu ──────────────────────────────────────────────────────────
+
+    public class Hrc1MaVatTuItem
+    {
+        public int Id { get; set; }
+        public string MaVatTu { get; set; } = "";
+        public string TenVatTu { get; set; } = "";
+        public bool? IsLock { get; set; }
+    }
+
+    public class Hrc1MaVatTuUpsertDto
+    {
+        public string MaVatTu { get; set; } = "";
+        public string? TenVatTu { get; set; }
+        public bool? IsLock { get; set; }
+    }
+
+    public class Hrc1MaVatTuSearchRequest
+    {
+        public string? SearchKey { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 50;
+    }
+
+    public class Hrc1MaVatTuBulkCreateRequest
+    {
+        public List<Hrc1MaVatTuUpsertDto> Items { get; set; } = new();
+    }
+
+    public class Hrc1MaVatTuBulkCreateResult
+    {
+        public int Created { get; set; }
+        public int Skipped { get; set; }
+        public List<string> SkippedItems { get; set; } = new();
+    }
+
+    // ── MaVatTu (lookup chung, giữ tương thích) ──────────────────────────────
 
     public class MaVatTuItem
     {
@@ -185,6 +220,8 @@
         public List<string> SkippedItems { get; set; } = new();
     }
 
+    // ── Tổng hợp slab ─────────────────────────────────────────────────────────
+
     public class Hrc1SlabTongHopItem
     {
         public string? MaMe { get; set; }
@@ -211,25 +248,4 @@
         public int SoSlabPKH { get; set; }
     }
 
-    // ── Workflow requests / responses ─────────────────────────────────────────
-
-    public class WorkflowResult
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; } = "";
-        public int AffectedRows { get; set; }
-    }
-
-    public class XacNhanRequest
-    {
-        public List<int> IdSlabs { get; set; } = new();
-        public string LoaiXacNhan { get; set; } = "";
-        public int NguoiThucHien { get; set; }
-    }
-
-    public class ChotPhieuRequest
-    {
-        public Guid IdPhieu { get; set; }
-        public int NguoiThucHien { get; set; }
-    }
 }

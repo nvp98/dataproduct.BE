@@ -1,4 +1,4 @@
-﻿namespace dataproduct.api.Models;
+namespace dataproduct.api.Models;
 
 public class Hrc1SlabTrangThai
 {
@@ -17,7 +17,7 @@ public class Hrc1SlabTrangThai
     public int? NguoiXacNhanDuc { get; set; }
     public DateTime? NgayXacNhanDuc { get; set; }
 
-    // ── Cán Tấm — XN Cán ───────────────────────────────────────────────────
+    // ── Cán Tấm — XN Kho (cột DB: TrangThaiCan) ───────────────────────────
     public int TrangThaiCan { get; set; }
     public int? NguoiXacNhanCan { get; set; }
     public DateTime? NgayXacNhanCan { get; set; }

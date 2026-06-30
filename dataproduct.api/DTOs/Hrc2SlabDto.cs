@@ -20,18 +20,6 @@ namespace dataproduct.api.DTOs
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 50;
     }
-    public class ChuyenBBSLRequest
-    {
-        public List<int> IdSlabs { get; set; } = [];
-        public Guid IdPhieu { get; set; }
-        public int NguoiThucHien { get; set; }
-    }
-
-     public class ThuHoiRequest
-    {
-        public List<int> IdSlabs { get; set; } = [];
-        public int NguoiThucHien { get; set; }
-    }
     public class Hrc2SlabItem
     {
         public int Id { get; set; }
@@ -62,7 +50,7 @@ namespace dataproduct.api.DTOs
         public bool? IsTrungIDSlab { get; set; }
         public bool? IsDiffMacThep { get; set; }
         public int? Line { get; set; }
-        public DateTime? SapLastTime { get; set; }
+        public DateOnly? SapLastTime { get; set; }
         public bool IsChot { get; set; }
         public DateTime? NgayTao { get; set; }
         public string? PhanLoai { get; set; }
@@ -128,40 +116,4 @@ namespace dataproduct.api.DTOs
         public int NguoiThucHien { get; set; }
     }
 
-    public class Hrc2SlabSyncRequest
-    {
-        public DateOnly? NgayBatDau { get; set; }
-        public DateOnly? NgayKetThuc { get; set; }
-    }
-
-    public class SyncStatusItem
-    {
-        public int Id { get; set; }
-        public string? TrangThai { get; set; }
-        public DateOnly? NgayBatDau { get; set; }
-        public DateOnly? NgayKetThuc { get; set; }
-        public DateTime? BatDauLuc { get; set; }
-        public DateTime? KetThucLuc { get; set; }
-        public int? SoRecordSync { get; set; }
-        public string? GhiChu { get; set; }
-    }
-
-    public class HrcSlabSearchRequest
-    {
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public string? CaSanXuat { get; set; }
-        public string? Kip { get; set; }
-        public int? MayDuc { get; set; }
-        public string? MeThep { get; set; }
-        public string? IdSlab { get; set; }
-        public string? MacThep { get; set; }
-        public bool? IsChot { get; set; }
-        public int? TrangThaiKCS { get; set; }
-        public int? TrangThaiDuc { get; set; }
-        public int? TrangThaiKho { get; set; }
-        public int? TrangThaiPKH { get; set; }
-        public int Page { get; set; } = 1;
-        public int PageSize { get; set; } = 50;
-    }
 }

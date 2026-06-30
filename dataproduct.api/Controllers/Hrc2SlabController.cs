@@ -15,6 +15,8 @@ namespace dataproduct.api.Controllers
             _svc = svc;
         }
 
+        // ── Đọc dữ liệu ─────────────────────────────────────────────────────
+
         /// <summary>Danh sách slab kèm trạng thái workflow</summary>
         [HttpPost("search")]
         public async Task<IActionResult> Search([FromBody] Hrc2SlabSearchRequest request)
@@ -179,5 +181,7 @@ namespace dataproduct.api.Controllers
             var result = await _svc.GetSyncStatusAsync();
             return result == null ? NoContent() : Ok(result);
         }
+
+        
     }
 }
