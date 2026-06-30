@@ -69,5 +69,7 @@ namespace dataproduct.api.Services
                 ghiChu      = latest.GhiChu,
             };
         }
+        public Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc)
+            => _repo.SyncAsync(ngayBatDau, ngayKetThuc);
     }
 }

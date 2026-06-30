@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Repositories
@@ -37,11 +38,11 @@ namespace dataproduct.api.Repositories
             if (req.IsDiffMacThep.HasValue)
                 query = query.Where(s => s.IsDiffMacThep == req.IsDiffMacThep.Value);
 
-            // Date filter via SapLastTime
+            // Date filter via NgaySanXuat
             if (DateTime.TryParse(req.TuNgay, out var tuNgay))
-                query = query.Where(s => s.SapLastTime >= tuNgay);
+                query = query.Where(s => s.NgaySanXuat >= tuNgay);
             if (DateTime.TryParse(req.DenNgay, out var denNgay))
-                query = query.Where(s => s.SapLastTime < denNgay.AddDays(1));
+                query = query.Where(s => s.NgaySanXuat < denNgay.AddDays(1));
 
             // Workflow filter
             if (req.TrangThaiKCS.HasValue)
@@ -64,9 +65,7 @@ namespace dataproduct.api.Repositories
             var total = await query.CountAsync();
 
             var slabs = await query
-                .OrderByDescending(s => s.SapLastTime)
-                .ThenBy(s => s.ShiftName)
-                .ThenBy(s => s.IdSlab)
+                .OrderByDescending(s => s.BkmisId)
                 .Skip((req.Page - 1) * req.PageSize)
                 .Take(req.PageSize)
                 .ToListAsync();
@@ -85,12 +84,12 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrEmpty(ca))  query = query.Where(s => s.CaSanXuat == ca);
             if (!string.IsNullOrEmpty(kip)) query = query.Where(s => s.KipSanXuat == kip);
             if (DateTime.TryParse(tuNgay, out var fromDt))
-                query = query.Where(s => s.SapLastTime >= fromDt);
+                query = query.Where(s => s.NgaySanXuat >= fromDt);
             if (DateTime.TryParse(denNgay, out var toDt))
-                query = query.Where(s => s.SapLastTime < toDt.AddDays(1));
+                query = query.Where(s => s.NgaySanXuat < toDt.AddDays(1));
 
             return await query
-                .GroupBy(s => new { s.MeThep, s.MacThep, s.ChieuDay, s.ChieuRong, s.ChieuDai, s.LoaiPhoi, s.ChatLuongTPHH })
+                .GroupBy(s => new { s.MeThep, s.MacThep, s.ChieuDay, s.ChieuRong, s.ChieuDai, s.PhanLoai })
                 .Select(g => new Hrc2SlabTongHopItem
                 {
                     MeThep        = g.Key.MeThep,
@@ -98,8 +97,7 @@ namespace dataproduct.api.Repositories
                     ChieuDay      = g.Key.ChieuDay,
                     ChieuRong     = g.Key.ChieuRong,
                     ChieuDai      = g.Key.ChieuDai,
-                    LoaiPhoi      = g.Key.LoaiPhoi,
-                    ChatLuongTPHH = g.Key.ChatLuongTPHH,
+                    PhanLoai      = g.Key.PhanLoai,
                     SoLuong       = g.Count(),
                     TongKhoiLuong = g.Sum(s => s.KhoiLuong),
                 })
@@ -158,7 +156,7 @@ namespace dataproduct.api.Repositories
             var slabs = await LoadPhieuSlabsAsync(idPhieu);
 
             return slabs
-                .GroupBy(s => new { s.MeThep, s.MacThep, s.ChieuDay, s.ChieuRong, s.ChieuDai, s.LoaiPhoi, s.ChatLuongTPHH })
+                .GroupBy(s => new { s.MeThep, s.MacThep, s.ChieuDay, s.ChieuRong, s.ChieuDai, s.PhanLoai })
                 .Select(g => new Hrc2SlabTongHopItem
                 {
                     MeThep        = g.Key.MeThep,
@@ -166,14 +164,49 @@ namespace dataproduct.api.Repositories
                     ChieuDay      = g.Key.ChieuDay,
                     ChieuRong     = g.Key.ChieuRong,
                     ChieuDai      = g.Key.ChieuDai,
-                    LoaiPhoi      = g.Key.LoaiPhoi,
-                    ChatLuongTPHH = g.Key.ChatLuongTPHH,
+                    PhanLoai      = g.Key.PhanLoai,
                     SoLuong       = g.Count(),
                     TongKhoiLuong = g.Sum(s => s.KhoiLuong),
                 })
                 .OrderBy(x => x.MeThep)
                 .ThenBy(x => x.MacThep)
                 .ToList();
+        }
+
+        public async Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc)
+        {
+            var p1 = ngayBatDau.HasValue
+                ? new SqlParameter("@NgayBatDau", ngayBatDau.Value.ToDateTime(TimeOnly.MinValue))
+                : new SqlParameter("@NgayBatDau", DBNull.Value);
+            var p2 = ngayKetThuc.HasValue
+                ? new SqlParameter("@NgayKetThuc", ngayKetThuc.Value.ToDateTime(TimeOnly.MinValue))
+                : new SqlParameter("@NgayKetThuc", DBNull.Value);
+
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC [dbo].[usp_SyncBK_HRC2_Slab] @NgayBatDau, @NgayKetThuc", p1, p2);
+
+            return await GetSyncStatusAsync() ?? new SyncStatusItem { TrangThai = "DONE" };
+        }
+
+        public async Task<SyncStatusItem?> GetSyncStatusAsync()
+        {
+            var latest = await _context.BkSyncHrc2SlabControls
+                .OrderByDescending(x => x.BatDauLuc)
+                .FirstOrDefaultAsync();
+
+            if (latest == null) return null;
+
+            return new SyncStatusItem
+            {
+                Id = latest.Id,
+                TrangThai = latest.TrangThai,
+                NgayBatDau = latest.NgayBatDau,
+                NgayKetThuc = latest.NgayKetThuc,
+                BatDauLuc = latest.BatDauLuc,
+                KetThucLuc = latest.KetThucLuc,
+                SoRecordSync = latest.SoRecordSync,
+                GhiChu = latest.GhiChu,
+            };
         }
 
         // ── Chi tiết slab trong phiếu ─────────────────────────────────────────
@@ -377,14 +410,20 @@ namespace dataproduct.api.Repositories
                 {
                     _context.BkHrc2SlabTrangThais.Add(new BkHrc2SlabTrangThai
                     {
-                        IdSlab = id,
-                        IdPhieuBBSL = idPhieu,
-                        NgayTao = now,
+                        IdSlab         = id,
+                        IdPhieuBBSL    = idPhieu,
+                        TrangThaiKCS   = 1,
+                        NguoiChuyenKCS = nguoiThucHien,
+                        NgayChuyenKCS  = now,
+                        NgayTao        = now,
                     });
                 }
                 else
                 {
-                    tt.IdPhieuBBSL = idPhieu;
+                    tt.IdPhieuBBSL    = idPhieu;
+                    tt.TrangThaiKCS   = 1;
+                    tt.NguoiChuyenKCS = nguoiThucHien;
+                    tt.NgayChuyenKCS  = now;
                 }
                 affected++;
             }
@@ -402,7 +441,12 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
 
             foreach (var t in records)
-                t.IdPhieuBBSL = null;
+            {
+                t.IdPhieuBBSL    = null;
+                t.TrangThaiKCS   = 0;
+                t.NguoiChuyenKCS = null;
+                t.NgayChuyenKCS  = null;
+            }
 
             await _context.SaveChangesAsync();
             return records.Count;
@@ -466,6 +510,7 @@ namespace dataproduct.api.Repositories
             {
                 Id                 = s.Id,
                 BkmisId            = s.BkmisId,
+                NgaySanXuat        = s.NgaySanXuat?.ToString("yyyy-MM-dd"),
                 ShiftName          = s.ShiftName,
                 CaSanXuat          = s.CaSanXuat,
                 KipSanXuat         = s.KipSanXuat,
@@ -494,6 +539,7 @@ namespace dataproduct.api.Repositories
                 SapLastTime        = s.SapLastTime,
                 IsChot             = s.IsChot,
                 NgayTao            = s.NgayTao,
+                PhanLoai           = s.PhanLoai,
                 TrangThaiKCS       = tt?.TrangThaiKCS ?? 0,
                 TrangThaiDuc       = tt?.TrangThaiDuc ?? 0,
                 TrangThaiKho       = tt?.TrangThaiKho ?? 0,

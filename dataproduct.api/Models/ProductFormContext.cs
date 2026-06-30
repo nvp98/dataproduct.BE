@@ -747,12 +747,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.GiaTri_Goc).HasPrecision(18, 3);
             entity.Property(e => e.QuyKho).HasPrecision(18, 3);
         });
-
         modelBuilder.Entity<BkHrc2Slab>(entity =>
         {
             entity.ToTable("BK_HRC2_Slab");
 
             entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
+            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat").HasColumnType("datetime");
             entity.Property(e => e.IdSlab).HasColumnName("IDSlab").HasMaxLength(100);
             entity.Property(e => e.ShiftName).HasMaxLength(50);
             entity.Property(e => e.CaSanXuat).HasColumnType("nchar(1)");
@@ -782,6 +782,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsTrungIDSlab).HasColumnName("IsTrungIDSlab");
             entity.Property(e => e.IsDiffMacThep).HasColumnName("IsDiffMacThep");
             entity.Property(e => e.Line).HasColumnName("Line");
+            entity.Property(e => e.PhanLoai).HasColumnName("PhanLoai").HasMaxLength(20);
 
             entity.HasOne(s => s.TrangThai)
                 .WithOne(t => t.Slab)

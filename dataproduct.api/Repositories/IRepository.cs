@@ -437,6 +437,7 @@ namespace dataproduct.api.Repositories
         Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
         Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien);
         Task<int> ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
+        Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc);
     }
 
     public interface IMacThepRepository
@@ -459,7 +460,6 @@ namespace dataproduct.api.Repositories
         Task<bool> DeleteAsync(int id);
         Task<Dictionary<string, string>> GetMaVatTuMapAsync(string nhaMay, IEnumerable<string> macThepNames);
     }
-
 
     public interface IMacThep_MayDucRepository
     {

@@ -4,6 +4,7 @@ public class BkHrc2Slab
 {
     public int Id { get; set; }
     public int? BkmisId { get; set; }
+    public DateTime? NgaySanXuat { get; set; }
     public string? IdSlab { get; set; }
     public string? ShiftName { get; set; }
     public string? CaSanXuat { get; set; }
@@ -33,6 +34,8 @@ public class BkHrc2Slab
     public int? Line { get; set; }
     public DateTime NgayTao { get; set; }
     public bool IsChot { get; set; }
+
+    public string? PhanLoai { get; set; }
 
     public BkHrc2SlabTrangThai? TrangThai { get; set; }
 }
