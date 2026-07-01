@@ -944,15 +944,16 @@ namespace dataproduct.api.Repositories
                 where m.IDLoCao == idLoCao
                    && m.Ngay == ngay.Date
                    && m.IDCa == idCa
-                   && s.TagKey != null
                    && n.IsDelete != true
+                // Bỏ điều kiện s.TagKey != null — silo không có tagKey vẫn được đưa vào cột
+                // để người dùng có thể nhập tay (không có data SCADA tự động)
                 orderby nh != null ? nh.ThuTu : 999,
                         s.ThuTu,
                         m.ThoiDiemBD == null ? 0 : 1,
                         m.ThoiDiemBD
                 select new
                 {
-                    TagKey = s.TagKey,
+                    TagKey = s.TagKey,       // có thể null khi silo chưa cấu hình tagKey
                     IDNVL = n.ID,
                     IDNhomNVL = n.IDNhomNVL,
                     ThoiDiemBD = m.ThoiDiemBD,
@@ -1033,8 +1034,11 @@ namespace dataproduct.api.Repositories
             var (timeFrom, timeTo) = GetTimeRangeByCa(ngay, idCa);
 
             // 7. Timeline mapping
+            // Chỉ đưa vào tagTimeline những mapping có TagKey — dùng để query SCADA
+            // Silo không có tagKey vẫn xuất hiện trong cột nhưng không có data tự động
             var tagTimeline = mappings
-                .GroupBy(m => m.TagKey)
+                .Where(m => m.TagKey != null)
+                .GroupBy(m => m.TagKey!)
                 .ToDictionary(
                     g => g.Key,
                     g => g.OrderBy(m => m.ThoiDiemBD ?? DateTime.MinValue)
