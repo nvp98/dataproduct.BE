@@ -121,6 +121,15 @@ namespace dataproduct.api.ResponseModels
         public string TenMayDuc { get; set; } = null!;
     }
 
+    // Mẻ BBGN thép lỏng lọc theo khoảng ThoiGian thực tế (giao ca)
+    public class HRC1_MeTheoThoiGianVm
+    {
+        public string? MeThoi { get; set; }       // HRC1_MeThep.MaMe
+        public decimal? KLThepLong { get; set; }
+        public string? ThoiGian { get; set; }      // vd: "02/01/2026 7h30"
+        public string? MayDuc { get; set; }
+    }
+
     // -------------------------------------------------------
     // Response chính — 1 kiểu duy nhất cho cả 3 công đoạn
     // -------------------------------------------------------
