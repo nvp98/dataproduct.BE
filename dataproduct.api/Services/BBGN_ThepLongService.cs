@@ -59,10 +59,10 @@ namespace dataproduct.api.Services
             if (!formData.TryGetProperty("table1", out var table))
                 return warnings;
             var bieuMau = GetString(formData, "maBm");
-            var ngaySX  = TryParseDateTime(formData, "NgaySX");
-            var ca      = TryParseInt(formData, "ca");
-            var scope   = TryParseInt(formData, "scope");
-            var kip     = GetString(formData, "kip");
+            var ngaySX = TryParseDateTime(formData, "NgaySX");
+            var ca = TryParseInt(formData, "ca");
+            var scope = TryParseInt(formData, "scope");
+            var kip = GetString(formData, "kip");
 
             // ===== PRELOAD DATA theo IdPhieu =====
             var existingData = await _context.BBGN_ThepLongs
@@ -110,7 +110,7 @@ namespace dataproduct.api.Services
                         warnings.Add($"Mẻ {me}: Không thể nhập KL lần 1 vì mẻ đã được chọn Lên thẳng");
                     }
 
-                     var klThepLong = TryParseDecimal(row, "klThepLong");
+                    var klThepLong = TryParseDecimal(row, "klThepLong");
 
                     // ===== UPDATE =====
                     var oldMe = existing.Me;
@@ -155,7 +155,7 @@ namespace dataproduct.api.Services
                     if (isIncomingLenThang)
                         klLan1 = null;
 
-                    var klThepLong = TryParseDecimal(row, "klThepLong") ;
+                    var klThepLong = TryParseDecimal(row, "klThepLong");
 
                     // ===== INSERT =====
                     var entity = new BBGN_ThepLong
@@ -166,10 +166,10 @@ namespace dataproduct.api.Services
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
-                        Ca      = ca,
-                        NgaySX  = ngaySX,
-                        Scope   = scope,
-                        Kip     = kip,
+                        Ca = ca,
+                        NgaySX = ngaySX,
+                        Scope = scope,
+                        Kip = kip,
                         KLLFSauThep = klLFSauThep,
                         KlLan1 = klLan1,
                         KlLan2 = klLan2,
@@ -203,7 +203,7 @@ namespace dataproduct.api.Services
 
             return warnings;
         }
-    
+
 
         private decimal? SumValues(params decimal?[] values)
         {
@@ -235,7 +235,7 @@ namespace dataproduct.api.Services
 
             return null;
         }
-        
+
         private decimal? TryParseDecimal(JsonElement row, string key)
         {
             if (!row.TryGetProperty(key, out var val)) return null;
@@ -338,8 +338,7 @@ namespace dataproduct.api.Services
 
             var query = _masterContext.Tbl_MeThoi
                 .Where(x => x.Is_Delete != true
-                         && toHopLoThoi.Contains(x.ID_LoThoi)
-                         && x.ID_TrangThai != 5);
+                         && toHopLoThoi.Contains(x.ID_LoThoi));
 
             if (!string.IsNullOrWhiteSpace(searchStr))
                 query = query.Where(x => x.MaMeThoi.Contains(searchStr.Trim()));
@@ -521,7 +520,7 @@ namespace dataproduct.api.Services
             var ca = caRaw.Select(x => new TongHopItem
             {
                 Label = x.Ca == 1 ? "Ca ngày" : x.Ca == 2 ? "Ca đêm" : $"Ca {x.Ca}",
-                SoMe  = x.SoMe
+                SoMe = x.SoMe
             }).ToList();
 
             var kip = await baseQuery
@@ -571,12 +570,12 @@ namespace dataproduct.api.Services
 
             return new TongHopBBGNThepLongResponse
             {
-                PhanLoai            = phanLoai,
-                Ca                  = ca,
-                Kip                 = kip,
-                TinhLuyenLenThang   = tinhLuyen,
-                DucVuong            = ducVuong,
-                DucTam              = ducTam,
+                PhanLoai = phanLoai,
+                Ca = ca,
+                Kip = kip,
+                TinhLuyenLenThang = tinhLuyen,
+                DucVuong = ducVuong,
+                DucTam = ducTam,
                 NhomPhanLoaiMacThep = nhomPhanLoai
             };
         }
@@ -602,14 +601,14 @@ namespace dataproduct.api.Services
             bool isHRC2 = (request.BieuMau ?? "") == "HRC2_BBGN_ThepLong";
 
             // Column positions (1-based)
-            int colKLLF       = isHRC2 ? 0  : 10; // 0 = not present
-            int colLan1       = isHRC2 ? 10 : 11;
-            int colLan2       = isHRC2 ? 11 : 12;
-            int colLan3       = isHRC2 ? 12 : 13;
+            int colKLLF = isHRC2 ? 0 : 10; // 0 = not present
+            int colLan1 = isHRC2 ? 10 : 11;
+            int colLan2 = isHRC2 ? 11 : 12;
+            int colLan3 = isHRC2 ? 12 : 13;
             int colKlThepLong = isHRC2 ? 13 : 14;
-            int colCau1       = isHRC2 ? 19 : 20;
-            int colCau2       = isHRC2 ? 20 : 21;
-            int totalCols     = isHRC2 ? 20 : 21;
+            int colCau1 = isHRC2 ? 19 : 20;
+            int colCau2 = isHRC2 ? 20 : 21;
+            int totalCols = isHRC2 ? 20 : 21;
 
             int startRow = 5;
             int stt = 1;
@@ -653,21 +652,21 @@ namespace dataproduct.api.Services
             labelRange.Merge();
             labelRange.Value = "Tổng";
             labelRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            labelRange.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+            labelRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             labelRange.Style.Font.Bold = true;
 
             if (colKLLF > 0)
                 ws.Cell(totalRow, colKLLF).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KLLFSauThep ?? 0));
-            ws.Cell(totalRow, colLan1).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan1 ?? 0));
-            ws.Cell(totalRow, colLan2).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan2 ?? 0));
-            ws.Cell(totalRow, colLan3).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan3 ?? 0));
+            ws.Cell(totalRow, colLan1).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan1 ?? 0));
+            ws.Cell(totalRow, colLan2).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan2 ?? 0));
+            ws.Cell(totalRow, colLan3).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KlLan3 ?? 0));
             ws.Cell(totalRow, colKlThepLong).Value = (XLCellValue)(double)data.Sum(x => (double)(x.KlThepLong ?? 0));
-            ws.Cell(totalRow, colCau1).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.klcau1 ?? 0));
-            ws.Cell(totalRow, colCau2).Value       = (XLCellValue)(double)data.Sum(x => (double)(x.klcau2 ?? 0));
+            ws.Cell(totalRow, colCau1).Value = (XLCellValue)(double)data.Sum(x => (double)(x.klcau1 ?? 0));
+            ws.Cell(totalRow, colCau2).Value = (XLCellValue)(double)data.Sum(x => (double)(x.klcau2 ?? 0));
 
             // ===== BORDER =====
             var tableRange = ws.Range(5, 1, totalRow, totalCols);
-            tableRange.Style.Border.InsideBorder  = XLBorderStyleValues.Thin;
+            tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
             using var ms = new MemoryStream();
@@ -675,8 +674,8 @@ namespace dataproduct.api.Services
             var fileName = $"ThongKe_BBGN_ThepLong_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
             return new ExportFileResult
             {
-                Content     = ms.ToArray(),
-                FileName    = fileName,
+                Content = ms.ToArray(),
+                FileName = fileName,
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
@@ -811,29 +810,29 @@ namespace dataproduct.api.Services
 
         public async Task<ExportFileResult> ExportPdfAsync(Guid idPhieu)
         {
-            var rows  = await LoadByIdPhieuAsync(idPhieu);
+            var rows = await LoadByIdPhieuAsync(idPhieu);
             var phieu = await GetBmPhieuByIdAsync(idPhieu);
 
-            var ca  = phieu?.Ca ?? 1;
+            var ca = phieu?.Ca ?? 1;
             var kip = phieu?.Kip ?? "";
             var ngay = phieu?.NgaySX ?? DateOnly.FromDateTime(DateTime.Today);
 
             string tuGio, denGio, tuNgay, denNgay;
             if (ca == 1)
             {
-                tuGio   = "08"; denGio  = "20";
-                tuNgay  = ngay.ToString("dd/MM/yyyy");
+                tuGio = "08"; denGio = "20";
+                tuNgay = ngay.ToString("dd/MM/yyyy");
                 denNgay = ngay.ToString("dd/MM/yyyy");
             }
             else
             {
-                tuGio   = "20"; denGio  = "08";
-                tuNgay  = ngay.ToString("dd/MM/yyyy");
+                tuGio = "20"; denGio = "08";
+                tuNgay = ngay.ToString("dd/MM/yyyy");
                 denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy");
             }
 
             // Build table rows
-            var sb  = new StringBuilder();
+            var sb = new StringBuilder();
             decimal sumKl = 0;
             int stt = 1;
             foreach (var r in rows)
@@ -859,7 +858,7 @@ namespace dataproduct.api.Services
             }
 
             // Phê duyệt
-            var pheDuyets   = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
+            var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
             var benGiaoList = pheDuyets.Where(x => x.CapDuyet == 0).ToList();
             var benNhanList = pheDuyets.Where(x => x.CapDuyet != 0).ToList();
 
@@ -910,8 +909,8 @@ namespace dataproduct.api.Services
 
             return new ExportFileResult
             {
-                Content     = pdfBytes,
-                FileName    = $"BBGN_ThepLong_{ngay:ddMMyyyy}_Ca{ca}.pdf",
+                Content = pdfBytes,
+                FileName = $"BBGN_ThepLong_{ngay:ddMMyyyy}_Ca{ca}.pdf",
                 ContentType = "application/pdf"
             };
         }
@@ -924,24 +923,24 @@ namespace dataproduct.api.Services
             // ===== DÒNG 5: Ca kíp =====
             if (phieu != null)
             {
-                var ca     = phieu.Ca ?? 1;
-                var kip    = phieu.Kip ?? "";
-                var ngay   = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today);
+                var ca = phieu.Ca ?? 1;
+                var kip = phieu.Kip ?? "";
+                var ngay = phieu.NgaySX ?? DateOnly.FromDateTime(DateTime.Today);
 
                 string startTime, endTime, startDate, endDate;
                 if (ca == 1)
                 {
                     startTime = "08 giờ 00";
-                    endTime   = "20 giờ 00";
+                    endTime = "20 giờ 00";
                     startDate = ngay.ToString("dd/MM/yyyy");
-                    endDate   = ngay.ToString("dd/MM/yyyy");
+                    endDate = ngay.ToString("dd/MM/yyyy");
                 }
                 else // Ca 2
                 {
                     startTime = "20 giờ 00";
-                    endTime   = "08 giờ 00";
+                    endTime = "08 giờ 00";
                     startDate = ngay.ToString("dd/MM/yyyy");
-                    endDate   = ngay.AddDays(1).ToString("dd/MM/yyyy");
+                    endDate = ngay.AddDays(1).ToString("dd/MM/yyyy");
                 }
 
                 ws.Cell(5, 1).Value = $"Ca {ca}{kip} Từ {startTime}  ngày {startDate} đến {endTime}  ngày {endDate}";
@@ -954,13 +953,13 @@ namespace dataproduct.api.Services
             {
                 var row = rows[i];
                 int r = startRow + i;
-            
-                ws.Cell(r, 1).Value = i + 1;         
+
+                ws.Cell(r, 1).Value = i + 1;
                 ws.Cell(r, 1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
-                                                                 // A - STT
-                ws.Cell(r, 2).Value = row.MayDuc ?? "";       
+                // A - STT
+                ws.Cell(r, 2).Value = row.MayDuc ?? "";
                 ws.Cell(r, 2).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
-                                                        // B - Máy đúc
+                // B - Máy đúc
                 ws.Cell(r, 3).Value = row.Me ?? "";                                                   // C - Mẻ
                 ws.Cell(r, 3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 
@@ -971,11 +970,11 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 6).Value = row.ThoiGian ?? "";                                             // F - Thời gian
                 ws.Cell(r, 6).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 
-                if (row.KlLan1.HasValue)    ws.Cell(r, 7).Value  = (double)row.KlLan1.Value;         // G - KL lần 1
+                if (row.KlLan1.HasValue) ws.Cell(r, 7).Value = (double)row.KlLan1.Value;         // G - KL lần 1
                 ws.Cell(r, 7).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
-                if (row.KlLan2.HasValue)    ws.Cell(r, 8).Value  = (double)row.KlLan2.Value;         // H - KL lần 2
+                if (row.KlLan2.HasValue) ws.Cell(r, 8).Value = (double)row.KlLan2.Value;         // H - KL lần 2
                 ws.Cell(r, 8).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
-                if (row.KlLan3.HasValue)    ws.Cell(r, 9).Value  = (double)row.KlLan3.Value;  
+                if (row.KlLan3.HasValue) ws.Cell(r, 9).Value = (double)row.KlLan3.Value;
                 ws.Cell(r, 9).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
                 // I - KL lần 3
                 if (row.KlThepLong.HasValue) ws.Cell(r, 10).Value = (double)row.KlThepLong.Value;    // J - KL thép lỏng
@@ -989,10 +988,10 @@ namespace dataproduct.api.Services
 
                 // Border toàn bộ ô trong dòng
                 var dataRange = ws.Range(r, 1, r, totalCols);
-                dataRange.Style.Border.TopBorder    = ClosedXML.Excel.XLBorderStyleValues.Thin;
+                dataRange.Style.Border.TopBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
                 dataRange.Style.Border.BottomBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
-                dataRange.Style.Border.LeftBorder   = ClosedXML.Excel.XLBorderStyleValues.Thin;
-                dataRange.Style.Border.RightBorder  = ClosedXML.Excel.XLBorderStyleValues.Thin;
+                dataRange.Style.Border.LeftBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+                dataRange.Style.Border.RightBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
                 dataRange.Style.Border.InsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
 
                 // Mẻ trùng → màu chữ đỏ cột C (Mẻ)
@@ -1007,13 +1006,13 @@ namespace dataproduct.api.Services
             var labelRange = ws.Range(sumRow, 1, sumRow, 9);
             labelRange.Merge();
             labelRange.FirstCell().Value = "Tổng";
-            labelRange.Style.Font.Bold   = true;
+            labelRange.Style.Font.Bold = true;
             labelRange.Style.Border.OutsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
 
             var sumRange = ws.Range(sumRow, 10, sumRow, 10);
             sumRange.Merge();
             sumRange.FirstCell().Value = (double)sumKlThepLong;
-            sumRange.Style.Font.Bold   = true;
+            sumRange.Style.Font.Bold = true;
             sumRange.Style.Border.OutsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
 
             // Merge K-M (cột 11-13): giá trị tổng KL thép lỏng
@@ -1071,7 +1070,7 @@ namespace dataproduct.api.Services
                 {
                     if (!reader.IsDBNull(0))
                     {
-                        result.Add(reader.GetString(0)); 
+                        result.Add(reader.GetString(0));
                     }
                 }
 
