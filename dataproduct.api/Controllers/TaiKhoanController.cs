@@ -214,7 +214,22 @@ namespace dataproduct.api.Controllers
                 })
                 .ToList();
 
-            return Ok(new { bmQuyenXlList, quyenTheoLo });
+            // Tương tự quyenTheoLo nhưng group theo MaKhuVuc (dùng cho các BM "ảo" chỉ có
+            // scope, không có KhuVucPhu — vd THONGKE_HRC1/THONGKE_HRC2 phân quyền theo tab).
+            var quyenTheoScope = (await _formContext.BmQuyenXls
+                    .AsNoTracking()
+                    .Where(x => x.IdTaiKhoan == user.ID_TaiKhoan && x.MaKhuVuc != null)
+                    .Select(x => new { x.MaBm, x.MaKhuVuc })
+                    .ToListAsync())
+                .GroupBy(x => x.MaBm)
+                .Select(g => new
+                {
+                    maBm = g.Key,
+                    maKhuVucs = g.Select(x => x.MaKhuVuc!).Distinct().ToList()
+                })
+                .ToList();
+
+            return Ok(new { bmQuyenXlList, quyenTheoLo, quyenTheoScope });
         }
 
         [HttpGet("list-ky-duyet")]

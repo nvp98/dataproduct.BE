@@ -21,6 +21,13 @@ namespace dataproduct.api.DTOs
         public int PageSize { get; set; } = 20;
     }
 
+    // Lấy mẻ BBGN thép lỏng (công đoạn đúc) theo khoảng ThoiGian thực tế (giờ nhập, HH:mm trong ca)
+    public class HRC1_MeTheoThoiGianQuery
+    {
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
+    }
+
     // -------------------------------------------------------
     // Lò thổi — fetch mẻ từ gang lỏng
     // -------------------------------------------------------

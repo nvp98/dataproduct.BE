@@ -383,6 +383,19 @@ namespace dataproduct.api.Controllers
         // Export
         // -------------------------------------------------------
 
+        /// <summary>GET /api/hrc1/duc/get-me-by-daterange?fromDate=&amp;toDate= — mẻ BBGN thép lỏng lọc theo khoảng ThoiGian thực tế (giao ca)</summary>
+        [HttpGet("duc/get-me-by-daterange")]
+        public async Task<IActionResult> GetMeTheoThoiGian([FromQuery] HRC1_MeTheoThoiGianQuery query)
+        {
+            try
+            {
+                var result = await _svc.GetMeTheoThoiGianAsync(query.FromDate, query.ToDate);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
         /// <summary>GET /api/hrc1/thong-ke — tìm kiếm phân trang từ HRC1_MeThep</summary>
         [HttpGet("thong-ke")]
         public async Task<IActionResult> ThongKe([FromQuery] HRC1_ThongKeQuery query)
