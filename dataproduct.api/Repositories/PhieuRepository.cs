@@ -524,6 +524,9 @@ namespace dataproduct.api.Repositories
             if (request.Ca.HasValue)
                 query = query.Where(x => x.Ca == request.Ca.Value);
 
+            if (!string.IsNullOrEmpty(request.Kip))
+                query = query.Where(x => x.Kip == request.Kip);
+
             if (request.ScopeFilters != null && request.ScopeFilters.Count > 0)
             {
                 var pairs = request.ScopeFilters
