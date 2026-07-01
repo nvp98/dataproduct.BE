@@ -67,6 +67,8 @@ namespace dataproduct.api.Services
             if (result.MacThepFilled > 0)
                 result.Message += $" | Cập nhật Mác thép: {result.MacThepFilled} slab";
 
+            // Lưu ý: Sync không lưu MaVatTu. MaVatTu chỉ được snapshot khi Đúc xác nhận (XacNhanAsync);
+            // trước khi xác nhận, /slabs-by-phieu sẽ tự join bảng MaVatTu theo MacThep để hiển thị.
             return result;
         }
 
@@ -104,8 +106,6 @@ namespace dataproduct.api.Services
         public Task<int> FillMacThepAsync() => _repo.FillMacThepAsync();
 
         public Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req) => _repo.UpdateSlabAsync(id, req);
-
-        public Task<int> BulkUpdateMaVatTuAsync(Hrc1BulkUpdateMaVatTuRequest req) => _repo.BulkUpdateMaVatTuAsync(req);
 
         public Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
             => _repo.GetTongHopGhiChuAsync(idPhieu);
@@ -180,7 +180,8 @@ namespace dataproduct.api.Services
             var soPhieu = phieu?.SoPhieu ?? "";
             var ngaySX = phieu?.NgaySX?.ToString("dd/MM/yyyy") ?? "";
 
-            var tongHopRows = BuildTongHopRows(slabs, ghiChus);
+            var tenVatTuMap = await _repo.GetTenVatTuMapAsync(slabs.Select(s => s.MacThep));
+            var tongHopRows = BuildTongHopRows(slabs, ghiChus, tenVatTuMap);
 
             var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC1_BBXNSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
@@ -198,7 +199,7 @@ namespace dataproduct.api.Services
                 if (rowIndex > startRow)
                     ws.Row(startRow).CopyTo(ws.Row(rowIndex));
 
-                var label = BuildSanPhamLabel(row.MacThep, row.KichThuoc);
+                var label = BuildSanPhamLabel(row.TenVatTu, row.MacThep);
 
                 ws.Cell(rowIndex, 1).Value = stt;
                 ws.Cell(rowIndex, 2).Value = label;
@@ -255,12 +256,13 @@ namespace dataproduct.api.Services
             var ca = phieu?.Ca == 1 ? "Ca ngày" : phieu?.Ca == 2 ? "Ca đêm" : "";
             var kip = phieu?.Kip ?? "";
 
-            var tongHopRows = BuildTongHopRows(slabs, ghiChus);
+            var tenVatTuMap = await _repo.GetTenVatTuMapAsync(slabs.Select(s => s.MacThep));
+            var tongHopRows = BuildTongHopRows(slabs, ghiChus, tenVatTuMap);
 
             var rowsHtml = new StringBuilder();
             foreach (var row in tongHopRows)
             {
-                var label = BuildSanPhamLabel(row.MacThep, row.KichThuoc);
+                var label = BuildSanPhamLabel(row.TenVatTu, row.MacThep);
                 rowsHtml.Append("<tr>");
                 rowsHtml.Append($"<td style=\"text-align:center\">{row.Stt}</td>");
                 rowsHtml.Append($"<td>{label}</td>");
@@ -283,8 +285,7 @@ namespace dataproduct.api.Services
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BBXNSL_PhoiTam.html");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy template HTML: {templatePath}");
-            var logoUrl = _config.GetValue<string>("AppSettings:LogoUrl")
-                          ?? "https://report.hoaphatdungquat.vn/img/logoHP.png";
+            var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var html = await File.ReadAllTextAsync(templatePath);
             html = html
                 .Replace("{{LogoUrl}}",       logoUrl)
@@ -344,12 +345,11 @@ namespace dataproduct.api.Services
             return string.Join(" ", parts);
         }
 
-        private static string BuildSanPhamLabel(string? macThep, string kichThuoc)
+        private static string BuildSanPhamLabel(string? tenVatTu, string? macThep)
         {
-            var parts = new[] { "Phôi tấm", !string.IsNullOrEmpty(kichThuoc) ? $"{kichThuoc}mm" : null, macThep }
-                .Where(p => !string.IsNullOrWhiteSpace(p))
-                .ToArray();
-            return parts.Length > 0 ? string.Join(" ", parts) : "-";
+            if (!string.IsNullOrWhiteSpace(tenVatTu)) return tenVatTu!;
+            if (!string.IsNullOrWhiteSpace(macThep)) return macThep!;
+            return "-";
         }
 
         private static void SetThinBorders(IXLWorksheet ws, int fromRow, int toRow, int lastCol)
@@ -378,33 +378,32 @@ namespace dataproduct.api.Services
             return await repo.LoadPhieuSlabsAsync(phieu);
         }
 
-        private record TongHopRow(int Stt, string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL, string? GhiChu);
+        private record TongHopRow(int Stt, string? MacThep, string? MaVatTu, string? TenVatTu, int SoPhoi, decimal TongKL, string? GhiChu);
 
-        private static List<TongHopRow> BuildTongHopRows(List<Hrc1Slab> slabs, List<Hrc1BbslTongHopGhiChu> ghiChus)
+        private static List<TongHopRow> BuildTongHopRows(List<Hrc1Slab> slabs, List<Hrc1BbslTongHopGhiChu> ghiChus, Dictionary<string, string> tenVatTuMap)
         {
-            var map = new Dictionary<string, (string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL)>();
+            var map = new Dictionary<string, (string? MacThep, string? MaVatTu, int SoPhoi, decimal TongKL)>();
 
             foreach (var slab in slabs)
             {
-                var hasKt = slab.ChieuDay != null && slab.ChieuRong != null && slab.ChieuDai != null;
-                var kt = hasKt ? $"{slab.ChieuDay}x{slab.ChieuRong}x{slab.ChieuDai}" : "";
-                var key = $"{slab.MacThep ?? ""}|{kt}";
+                var key = $"{slab.MacThep ?? ""}|{slab.MaVatTu ?? ""}";
 
                 if (!map.ContainsKey(key))
-                    map[key] = (slab.MacThep, kt, 0, 0);
+                    map[key] = (slab.MacThep, slab.MaVatTu, 0, 0);
 
                 var cur = map[key];
-                map[key] = (cur.MacThep, cur.KichThuoc, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
+                map[key] = (cur.MacThep, cur.MaVatTu, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
             }
 
             var ghiChuDict = ghiChus.ToDictionary(
-                g => $"{g.MacThep ?? ""}|{g.KichThuoc ?? ""}",
+                g => $"{g.MacThep ?? ""}|{g.MaVatTu ?? ""}",
                 g => g.GhiChu);
 
             return map.Select((kvp, i) =>
             {
                 var ghiChu = ghiChuDict.TryGetValue(kvp.Key, out var gc) ? gc : null;
-                return new TongHopRow(i + 1, kvp.Value.MacThep, kvp.Value.KichThuoc, kvp.Value.SoPhoi, kvp.Value.TongKL, ghiChu);
+                tenVatTuMap.TryGetValue(kvp.Value.MacThep ?? "", out var tenVatTu);
+                return new TongHopRow(i + 1, kvp.Value.MacThep, kvp.Value.MaVatTu, tenVatTu, kvp.Value.SoPhoi, kvp.Value.TongKL, ghiChu);
             }).ToList();
         }
 

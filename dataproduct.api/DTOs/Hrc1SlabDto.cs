@@ -84,6 +84,7 @@ namespace dataproduct.api.DTOs
         public DateTime? NgayCapNhat { get; set; }
         public string? GhiChu { get; set; }
         public string? MaVatTu { get; set; }
+        public string? TenVatTu { get; set; }
 
         // Workflow (LEFT JOIN HRC1_Slab_TrangThai)
         public bool IsChuyenCa { get; set; }
@@ -119,18 +120,12 @@ namespace dataproduct.api.DTOs
         public string? MaVatTu { get; set; }
     }
 
-    public class Hrc1BulkUpdateMaVatTuRequest
-    {
-        public List<int> Ids { get; set; } = [];
-        public string? MaVatTu { get; set; }
-    }
-
     // ── Tổng hợp ghi chú ─────────────────────────────────────────────────────
 
     public class Hrc1TongHopGhiChuItem
     {
         public string? MacThep { get; set; }
-        public string? KichThuoc { get; set; }
+        public string? MaVatTu { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -138,7 +133,7 @@ namespace dataproduct.api.DTOs
     {
         public Guid IdPhieuBBSL { get; set; }
         public string? MacThep { get; set; }
-        public string? KichThuoc { get; set; }
+        public string? MaVatTu { get; set; }
         public string? GhiChu { get; set; }
     }
 

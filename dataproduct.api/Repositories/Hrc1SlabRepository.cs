@@ -10,6 +10,7 @@ namespace dataproduct.api.Repositories
         private readonly ProductFormContext _context;
         private readonly SyncPhanLoaiService _syncPhanLoai;
         private const string MaBm = "HRC1_BBGN_PhoiTam";
+        private const string NhaMayHrc1 = "HRC1";
 
         public Hrc1SlabRepository(ProductFormContext context, SyncPhanLoaiService syncPhanLoai)
         {
@@ -183,12 +184,15 @@ namespace dataproduct.api.Repositories
                     .ToDictionaryAsync(p => p.Idphieu, p => p)
                 : new Dictionary<Guid, BmPhieu>();
 
+            var maVatTuMap = await GetMaVatTuLookupAsync(slabs.Select(s => s.MacThep));
+
             var items = slabs.Select(s =>
             {
                 ttMap.TryGetValue(s.Id, out var tt);
                 BmPhieu? phieu = null;
                 if (tt?.IdPhieuBBSL != null) phieuMap.TryGetValue(tt.IdPhieuBBSL.Value, out phieu);
-                return MapToItem(s, tt, phieu);
+                maVatTuMap.TryGetValue(s.MacThep ?? "", out var mvt);
+                return MapToItem(s, tt, phieu, ResolveMaVatTu(s, tt, mvt), mvt?.TenVatTu);
             });
 
             return (items, total);
@@ -368,15 +372,24 @@ namespace dataproduct.api.Repositories
                     .ToDictionaryAsync(s => s.Id)
                 : new Dictionary<int, Hrc1Slab>();
 
+            var maVatTuMap = await GetMaVatTuLookupAsync(
+                naturalSlabs.Select(s => s.MacThep).Concat(transferredSlabMap.Values.Select(s => s.MacThep)));
+
             var naturalItems = naturalSlabs.Select(s =>
             {
                 naturalTTMap.TryGetValue(s.Id, out var tt);
-                return MapToItem(s, tt, null);
+                maVatTuMap.TryGetValue(s.MacThep ?? "", out var mvt);
+                return MapToItem(s, tt, null, ResolveMaVatTu(s, tt, mvt), mvt?.TenVatTu);
             });
 
             var transferredItems = transferredTTs
                 .Where(t => transferredSlabMap.ContainsKey(t.IdSlab))
-                .Select(t => MapToItem(transferredSlabMap[t.IdSlab], t, null));
+                .Select(t =>
+                {
+                    var s = transferredSlabMap[t.IdSlab];
+                    maVatTuMap.TryGetValue(s.MacThep ?? "", out var mvt);
+                    return MapToItem(s, t, null, ResolveMaVatTu(s, t, mvt), mvt?.TenVatTu);
+                });
 
             return naturalItems.Concat(transferredItems)
                 .OrderBy(x => x.MayDuc)
@@ -490,6 +503,7 @@ namespace dataproduct.api.Repositories
                 .ToDictionaryAsync(t => t.IdSlab);
 
             var now = DateTime.Now;
+            var slabsXacNhan = new List<Hrc1Slab>();
             foreach (var slab in slabs)
             {
                 trangThaiMap.TryGetValue(slab.Id, out var tt);
@@ -527,7 +541,13 @@ namespace dataproduct.api.Repositories
                         tt.NgayXacNhanCan = now;
                     }
                 }
+
+                slabsXacNhan.Add(slab);
             }
+
+            // Đúc xác nhận: chốt snapshot VatTuCode hiện tại (theo MacThep) vào HRC1_Slab.MaVatTu
+            if (loaiXacNhan == "Duc")
+                await FillMaVatTuForSlabsAsync(slabsXacNhan, overwrite: true);
 
             await _context.SaveChangesAsync();
         }
@@ -696,6 +716,53 @@ namespace dataproduct.api.Repositories
             return updated;
         }
 
+        // ── MaVatTu: snapshot khi Đúc xác nhận, live-join khi chưa xác nhận ───
+
+        // Đã Đúc xác nhận (TrangThaiDuc == 1) → dùng snapshot đã lưu trên slab (lịch sử tại thời điểm xác nhận)
+        // Chưa xác nhận → lấy VatTuCode hiện tại từ bảng MaVatTu (theo MacThep) để hiển thị, không lưu lại
+        private static string? ResolveMaVatTu(Hrc1Slab s, Hrc1SlabTrangThai? tt, MaVatTu? mvt)
+            => tt?.TrangThaiDuc == 1 ? s.MaVatTu : mvt?.VatTuCode;
+
+        public async Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps)
+        {
+            var map = await GetMaVatTuLookupAsync(macTheps);
+            return map.ToDictionary(kv => kv.Key, kv => kv.Value.TenVatTu);
+        }
+
+        private async Task<Dictionary<string, MaVatTu>> GetMaVatTuLookupAsync(IEnumerable<string?> macThepList)
+        {
+            var names = macThepList.Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList()!;
+            if (names.Count == 0) return new Dictionary<string, MaVatTu>();
+
+            return await _context.MaVatTus
+                .AsNoTracking()
+                .Where(x => x.NhaMay == NhaMayHrc1 && names.Contains(x.MacThep))
+                .ToDictionaryAsync(x => x.MacThep, x => x);
+        }
+
+        private async Task<int> FillMaVatTuForSlabsAsync(List<Hrc1Slab> slabs, bool overwrite)
+        {
+            var macTheps = slabs.Where(s => !string.IsNullOrEmpty(s.MacThep)).Select(s => s.MacThep!).Distinct().ToList();
+            if (macTheps.Count == 0) return 0;
+
+            var map = await GetMaVatTuLookupAsync(macTheps);
+            if (map.Count == 0) return 0;
+
+            int updated = 0;
+            var now = DateTime.Now;
+            foreach (var slab in slabs)
+            {
+                if (string.IsNullOrEmpty(slab.MacThep)) continue;
+                if (!overwrite && slab.MaVatTu != null) continue;
+                if (!map.TryGetValue(slab.MacThep, out var mvt)) continue;
+
+                slab.MaVatTu = mvt.VatTuCode;
+                slab.NgayCapNhat = now;
+                updated++;
+            }
+            return updated;
+        }
+
         // ── Update GhiChu / MaVatTu ──────────────────────────────────────────
 
         public async Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req)
@@ -708,22 +775,6 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<int> BulkUpdateMaVatTuAsync(Hrc1BulkUpdateMaVatTuRequest req)
-        {
-            if (req.Ids == null || req.Ids.Count == 0) return 0;
-            var slabs = await _context.Hrc1Slabs
-                .Where(s => req.Ids.Contains(s.Id))
-                .ToListAsync();
-            var now = DateTime.Now;
-            foreach (var slab in slabs)
-            {
-                slab.MaVatTu = req.MaVatTu;
-                slab.NgayCapNhat = now;
-            }
-            await _context.SaveChangesAsync();
-            return slabs.Count;
-        }
-
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         public async Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
@@ -733,9 +784,9 @@ namespace dataproduct.api.Repositories
                 .Where(x => x.IdPhieuBBSL == idPhieu)
                 .Select(x => new Hrc1TongHopGhiChuItem
                 {
-                    MacThep   = x.MacThep,
-                    KichThuoc = x.KichThuoc,
-                    GhiChu    = x.GhiChu,
+                    MacThep = x.MacThep,
+                    MaVatTu = x.MaVatTu,
+                    GhiChu  = x.GhiChu,
                 })
                 .ToListAsync();
         }
@@ -746,7 +797,7 @@ namespace dataproduct.api.Repositories
                 .FirstOrDefaultAsync(x =>
                     x.IdPhieuBBSL == req.IdPhieuBBSL &&
                     x.MacThep == req.MacThep &&
-                    x.KichThuoc == req.KichThuoc);
+                    x.MaVatTu == req.MaVatTu);
 
             if (existing == null)
             {
@@ -754,7 +805,7 @@ namespace dataproduct.api.Repositories
                 {
                     IdPhieuBBSL = req.IdPhieuBBSL,
                     MacThep     = req.MacThep,
-                    KichThuoc   = req.KichThuoc,
+                    MaVatTu     = req.MaVatTu,
                     GhiChu      = req.GhiChu,
                     NgayCapNhat = DateTime.Now,
                 });
@@ -801,7 +852,7 @@ namespace dataproduct.api.Repositories
 
         // ── Helper: map model → DTO ───────────────────────────────────────────
 
-        private static Hrc1SlabItem MapToItem(Hrc1Slab s, Hrc1SlabTrangThai? tt, BmPhieu? phieu)
+        private static Hrc1SlabItem MapToItem(Hrc1Slab s, Hrc1SlabTrangThai? tt, BmPhieu? phieu, string? maVatTu, string? tenVatTu)
         {
             return new Hrc1SlabItem
             {
@@ -822,7 +873,8 @@ namespace dataproduct.api.Repositories
                 NgayTao = s.NgayTao,
                 NgayCapNhat = s.NgayCapNhat,
                 GhiChu = s.GhiChu,
-                MaVatTu = s.MaVatTu,
+                MaVatTu = maVatTu,
+                TenVatTu = tenVatTu,
                 IsChuyenCa = tt?.IsChuyenCa ?? false,
                 IdPhieuGoc = tt?.IdPhieuGoc,
                 TrangThaiDuc = tt?.TrangThaiDuc ?? 0,

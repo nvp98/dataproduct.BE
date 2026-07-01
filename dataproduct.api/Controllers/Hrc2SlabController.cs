@@ -182,6 +182,22 @@ namespace dataproduct.api.Controllers
             return result == null ? NoContent() : Ok(result);
         }
 
-        
+        // ── Export ────────────────────────────────────────────────────────────
+
+        [HttpGet("export/excel")]
+        public async Task<IActionResult> ExportExcel([FromQuery] Guid idPhieu, [FromQuery] string tab = "chitiet")
+        {
+            var result = tab == "tonghop"
+                ? await _svc.ExportTongHopExcelAsync(idPhieu)
+                : await _svc.ExportChiTietExcelAsync(idPhieu);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+
+        [HttpGet("export/pdf")]
+        public async Task<IActionResult> ExportPdf([FromQuery] Guid idPhieu)
+        {
+            var result = await _svc.ExportTongHopPdfAsync(idPhieu);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
     }
 }

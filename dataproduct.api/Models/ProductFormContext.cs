@@ -869,7 +869,7 @@ public partial class ProductFormContext : DbContext
         {
             entity.ToTable("HRC1_BBSL_TongHop_GhiChu");
             entity.Property(e => e.MacThep).HasMaxLength(50);
-            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.MaVatTu).HasMaxLength(100);
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
         });

@@ -193,13 +193,6 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        [HttpPatch("bulk-ma-vat-tu")]
-        public async Task<IActionResult> BulkUpdateMaVatTu([FromBody] Hrc1BulkUpdateMaVatTuRequest req)
-        {
-            var updated = await _svc.BulkUpdateMaVatTuAsync(req);
-            return Ok(new WorkflowResult { Success = true, Message = $"Đã cập nhật {updated} slab.", AffectedRows = updated });
-        }
-
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         [HttpGet("tonghop-ghi-chu/{idPhieu:guid}")]
