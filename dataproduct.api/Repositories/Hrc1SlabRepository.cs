@@ -503,11 +503,15 @@ namespace dataproduct.api.Repositories
                 .ToDictionaryAsync(t => t.IdSlab);
 
             var now = DateTime.Now;
-            var slabsXacNhan = new List<Hrc1Slab>();
+            // Đúc và Cán đồng cấp, xác nhận song song → snapshot MaVatTu chốt tại lần xác nhận ĐẦU TIÊN
+            // (bên nào xác nhận trước), lần xác nhận còn lại không ghi đè snapshot đã có.
+            var slabsFirstXacNhan = new List<Hrc1Slab>();
             foreach (var slab in slabs)
             {
                 trangThaiMap.TryGetValue(slab.Id, out var tt);
                 if (tt?.TrangThaiPKH == 1) continue;
+
+                var isFirstXacNhan = tt == null || (tt.TrangThaiDuc != 1 && tt.TrangThaiCan != 1);
 
                 if (tt == null)
                 {
@@ -518,7 +522,7 @@ namespace dataproduct.api.Repositories
                         newTt.NguoiXacNhanDuc = nguoiThucHien;
                         newTt.NgayXacNhanDuc = now;
                     }
-                    else if (loaiXacNhan == "Kho")
+                    else if (loaiXacNhan == "Can")
                     {
                         newTt.TrangThaiCan = 1;
                         newTt.NguoiXacNhanCan = nguoiThucHien;
@@ -534,7 +538,7 @@ namespace dataproduct.api.Repositories
                         tt.NguoiXacNhanDuc = nguoiThucHien;
                         tt.NgayXacNhanDuc = now;
                     }
-                    else if (loaiXacNhan == "Kho")
+                    else if (loaiXacNhan == "Can")
                     {
                         tt.TrangThaiCan = 1;
                         tt.NguoiXacNhanCan = nguoiThucHien;
@@ -542,12 +546,13 @@ namespace dataproduct.api.Repositories
                     }
                 }
 
-                slabsXacNhan.Add(slab);
+                if (isFirstXacNhan)
+                    slabsFirstXacNhan.Add(slab);
             }
 
-            // Đúc xác nhận: chốt snapshot VatTuCode hiện tại (theo MacThep) vào HRC1_Slab.MaVatTu
-            if (loaiXacNhan == "Duc")
-                await FillMaVatTuForSlabsAsync(slabsXacNhan, overwrite: true);
+            // Chốt snapshot VatTuCode hiện tại (theo MacThep) vào HRC1_Slab.MaVatTu cho các slab vừa xác nhận lần đầu
+            if (slabsFirstXacNhan.Count > 0)
+                await FillMaVatTuForSlabsAsync(slabsFirstXacNhan, overwrite: true);
 
             await _context.SaveChangesAsync();
         }
@@ -568,7 +573,7 @@ namespace dataproduct.api.Repositories
                     t.NguoiXacNhanDuc = null;
                     t.NgayXacNhanDuc = null;
                 }
-                else if (loaiXacNhan == "Kho")
+                else if (loaiXacNhan == "Can")
                 {
                     t.TrangThaiCan = 0;
                     t.NguoiXacNhanCan = null;
@@ -585,6 +590,9 @@ namespace dataproduct.api.Repositories
         {
             var phieu = await _context.BmPhieus.FindAsync(idPhieu)
                 ?? throw new InvalidOperationException("Phiếu không tồn tại");
+
+            if (phieu.TinhTrang == 5)
+                throw new InvalidOperationException("Phiếu đã được chốt trước đó.");
 
             var caStr = phieu.Ca?.ToString();
             var ngaySX = phieu.NgaySX;
@@ -607,6 +615,13 @@ namespace dataproduct.api.Repositories
             var transferredRecords = await _context.Hrc1SlabTrangThais
                 .Where(t => t.IsChuyenCa && t.IdPhieuBBSL == idPhieu)
                 .ToListAsync();
+
+            var chuaXacNhan = naturalSlabs.Count(s =>
+                    !naturalTTMap.TryGetValue(s.Id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1)
+                + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1);
+            if (chuaXacNhan > 0)
+                throw new InvalidOperationException(
+                    $"Còn {chuaXacNhan} slab chưa được Đúc xác nhận và Cán xác nhận, không thể chốt phiếu.");
 
             foreach (var slab in naturalSlabs)
             {
@@ -637,7 +652,6 @@ namespace dataproduct.api.Repositories
             }
 
             phieu.TinhTrang = 5;
-            phieu.IsLock = 1;
 
             await _context.SaveChangesAsync();
         }
@@ -677,8 +691,7 @@ namespace dataproduct.api.Repositories
                 t.NgayChotPKH = null;
             }
 
-            phieu.TinhTrang = 1;
-            phieu.IsLock = 0;
+            phieu.TinhTrang = 0;
 
             await _context.SaveChangesAsync();
         }
@@ -716,12 +729,12 @@ namespace dataproduct.api.Repositories
             return updated;
         }
 
-        // ── MaVatTu: snapshot khi Đúc xác nhận, live-join khi chưa xác nhận ───
+        // ── MaVatTu: snapshot khi Đúc hoặc Cán xác nhận (đồng cấp), live-join khi cả 2 chưa xác nhận ───
 
-        // Đã Đúc xác nhận (TrangThaiDuc == 1) → dùng snapshot đã lưu trên slab (lịch sử tại thời điểm xác nhận)
-        // Chưa xác nhận → lấy VatTuCode hiện tại từ bảng MaVatTu (theo MacThep) để hiển thị, không lưu lại
+        // Đã Đúc HOẶC Cán xác nhận → dùng snapshot đã lưu trên slab (lịch sử tại thời điểm xác nhận đầu tiên)
+        // Cả 2 chưa xác nhận → lấy VatTuCode hiện tại từ bảng MaVatTu (theo MacThep) để hiển thị, không lưu lại
         private static string? ResolveMaVatTu(Hrc1Slab s, Hrc1SlabTrangThai? tt, MaVatTu? mvt)
-            => tt?.TrangThaiDuc == 1 ? s.MaVatTu : mvt?.VatTuCode;
+            => (tt?.TrangThaiDuc == 1 || tt?.TrangThaiCan == 1) ? s.MaVatTu : mvt?.VatTuCode;
 
         public async Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps)
         {
@@ -769,6 +782,11 @@ namespace dataproduct.api.Repositories
         {
             var slab = await _context.Hrc1Slabs.FindAsync(id)
                 ?? throw new InvalidOperationException($"Slab {id} không tồn tại.");
+
+            var tt = await _context.Hrc1SlabTrangThais.FirstOrDefaultAsync(t => t.IdSlab == id);
+            if (tt?.TrangThaiPKH == 1)
+                throw new InvalidOperationException("Slab thuộc phiếu đã chốt, không thể chỉnh sửa.");
+
             slab.GhiChu = req.GhiChu;
             slab.MaVatTu = req.MaVatTu;
             slab.NgayCapNhat = DateTime.Now;

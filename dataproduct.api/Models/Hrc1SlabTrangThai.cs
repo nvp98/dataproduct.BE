@@ -17,7 +17,7 @@ public class Hrc1SlabTrangThai
     public int? NguoiXacNhanDuc { get; set; }
     public DateTime? NgayXacNhanDuc { get; set; }
 
-    // ── Cán Tấm — XN Kho (cột DB: TrangThaiCan) ───────────────────────────
+    // ── Cán Tấm — XN Cán ───────────────────────────────────────────────────
     public int TrangThaiCan { get; set; }
     public int? NguoiXacNhanCan { get; set; }
     public DateTime? NgayXacNhanCan { get; set; }

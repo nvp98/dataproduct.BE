@@ -349,6 +349,12 @@ namespace dataproduct.api.Repositories
                 .Where(t => t.IdPhieuBBSL == idPhieu)
                 .ToListAsync();
 
+            // Đúc và Kho đồng cấp, song song → chỉ chốt được khi cả 2 bên đã xác nhận hết
+            var chuaXacNhan = records.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiKho != 1);
+            if (chuaXacNhan > 0)
+                throw new InvalidOperationException(
+                    $"Còn {chuaXacNhan} slab chưa được Đúc xác nhận và Kho xác nhận, không thể chốt phiếu.");
+
             var now = DateTime.Now;
             foreach (var t in records)
             {
