@@ -128,6 +128,14 @@ namespace dataproduct.api.ResponseModels
         public decimal? KLThepLong { get; set; }
         public string? ThoiGian { get; set; }      // vd: "02/01/2026 7h30"
         public string? MayDuc { get; set; }
+        public string? ThungSo { get; set; }
+        public decimal? KLLFSauThep { get; set; }
+        public decimal? KLLan1 { get; set; }
+        public decimal? KLLan2 { get; set; }
+        public decimal? KLLan3 { get; set; }
+        public bool? IsThuNghiem { get; set; }
+        public string? PhanLoai { get; set; }
+        public string? MacThepBKMIS { get; set; }
     }
 
     // -------------------------------------------------------
