@@ -434,7 +434,9 @@ namespace dataproduct.api.Services
             var mayDucDict = (await _repo.GetMayDucsHRC1Async())
                 .ToDictionary(m => m.Id, m => m.TenMayDuc);
 
-            var raw = new List<(DateTime Actual, string? MaMe, decimal? KlThepLong, string? TenMayDuc)>();
+            var raw = new List<(DateTime Actual, string? MaMe, decimal? KlThepLong, string? TenMayDuc,
+                string? ThungSo, decimal? KLLFSauThep, decimal? KlLan1, decimal? KlLan2, decimal? KlLan3,
+                bool? IsThuNghiem, string? PhanLoai, string? MacThepBKMIS)>();
             var seenMeIds = new HashSet<int>();
 
             foreach (var phieu in phieus)
@@ -464,7 +466,9 @@ namespace dataproduct.api.Services
                     if (actual < fromDate || actual > toDate) continue;
 
                     mayDucDict.TryGetValue(idMayDuc, out var tenMayDuc);
-                    raw.Add((actual, m.MaMe, m.KlThepLong, tenMayDuc));
+                    raw.Add((actual, m.MaMe, m.KlThepLong, tenMayDuc,
+                        m.ThungSo, m.KLLFSauThep, m.KlLan1, m.KlLan2, m.KlLan3,
+                        m.IsThuNghiem, m.PhanLoai, m.MacThepBKMIS));
                 }
             }
 
@@ -475,7 +479,15 @@ namespace dataproduct.api.Services
                     MeThoi = r.MaMe,
                     KLThepLong = r.KlThepLong,
                     ThoiGian = $"{r.Actual:dd/MM/yyyy} {r.Actual.Hour}h{r.Actual.Minute:D2}",
-                    MayDuc = r.TenMayDuc
+                    MayDuc = r.TenMayDuc,
+                    ThungSo = r.ThungSo,
+                    KLLFSauThep = r.KLLFSauThep,
+                    KLLan1 = r.KlLan1,
+                    KLLan2 = r.KlLan2,
+                    KLLan3 = r.KlLan3,
+                    IsThuNghiem = r.IsThuNghiem,
+                    PhanLoai = r.PhanLoai,
+                    MacThepBKMIS = r.MacThepBKMIS
                 }).ToList();
         }
 
