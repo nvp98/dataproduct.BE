@@ -19,6 +19,7 @@ namespace dataproduct.api.Repositories
         Task<List<HRC1_MePhanCong>> GetAllMePhanCongsByMeIdAsync(int meId);
         Task<List<HRC1_MeThep>> GetMeThepsByIdsAsync(IEnumerable<int> meIds);
         Task<List<HRC1_MeThep>> GetMeThepsByMayDucAsync(DateOnly ngay, int ca, int idMayDuc);
+        Task<List<BmPhieu>> GetPhieuThepLongByNgaysAsync(IEnumerable<DateOnly> ngays);
         Task<List<HRC1_MeThep>> GetChoNhanAsync();
         Task<HRC1_PagedResult<HRC1_ChoNhanMeVm>> GetMeChoNhanPagedAsync(DateOnly? tuNgay, DateOnly? denNgay, int? ca, string? maMe, string? thungSo, int? loSo, int page, int pageSize);
         Task<List<MayDuc>> GetMayDucsHRC1Async();
@@ -121,6 +122,12 @@ namespace dataproduct.api.Repositories
                 .OrderBy(m => m.NgayNhanTL.HasValue ? m.NgayNhanTL : m.NgayTao)
                 .ToListAsync();
         }
+
+        // Phiếu BBGN thép lỏng (công đoạn đúc) theo danh sách ngày — lọc thêm theo Ca ở tầng service
+        public Task<List<BmPhieu>> GetPhieuThepLongByNgaysAsync(IEnumerable<DateOnly> ngays) =>
+            _ctx.BmPhieus
+                .Where(p => p.MaBm == "HRC1_BBGN_ThepLong" && p.NgaySX.HasValue && ngays.Contains(p.NgaySX.Value))
+                .ToListAsync();
 
         // Mẻ chờ TL nhận: lò đã xác nhận, chỉ định tinh_luyen, TL chưa nhận
         public Task<List<HRC1_MeThep>> GetChoNhanAsync() =>

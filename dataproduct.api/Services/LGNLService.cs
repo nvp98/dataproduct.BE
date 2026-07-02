@@ -511,9 +511,18 @@ namespace dataproduct.api.Services
                 .GroupBy(r => r.IdNVL)
                 .ToDictionary(g => g.Key, g => g.First().DoAm!.Value);
 
-            var manualMap = savedRecords
+            // Lò 1-4 có soMe từ SCADA (batch number) → match theo (soMe, IDNVL) — đúng ngữ nghĩa, ổn định.
+            // Lò 5-6 không có ts0 → soMe trong pivot là null → dùng (ThuTu, IDNVL) làm fallback.
+            // (Không dùng ThoiGianNapLieu vì format FE toLocaleTimeString và BE HH:mm:ss có thể khác nhau.)
+            var manualBySoMe = savedRecords
+                .Where(r => r.ManualGiaTri && r.SoMe.HasValue)
+                .GroupBy(r => (r.SoMe, r.IdNVL))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var manualByThuTu = savedRecords
                 .Where(r => r.ManualGiaTri)
-                .ToDictionary(r => (r.SoMe, r.ThoiGianNapLieu, r.IdNVL));
+                .GroupBy(r => (r.ThuTu, r.IdNVL))
+                .ToDictionary(g => g.Key, g => g.First());
 
             // 4. Convert pivot rows → LG_NL_ChiTiet
             // Group-first: iterate pivot.Columns (nhóm → NVL) to drive item mapping,
@@ -569,15 +578,55 @@ namespace dataproduct.api.Services
             // 5. Merge: giữ giá trị nhập tay, cập nhật GiaTri_Goc = giá trị SCADA mới
             foreach (var item in items)
             {
-                var key = (item.SoMe, item.ThoiGianNapLieu, item.IDNVL);
-                if (manualMap.TryGetValue(key, out var saved))
+                // Lò 1-4: pivot có soMe → match theo batch number + NVL (ngữ nghĩa đúng)
+                // Lò 5-6: pivot không có soMe → match theo vị trí dòng (ThuTu) + NVL
+                LGNLChiTietDto? saved = null;
+                if (item.SoMe.HasValue)
+                    manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out saved);
+                else
+                    manualByThuTu.TryGetValue((item.ThuTu, item.IDNVL), out saved);
+
+                if (saved != null)
                 {
-                    item.GiaTri_Goc  = item.GiaTri;
-                    item.GiaTri      = saved.GiaTri;
+                    item.GiaTri_Goc   = item.GiaTri;
+                    item.GiaTri       = saved.GiaTri;
                     item.ManualGiaTri = true;
-                    item.DoAm        = saved.DoAm ?? item.DoAm;
+                    item.DoAm         = saved.DoAm ?? item.DoAm;
                 }
             }
+
+            // 5b. Giữ lại bản ghi nhập tay cho NVL không có SCADA data (silo không có tagKey).
+            // Các NVL này không xuất hiện trong pivot.Rows nên items không có entry cho chúng.
+            // Nếu xóa hết rồi ghi mới mà thiếu các bản ghi này → mất data nhập tay.
+            var scadaNvlIds = items.Select(x => x.IDNVL).ToHashSet();
+            var noScadaItems = savedRecords
+                .Where(r => !scadaNvlIds.Contains(r.IdNVL))
+                .GroupBy(r => new { r.ThuTu, r.IdNVL })
+                .Select(g => g.First())
+                .Select(r => new LG_NL_ChiTiet
+                {
+                    IDPhieu         = idPhieu,
+                    IDLoCao         = idLoCao,
+                    Ngay            = ngay,
+                    IDCa            = idCa,
+                    ThoiGianNapLieu = r.ThoiGianNapLieu,
+                    SoMe            = r.SoMe,
+                    MeGio           = r.MeGio,
+                    CheDo           = r.CheDo,
+                    ThuocThamLieu1  = r.ThuocThamLieu1,
+                    ThuocThamLieu2  = r.ThuocThamLieu2,
+                    GhiChu          = r.GhiChu,
+                    IDNVL           = r.IdNVL,
+                    GiaTri          = r.GiaTri,
+                    ThuTu           = r.ThuTu,
+                    NgayTao         = DateTime.Now,
+                    ManualGiaTri    = true,
+                    GiaTri_Goc      = r.GiaTri_Goc,
+                    DoAm            = r.DoAm,
+                })
+                .ToList();
+
+            items.AddRange(noScadaItems);
 
             // 6. Tính QuyKho
             var totalByNvl = items

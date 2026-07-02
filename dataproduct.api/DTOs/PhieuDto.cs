@@ -74,6 +74,7 @@ namespace dataproduct.api.DTOs
         public DateTime? TuNgay { get; set; }
         public DateTime? DenNgay { get; set; }
         public int? Ca { get; set; }
+        public string? Kip { get; set; }
         public int? Scope { get; set; }
         public List<string>? ScopeFilters { get; set; }
         public int? MayDuc { get; set; }

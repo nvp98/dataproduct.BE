@@ -395,6 +395,103 @@ namespace dataproduct.api.Services
         }
 
         // -------------------------------------------------------
+        // GET — mẻ BBGN thép lỏng (công đoạn đúc) lọc theo khoảng ThoiGian thực tế
+        // Lọc phiếu BM_Phieu (MaBm=HRC1_BBGN_ThepLong) có ngày/ca giao với [fromDate,toDate],
+        // rồi dùng đúng logic lấy mẻ của GetPhieuAsync (nhánh "duc"): GetMeThepsByMayDucAsync
+        // theo phieu.NgaySX/Ca/Scope. ThoiGian trong HRC1_MeThep chỉ là chuỗi HH:mm không có
+        // ngày nên phải quy theo ca của phiếu (ca 1: 08h-20h cùng ngày NgaySX; ca 2: 20h NgaySX
+        // -> 08h ngày kế) mới tính được ngày thực, sau đó lọc lại đúng khoảng fromDate-toDate.
+        // -------------------------------------------------------
+        public async Task<List<HRC1_MeTheoThoiGianVm>> GetMeTheoThoiGianAsync(DateTime fromDate, DateTime toDate)
+        {
+            if (toDate < fromDate)
+                throw new InvalidOperationException("toDate phải lớn hơn hoặc bằng fromDate.");
+
+            var shifts = new HashSet<(DateOnly Ngay, int Ca)>();
+            var day = DateOnly.FromDateTime(fromDate).AddDays(-1);
+            var lastDay = DateOnly.FromDateTime(toDate);
+            while (day <= lastDay)
+            {
+                var ca1Start = day.ToDateTime(new TimeOnly(8, 0));
+                var ca1End = day.ToDateTime(new TimeOnly(20, 0));
+                var ca2Start = ca1End;
+                var ca2End = day.AddDays(1).ToDateTime(new TimeOnly(8, 0));
+
+                if (ca1Start < toDate && ca1End > fromDate)
+                    shifts.Add((day, 1));
+                if (ca2Start < toDate && ca2End > fromDate)
+                    shifts.Add((day, 2));
+
+                day = day.AddDays(1);
+            }
+
+            var ngays = shifts.Select(s => s.Ngay).Distinct().ToList();
+            var phieus = (await _repo.GetPhieuThepLongByNgaysAsync(ngays))
+                .Where(p => p.NgaySX.HasValue && p.Ca.HasValue && p.Scope.HasValue
+                         && shifts.Contains((p.NgaySX.Value, p.Ca.Value)))
+                .ToList();
+
+            var mayDucDict = (await _repo.GetMayDucsHRC1Async())
+                .ToDictionary(m => m.Id, m => m.TenMayDuc);
+
+            var raw = new List<(DateTime Actual, string? MaMe, decimal? KlThepLong, string? TenMayDuc,
+                string? ThungSo, decimal? KLLFSauThep, decimal? KlLan1, decimal? KlLan2, decimal? KlLan3,
+                bool? IsThuNghiem, string? PhanLoai, string? MacThepBKMIS)>();
+            var seenMeIds = new HashSet<int>();
+
+            foreach (var phieu in phieus)
+            {
+                var ngay = phieu.NgaySX!.Value;
+                var ca = phieu.Ca!.Value;
+                var idMayDuc = phieu.Scope!.Value;
+
+                var mes = await _repo.GetMeThepsByMayDucAsync(ngay, ca, idMayDuc);
+                foreach (var m in mes)
+                {
+                    if (!seenMeIds.Add(m.Id)) continue;
+                    // Chưa nhập ThoiGian thì bỏ qua
+                    if (string.IsNullOrWhiteSpace(m.ThoiGian)) continue;
+                    if (!TimeOnly.TryParseExact(m.ThoiGian, "HH:mm",
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.None, out var gio))
+                        continue;
+
+                    // Ca 1: toàn bộ giờ thuộc cùng ngày NgaySX.
+                    // Ca 2: 20h-23h59 thuộc NgaySX, 00h-07h59 thuộc ngày kế tiếp.
+                    var ngayThucTe = ca == 1 || gio.Hour >= 20
+                        ? ngay
+                        : ngay.AddDays(1);
+
+                    var actual = ngayThucTe.ToDateTime(gio);
+                    if (actual < fromDate || actual > toDate) continue;
+
+                    mayDucDict.TryGetValue(idMayDuc, out var tenMayDuc);
+                    raw.Add((actual, m.MaMe, m.KlThepLong, tenMayDuc,
+                        m.ThungSo, m.KLLFSauThep, m.KlLan1, m.KlLan2, m.KlLan3,
+                        m.IsThuNghiem, m.PhanLoai, m.MacThepBKMIS));
+                }
+            }
+
+            return raw
+                .OrderBy(r => r.Actual)
+                .Select(r => new HRC1_MeTheoThoiGianVm
+                {
+                    MeThoi = r.MaMe,
+                    KLThepLong = r.KlThepLong,
+                    ThoiGian = $"{r.Actual:dd/MM/yyyy} {r.Actual.Hour}h{r.Actual.Minute:D2}",
+                    MayDuc = r.TenMayDuc,
+                    ThungSo = r.ThungSo,
+                    KLLFSauThep = r.KLLFSauThep,
+                    KLLan1 = r.KlLan1,
+                    KLLan2 = r.KlLan2,
+                    KLLan3 = r.KlLan3,
+                    IsThuNghiem = r.IsThuNghiem,
+                    PhanLoai = r.PhanLoai,
+                    MacThepBKMIS = r.MacThepBKMIS
+                }).ToList();
+        }
+
+        // -------------------------------------------------------
         // TINH LUYỆN
         // -------------------------------------------------------
         public async Task NhanMeAsync(HRC1_NhanMeRequest req, int userId)
