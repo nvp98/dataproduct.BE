@@ -441,7 +441,7 @@ namespace dataproduct.api.Controllers
                         var kip = phieu?.Kip ?? "";
 
                         var (headersBOF, headersLFRH, rows) =
-                            await _excelService.GetExportDataAsync(ngay, ca, item.BieuMauShort, item.Scope);
+                            await _excelService.GetExportDataAsync(ngay, ca, item.BieuMauShort, item.Scope, phieu?.Idphieu);
 
                         var headers = item.BieuMauShort.Equals("BOF", StringComparison.OrdinalIgnoreCase)
                             ? headersBOF
