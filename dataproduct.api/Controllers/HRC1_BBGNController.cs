@@ -303,6 +303,71 @@ namespace dataproduct.api.Controllers
             catch (Exception ex)                 { return StatusCode(500, ex.Message); }
         }
 
+        /// <summary>POST /api/hrc1/duc/xac-nhan-pcn — chỉ áp dụng mẻ IsThuNghiem=true</summary>
+        [HttpPost("duc/xac-nhan-pcn")]
+        public async Task<IActionResult> XacNhanPCN([FromBody] HRC1_DucXacNhanPCNRequest req)
+        {
+            try
+            {
+                await _svc.XacNhanPCNAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/khong-xac-nhan-pcn — chỉ áp dụng mẻ IsThuNghiem=true</summary>
+        [HttpPost("duc/khong-xac-nhan-pcn")]
+        public async Task<IActionResult> KhongXacNhanPCN([FromBody] HRC1_DucKhongXacNhanPCNRequest req)
+        {
+            try
+            {
+                await _svc.KhongXacNhanPCNAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/reset-xac-nhan-pcn — reset TrangThaiPCN về null</summary>
+        [HttpPost("duc/reset-xac-nhan-pcn")]
+        public async Task<IActionResult> ResetXacNhanPCN([FromBody] HRC1_DucResetXacNhanPCNRequest req)
+        {
+            try
+            {
+                await _svc.ResetXacNhanPCNAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/chot-pcn — P.KH chốt PCN (khóa vĩnh viễn), từ trang Thống kê</summary>
+        [HttpPost("duc/chot-pcn")]
+        public async Task<IActionResult> ChotPCN([FromBody] HRC1_ChotPCNRequest req)
+        {
+            try
+            {
+                await _svc.ChotPCNAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/duc/bo-chot-pcn — P.KH bỏ chốt PCN, từ trang Thống kê</summary>
+        [HttpPost("duc/bo-chot-pcn")]
+        public async Task<IActionResult> BoChotPCN([FromBody] HRC1_BoChotPCNRequest req)
+        {
+            try
+            {
+                await _svc.BoChotPCNAsync(req, LayUserId());
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
         /// <summary>POST /api/hrc1/duc/chot-me — P.KH chốt mẻ đúc</summary>
         [HttpPost("duc/chot-me")]
         public async Task<IActionResult> ChotMe([FromBody] HRC1_DucChotMeRequest req)

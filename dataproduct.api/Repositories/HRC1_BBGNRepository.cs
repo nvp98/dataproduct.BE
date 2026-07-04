@@ -419,6 +419,10 @@ namespace dataproduct.api.Repositories
                     select pc.MeId;
                 q = q.Where(m => chuyenVeMeIds.Contains(m.Id));
             }
+            if (f.IsThuNghiem.HasValue)
+                q = q.Where(m => m.IsThuNghiem == f.IsThuNghiem);
+            if (f.TrangThaiPCN.HasValue)
+                q = q.Where(m => m.TrangThaiPCN == f.TrangThaiPCN);
             return q;
         }
 
@@ -537,7 +541,10 @@ namespace dataproduct.api.Repositories
                 GhiChuLo           = m.GhiChuLo,
                 GhiChuTL           = m.GhiChuTL,
                 GhiChuDuc          = m.GhiChuDuc,
+                GhiChuPCN          = m.GhiChuPCN,
                 IsThuNghiem        = m.IsThuNghiem,
+                TrangThaiPCN       = m.TrangThaiPCN,
+                TrangThaiChotPCN   = m.TrangThaiChotPCN,
                 IsManualTL         = m.IsManualTL,
                 TenMayDuc          = tenMayDuc,
                 MacThep            = m.MacThep,

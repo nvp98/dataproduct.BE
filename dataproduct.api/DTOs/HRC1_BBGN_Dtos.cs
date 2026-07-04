@@ -114,6 +114,38 @@ namespace dataproduct.api.DTOs
     }
 
     // -------------------------------------------------------
+    // Máy đúc — xác nhận / không xác nhận / reset PCN (chỉ áp dụng mẻ IsThuNghiem=true)
+    // TrangThaiPCN: null=chưa xử lý, true=đã xác nhận, false=không xác nhận
+    // -------------------------------------------------------
+    public class HRC1_DucXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_DucKhongXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_DucResetXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Chốt / bỏ chốt PCN (P.KH, từ trang Thống kê) — khóa vĩnh viễn TrangThaiPCN
+    // -------------------------------------------------------
+    public class HRC1_ChotPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_BoChotPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
     // Tinh luyện — thêm mẻ tay (không qua luồng nhận mẻ)
     // -------------------------------------------------------
     public class HRC1_ThemMeTayRequest
@@ -189,6 +221,8 @@ namespace dataproduct.api.DTOs
         public DateOnly? TuNgayLoThoi { get; set; }
         public DateOnly? DenNgayLoThoi { get; set; }
         public string? MaMeChuyenVe { get; set; }  // chỉ lấy mẻ đã chuyển sang mẻ khác
+        public bool? IsThuNghiem { get; set; }
+        public bool? TrangThaiPCN { get; set; }    // chỉ áp dụng khi IsThuNghiem=true; true=đã xác nhận, false=không xác nhận
     }
 
     // -------------------------------------------------------
@@ -210,7 +244,10 @@ namespace dataproduct.api.DTOs
         public string? GhiChuLo { get; set; }
         public string? GhiChuTL { get; set; }
         public string? GhiChuDuc { get; set; }
+        public string? GhiChuPCN { get; set; }
         public bool? IsThuNghiem { get; set; }
+        public bool? TrangThaiPCN { get; set; }
+        public bool? TrangThaiChotPCN { get; set; }
         public string? TenMayDuc { get; set; }
         public string? MacThep { get; set; }
         public string? PhanLoai { get; set; }

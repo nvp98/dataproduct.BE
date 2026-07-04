@@ -246,6 +246,10 @@ namespace dataproduct.api.Services
             if (req.DichChuyen == "len_thang" && (me.TrangThaiTL ?? 0) >= 1)
                 throw new InvalidOperationException("Tinh luyện đã nhận mẻ này. Chỉ có thể chọn tinh luyện để tham khảo, không thể chuyển sang lên thẳng.");
 
+            // Đã có xác nhận/không xác nhận PCN ở máy đúc — phải Reset xác nhận PCN về null trước khi đổi Thử nghiệm
+            if (req.IsThuNghiem.HasValue && req.IsThuNghiem != me.IsThuNghiem && me.TrangThaiPCN != null)
+                throw new InvalidOperationException("Mẻ đã có xác nhận/không xác nhận PCN. Cần Reset xác nhận PCN trước khi đổi Thử nghiệm.");
+
             var oldDich = me.DichChuyen;
             var old = Snapshot(me);
 
@@ -742,6 +746,156 @@ namespace dataproduct.api.Services
         }
 
         // -------------------------------------------------------
+        // MÁY ĐÚC — XÁC NHẬN PCN (chỉ áp dụng mẻ IsThuNghiem=true)
+        // -------------------------------------------------------
+        public async Task XacNhanPCNAsync(HRC1_DucXacNhanPCNRequest req, int userId)
+        {
+            if (req.MeIds.Count == 0) return;
+
+            var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            var now = DateTime.Now;
+
+            foreach (var me in meTheps)
+            {
+                if (me.IsThuNghiem != true) continue;
+                if (me.TrangThaiChotPCN == true) continue; // đã chốt PCN — khóa vĩnh viễn
+                if (me.TrangThaiPCN == true) continue;
+
+                me.TrangThaiPCN = true;
+                me.CapNhatLuc = now;
+                me.CapNhatBoiPCN = userId;
+
+                _repo.AddLichSu(new HRC1_LichSu
+                {
+                    MeId = me.Id,
+                    TaiKhoanId = userId,
+                    HanhDong = "xac_nhan_pcn",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
+                });
+            }
+            await _repo.SaveChangesAsync();
+        }
+
+        public async Task KhongXacNhanPCNAsync(HRC1_DucKhongXacNhanPCNRequest req, int userId)
+        {
+            if (req.MeIds.Count == 0) return;
+
+            var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            var now = DateTime.Now;
+
+            foreach (var me in meTheps)
+            {
+                if (me.IsThuNghiem != true) continue;
+                if (me.TrangThaiChotPCN == true) continue; // đã chốt PCN — khóa vĩnh viễn
+                if (me.TrangThaiPCN == false) continue;
+
+                me.TrangThaiPCN = false;
+                me.CapNhatLuc = now;
+                me.CapNhatBoiPCN = userId;
+
+                _repo.AddLichSu(new HRC1_LichSu
+                {
+                    MeId = me.Id,
+                    TaiKhoanId = userId,
+                    HanhDong = "khong_xac_nhan_pcn",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
+                });
+            }
+            await _repo.SaveChangesAsync();
+        }
+
+        // Reset về null (chưa xử lý) — undo cả xác nhận lẫn không xác nhận
+        public async Task ResetXacNhanPCNAsync(HRC1_DucResetXacNhanPCNRequest req, int userId)
+        {
+            if (req.MeIds.Count == 0) return;
+
+            var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            var now = DateTime.Now;
+
+            foreach (var me in meTheps)
+            {
+                if (me.TrangThaiChotPCN == true) continue; // đã chốt PCN — khóa vĩnh viễn
+                if (me.TrangThaiPCN == null) continue;
+
+                me.TrangThaiPCN = null;
+                me.CapNhatLuc = now;
+                me.CapNhatBoiPCN = userId;
+
+                _repo.AddLichSu(new HRC1_LichSu
+                {
+                    MeId = me.Id,
+                    TaiKhoanId = userId,
+                    HanhDong = "reset_xac_nhan_pcn",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
+                });
+            }
+            await _repo.SaveChangesAsync();
+        }
+
+        // -------------------------------------------------------
+        // CHỐT / BỎ CHỐT PCN (P.KH, từ trang Thống kê) — khóa vĩnh viễn TrangThaiPCN,
+        // chỉ áp dụng mẻ đã IsThuNghiem=true && TrangThaiPCN=true
+        // -------------------------------------------------------
+        public async Task ChotPCNAsync(HRC1_ChotPCNRequest req, int userId)
+        {
+            if (req.MeIds.Count == 0) return;
+
+            var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            var now = DateTime.Now;
+
+            foreach (var me in meTheps)
+            {
+                if (me.IsThuNghiem != true) continue;
+                if (me.TrangThaiPCN != true) continue;
+                if (me.TrangThaiChotPCN == true) continue;
+
+                me.TrangThaiChotPCN = true;
+                me.CapNhatLuc = now;
+                me.CapNhatChotPCNBoi = userId;
+
+                _repo.AddLichSu(new HRC1_LichSu
+                {
+                    MeId = me.Id,
+                    TaiKhoanId = userId,
+                    HanhDong = "chot_pcn",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
+                });
+            }
+            await _repo.SaveChangesAsync();
+        }
+
+        public async Task BoChotPCNAsync(HRC1_BoChotPCNRequest req, int userId)
+        {
+            if (req.MeIds.Count == 0) return;
+
+            var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            var now = DateTime.Now;
+
+            foreach (var me in meTheps)
+            {
+                if (me.TrangThaiChotPCN != true) continue;
+
+                me.TrangThaiChotPCN = false;
+                me.CapNhatLuc = now;
+                me.CapNhatChotPCNBoi = userId;
+
+                _repo.AddLichSu(new HRC1_LichSu
+                {
+                    MeId = me.Id,
+                    TaiKhoanId = userId,
+                    HanhDong = "bo_chot_pcn",
+                    DuLieuMoi = Snapshot(me),
+                    Luc = now
+                });
+            }
+            await _repo.SaveChangesAsync();
+        }
+
+        // -------------------------------------------------------
         // Đồng bộ mẻ thổi từ gang lỏng — chỉ dành cho phiếu lò thổi
         // loSo: lò thổi số cần đồng bộ (1–5)
         // -------------------------------------------------------
@@ -1223,6 +1377,7 @@ namespace dataproduct.api.Services
             {
                 case "tl":  me.GhiChuTL  = ghiChu; break;
                 case "duc": me.GhiChuDuc = ghiChu; break;
+                case "pcn": me.GhiChuPCN = ghiChu; break;
                 default:    me.GhiChuLo  = ghiChu; break;
             }
             me.CapNhatBoi = userId;
@@ -1350,9 +1505,12 @@ namespace dataproduct.api.Services
                 IdMacThep = m.IdMacThep,
                 GhiChuTL  = m.GhiChuTL,
                 GhiChuDuc = m.GhiChuDuc,
+                GhiChuPCN = m.GhiChuPCN,
                 TrangThaiLo = m.TrangThaiLo,
                 TrangThaiTL = m.TrangThaiTL,
                 TrangThaiDuc = m.TrangThaiDuc,
+                TrangThaiPCN = m.TrangThaiPCN,
+                TrangThaiChotPCN = m.TrangThaiChotPCN,
                 CapNhatBoi = m.CapNhatBoi,
                 CapNhatLuc = m.CapNhatLuc,
                 XacNhanBoi = pc.XacNhanBoi,

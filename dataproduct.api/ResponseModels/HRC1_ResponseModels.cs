@@ -38,6 +38,7 @@ namespace dataproduct.api.ResponseModels
         public int? IdMacThep { get; set; }
         public string? GhiChuTL { get; set; }
         public string? GhiChuDuc { get; set; }
+        public string? GhiChuPCN { get; set; }
 
         // Trạng thái
         // LT/Đúc: 0=chờ, 1=đã xác nhận, 2=đã chốt
@@ -45,6 +46,8 @@ namespace dataproduct.api.ResponseModels
         public int? TrangThaiLo { get; set; }
         public int? TrangThaiTL { get; set; }
         public int? TrangThaiDuc { get; set; }
+        public bool? TrangThaiPCN { get; set; }
+        public bool? TrangThaiChotPCN { get; set; }
 
         // Tinh luyện đã nhận (chỉ có giá trị khi xem từ lò thổi panel)
         public int? SoTinhLuyenNhan { get; set; }  // scope TL đã nhận mẻ; null = chưa nhận

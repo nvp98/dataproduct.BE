@@ -428,10 +428,23 @@ namespace dataproduct.api.Repositories
 
                         var userId = request.UserId.Value;
 
-                        // HRC1_BBGN_ThepLong: trả tất cả, user xử lý từng mẻ trong phiếu, không phê duyệt phiếu
+                        // Quyền mở rộng (extraQuyens, vd "Xác nhận PCN") khớp đúng vùng 2 — FE tự tính từ
+                        // bmQuyenConfig.ts và gửi lên qua request.ExtraQuyenChucNangs, BE không hard-code giá trị.
+                        var extraQuyens = request.ExtraQuyenChucNangs ?? new List<byte>();
+
+                        // HRC1_BBGN_ThepLong: không phê duyệt theo phiếu (user xử lý từng mẻ trong phiếu),
+                        // nên không cần BmPheDuyet như regularQuery2 — nhưng vẫn phải khớp đúng scope (MaKhuVuc == Scope)
+                        // theo BmQuyenXl, cho quyền 2|4 (Xác nhận đúc) HOẶC bất kỳ quyền mở rộng nào trong extraQuyens.
                         var hrc1BbgnQuery = _context.BmPhieus
                             .Where(x => x.IsDelete != 1 && x.IsLock != 1
-                                     && x.MaBm == "HRC1_BBGN_ThepLong");
+                                     && x.MaBm == "HRC1_BBGN_ThepLong")
+                            .Where(x => _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                (q.QuyenChucNang == 2 || q.QuyenChucNang == 4 ||
+                                 (q.QuyenChucNang != null && extraQuyens.Contains(q.QuyenChucNang.Value)))
+                            ));
 
                         // HRC1_LoThoi/TinhLuyen: phiếu không có scope, trả nếu user có quyền 2|4 cho maBm
                         var hrc1LoTLQuery2 = _context.BmPhieus
