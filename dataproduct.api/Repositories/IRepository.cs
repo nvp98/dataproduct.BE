@@ -101,6 +101,15 @@ namespace dataproduct.api.Repositories
         Task<SearchThongKeApiResponse> SearchThongKeApiAsync(SearchThongKe dto);
         Task<List<ThongKeSumItem>> GetThongKeSumAsync(SearchThongKe dto);
     }
+
+    public interface IDLNMHRC1Repository
+    {
+        Task<IEnumerable<Hrc1TieuHaoBof>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF");
+        Task<List<Hrc1GroupedByMeThoiModel>> GetAllGroupedBatchAsync(IEnumerable<Hrc1TieuHaoBof> baseList);
+        Task<SearchThongKeHrc1ApiResponse> SearchThongKeApiAsync(SearchThongKeHrc1 dto);
+        Task<List<ThongKeSumItemHrc1>> GetThongKeSumAsync(SearchThongKeHrc1 dto);
+    }
+
     public interface IHeaderKeyRepository
     {
         Task<IEnumerable<Header_Key>> GetAllAsync();
@@ -429,5 +438,14 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(MayDuc entity);
         Task DeleteAsync(int id);
         Task<bool> ExistsByTenAsync(string tenMayDuc, byte nhaMay, int? excludeId = null);
+    }
+
+    public interface IHrc1PhuLieuNmRepository
+    {
+        Task<IEnumerable<Hrc1PhuLieuNm>> GetAllAsync(bool? dangSuDung, string? searchKey);
+        Task<Hrc1PhuLieuNm?> GetByIdAsync(int id);
+        Task AddAsync(Hrc1PhuLieuNm entity);
+        Task UpdateAsync(Hrc1PhuLieuNm entity);
+        Task<bool> ExistsByTenPhuLieuAsync(string tenPhuLieu, int? excludeId = null);
     }
 }

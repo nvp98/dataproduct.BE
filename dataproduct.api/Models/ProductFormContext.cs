@@ -54,6 +54,9 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
     public virtual DbSet<PhuLieu_NM> PhuLieu_NMs { get; set; }
     public virtual DbSet<PhuLieu_HRC2> PhuLieu_HRC2s { get; set; }
+    public virtual DbSet<Hrc1TieuHaoBof> Hrc1TieuHaoBofs { get; set; }
+    public virtual DbSet<Hrc1PhuLieu> Hrc1PhuLieus { get; set; }
+    public virtual DbSet<Hrc1PhuLieuNm> Hrc1PhuLieuNms { get; set; }
     public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
@@ -482,6 +485,82 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsManual).HasColumnName("IsManual");
             entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
         });
+
+        modelBuilder.Entity<Hrc1TieuHaoBof>(entity =>
+        {
+            entity.ToTable("HRC1_TieuHao_BOF");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.IDNM).HasColumnName("IDNM");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.O2).HasColumnName("O2");
+            entity.Property(e => e.N2).HasColumnName("N2");
+            entity.Property(e => e.AR).HasColumnName("AR");
+            entity.Property(e => e.IsChuyenCa).HasColumnName("IsChuyenCa");
+            entity.Property(e => e.CaChuyen).HasColumnName("CaChuyen");
+            entity.Property(e => e.IsTrungMeThoi).HasColumnName("IsTrungMeThoi");
+            entity.Property(e => e.QueLayMau).HasColumnName("QueLayMau");
+            entity.Property(e => e.QueDoNhiet).HasColumnName("QueDoNhiet");
+            entity.Property(e => e.GhiChu).HasColumnName("GhiChu");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NgayXoa).HasColumnName("NgayXoa");
+            entity.Property(e => e.NguoiXoa).HasColumnName("NguoiXoa");
+            entity.Property(e => e.ThoiDiemKetThuc).HasColumnName("ThoiDiemKetThuc");
+            entity.Property(e => e.KLGang).HasColumnName("KLGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLGangLongCCT).HasColumnName("KLGangLongCCT").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang").HasPrecision(18, 3);
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
+            entity.Property(e => e.ThoiDiemBatDau).HasColumnName("ThoiDiemBatDau");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieu>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieu");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.MeID).HasColumnName("MeID");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia").HasPrecision(18, 3);
+            entity.Property(e => e.KLPhanBo).HasColumnName("KLPhanBo").HasPrecision(18, 3);
+            entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
+            entity.Property(e => e.IsManual).HasColumnName("IsManual");
+            entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual").HasPrecision(18, 3);
+            entity.Property(e => e.IsAddManual).HasColumnName("IsAddManual");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieuNm>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieuNM");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.TenPhuLieuNM).HasColumnName("TenPhuLieuNM");
+            entity.Property(e => e.DangSuDung).HasColumnName("DangSuDung");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+        });
+
         modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC2>(entity =>
         {
             entity.ToTable("STD_XUAT_NHAP_TON_HRC2");
