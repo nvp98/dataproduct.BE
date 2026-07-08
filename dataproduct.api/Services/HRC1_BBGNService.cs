@@ -110,9 +110,9 @@ namespace dataproduct.api.Services
                 rawMes = await _repo.GetMeThepsByIdsAsync(meIds);
                 var meDict = rawMes.ToDictionary(m => m.Id);
 
-                // Tải mẻ đích ChuyenVeMe để tra tên máy đúc (chỉ cần cho tinh_luyen)
+                // Tải mẻ đích ChuyenVeMe để tra tên máy đúc (tinh_luyen: chuyển TL; lo_thoi: chuyển mẻ lên thẳng)
                 Dictionary<int, HRC1_MeThep> chuyenVeDict = new();
-                if (congDoan == "tinh_luyen")
+                if (congDoan == "tinh_luyen" || congDoan == "lo_thoi")
                 {
                     var chuyenVeIds = phanCongs
                         .Where(pc => pc.ChuyenVeMeId.HasValue)
@@ -252,6 +252,7 @@ namespace dataproduct.api.Services
 
             var oldDich = me.DichChuyen;
             var old = Snapshot(me);
+            var loThoiPc = await _repo.GetLoThoiMePhanCongByMeIdAsync(meId);
 
             me.ThungSo = req.ThungSo ?? me.ThungSo;
             me.KLLFSauThep = req.KLLFSauThep ?? me.KLLFSauThep;
@@ -273,7 +274,12 @@ namespace dataproduct.api.Services
                     // IdMayDucDich thuộc về tinh luyện — không ghi đè.
                     // Ngoại lệ: nếu trước đó là len_thang thì reset để TL tự chọn lại.
                     if (previouslyLenThang)
+                    {
                         me.IdMayDucDich = null;
+                        // Không còn lên thẳng nữa → xóa chuyển mẻ cũ (không còn ý nghĩa)
+                        if (loThoiPc != null)
+                            loThoiPc.ChuyenVeMeId = null;
+                    }
                     // Xóa các trường chỉ dùng cho len_thang khi lưu về tinh_luyen
                     me.ThoiGian = null;
                     me.KlLan2 = null;
@@ -291,6 +297,9 @@ namespace dataproduct.api.Services
                 me.ThoiGian = req.ThoiGian ?? me.ThoiGian;
                 me.KlLan2 = req.KlLan2 ?? me.KlLan2;
                 me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
+                // Chuyển mẻ (gộp vào máy đúc của mẻ khác) — lưu trên MePhanCong "lo_thoi", luôn ghi đè để cho phép xóa (set null)
+                if (loThoiPc != null)
+                    loThoiPc.ChuyenVeMeId = req.ChuyenVeMeId;
             }
             me.IsThuNghiem = req.IsThuNghiem ?? me.IsThuNghiem;
             me.IsTrungMeThoi = req.IsTrungMeThoi ?? me.IsTrungMeThoi;

@@ -56,6 +56,7 @@ namespace dataproduct.api.DTOs
         public bool? IsTrungMeThoi { get; set; }
         public string? GhiChuLo { get; set; }
         public decimal? KlThepLongPhanBo { get; set; }
+        public int? ChuyenVeMeId { get; set; }     // FK→HRC1_MeThep; chỉ áp dụng khi len_thang; null = không chuyển
     }
 
     // -------------------------------------------------------

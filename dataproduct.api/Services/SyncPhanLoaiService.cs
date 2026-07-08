@@ -71,7 +71,7 @@ namespace dataproduct.api.Services
                 if (row.Me != null && phanLoaiMap.TryGetValue(row.Me, out var entry))
                 {
                     row.PhanLoai = entry.PhanLoai;
-                    row.MacThepBKMIS = entry.GradeCode;
+                    row.MacThepBKMIS = entry.GradeCode?.Trim();
                     _context.BBGN_ThepLongs.Update(row);
                     updated++;
                 }

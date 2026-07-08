@@ -15,6 +15,7 @@ namespace dataproduct.api.Repositories
         Task<HRC1_MeThep?> GetMeByMaMeAsync(string maMe);
         Task<List<HRC1_MeThep>> SearchMeThepAsync(string q, int limit);
         Task<HRC1_MePhanCong?> GetMePhanCongByIdAsync(int id);
+        Task<HRC1_MePhanCong?> GetLoThoiMePhanCongByMeIdAsync(int meId);
         Task<List<HRC1_MePhanCong>> GetMePhanCongsByPhieuAsync(Guid idPhieu, string congDoan, int? scopePhieu = null);
         Task<List<HRC1_MePhanCong>> GetAllMePhanCongsByMeIdAsync(int meId);
         Task<List<HRC1_MeThep>> GetMeThepsByIdsAsync(IEnumerable<int> meIds);
@@ -86,6 +87,12 @@ namespace dataproduct.api.Repositories
 
         public Task<HRC1_MePhanCong?> GetMePhanCongByIdAsync(int id) =>
             _ctx.HRC1_MePhanCongs.FindAsync(id).AsTask();
+
+        public Task<HRC1_MePhanCong?> GetLoThoiMePhanCongByMeIdAsync(int meId) =>
+            _ctx.HRC1_MePhanCongs
+                .Where(pc => pc.MeId == meId && pc.CongDoan == "lo_thoi")
+                .OrderByDescending(pc => pc.Id)
+                .FirstOrDefaultAsync();
 
         public Task<List<HRC1_MePhanCong>> GetMePhanCongsByPhieuAsync(Guid idPhieu, string congDoan, int? scopePhieu = null) =>
             _ctx.HRC1_MePhanCongs
@@ -316,7 +323,7 @@ namespace dataproduct.api.Repositories
             if (meIdList.Count == 0) return new();
 
             var tlPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIdList.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
                 .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
@@ -464,11 +471,11 @@ namespace dataproduct.api.Repositories
                     nhomDict[x.TenMacThep] = x.TenNhom;
             }
 
-            // ChuyenVe: lấy ChuyenVeMeId từ MePhanCong tinh_luyen (dòng chính, ThuTuTL = null)
+            // ChuyenVe: lấy ChuyenVeMeId từ MePhanCong dòng chính (tinh_luyen hoặc lo_thoi, ThuTuTL = null)
             var meIds = mes.Select(m => m.Id).ToList();
             var chuyenVeDict = new Dictionary<int, (string? maMe, string? tenMayDuc)>();
             var tlPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIds.Contains(pc.MeId) && pc.ChuyenVeMeId.HasValue)
                 .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
                 .ToListAsync();
@@ -526,6 +533,8 @@ namespace dataproduct.api.Repositories
                 : (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null);
             int? caDuc = isLenThang ? m.Ca : m.CaTinhLuyen;
             chuyenVeDict.TryGetValue(m.Id, out var chuyenVe);
+            string? chuyenVeMaMe    = isLenThang ? m.MaMe    : chuyenVe.maMe;
+            string? tenMayDucChuyen = isLenThang ? tenMayDuc : chuyenVe.tenMayDuc;
             return new HRC1_ExportRow
             {
                 MeId               = m.Id,
@@ -567,8 +576,8 @@ namespace dataproduct.api.Repositories
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
                 TenCapNhatBoiDuc   = tenDuc,
-                ChuyenVeMaMe       = chuyenVe.maMe,
-                TenMayDucChuyen    = chuyenVe.tenMayDuc,
+                ChuyenVeMaMe       = chuyenVeMaMe,
+                TenMayDucChuyen    = tenMayDucChuyen,
                 NgayDuc            = ngayDuc,
                 CaDuc              = caDuc,
             };
@@ -625,7 +634,7 @@ namespace dataproduct.api.Repositories
             if (q.IsChuyenMe == true)
             {
                 var chuyenMeIds = _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
                     .Select(pc => pc.MeId);
                 meQuery = meQuery.Where(m => chuyenMeIds.Contains(m.Id));
@@ -659,7 +668,7 @@ namespace dataproduct.api.Repositories
 
             // Mẻ trong tập lọc đã bị chuyển sang mẻ khác (ChuyenVeMeId != self)
             var srcPcsInSet = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && allMeIds.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue
                           && pc.ChuyenVeMeId != pc.MeId)
@@ -673,7 +682,7 @@ namespace dataproduct.api.Repositories
             if (nonSourceMeIds.Count > 0)
             {
                 var incomingPcs = await _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue
                               && nonSourceMeIds.Contains(pc.ChuyenVeMeId!.Value)
                               && pc.ChuyenVeMeId != pc.MeId)
@@ -850,7 +859,7 @@ namespace dataproduct.api.Repositories
 
             // Mẻ trong tập đã bị chuyển sang mẻ khác (source mẻ → hiển thị 0)
             var srcPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIds.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue
                           && pc.ChuyenVeMeId != pc.MeId)
@@ -864,7 +873,7 @@ namespace dataproduct.api.Repositories
             if (nonSourceIds.Count > 0)
             {
                 var incomingPcs = await _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue
                               && nonSourceIds.Contains(pc.ChuyenVeMeId!.Value)
                               && pc.ChuyenVeMeId != pc.MeId)
