@@ -922,10 +922,10 @@ namespace dataproduct.api.Repositories
             if (meIds.Count == 0)
                 return (new List<int>(), new List<int>());
 
-            // Bên giao – tinh_luyen path: người đã "nhan_me" (TL nhận mẻ)
-            var tlGiaoIds = await _ctx.HRC1_LichSus
-                .Where(ls => meIds.Contains(ls.MeId) && ls.HanhDong == "nhan_me" && ls.TaiKhoanId.HasValue)
-                .Select(ls => ls.TaiKhoanId!.Value)
+            // Bên giao – tinh_luyen path: CapNhatBoiTL của mẻ qua tinh luyện (người sửa cuối)
+            var tlGiaoIds = await _ctx.HRC1_MeTheps
+                .Where(m => meIds.Contains(m.Id) && m.DichChuyen == "tinh_luyen" && m.CapNhatBoiTL.HasValue)
+                .Select(m => m.CapNhatBoiTL!.Value)
                 .Distinct()
                 .ToListAsync();
 

@@ -46,6 +46,18 @@ namespace dataproduct.api.Services
         }
 
         // -------------------------------------------------------
+        // JSON partial-patch helpers — phân biệt "field không gửi lên" (giữ nguyên)
+        // với "field gửi giá trị null" (user xóa input, phải lưu null). Deserialize thẳng
+        // sang DTO bằng "??" không phân biệt được 2 trường hợp này vì cả 2 đều ra null.
+        // -------------------------------------------------------
+        private static readonly JsonSerializerOptions _jsonPatchOpts = new() { PropertyNameCaseInsensitive = true };
+
+        private static HashSet<string> ProvidedKeys(JsonElement body) =>
+            body.ValueKind == JsonValueKind.Object
+                ? new HashSet<string>(body.EnumerateObject().Select(p => p.Name), StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>();
+
+        // -------------------------------------------------------
         // GET — phiếu bất kỳ công đoạn (lo_thoi | tinh_luyen | duc)
         // loSo: lọc mẻ theo lò thổi (cho lo_thoi phiếu); scopePhieu: lọc theo TL scope (tinh_luyen); idMayDuc: override scope cho duc
         // -------------------------------------------------------
@@ -235,12 +247,20 @@ namespace dataproduct.api.Services
         // -------------------------------------------------------
         // LÒ THỔI
         // -------------------------------------------------------
-        public async Task UpdateMeAsync(int meId, HRC1_LoThoiUpdateRequest req, int userId)
+        public async Task UpdateMeAsync(int meId, JsonElement body, int userId)
         {
+            var req = body.Deserialize<HRC1_LoThoiUpdateRequest>(_jsonPatchOpts) ?? new HRC1_LoThoiUpdateRequest();
+            var provided = ProvidedKeys(body);
+            bool P(string name) => provided.Contains(name);
+
             var me = await _repo.GetMeByIdAsync(meId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy mẻ {meId}");
             if (me.TrangThaiLo >= 1)
                 throw new InvalidOperationException("Mẻ đã xác nhận, không thể chỉnh sửa.");
+            // Đúc "xác nhận" chỉ là trạng thái tạm (còn có thể "Hủy xác nhận") — không chặn lò thổi sửa/lưu ở
+            // bước này. Chỉ khi mẻ đã CHỐT (IsChot, khóa vĩnh viễn) mới thực sự cấm nhập và lưu.
+            if (me.IsChot == true)
+                throw new InvalidOperationException("Mẻ đã chốt, không thể chỉnh sửa.");
 
             // Nếu TL đã nhận mẻ thì lò thổi không được chuyển sang lên thẳng nữa
             if (req.DichChuyen == "len_thang" && (me.TrangThaiTL ?? 0) >= 1)
@@ -254,10 +274,13 @@ namespace dataproduct.api.Services
             var old = Snapshot(me);
             var loThoiPc = await _repo.GetLoThoiMePhanCongByMeIdAsync(meId);
 
-            me.ThungSo = req.ThungSo ?? me.ThungSo;
-            me.KLLFSauThep = req.KLLFSauThep ?? me.KLLFSauThep;
-            me.KlLan3 = req.KlLan3 ?? me.KlLan3;
-            if (req.DichChuyen is not null)
+            // Dùng P("field") thay cho "req.Field ?? me.Field": field không có trong JSON (không sửa) → giữ
+            // nguyên; field có trong JSON dù giá trị là null (user xóa input) → phải lưu null. "??" không phân
+            // biệt được 2 trường hợp này (cả 2 đều là null sau khi deserialize) nên trước đây không xóa được.
+            me.ThungSo = P("thungSo") ? req.ThungSo : me.ThungSo;
+            me.KLLFSauThep = P("kllfSauThep") ? req.KLLFSauThep : me.KLLFSauThep;
+            me.KlLan3 = P("klLan3") ? req.KlLan3 : me.KlLan3;
+            if (P("dichChuyen") && req.DichChuyen is not null)
             {
                 var previouslyLenThang = me.DichChuyen == "len_thang";
                 me.DichChuyen = req.DichChuyen;
@@ -279,32 +302,35 @@ namespace dataproduct.api.Services
                         // Không còn lên thẳng nữa → xóa chuyển mẻ cũ (không còn ý nghĩa)
                         if (loThoiPc != null)
                             loThoiPc.ChuyenVeMeId = null;
+                        // ThoiGian/KlLan2/KlThepLong là dữ liệu lò thổi tự nhập khi lên thẳng (không qua TL).
+                        // Chỉ xóa khi THỰC SỰ chuyển từ lên thẳng về tinh luyện — nếu mẻ đã ở tinh luyện từ
+                        // trước thì đây chính là các cột TL đang dùng để lưu dữ liệu đã nhập, không được xóa
+                        // mỗi lần lò thổi lưu lại (bug: TL nhập xong bị mất khi lò thổi sửa dữ liệu khác).
+                        me.ThoiGian = null;
+                        me.KlLan2 = null;
+                        me.KlThepLong = null;
                     }
-                    // Xóa các trường chỉ dùng cho len_thang khi lưu về tinh_luyen
-                    me.ThoiGian = null;
-                    me.KlLan2 = null;
-                    me.KlThepLong = null;
                 }
             }
-            else
+            else if (!P("dichChuyen"))
             {
-                me.TLDichSo = req.TLDichSo ?? me.TLDichSo;
-                me.IdMayDucDich = req.IdMayDucDich ?? me.IdMayDucDich;
+                me.TLDichSo = P("tlDichSo") ? req.TLDichSo : me.TLDichSo;
+                me.IdMayDucDich = P("idMayDucDich") ? req.IdMayDucDich : me.IdMayDucDich;
             }
             // Lò thổi tự nhập ThoiGian, KlLan2 & KlThepLong khi mẻ đi thẳng lên máy đúc (không qua TL)
             if (me.DichChuyen == "len_thang")
             {
-                me.ThoiGian = req.ThoiGian ?? me.ThoiGian;
-                me.KlLan2 = req.KlLan2 ?? me.KlLan2;
-                me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
+                me.ThoiGian = P("thoiGian") ? req.ThoiGian : me.ThoiGian;
+                me.KlLan2 = P("klLan2") ? req.KlLan2 : me.KlLan2;
+                me.KlThepLong = P("klThepLong") ? req.KlThepLong : me.KlThepLong;
                 // Chuyển mẻ (gộp vào máy đúc của mẻ khác) — lưu trên MePhanCong "lo_thoi", luôn ghi đè để cho phép xóa (set null)
                 if (loThoiPc != null)
                     loThoiPc.ChuyenVeMeId = req.ChuyenVeMeId;
             }
-            me.IsThuNghiem = req.IsThuNghiem ?? me.IsThuNghiem;
-            me.IsTrungMeThoi = req.IsTrungMeThoi ?? me.IsTrungMeThoi;
-            me.GhiChuLo = req.GhiChuLo ?? me.GhiChuLo;
-            me.KLThepLongPhanBo = req.KlThepLongPhanBo ?? me.KLThepLongPhanBo;
+            me.IsThuNghiem = P("isThuNghiem") ? req.IsThuNghiem : me.IsThuNghiem;
+            me.IsTrungMeThoi = P("isTrungMeThoi") ? req.IsTrungMeThoi : me.IsTrungMeThoi;
+            me.GhiChuLo = P("ghiChuLo") ? req.GhiChuLo : me.GhiChuLo;
+            me.KLThepLongPhanBo = P("klThepLongPhanBo") ? req.KlThepLongPhanBo : me.KLThepLongPhanBo;
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
 
@@ -559,8 +585,12 @@ namespace dataproduct.api.Services
             await _repo.SaveChangesAsync();
         }
 
-        public async Task UpdateMePhanCongAsync(int mePhanCongId, HRC1_TinhLuyenUpdateRequest req, int userId)
+        public async Task UpdateMePhanCongAsync(int mePhanCongId, JsonElement body, int userId)
         {
+            var req = body.Deserialize<HRC1_TinhLuyenUpdateRequest>(_jsonPatchOpts) ?? new HRC1_TinhLuyenUpdateRequest();
+            var provided = ProvidedKeys(body);
+            bool P(string name) => provided.Contains(name);
+
             var pc = await _repo.GetMePhanCongByIdAsync(mePhanCongId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy mẻ phân công {mePhanCongId}");
 
@@ -571,22 +601,24 @@ namespace dataproduct.api.Services
 
             var old = Snapshot(me);
 
-            me.ThoiGian = req.ThoiGian ?? me.ThoiGian;
-            me.KlLan1 = req.KlLan1 ?? me.KlLan1;
-            me.KlLan2 = req.KlLan2 ?? me.KlLan2;
-            me.KlLan3 = req.KlLan3 ?? me.KlLan3;
-            me.KlThepLong = req.KlThepLong ?? me.KlThepLong;
-            me.IdMayDucDich = req.IdMayDucDich ?? me.IdMayDucDich;
-            me.PhanLoai = req.PhanLoai ?? me.PhanLoai;
-            me.MacThep = req.MacThep ?? me.MacThep;
-            me.MacThepBKMIS = req.MacThepBKMIS ?? me.MacThepBKMIS;
-            me.IdMacThep = req.IdMacThep ?? me.IdMacThep;
-            me.GhiChuTL = req.GhiChuTL ?? me.GhiChuTL;
+            // P("field") thay cho "req.Field ?? me.Field" — cho phép TL xóa input (lưu null) mà không bị
+            // "??" fallback về giá trị cũ (field không gửi lên và field gửi null đều ra null sau deserialize).
+            me.ThoiGian = P("thoiGian") ? req.ThoiGian : me.ThoiGian;
+            me.KlLan1 = P("klLan1") ? req.KlLan1 : me.KlLan1;
+            me.KlLan2 = P("klLan2") ? req.KlLan2 : me.KlLan2;
+            me.KlLan3 = P("klLan3") ? req.KlLan3 : me.KlLan3;
+            me.KlThepLong = P("klThepLong") ? req.KlThepLong : me.KlThepLong;
+            me.IdMayDucDich = P("idMayDucDich") ? req.IdMayDucDich : me.IdMayDucDich;
+            me.PhanLoai = P("phanLoai") ? req.PhanLoai : me.PhanLoai;
+            me.MacThep = P("macThep") ? req.MacThep : me.MacThep;
+            me.MacThepBKMIS = P("macThepBKMIS") ? req.MacThepBKMIS : me.MacThepBKMIS;
+            me.IdMacThep = P("idMacThep") ? req.IdMacThep : me.IdMacThep;
+            me.GhiChuTL = P("ghiChuTL") ? req.GhiChuTL : me.GhiChuTL;
             // Chỉ mẻ IsManualTL mới được TinhLuyen ghi các field thường do LoThoi nhập
             if (me.IsManualTL == true)
             {
-                me.ThungSo = req.ThungSo ?? me.ThungSo;
-                me.KLLFSauThep = req.KllfSauThep ?? me.KLLFSauThep;
+                me.ThungSo = P("thungSo") ? req.ThungSo : me.ThungSo;
+                me.KLLFSauThep = P("kllfSauThep") ? req.KllfSauThep : me.KLLFSauThep;
             }
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
@@ -698,16 +730,42 @@ namespace dataproduct.api.Services
         // -------------------------------------------------------
         // MÁY ĐÚC
         // -------------------------------------------------------
-        public async Task XacNhanDucAsync(HRC1_DucXacNhanRequest req, int userId)
+
+        // Điều kiện đủ để xác nhận đúc — PHẢI khớp với checkDucReady ở FE (TaoPhieuGN.tsx).
+        // Re-check ngay tại thời điểm ghi DB (không tin dữ liệu FE gửi lên/đã load trước đó) để chống race
+        // condition: LT/TL có thể vừa xóa 1 field bắt buộc trong lúc Đúc đang bấm xác nhận với data cũ trên UI.
+        private static List<string> CheckDucReady(HRC1_MeThep me)
         {
-            if (req.MeIds.Count == 0) return;
+            var missing = new List<string>();
+            if (string.IsNullOrEmpty(me.MaMe))                       missing.Add("Mã mẻ");
+            if (string.IsNullOrEmpty(me.ThungSo))                    missing.Add("Thùng số");
+            if (string.IsNullOrEmpty(me.ThoiGian))                   missing.Add("Thời gian");
+            if (me.KLLFSauThep == null)                              missing.Add("KL thùng LF sau khi ra thép");
+            if (me.DichChuyen != "len_thang" && me.KlLan1 == null)   missing.Add("KL thùng&thép lỏng vào bệ xoay - Lần 1 (tấn)");
+            if (me.KlLan2 == null)                                   missing.Add("KL bì - Lần 2 (tấn)");
+            if (me.KlThepLong == null)                               missing.Add("KL thép lỏng");
+            if (me.IdMayDucDich == null)                             missing.Add("Máy đúc");
+            return missing;
+        }
+
+        public async Task<HRC1_DucXacNhanResult> XacNhanDucAsync(HRC1_DucXacNhanRequest req, int userId)
+        {
+            var result = new HRC1_DucXacNhanResult();
+            if (req.MeIds.Count == 0) return result;
 
             var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
             var now = DateTime.Now;
 
             foreach (var me in meTheps)
             {
-                if (me.TrangThaiDuc >= 1) continue;
+                if (me.TrangThaiDuc >= 1) { result.ThanhCong.Add(me.Id); continue; }
+
+                var missing = CheckDucReady(me);
+                if (missing.Count > 0)
+                {
+                    result.ThatBai.Add(new HRC1_DucXacNhanThatBai { MeId = me.Id, MaMe = me.MaMe ?? "", LyDo = missing });
+                    continue;
+                }
 
                 me.TrangThaiDuc = 1;
                 me.CapNhatBoi = userId;
@@ -722,8 +780,10 @@ namespace dataproduct.api.Services
                     DuLieuMoi = Snapshot(me),
                     Luc = now
                 });
+                result.ThanhCong.Add(me.Id);
             }
             await _repo.SaveChangesAsync();
+            return result;
         }
 
         public async Task BoXacNhanDucAsync(HRC1_DucBoXacNhanRequest req, int userId)

@@ -114,6 +114,20 @@ namespace dataproduct.api.DTOs
         public List<int> MeIds { get; set; } = new();
     }
 
+    // Mẻ không xác nhận được vì thiếu dữ liệu bắt buộc (bị LT/TL xóa sau khi FE đã load) — xem CheckDucReady
+    public class HRC1_DucXacNhanThatBai
+    {
+        public int MeId { get; set; }
+        public string MaMe { get; set; } = string.Empty;
+        public List<string> LyDo { get; set; } = new();
+    }
+
+    public class HRC1_DucXacNhanResult
+    {
+        public List<int> ThanhCong { get; set; } = new();
+        public List<HRC1_DucXacNhanThatBai> ThatBai { get; set; } = new();
+    }
+
     // -------------------------------------------------------
     // Máy đúc — xác nhận / không xác nhận / reset PCN (chỉ áp dụng mẻ IsThuNghiem=true)
     // TrangThaiPCN: null=chưa xử lý, true=đã xác nhận, false=không xác nhận
