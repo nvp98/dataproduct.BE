@@ -54,7 +54,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
     public virtual DbSet<PhuLieu_NM> PhuLieu_NMs { get; set; }
     public virtual DbSet<PhuLieu_HRC2> PhuLieu_HRC2s { get; set; }
-    public virtual DbSet<Hrc1TieuHaoBof> Hrc1TieuHaoBofs { get; set; }
+    public virtual DbSet<Hrc1TieuHao> Hrc1TieuHaos { get; set; }
     public virtual DbSet<Hrc1PhuLieu> Hrc1PhuLieus { get; set; }
     public virtual DbSet<Hrc1PhuLieuNm> Hrc1PhuLieuNms { get; set; }
     public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
@@ -486,9 +486,9 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
         });
 
-        modelBuilder.Entity<Hrc1TieuHaoBof>(entity =>
+        modelBuilder.Entity<Hrc1TieuHao>(entity =>
         {
-            entity.ToTable("HRC1_TieuHao_BOF");
+            entity.ToTable("HRC1_TieuHao");
             entity.HasKey(e => e.ID);
             entity.Property(e => e.ID).HasColumnName("ID");
             entity.Property(e => e.IDNM).HasColumnName("IDNM");
@@ -515,6 +515,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLGangLongCCT).HasColumnName("KLGangLongCCT").HasPrecision(18, 3);
             entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe").HasPrecision(18, 3);
             entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepLong).HasColumnName("KLThepLong").HasPrecision(18, 3);
             entity.Property(e => e.Ca).HasColumnName("Ca");
             entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
             entity.Property(e => e.ThoiDiemBatDau).HasColumnName("ThoiDiemBatDau");

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace dataproduct.api.ResponseModels
 {
-    public class Hrc1TieuHaoBof_ResponseModel
+    public class Hrc1TieuHao_ResponseModel
     {
         public int ID { get; set; }
         public string? BieuMau { get; set; }
@@ -17,6 +17,7 @@ namespace dataproduct.api.ResponseModels
         public decimal? KLGangLongCCT { get; set; }
         public decimal? KLThepPhe { get; set; }
         public decimal? KLThepPheGang { get; set; }
+        public decimal? KLThepLong { get; set; }
         public double? O2 { get; set; }
         public double? N2 { get; set; }
         public double? AR { get; set; }
@@ -36,7 +37,7 @@ namespace dataproduct.api.ResponseModels
     /// </summary>
     public class Hrc1GroupedByMeThoiModel
     {
-        public Hrc1TieuHaoBof_ResponseModel? data { get; set; }
+        public Hrc1TieuHao_ResponseModel? data { get; set; }
         public List<HeaderKeyGroupedByReportNoModel> phuLieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> phanBoPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
         public List<HeaderKeyGroupedByReportNoModel> manualAdjustPhulieus { get; set; } = new List<HeaderKeyGroupedByReportNoModel>();
@@ -64,7 +65,7 @@ namespace dataproduct.api.ResponseModels
 
     public class Hrc1ThongKeRow
     {
-        public Hrc1TieuHaoBof_ResponseModel? Data { get; set; }
+        public Hrc1TieuHao_ResponseModel? Data { get; set; }
         public List<Hrc1ThongKeValue> Values { get; set; } = new();
     }
 

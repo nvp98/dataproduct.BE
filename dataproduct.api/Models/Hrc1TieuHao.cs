@@ -2,7 +2,7 @@ using System;
 
 namespace dataproduct.api.Models;
 
-public partial class Hrc1TieuHaoBof
+public partial class Hrc1TieuHao
 {
     public int ID { get; set; }
     public int? IDNM { get; set; }
@@ -29,6 +29,7 @@ public partial class Hrc1TieuHaoBof
     public decimal? KLGangLongCCT { get; set; }
     public decimal? KLThepPhe { get; set; }
     public decimal? KLThepPheGang { get; set; }
+    public decimal? KLThepLong { get; set; }
     public byte? Ca { get; set; }
     public DateOnly? NgaySanXuat { get; set; }
     public DateTime? ThoiDiemBatDau { get; set; }

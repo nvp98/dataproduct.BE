@@ -13,6 +13,7 @@ namespace dataproduct.api.DTOs
         public string? MacThep { get; set; }
         public decimal? KLGang { get; set; }
         public decimal? KLThepPhe { get; set; }
+        public decimal? KLThepLong { get; set; }
         public double? O2 { get; set; }
         public double? N2 { get; set; }
         public double? AR { get; set; }

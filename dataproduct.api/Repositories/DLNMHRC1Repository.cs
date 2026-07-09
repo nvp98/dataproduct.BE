@@ -14,9 +14,9 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<Hrc1TieuHaoBof>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF")
+        public async Task<IEnumerable<Hrc1TieuHao>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF")
         {
-            var query = _context.Hrc1TieuHaoBofs.Where(x => x.IsDeleted == false).AsQueryable();
+            var query = _context.Hrc1TieuHaos.Where(x => x.IsDeleted == false).AsQueryable();
 
             if (ngaySanXuat.HasValue)
                 query = query.Where(x => x.NgaySanXuat == ngaySanXuat.Value);
@@ -33,7 +33,7 @@ namespace dataproduct.api.Repositories
             return await query.OrderBy(x => x.MeThoi).ToListAsync();
         }
 
-        public async Task<List<Hrc1GroupedByMeThoiModel>> GetAllGroupedBatchAsync(IEnumerable<Hrc1TieuHaoBof> baseList)
+        public async Task<List<Hrc1GroupedByMeThoiModel>> GetAllGroupedBatchAsync(IEnumerable<Hrc1TieuHao> baseList)
         {
             var bases = baseList.ToList();
             if (bases.Count == 0) return new List<Hrc1GroupedByMeThoiModel>();
@@ -128,9 +128,9 @@ namespace dataproduct.api.Repositories
         // Thống kê tiêu hao BOF (search / sum) — dùng cho ThongKeTieuHaoBOF.tsx
         // =========================================================
 
-        private IQueryable<Hrc1TieuHaoBof> BuildThongKeQuery(SearchThongKeHrc1 dto)
+        private IQueryable<Hrc1TieuHao> BuildThongKeQuery(SearchThongKeHrc1 dto)
         {
-            var query = _context.Hrc1TieuHaoBofs.Where(x => x.BieuMau == "BOF").AsQueryable();
+            var query = _context.Hrc1TieuHaos.Where(x => x.BieuMau == "BOF").AsQueryable();
 
             if (dto.TuNgay.HasValue)
                 query = query.Where(x => x.NgaySanXuat >= DateOnly.FromDateTime(dto.TuNgay.Value));
@@ -234,7 +234,7 @@ namespace dataproduct.api.Repositories
                 .ToList();
         }
 
-        private static Hrc1TieuHaoBof_ResponseModel MapData(Hrc1TieuHaoBof b) => new Hrc1TieuHaoBof_ResponseModel
+        private static Hrc1TieuHao_ResponseModel MapData(Hrc1TieuHao b) => new Hrc1TieuHao_ResponseModel
         {
             ID = b.ID,
             BieuMau = b.BieuMau,
@@ -248,6 +248,7 @@ namespace dataproduct.api.Repositories
             KLGangLongCCT = b.KLGangLongCCT,
             KLThepPhe = b.KLThepPhe,
             KLThepPheGang = b.KLThepPheGang,
+            KLThepLong = b.KLThepLong,
             O2 = b.O2,
             N2 = b.N2,
             AR = b.AR,
@@ -259,5 +260,59 @@ namespace dataproduct.api.Repositories
             ThoiDiemBatDau = b.ThoiDiemBatDau,
             ThoiDiemKetThuc = b.ThoiDiemKetThuc,
         };
+
+        // =========================================================
+        // Chuyển mẻ sang ca khác (trước/sau) — mirror DLNMHRC2Repository.ChuyenMeThoiAsync,
+        // đổi target từ DLNM_HRC2 sang Hrc1TieuHao (đã đổi tên từ HRC1_TieuHao_BOF, dùng chung BOF/LF).
+        // Không đụng Hrc1PhuLieu: khác PhuLieu_HRC2 (khớp theo MeThoi/BieuMau, không có Ngay/Ca riêng),
+        // Hrc1PhuLieu khớp qua MeID (FK tới đúng dòng Hrc1TieuHao vừa cập nhật) nên tự "theo" mẻ, không cần sửa.
+        public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
+        {
+            int? caKQ = null;
+            DateOnly? ngayKQ = null;
+            if (request.ChuyenToiCa == 1) // chuyển về ca trước
+            {
+                if (request.Ca == 1) { caKQ = 2; ngayKQ = request.NgaySX.AddDays(-1); }
+                else { caKQ = 1; ngayKQ = request.NgaySX; }
+            }
+            else // chuyển đến ca sau
+            {
+                if (request.Ca == 2) { caKQ = 1; ngayKQ = request.NgaySX.AddDays(1); }
+                else { caKQ = 2; ngayKQ = request.NgaySX; }
+            }
+
+            var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x =>
+                x.MaBm == request.MaBM && x.NgaySX == ngayKQ && x.Ca == caKQ &&
+                x.Scope == request.Scope && x.IsDelete == 0 && x.IsLock == 0);
+
+            if (phieu == null)
+                throw new ApplicationException("Phiếu chưa được tạo");
+            if (phieu.TinhTrang != 0 && phieu.TinhTrang != 3 && phieu.TinhTrang != 7)
+                throw new ApplicationException("Phiếu đã được gửi đi nên không nhận mẻ chuyển");
+
+            var items = await _context.Hrc1TieuHaos
+                .Where(x => x.MeThoi == request.MeThoi && x.BieuMau == request.BieuMau && x.Scope == request.Scope && !x.IsDeleted)
+                .ToListAsync();
+
+            if (items.Count == 0)
+                throw new ApplicationException("Phiếu không có dữ liệu");
+
+            foreach (var item in items)
+            {
+                item.NgaySanXuat = ngayKQ;
+                item.Ca = (byte?)caKQ;
+                item.IsChuyenCa = true;
+                item.NgayCapNhat = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // IsTrungMeThoi tính theo (BieuMau, MeThoi), không phụ thuộc Ca/Ngày — recheck cho nhất quán
+            // với mọi thao tác khác ảnh hưởng tới mẻ (thêm/sửa/xóa) đều gọi lại SP này.
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", request.BieuMau, request.MeThoi);
+
+            return true;
+        }
     }
 }

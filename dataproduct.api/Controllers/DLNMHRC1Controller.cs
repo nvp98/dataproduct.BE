@@ -9,12 +9,10 @@ namespace dataproduct.api.Controllers
     public class DLNMHRC1Controller : ControllerBase
     {
         private readonly DLNMHRC1Service _service;
-        private readonly Hrc1PhieuDetailExcelService _excelService;
 
-        public DLNMHRC1Controller(DLNMHRC1Service service, Hrc1PhieuDetailExcelService excelService)
+        public DLNMHRC1Controller(DLNMHRC1Service service)
         {
             _service = service;
-            _excelService = excelService;
         }
 
         [HttpPost("filter")]
@@ -26,6 +24,25 @@ namespace dataproduct.api.Controllers
                     return BadRequest("Thiếu dữ liệu bộ lọc.");
                 var result = await _service.FilterGroupedAsync(request);
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
+        [HttpPost("chuyen-me-thoi")]
+        public async Task<IActionResult> ChuyenMeThoi([FromBody] ChuyenMeThoiRequest request)
+        {
+            try
+            {
+                await _service.ChuyenMeThoiAsync(request);
+                return Ok(new { data = new { message = "Chuyển mẻ thành công" } });
+            }
+            catch (ApplicationException ex)
+            {
+                // Trả về đúng message nghiệp vụ được throw từ Repository
+                return BadRequest(new { data = new { message = ex.Message } });
             }
             catch (Exception ex)
             {
@@ -130,7 +147,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var file = await _excelService.ExportExcelDetailAsync(ngay, ca, scope, idPhieu);
+                var file = await _service.ExportExcelDetailAsync(ngay, ca, scope, idPhieu);
                 return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex)
@@ -147,7 +164,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var file = await _excelService.ExportPdfDetailAsync(ngay, ca, scope, idPhieu);
+                var file = await _service.ExportPdfDetailAsync(ngay, ca, scope, idPhieu);
                 return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex)

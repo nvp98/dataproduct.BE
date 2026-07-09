@@ -104,10 +104,11 @@ namespace dataproduct.api.Repositories
 
     public interface IDLNMHRC1Repository
     {
-        Task<IEnumerable<Hrc1TieuHaoBof>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF");
-        Task<List<Hrc1GroupedByMeThoiModel>> GetAllGroupedBatchAsync(IEnumerable<Hrc1TieuHaoBof> baseList);
+        Task<IEnumerable<Hrc1TieuHao>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF");
+        Task<List<Hrc1GroupedByMeThoiModel>> GetAllGroupedBatchAsync(IEnumerable<Hrc1TieuHao> baseList);
         Task<SearchThongKeHrc1ApiResponse> SearchThongKeApiAsync(SearchThongKeHrc1 dto);
         Task<List<ThongKeSumItemHrc1>> GetThongKeSumAsync(SearchThongKeHrc1 dto);
+        Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
     }
 
     public interface IHeaderKeyRepository
