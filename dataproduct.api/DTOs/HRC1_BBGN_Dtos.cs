@@ -238,6 +238,8 @@ namespace dataproduct.api.DTOs
         public string? MaMeChuyenVe { get; set; }  // chỉ lấy mẻ đã chuyển sang mẻ khác
         public bool? IsThuNghiem { get; set; }
         public bool? TrangThaiPCN { get; set; }    // chỉ áp dụng khi IsThuNghiem=true; true=đã xác nhận, false=không xác nhận
+        public bool? IsLenThang { get; set; }      // true = chỉ lấy mẻ lên thẳng (DichChuyen == "len_thang")
+        public bool? ChuaLenDuc { get; set; }      // true = chỉ lấy mẻ chưa có dữ liệu máy đúc (IdMayDucDich == null)
     }
 
     // -------------------------------------------------------

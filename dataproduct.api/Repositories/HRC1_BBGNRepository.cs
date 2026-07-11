@@ -430,6 +430,10 @@ namespace dataproduct.api.Repositories
                 q = q.Where(m => m.IsThuNghiem == f.IsThuNghiem);
             if (f.TrangThaiPCN.HasValue)
                 q = q.Where(m => m.TrangThaiPCN == f.TrangThaiPCN);
+            if (f.IsLenThang == true)
+                q = q.Where(m => m.DichChuyen == "len_thang");
+            if (f.ChuaLenDuc == true)
+                q = q.Where(m => m.IdMayDucDich == null);
             return q;
         }
 
