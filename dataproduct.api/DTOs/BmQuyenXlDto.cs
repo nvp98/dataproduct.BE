@@ -11,6 +11,9 @@ namespace dataproduct.api.DTOs
         public string? KhuVucPhu { get; set; }
     }
 
+    /// <summary>Raw (MaBm, QuyenChucNang) cho 1 quyền mở rộng riêng theo BM (value >= 6). FE tự tra vùng qua bmQuyenConfig.ts.</summary>
+    public record ExtraQuyenMenuItemDto(string MaBm, byte QuyenChucNang);
+
     /// <summary>Dùng cho menu: Việc tôi bắt đầu, Việc đến tôi và Danh sách chỉ xem.</summary>
     public class MenuPermissionsDto
     {
@@ -18,6 +21,7 @@ namespace dataproduct.api.DTOs
         public IReadOnlyList<string> ApprovingForms { get; set; } = new List<string>();
         public IReadOnlyList<string> ViewingForms { get; set; } = new List<string>();
         public IReadOnlyList<string> ChotPhieuForms { get; set; } = new List<string>();
+        public IReadOnlyList<ExtraQuyenMenuItemDto> ExtraQuyens { get; set; } = new List<ExtraQuyenMenuItemDto>();
     }
 
     public class BmQuyenXlCreateDto
