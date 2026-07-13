@@ -1165,6 +1165,8 @@ namespace dataproduct.api.Services
         {
             if (req.MeIds.Count == 0) return;
             var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            if(meTheps.Any(m => m.TrangThaiDuc < 1))
+                throw new InvalidOperationException("Chỉ có thể chốt mẻ đã được máy đúc xác nhận.");
             var now = DateTime.Now;
 
             foreach (var me in meTheps)
