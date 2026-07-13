@@ -559,7 +559,7 @@ namespace dataproduct.api.Services
                 from row in baseQuery
                 where row.MacThepBKMIS != null
                 join mt in _context.MacTheps on row.MacThepBKMIS equals mt.TenMacThep
-                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 2
                 join nhom in _context.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                 group row by nhom.TenNhom into g
                 orderby g.Key
@@ -751,7 +751,7 @@ namespace dataproduct.api.Services
             {
                 var phanLoaiNhom = request.PhanLoaiNhom.Trim();
                 var matchingMacThepNames = _context.MacTheps
-                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue &&
+                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue && m.NhaMay == 2 &&
                         _context.NhomPhanLoaiMacTheps
                             .Any(n => n.Id == m.Id_NhomPhanLoaiMacThep.Value && n.TenNhom.Contains(phanLoaiNhom)))
                     .Select(m => m.TenMacThep);
@@ -778,7 +778,7 @@ namespace dataproduct.api.Services
             if (bkmisNames.Count == 0) return;
 
             var macTheps = await _context.MacTheps
-                .Where(x => bkmisNames.Contains(x.TenMacThep))
+                .Where(x => bkmisNames.Contains(x.TenMacThep) && x.NhaMay == 2 && x.IsLock != true)
                 .ToListAsync();
 
             var nhomIds = macTheps

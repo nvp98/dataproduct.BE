@@ -402,7 +402,7 @@ namespace dataproduct.api.Repositories
                     from m2 in _ctx.HRC1_MeTheps
                     where m2.MacThepBKMIS != null
                     join mt in _ctx.MacTheps on m2.MacThepBKMIS equals mt.TenMacThep
-                    where mt.Id_NhomPhanLoaiMacThep.HasValue
+                    where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                     join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                     select m2.Id;
                 q = q.Where(m => !hasNhomIds.Contains(m.Id));
@@ -413,7 +413,7 @@ namespace dataproduct.api.Repositories
                     from m2 in _ctx.HRC1_MeTheps
                     where m2.MacThepBKMIS != null
                     join mt in _ctx.MacTheps on m2.MacThepBKMIS equals mt.TenMacThep
-                    where mt.Id_NhomPhanLoaiMacThep == f.IdNhomPhanLoai
+                    where mt.Id_NhomPhanLoaiMacThep == f.IdNhomPhanLoai && mt.NhaMay == 1
                     select m2.Id;
                 q = q.Where(m => nhomMeIds.Contains(m.Id));
             }
@@ -467,7 +467,7 @@ namespace dataproduct.api.Repositories
             {
                 var nhomData = await (
                     from mt in _ctx.MacTheps
-                    where bkmisList.Contains(mt.TenMacThep) && mt.Id_NhomPhanLoaiMacThep.HasValue
+                    where bkmisList.Contains(mt.TenMacThep) && mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                     join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                     select new { mt.TenMacThep, nhom.TenNhom }
                 ).ToListAsync();
@@ -836,7 +836,7 @@ namespace dataproduct.api.Repositories
                 from m in meQuery
                 where m.MacThepBKMIS != null
                 join mt in _ctx.MacTheps on m.MacThepBKMIS equals mt.TenMacThep
-                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                 join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                 group m by nhom.TenNhom into g
                 orderby g.Key
