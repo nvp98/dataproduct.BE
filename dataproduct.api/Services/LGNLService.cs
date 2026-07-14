@@ -576,15 +576,25 @@ namespace dataproduct.api.Services
             }
 
             // 5. Merge: giữ giá trị nhập tay, cập nhật GiaTri_Goc = giá trị SCADA mới
+            // Đồng thời đánh dấu bản ghi nhập tay nào đã được "dùng" (khớp với 1 dòng SCADA
+            // hiện tại) để bước 5b biết bản ghi nào bị bỏ rơi (dòng người dùng tự thêm tay).
+            var consumedBySoMe = new HashSet<(decimal? SoMe, int IdNVL)>();
+            var consumedByThuTu = new HashSet<(int? ThuTu, int IdNVL)>();
             foreach (var item in items)
             {
-                // Lò 1-4: pivot có soMe → match theo batch number + NVL (ngữ nghĩa đúng)
-                // Lò 5-6: pivot không có soMe → match theo vị trí dòng (ThuTu) + NVL
+                // Ưu tiên match theo SoMe + NVL.
+                // Nếu dữ liệu cũ hoặc SCADA chưa có SoMe thì fallback theo ThuTu + NVL.
                 LGNLChiTietDto? saved = null;
                 if (item.SoMe.HasValue)
-                    manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out saved);
-                else
-                    manualByThuTu.TryGetValue((item.ThuTu, item.IDNVL), out saved);
+                {
+                    if (manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out saved))
+                        consumedBySoMe.Add((item.SoMe, item.IDNVL));
+                }
+                if( saved ==null && !item.SoMe.HasValue)
+                {
+                    if (manualByThuTu.TryGetValue((item.ThuTu, item.IDNVL), out saved))
+                        consumedByThuTu.Add((item.ThuTu, item.IDNVL));
+                }
 
                 if (saved != null)
                 {
@@ -595,36 +605,58 @@ namespace dataproduct.api.Services
                 }
             }
 
-            // 5b. Giữ lại bản ghi nhập tay cho NVL không có SCADA data (silo không có tagKey).
-            // Các NVL này không xuất hiện trong pivot.Rows nên items không có entry cho chúng.
-            // Nếu xóa hết rồi ghi mới mà thiếu các bản ghi này → mất data nhập tay.
+            // 5b. Giữ lại bản ghi cần bảo toàn qua lần Sync này — gồm 2 trường hợp:
+            //  (a) NVL hoàn toàn không có SCADA data (silo không có tagKey) — giữ mọi bản ghi
+            //      đã lưu (như cũ), vì đây là NVL nhập tay hoàn toàn.
+            //  (b) Bản ghi nhập tay (ManualGiaTri) không khớp với dòng SCADA nào ở bước merge
+            //      trên — đây là dòng người dùng tự bấm "+ Thêm dòng" rồi nhập tay cho NVL
+            //      vẫn có SCADA ở dòng khác, nên không có item nào ở bước 4 đại diện cho nó.
+            //      Trước đây chỉ loại theo "NVL có SCADA hay không" (a) nên các dòng tự thêm
+            //      này bị xóa mất mỗi khi Sync lại — đây là chỗ sửa cho (b).
             var scadaNvlIds = items.Select(x => x.IDNVL).ToHashSet();
-            var noScadaItems = savedRecords
-                .Where(r => !scadaNvlIds.Contains(r.IdNVL))
+            var preservedRecords = savedRecords
+                .Where(r => !scadaNvlIds.Contains(r.IdNVL)
+                    || (r.ManualGiaTri
+                        && !(r.SoMe.HasValue && consumedBySoMe.Contains((r.SoMe, r.IdNVL)))
+                        && !(!r.SoMe.HasValue && consumedByThuTu.Contains((r.ThuTu, r.IdNVL)))))
                 .GroupBy(r => new { r.ThuTu, r.IdNVL })
                 .Select(g => g.First())
-                .Select(r => new LG_NL_ChiTiet
-                {
-                    IDPhieu         = idPhieu,
-                    IDLoCao         = idLoCao,
-                    Ngay            = ngay,
-                    IDCa            = idCa,
-                    ThoiGianNapLieu = r.ThoiGianNapLieu,
-                    SoMe            = r.SoMe,
-                    MeGio           = r.MeGio,
-                    CheDo           = r.CheDo,
-                    ThuocThamLieu1  = r.ThuocThamLieu1,
-                    ThuocThamLieu2  = r.ThuocThamLieu2,
-                    GhiChu          = r.GhiChu,
-                    IDNVL           = r.IdNVL,
-                    GiaTri          = r.GiaTri,
-                    ThuTu           = r.ThuTu,
-                    NgayTao         = DateTime.Now,
-                    ManualGiaTri    = true,
-                    GiaTri_Goc      = r.GiaTri_Goc,
-                    DoAm            = r.DoAm,
-                })
                 .ToList();
+
+            // Đánh số lại ThuTu cho các dòng được bảo toàn, nối tiếp sau các dòng SCADA
+            // vừa build ở bước 4 (biến thuTu hiện = số dòng SCADA). Group theo ThuTu GỐC để
+            // các cột NVL cùng 1 dòng gốc vẫn được gộp chung 1 dòng mới — nhưng ThuTu mới
+            // không được trùng với dòng SCADA (vốn đánh số lại mỗi lần Sync), nếu không FE
+            // sẽ gộp nhầm dòng nhập tay vào dòng SCADA cùng ThuTu và làm mất dữ liệu.
+            var noScadaItems = new List<LG_NL_ChiTiet>();
+            foreach (var group in preservedRecords.GroupBy(r => r.ThuTu))
+            {
+                thuTu++;
+                foreach (var r in group)
+                {
+                    noScadaItems.Add(new LG_NL_ChiTiet
+                    {
+                        IDPhieu         = idPhieu,
+                        IDLoCao         = idLoCao,
+                        Ngay            = ngay,
+                        IDCa            = idCa,
+                        ThoiGianNapLieu = r.ThoiGianNapLieu,
+                        SoMe            = r.SoMe,
+                        MeGio           = r.MeGio,
+                        CheDo           = r.CheDo,
+                        ThuocThamLieu1  = r.ThuocThamLieu1,
+                        ThuocThamLieu2  = r.ThuocThamLieu2,
+                        GhiChu          = r.GhiChu,
+                        IDNVL           = r.IdNVL,
+                        GiaTri          = r.GiaTri,
+                        ThuTu           = thuTu,
+                        NgayTao         = DateTime.Now,
+                        ManualGiaTri    = true,
+                        GiaTri_Goc      = r.GiaTri_Goc,
+                        DoAm            = r.DoAm,
+                    });
+                }
+            }
 
             items.AddRange(noScadaItems);
 
