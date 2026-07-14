@@ -585,15 +585,22 @@ namespace dataproduct.api.Services
                 // Ưu tiên match theo SoMe + NVL.
                 // Nếu dữ liệu cũ hoặc SCADA chưa có SoMe thì fallback theo ThuTu + NVL.
                 LGNLChiTietDto? saved = null;
+
                 if (item.SoMe.HasValue)
                 {
                     if (manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out saved))
+                    {
                         consumedBySoMe.Add((item.SoMe, item.IDNVL));
+                    }
                 }
-                if( saved ==null && !item.SoMe.HasValue)
+
+                // Không tìm thấy thì fallback ThuTu
+                if (saved == null)
                 {
                     if (manualByThuTu.TryGetValue((item.ThuTu, item.IDNVL), out saved))
+                    {
                         consumedByThuTu.Add((item.ThuTu, item.IDNVL));
+                    }
                 }
 
                 if (saved != null)
@@ -602,6 +609,11 @@ namespace dataproduct.api.Services
                     item.GiaTri       = saved.GiaTri;
                     item.ManualGiaTri = true;
                     item.DoAm         = saved.DoAm ?? item.DoAm;
+
+                    if (!saved.SoMe.HasValue && item.SoMe.HasValue)
+                    {
+                        saved.SoMe = item.SoMe;
+                    }
                 }
             }
 
