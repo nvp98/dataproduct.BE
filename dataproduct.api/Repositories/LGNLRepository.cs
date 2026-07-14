@@ -736,10 +736,26 @@ namespace dataproduct.api.Repositories
 
         // Helper: chỉ add placeholder "—" cho nhóm thực sự không có NVL nào sau tất cả các bước
 
+        //(DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
+        //{
+        //    1 => (ngay.Date.AddHours(7).AddMinutes(30), ngay.Date.AddHours(19).AddMinutes(30)),
+        //    2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
+        //    _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
+        //};
         (DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
         {
-            1 => (ngay.Date.AddHours(7).AddMinutes(30), ngay.Date.AddHours(19).AddMinutes(30)),
-            2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
+            // Ca ngày: 07:31 -> 19:30
+            1 => (
+                ngay.Date.AddHours(7).AddMinutes(31),
+                ngay.Date.AddHours(19).AddMinutes(30)
+            ),
+
+            // Ca đêm: 19:31 -> 07:30 hôm sau
+            2 => (
+                ngay.Date.AddHours(19).AddMinutes(31),
+                ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)
+            ),
+
             _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
         };
         //public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(DateTime ngay, int idCa, int idLoCao)
