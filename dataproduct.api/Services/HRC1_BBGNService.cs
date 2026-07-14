@@ -475,7 +475,7 @@ namespace dataproduct.api.Services
 
             var raw = new List<(DateTime Actual, string? MaMe, decimal? KlThepLong, string? TenMayDuc,
                 string? ThungSo, decimal? KLLFSauThep, decimal? KlLan1, decimal? KlLan2, decimal? KlLan3,
-                bool? IsThuNghiem, string? PhanLoai, string? MacThepBKMIS)>();
+                bool? IsThuNghiem, string? PhanLoai, string? MacThepBKMIS, string? TrangThai)>();
             var seenMeIds = new HashSet<int>();
 
             foreach (var phieu in phieus)
@@ -507,7 +507,7 @@ namespace dataproduct.api.Services
                     mayDucDict.TryGetValue(idMayDuc, out var tenMayDuc);
                     raw.Add((actual, m.MaMe, m.KlThepLong, tenMayDuc,
                         m.ThungSo, m.KLLFSauThep, m.KlLan1, m.KlLan2, m.KlLan3,
-                        m.IsThuNghiem, m.PhanLoai, m.MacThepBKMIS));
+                        m.IsThuNghiem, m.PhanLoai, m.MacThepBKMIS, m.TrangThaiDuc  == 1 ? "Đã xác nhận" : "Chưa xác nhận"));
                 }
             }
 
@@ -526,7 +526,8 @@ namespace dataproduct.api.Services
                     KLLan3 = r.KlLan3,
                     IsThuNghiem = r.IsThuNghiem,
                     PhanLoai = r.PhanLoai,
-                    MacThepBKMIS = r.MacThepBKMIS
+                    MacThepBKMIS = r.MacThepBKMIS,
+                    TrangThai = r.TrangThai
                 }).ToList();
         }
 

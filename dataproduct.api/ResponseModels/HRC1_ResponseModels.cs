@@ -139,6 +139,7 @@ namespace dataproduct.api.ResponseModels
         public bool? IsThuNghiem { get; set; }
         public string? PhanLoai { get; set; }
         public string? MacThepBKMIS { get; set; }
+        public string? TrangThai { get; set; }  // "Đã xác nhận" | "Chưa xác nhận"
     }
 
     // -------------------------------------------------------
