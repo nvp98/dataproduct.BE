@@ -195,12 +195,31 @@ namespace dataproduct.api.Services
             if (toInsert.Any())
                 await _context.BBGN_ThepLongs.AddRangeAsync(toInsert);
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // Unique index UX_BBGN_ThepLong_IdPhieu_Me (migration bbgn_theplong_unique_idphieu_me.sql)
+                // chặn insert trùng (IdPhieu, Me) — xảy ra khi 2 request Lưu cho cùng 1 dòng mới
+                // (chưa có Id) được gửi gần nhau (double-click, "Làm mới dữ liệu" trong lúc đang Lưu...).
+                // Trả về cảnh báo thay vì để lộ lỗi 500 SQL thô cho FE.
+                warnings.Add(
+                    "Một số mẻ vừa được lưu trùng lúc từ nơi khác (có thể do bấm Lưu nhiều lần hoặc " +
+                    "\"Làm mới dữ liệu\" trong lúc đang lưu). Vui lòng bấm \"Làm mới dữ liệu\" để kiểm tra lại trước khi tiếp tục.");
+                return warnings;
+            }
 
             await UpdateDuplicateFlagsForMesAsync(affectedMes);
 
             return warnings;
         }
+
+        /// <summary>SQL Server: 2601/2627 = vi phạm unique index/constraint.</summary>
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
+            ex.InnerException is SqlException sqlEx &&
+            sqlEx.Errors.Cast<SqlError>().Any(e => e.Number is 2601 or 2627);
 
 
         private decimal? SumValues(params decimal?[] values)

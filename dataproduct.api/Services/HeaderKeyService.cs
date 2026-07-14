@@ -33,6 +33,7 @@ namespace dataproduct.api.Services
             {
                 throw new InvalidOperationException("Tên hiển thị đã tồn tại.");
             }
+            await EnsureThuTuUniqueAsync(entity, excludeId: null);
             await _repo.AddAsync(entity);
             return entity;
         }
@@ -45,6 +46,7 @@ namespace dataproduct.api.Services
             {
                 throw new InvalidOperationException("Tên hiển thị đã tồn tại.");
             }
+            await EnsureThuTuUniqueAsync(entity, excludeId: id);
             // Update existing entity thay vì tạo entity mới để tránh tracking conflict
             existing.TenHienThi = entity.TenHienThi;
             existing.LoaiPhieu = entity.LoaiPhieu;
@@ -63,6 +65,28 @@ namespace dataproduct.api.Services
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;
+        }
+
+        /// <summary>Chặn 2 Header_Key khác nhau dùng chung 1 số thứ tự trong cùng 1 cột
+        /// (mỗi cột TT_TK_BOF/TT_TK_LFRH/TT_Excel_BOF/TT_Excel_LFRH là 1 không gian số độc lập).</summary>
+        private async Task EnsureThuTuUniqueAsync(Header_Key entity, int? excludeId)
+        {
+            var checks = new (int? Value, ThuTuColumn Column, string Label)[]
+            {
+                (entity.ThuTu_TK_BOF, ThuTuColumn.TK_BOF, "Thứ tự Thống kê BOF"),
+                (entity.ThuTu_TK_LFRH, ThuTuColumn.TK_LFRH, "Thứ tự Thống kê LF/RH"),
+                (entity.ThuTu_Excel_BOF, ThuTuColumn.Excel_BOF, "Thứ tự Excel BOF"),
+                (entity.ThuTu_Excel_LFRH, ThuTuColumn.Excel_LFRH, "Thứ tự Excel LF/RH"),
+            };
+
+            foreach (var (value, column, label) in checks)
+            {
+                if (!value.HasValue) continue;
+                var conflict = await _repo.FindDuplicateThuTuAsync(column, value.Value, excludeId);
+                if (conflict != null)
+                    throw new InvalidOperationException(
+                        $"{label} = {value.Value} đã được dùng bởi Header Key \"{conflict.TenHienThi}\". Vui lòng chọn số khác.");
+            }
         }
 
         public async Task<bool> DeleteAsync(int id)
@@ -98,9 +122,10 @@ namespace dataproduct.api.Services
             bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
-            string? SortThuTu,
             int? IdNhom,
             bool? chuaMappingNM,
+            string? SortBy,
+            string? SortOrder,
             int page,
             int pageSize
         )
@@ -113,9 +138,10 @@ namespace dataproduct.api.Services
                 IsUsedThongKe,
                 FromDate,
                 ToDate,
-                SortThuTu,
                 IdNhom,
                 chuaMappingNM,
+                SortBy,
+                SortOrder,
                 page,
                 pageSize
             );
