@@ -1742,7 +1742,7 @@ namespace dataproduct.api.Services
         {
             if (string.IsNullOrEmpty(r.ThoiGian)) return "9999-12-31 99:99";
             var baseDate = r.NgayDuc ?? DateOnly.FromDateTime(r.NgayTao);
-            var isNextDay = r.CaDuc == 2 && string.Compare(r.ThoiGian, "20:00", StringComparison.Ordinal) < 0;
+            var isNextDay = r.CaDuc == 2 && string.Compare(r.ThoiGian, "19:21", StringComparison.Ordinal) < 0;
             return $"{(isNextDay ? baseDate.AddDays(1) : baseDate):yyyy-MM-dd} {r.ThoiGian}";
         }
 
@@ -2160,7 +2160,7 @@ namespace dataproduct.api.Services
                 .OrderBy(r =>
                 {
                     if (string.IsNullOrEmpty(r.ThoiGian)) return "9999-12-31 99:99";
-                    var isNextDay = ca == 2 && string.Compare(r.ThoiGian, "20:00", StringComparison.Ordinal) < 0;
+                    var isNextDay = ca == 2 && string.Compare(r.ThoiGian, "19:21", StringComparison.Ordinal) < 0;
                     return $"{(isNextDay ? ngay.AddDays(1) : ngay):yyyy-MM-dd} {r.ThoiGian}";
                 })
                 .ToList();
