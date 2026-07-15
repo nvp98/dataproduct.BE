@@ -1145,6 +1145,33 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
+        // Xóa + ghi mới trong cùng 1 transaction — nếu insert lỗi giữa chừng thì rollback
+        // luôn phần xóa, tránh mất trắng dữ liệu chi tiết của phiếu (trước đây xóa và ghi
+        // là 2 lệnh tách rời, lỗi ở bước ghi sẽ để lại phiếu không còn chi tiết nào).
+        public async Task ReplaceChiTietAsync(Guid idPhieu, List<LG_NL_ChiTiet> entities)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                await _context.LG_NL_ChiTiet
+                    .Where(x => x.IDPhieu == idPhieu)
+                    .ExecuteDeleteAsync();
+
+                if (entities.Count > 0)
+                {
+                    await _context.LG_NL_ChiTiet.AddRangeAsync(entities);
+                    await _context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
         {
             return await _context.LG_NL_ChiTiet

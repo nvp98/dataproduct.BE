@@ -395,6 +395,7 @@ namespace dataproduct.api.Repositories
         // Chi tiết nạp liệu theo phiếu
         Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
         Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_NL_ChiTiet> entities);
         Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
 
         // Phiếu
