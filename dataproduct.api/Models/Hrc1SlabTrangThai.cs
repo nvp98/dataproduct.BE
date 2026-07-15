@@ -17,10 +17,10 @@ public class Hrc1SlabTrangThai
     public int? NguoiXacNhanDuc { get; set; }
     public DateTime? NgayXacNhanDuc { get; set; }
 
-    // ── Cán Tấm — XN Kho ───────────────────────────────────────────────────
-    public int TrangThaiKho { get; set; }
-    public int? NguoiXacNhanKho { get; set; }
-    public DateTime? NgayXacNhanKho { get; set; }
+    // ── Cán Tấm — XN Cán ───────────────────────────────────────────────────
+    public int TrangThaiCan { get; set; }
+    public int? NguoiXacNhanCan { get; set; }
+    public DateTime? NgayXacNhanCan { get; set; }
 
     // ── PKH — Chốt ─────────────────────────────────────────────────────────
     public int TrangThaiPKH { get; set; }

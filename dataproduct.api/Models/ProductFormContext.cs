@@ -819,7 +819,7 @@ public partial class ProductFormContext : DbContext
         {
             entity.ToTable("HRC1_BBSL_TongHop_GhiChu");
             entity.Property(e => e.MacThep).HasMaxLength(50);
-            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.MaVatTu).HasMaxLength(100);
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
         });
@@ -831,7 +831,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.NgayChuyen).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
-            entity.Property(e => e.NgayXacNhanKho).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanCan).HasColumnType("datetime");
             entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");
         });
 

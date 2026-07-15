@@ -97,8 +97,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
-                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Can")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Can'.");
 
             await _svc.XacNhanAsync(request);
             return Ok(new WorkflowResult
@@ -114,8 +114,8 @@ namespace dataproduct.api.Controllers
         {
             if (request.IdSlabs.Count == 0)
                 return BadRequest("Danh sách slab không được rỗng.");
-            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Kho")
-                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Kho'.");
+            if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Can")
+                return BadRequest("LoaiXacNhan phải là 'Duc' hoặc 'Can'.");
 
             await _svc.HuyXacNhanAsync(request);
             return Ok(new WorkflowResult

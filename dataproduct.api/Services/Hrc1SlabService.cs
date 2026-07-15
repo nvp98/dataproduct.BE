@@ -382,7 +382,10 @@ namespace dataproduct.api.Services
 
         private static List<TongHopRow> BuildTongHopRows(List<Hrc1Slab> slabs, List<Hrc1BbslTongHopGhiChu> ghiChus)
         {
-            var map = new Dictionary<string, (string? MacThep, string KichThuoc, int SoPhoi, decimal TongKL)>();
+            // Nhóm hiển thị theo (MacThep, KichThuoc tính từ kích thước slab), nhưng ghi chú
+            // được lưu theo (MacThep, MaVatTu) — vì bảng HRC1_BBSL_TongHop_GhiChu không có cột
+            // KichThuoc. MaVatTu đại diện của nhóm lấy từ slab đầu tiên có MaVatTu trong nhóm.
+            var map = new Dictionary<string, (string? MacThep, string KichThuoc, string? MaVatTu, int SoPhoi, decimal TongKL)>();
 
             foreach (var slab in slabs)
             {
@@ -391,19 +394,21 @@ namespace dataproduct.api.Services
                 var key = $"{slab.MacThep ?? ""}|{kt}";
 
                 if (!map.ContainsKey(key))
-                    map[key] = (slab.MacThep, kt, 0, 0);
+                    map[key] = (slab.MacThep, kt, slab.MaVatTu, 0, 0);
 
                 var cur = map[key];
-                map[key] = (cur.MacThep, cur.KichThuoc, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
+                var maVatTu = cur.MaVatTu ?? slab.MaVatTu;
+                map[key] = (cur.MacThep, cur.KichThuoc, maVatTu, cur.SoPhoi + 1, cur.TongKL + (slab.KhoiLuong ?? 0));
             }
 
             var ghiChuDict = ghiChus.ToDictionary(
-                g => $"{g.MacThep ?? ""}|{g.KichThuoc ?? ""}",
+                g => $"{g.MacThep ?? ""}|{g.MaVatTu ?? ""}",
                 g => g.GhiChu);
 
             return map.Select((kvp, i) =>
             {
-                var ghiChu = ghiChuDict.TryGetValue(kvp.Key, out var gc) ? gc : null;
+                var ghiChuKey = $"{kvp.Value.MacThep ?? ""}|{kvp.Value.MaVatTu ?? ""}";
+                var ghiChu = ghiChuDict.TryGetValue(ghiChuKey, out var gc) ? gc : null;
                 return new TongHopRow(i + 1, kvp.Value.MacThep, kvp.Value.KichThuoc, kvp.Value.SoPhoi, kvp.Value.TongKL, ghiChu);
             }).ToList();
         }

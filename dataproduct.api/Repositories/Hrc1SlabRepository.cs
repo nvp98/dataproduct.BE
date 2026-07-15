@@ -34,7 +34,7 @@ namespace dataproduct.api.Repositories
                 .Where(s => slabIds.Contains(s.IDSlab))
                 .ToDictionaryAsync(s => s.IDSlab);
 
-            // Load TrangThai riêng để kiểm tra guard (CutDate + TrangThaiKho + TrangThaiPKH)
+            // Load TrangThai riêng để kiểm tra guard (CutDate + TrangThaiCan + TrangThaiPKH)
             var existingInternalIds = existing.Values.Select(s => s.Id).ToList();
             var trangThaiMap = existingInternalIds.Count > 0
                 ? await _context.Hrc1SlabTrangThais
@@ -57,7 +57,7 @@ namespace dataproduct.api.Repositories
                 {
                     trangThaiMap.TryGetValue(slab.Id, out var tt);
                     if (slab.CutDate.HasValue
-                        || tt?.TrangThaiKho == 1
+                        || tt?.TrangThaiCan == 1
                         || tt?.TrangThaiPKH == 1) continue;
 
                     slab.IDPiece = item.PIECE_ID;
@@ -143,10 +143,10 @@ namespace dataproduct.api.Repositories
                 query = req.TrangThaiDuc == 0
                     ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiDuc == 1))
                     : query.Where(s => _context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiDuc == req.TrangThaiDuc));
-            if (req.TrangThaiKho.HasValue)
-                query = req.TrangThaiKho == 0
-                    ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiKho == 1))
-                    : query.Where(s => _context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiKho == req.TrangThaiKho));
+            if (req.TrangThaiCan.HasValue)
+                query = req.TrangThaiCan == 0
+                    ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiCan == 1))
+                    : query.Where(s => _context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiCan == req.TrangThaiCan));
             if (req.TrangThaiPKH.HasValue)
                 query = req.TrangThaiPKH == 0
                     ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiPKH == 1))
@@ -280,8 +280,8 @@ namespace dataproduct.api.Repositories
 
                 var duc = naturalSlabs.Count(s => naturalTTMap.TryGetValue(s.Id, out var tt) && tt.TrangThaiDuc == 1)
                         + transferred.Count(t => t.TrangThaiDuc == 1);
-                var kho = naturalSlabs.Count(s => naturalTTMap.TryGetValue(s.Id, out var tt) && tt.TrangThaiKho == 1)
-                        + transferred.Count(t => t.TrangThaiKho == 1);
+                var can = naturalSlabs.Count(s => naturalTTMap.TryGetValue(s.Id, out var tt) && tt.TrangThaiCan == 1)
+                        + transferred.Count(t => t.TrangThaiCan == 1);
                 var pkh = naturalSlabs.Count(s => naturalTTMap.TryGetValue(s.Id, out var tt) && tt.TrangThaiPKH == 1)
                         + transferred.Count(t => t.TrangThaiPKH == 1);
 
@@ -295,7 +295,7 @@ namespace dataproduct.api.Repositories
                     TinhTrang = p.TinhTrang,
                     SoSlabDaChot = naturalSlabs.Count + transferred.Count,
                     SoSlabDuc = duc,
-                    SoSlabKho = kho,
+                    SoSlabCan = can,
                     SoSlabPKH = pkh,
                 };
             });
@@ -504,11 +504,11 @@ namespace dataproduct.api.Repositories
                         newTt.NguoiXacNhanDuc = nguoiThucHien;
                         newTt.NgayXacNhanDuc = now;
                     }
-                    else if (loaiXacNhan == "Kho")
+                    else if (loaiXacNhan == "Can")
                     {
-                        newTt.TrangThaiKho = 1;
-                        newTt.NguoiXacNhanKho = nguoiThucHien;
-                        newTt.NgayXacNhanKho = now;
+                        newTt.TrangThaiCan = 1;
+                        newTt.NguoiXacNhanCan = nguoiThucHien;
+                        newTt.NgayXacNhanCan = now;
                     }
                     _context.Hrc1SlabTrangThais.Add(newTt);
                 }
@@ -520,11 +520,11 @@ namespace dataproduct.api.Repositories
                         tt.NguoiXacNhanDuc = nguoiThucHien;
                         tt.NgayXacNhanDuc = now;
                     }
-                    else if (loaiXacNhan == "Kho")
+                    else if (loaiXacNhan == "Can")
                     {
-                        tt.TrangThaiKho = 1;
-                        tt.NguoiXacNhanKho = nguoiThucHien;
-                        tt.NgayXacNhanKho = now;
+                        tt.TrangThaiCan = 1;
+                        tt.NguoiXacNhanCan = nguoiThucHien;
+                        tt.NgayXacNhanCan = now;
                     }
                 }
             }
@@ -548,11 +548,11 @@ namespace dataproduct.api.Repositories
                     t.NguoiXacNhanDuc = null;
                     t.NgayXacNhanDuc = null;
                 }
-                else if (loaiXacNhan == "Kho")
+                else if (loaiXacNhan == "Can")
                 {
-                    t.TrangThaiKho = 0;
-                    t.NguoiXacNhanKho = null;
-                    t.NgayXacNhanKho = null;
+                    t.TrangThaiCan = 0;
+                    t.NguoiXacNhanCan = null;
+                    t.NgayXacNhanCan = null;
                 }
             }
 
@@ -733,9 +733,9 @@ namespace dataproduct.api.Repositories
                 .Where(x => x.IdPhieuBBSL == idPhieu)
                 .Select(x => new Hrc1TongHopGhiChuItem
                 {
-                    MacThep   = x.MacThep,
-                    KichThuoc = x.KichThuoc,
-                    GhiChu    = x.GhiChu,
+                    MacThep = x.MacThep,
+                    MaVatTu = x.MaVatTu,
+                    GhiChu  = x.GhiChu,
                 })
                 .ToListAsync();
         }
@@ -746,7 +746,7 @@ namespace dataproduct.api.Repositories
                 .FirstOrDefaultAsync(x =>
                     x.IdPhieuBBSL == req.IdPhieuBBSL &&
                     x.MacThep == req.MacThep &&
-                    x.KichThuoc == req.KichThuoc);
+                    x.MaVatTu == req.MaVatTu);
 
             if (existing == null)
             {
@@ -754,7 +754,7 @@ namespace dataproduct.api.Repositories
                 {
                     IdPhieuBBSL = req.IdPhieuBBSL,
                     MacThep     = req.MacThep,
-                    KichThuoc   = req.KichThuoc,
+                    MaVatTu     = req.MaVatTu,
                     GhiChu      = req.GhiChu,
                     NgayCapNhat = DateTime.Now,
                 });
@@ -826,7 +826,7 @@ namespace dataproduct.api.Repositories
                 IsChuyenCa = tt?.IsChuyenCa ?? false,
                 IdPhieuGoc = tt?.IdPhieuGoc,
                 TrangThaiDuc = tt?.TrangThaiDuc ?? 0,
-                TrangThaiKho = tt?.TrangThaiKho ?? 0,
+                TrangThaiCan = tt?.TrangThaiCan ?? 0,
                 TrangThaiPKH = tt?.TrangThaiPKH ?? 0,
                 IdPhieuBBSL = tt?.IdPhieuBBSL,
                 SoPhieuBBSL = phieu?.SoPhieu,

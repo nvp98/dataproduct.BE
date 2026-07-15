@@ -56,7 +56,7 @@ namespace dataproduct.api.DTOs
         /// <summary>null = tất cả, true = đã chốt (CutDate IS NOT NULL), false = chưa</summary>
         public bool? IsChot { get; set; }
         public int? TrangThaiDuc { get; set; }
-        public int? TrangThaiKho { get; set; }
+        public int? TrangThaiCan { get; set; }
         public int? TrangThaiPKH { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 50;
@@ -89,7 +89,7 @@ namespace dataproduct.api.DTOs
         public bool IsChuyenCa { get; set; }
         public Guid? IdPhieuGoc { get; set; }
         public int TrangThaiDuc { get; set; }
-        public int TrangThaiKho { get; set; }
+        public int TrangThaiCan { get; set; }
         public int TrangThaiPKH { get; set; }
         public Guid? IdPhieuBBSL { get; set; }
         public string? SoPhieuBBSL { get; set; }
@@ -130,7 +130,7 @@ namespace dataproduct.api.DTOs
     public class Hrc1TongHopGhiChuItem
     {
         public string? MacThep { get; set; }
-        public string? KichThuoc { get; set; }
+        public string? MaVatTu { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -138,7 +138,7 @@ namespace dataproduct.api.DTOs
     {
         public Guid IdPhieuBBSL { get; set; }
         public string? MacThep { get; set; }
-        public string? KichThuoc { get; set; }
+        public string? MaVatTu { get; set; }
         public string? GhiChu { get; set; }
     }
 
@@ -200,7 +200,7 @@ namespace dataproduct.api.DTOs
         public int? TinhTrang { get; set; }
         public int SoSlabDaChot { get; set; }
         public int SoSlabDuc { get; set; }
-        public int SoSlabKho { get; set; }
+        public int SoSlabCan { get; set; }
         public int SoSlabPKH { get; set; }
     }
 }
