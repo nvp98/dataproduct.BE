@@ -151,6 +151,21 @@ namespace dataproduct.api.Services
                 stt++;
             }
 
+            // Total row
+            if (slabs.Count > 0)
+            {
+                if (rowIndex > startRow)
+                    ws.Row(startRow).CopyTo(ws.Row(rowIndex));
+
+                ws.Cell(rowIndex, 1).Value = "Tổng";
+                ws.Cell(rowIndex, 2).Value = "";
+                ws.Cell(rowIndex, 3).Value = "";
+                ws.Cell(rowIndex, 4).Value = "";
+                ws.Cell(rowIndex, 5).Value = "";
+                ws.Cell(rowIndex, 6).Value =   (double)slabs.Sum(r => r.KhoiLuong.HasValue ? r.KhoiLuong.Value : 0);
+                ws.Cell(rowIndex, 7).Value = "";
+            }
+
             if (rowIndex > startRow)
                 SetThinBorders(ws, startRow, rowIndex - 1, 7);
 
