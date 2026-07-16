@@ -22,6 +22,10 @@ public class Hrc1SlabTrangThai
     public int? NguoiXacNhanCan { get; set; }
     public DateTime? NgayXacNhanCan { get; set; }
 
+    // ── PGĐ/GĐ NM - XN C4 ───────────────────────────────────────────────────
+    public bool TrangThaiC4 { get; set; }
+    public int? NguoiXacNhanC4 { get; set; }
+    public DateTime? NgayXacNhanC4 { get; set; }
     // ── PKH — Chốt ─────────────────────────────────────────────────────────
     public int TrangThaiPKH { get; set; }
     public int? NguoiChotPKH { get; set; }

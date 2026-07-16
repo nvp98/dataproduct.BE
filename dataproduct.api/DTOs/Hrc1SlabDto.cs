@@ -57,6 +57,8 @@ namespace dataproduct.api.DTOs
         public bool? IsChot { get; set; }
         public int? TrangThaiDuc { get; set; }
         public int? TrangThaiCan { get; set; }
+        /// <summary>null = tất cả, true = đã XN C4, false = chưa</summary>
+        public bool? TrangThaiC4 { get; set; }
         public int? TrangThaiPKH { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 50;
@@ -91,6 +93,7 @@ namespace dataproduct.api.DTOs
         public Guid? IdPhieuGoc { get; set; }
         public int TrangThaiDuc { get; set; }
         public int TrangThaiCan { get; set; }
+        public bool TrangThaiC4 { get; set; }
         public int TrangThaiPKH { get; set; }
         public Guid? IdPhieuBBSL { get; set; }
         public string? SoPhieuBBSL { get; set; }

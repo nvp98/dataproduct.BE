@@ -18,7 +18,7 @@ namespace dataproduct.api.DTOs
     public class XacNhanRequest
     {
         public List<int> IdSlabs { get; set; } = [];
-        /// <summary>HRC2: "Duc" | "Kho" | "PKH". HRC1: "Duc" | "Can" (dùng chung DTO, mỗi controller tự validate).</summary>
+        /// <summary>HRC2: "Duc" | "Kho" | "PKH". HRC1: "Duc" | "Can" | "C4" (dùng chung DTO, mỗi controller tự validate).</summary>
         public string LoaiXacNhan { get; set; } = "";
         public int NguoiThucHien { get; set; }
     }

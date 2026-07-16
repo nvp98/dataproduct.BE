@@ -882,6 +882,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayChuyen).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanCan).HasColumnType("datetime");
+            entity.Property(e => e.NgayXacNhanC4).HasColumnType("datetime");
             entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");
         });
 

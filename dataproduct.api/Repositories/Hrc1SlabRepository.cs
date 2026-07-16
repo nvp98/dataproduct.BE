@@ -35,7 +35,7 @@ namespace dataproduct.api.Repositories
                 .Where(s => slabIds.Contains(s.IDSlab))
                 .ToDictionaryAsync(s => s.IDSlab);
 
-            // Load TrangThai riêng để kiểm tra guard (CutDate + TrangThaiCan + TrangThaiPKH)
+            // Load TrangThai riêng để kiểm tra guard (CutDate + TrangThaiCan + TrangThaiC4 + TrangThaiPKH)
             var existingInternalIds = existing.Values.Select(s => s.Id).ToList();
             var trangThaiMap = existingInternalIds.Count > 0
                 ? await _context.Hrc1SlabTrangThais
@@ -59,6 +59,7 @@ namespace dataproduct.api.Repositories
                     trangThaiMap.TryGetValue(slab.Id, out var tt);
                     if (slab.CutDate.HasValue
                         || tt?.TrangThaiCan == 1
+                        || tt?.TrangThaiC4 == true
                         || tt?.TrangThaiPKH == 1) continue;
 
                     slab.IDPiece = item.PIECE_ID;
@@ -148,6 +149,10 @@ namespace dataproduct.api.Repositories
                 query = req.TrangThaiCan == 0
                     ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiCan == 1))
                     : query.Where(s => _context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiCan == req.TrangThaiCan));
+            if (req.TrangThaiC4.HasValue)
+                query = !req.TrangThaiC4.Value
+                    ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiC4))
+                    : query.Where(s => _context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiC4));
             if (req.TrangThaiPKH.HasValue)
                 query = req.TrangThaiPKH == 0
                     ? query.Where(s => !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.TrangThaiPKH == 1))
@@ -503,7 +508,7 @@ namespace dataproduct.api.Repositories
                 .ToDictionaryAsync(t => t.IdSlab);
 
             var now = DateTime.Now;
-            // Đúc và Cán đồng cấp, xác nhận song song → snapshot MaVatTu chốt tại lần xác nhận ĐẦU TIÊN
+            // Đúc, Cán và C4 đồng cấp, xác nhận song song → snapshot MaVatTu chốt tại lần xác nhận ĐẦU TIÊN
             // (bên nào xác nhận trước), lần xác nhận còn lại không ghi đè snapshot đã có.
             var slabsFirstXacNhan = new List<Hrc1Slab>();
             foreach (var slab in slabs)
@@ -511,7 +516,7 @@ namespace dataproduct.api.Repositories
                 trangThaiMap.TryGetValue(slab.Id, out var tt);
                 if (tt?.TrangThaiPKH == 1) continue;
 
-                var isFirstXacNhan = tt == null || (tt.TrangThaiDuc != 1 && tt.TrangThaiCan != 1);
+                var isFirstXacNhan = tt == null || (tt.TrangThaiDuc != 1 && tt.TrangThaiCan != 1 && !tt.TrangThaiC4);
 
                 if (tt == null)
                 {
@@ -528,6 +533,12 @@ namespace dataproduct.api.Repositories
                         newTt.NguoiXacNhanCan = nguoiThucHien;
                         newTt.NgayXacNhanCan = now;
                     }
+                    else if (loaiXacNhan == "C4")
+                    {
+                        newTt.TrangThaiC4 = true;
+                        newTt.NguoiXacNhanC4 = nguoiThucHien;
+                        newTt.NgayXacNhanC4 = now;
+                    }
                     _context.Hrc1SlabTrangThais.Add(newTt);
                 }
                 else
@@ -543,6 +554,12 @@ namespace dataproduct.api.Repositories
                         tt.TrangThaiCan = 1;
                         tt.NguoiXacNhanCan = nguoiThucHien;
                         tt.NgayXacNhanCan = now;
+                    }
+                    else if (loaiXacNhan == "C4")
+                    {
+                        tt.TrangThaiC4 = true;
+                        tt.NguoiXacNhanC4 = nguoiThucHien;
+                        tt.NgayXacNhanC4 = now;
                     }
                 }
 
@@ -578,6 +595,12 @@ namespace dataproduct.api.Repositories
                     t.TrangThaiCan = 0;
                     t.NguoiXacNhanCan = null;
                     t.NgayXacNhanCan = null;
+                }
+                else if (loaiXacNhan == "C4")
+                {
+                    t.TrangThaiC4 = false;
+                    t.NguoiXacNhanC4 = null;
+                    t.NgayXacNhanC4 = null;
                 }
             }
 
@@ -617,11 +640,11 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
 
             var chuaXacNhan = naturalSlabs.Count(s =>
-                    !naturalTTMap.TryGetValue(s.Id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1)
-                + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1);
+                    !naturalTTMap.TryGetValue(s.Id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1 || !tt.TrangThaiC4)
+                + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1 || !t.TrangThaiC4);
             if (chuaXacNhan > 0)
                 throw new InvalidOperationException(
-                    $"Còn {chuaXacNhan} slab chưa được Đúc xác nhận và Cán xác nhận, không thể chốt phiếu.");
+                    $"Còn {chuaXacNhan} slab chưa được Đúc, Cán và C4 xác nhận đầy đủ, không thể chốt phiếu.");
 
             foreach (var slab in naturalSlabs)
             {
@@ -734,7 +757,7 @@ namespace dataproduct.api.Repositories
         // Đã Đúc HOẶC Cán xác nhận → dùng snapshot đã lưu trên slab (lịch sử tại thời điểm xác nhận đầu tiên)
         // Cả 2 chưa xác nhận → lấy VatTuCode hiện tại từ bảng MaVatTu (theo MacThep) để hiển thị, không lưu lại
         private static string? ResolveMaVatTu(Hrc1Slab s, Hrc1SlabTrangThai? tt, MaVatTu? mvt)
-            => (tt?.TrangThaiDuc == 1 || tt?.TrangThaiCan == 1) ? s.MaVatTu : mvt?.VatTuCode;
+            => (tt?.TrangThaiDuc == 1 || tt?.TrangThaiCan == 1 || tt?.TrangThaiC4 == true) ? s.MaVatTu : mvt?.VatTuCode;
 
         public async Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps)
         {
@@ -897,6 +920,7 @@ namespace dataproduct.api.Repositories
                 IdPhieuGoc = tt?.IdPhieuGoc,
                 TrangThaiDuc = tt?.TrangThaiDuc ?? 0,
                 TrangThaiCan = tt?.TrangThaiCan ?? 0,
+                TrangThaiC4 = tt?.TrangThaiC4 ?? false,
                 TrangThaiPKH = tt?.TrangThaiPKH ?? 0,
                 IdPhieuBBSL = tt?.IdPhieuBBSL,
                 SoPhieuBBSL = phieu?.SoPhieu,
