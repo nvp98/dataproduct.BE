@@ -1,4 +1,4 @@
-﻿using dataproduct.api.DTOs;
+using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
@@ -408,42 +408,6 @@ namespace dataproduct.api.Repositories
         Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
     }
 
-    public interface IHrc1SlabRepository
-    {
-        Task<Hrc1SlabSyncResult> UpsertFromApiAsync(List<TscSlabItem> items);
-        Task<(IEnumerable<Hrc1SlabItem> Data, int TotalCount)> SearchAsync(Hrc1SlabSearchRequest req);
-        Task<IEnumerable<Hrc1SlabTongHopItem>> GetTongHopAsync(DateOnly? tuNgay, DateOnly? denNgay, string? ca, string? kip);
-        Task<IEnumerable<Hrc1PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
-        Task<IEnumerable<Hrc1SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
-        Task<IEnumerable<Hrc1SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu);
-        Task<int> ChuyenPhoiAsync(List<int> idSlabs, Guid idPhieuNguon, string huong, int nguoiChuyen);
-        Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
-        Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
-        Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
-        Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
-        Task<int> FillMacThepAsync();
-        Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps);
-        Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req);
-        Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu);
-        Task SaveTongHopGhiChuAsync(Hrc1SaveTongHopGhiChuRequest req);
-    }
-
-    public interface IHrc2SlabRepository
-    {
-        Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req);
-        Task<IEnumerable<Hrc2SlabTongHopItem>> GetTongHopAsync(string? tuNgay, string? denNgay, string? ca, string? kip);
-        Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
-        Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
-        Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu);
-        Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
-        Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
-        Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
-        Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
-        Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien);
-        Task<int> ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
-        Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc);
-    }
-
     public interface IMacThepRepository
     {
         Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, List<int>? idMayDucs = null);
@@ -452,17 +416,6 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(MacThep entity);
         Task DeleteAsync(int id);
         Task<bool> ExistsByTenAndMayDucAsync(string tenMacThep, List<int> idMayDucs, int? excludeId = null);
-    }
-
-    public interface IMaVatTuRepository
-    {
-        Task<(IEnumerable<MaVatTuItem> Data, int TotalCount)> SearchAsync(MaVatTuSearchRequest req);
-        Task<MaVatTuItem?> GetByIdAsync(int id);
-        Task<MaVatTuItem> CreateAsync(MaVatTuUpsertDto dto);
-        Task<MaVatTuBulkCreateResult> BulkCreateAsync(List<MaVatTuUpsertDto> items);
-        Task<bool> UpdateAsync(int id, MaVatTuUpsertDto dto);
-        Task<bool> DeleteAsync(int id);
-        Task<Dictionary<string, string>> GetMaVatTuMapAsync(string nhaMay, IEnumerable<string> macThepNames);
     }
 
     public interface IMacThep_MayDucRepository

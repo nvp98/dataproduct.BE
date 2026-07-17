@@ -61,9 +61,6 @@ builder.Services.Scan(scan => scan
     .AddClasses(c => c.Where(t => t.Name.EndsWith("Enricher")))
         .AsImplementedInterfaces()
         .WithScopedLifetime()
-    .AddClasses(c => c.Where(t => t.Name.EndsWith("SearchFilterProvider")))
-        .AsImplementedInterfaces()
-        .WithScopedLifetime()
 );
 
 
