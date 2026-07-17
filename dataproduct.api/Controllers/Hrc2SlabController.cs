@@ -145,26 +145,13 @@ namespace dataproduct.api.Controllers
         [HttpPost("chot-phieu")]
         public async Task<IActionResult> ChotPhieu([FromBody] Hrc2ChotPhieuRequest request)
         {
-            try
+            await _svc.ChotPhieuAsync(request);
+            return Ok(new WorkflowResult
             {
-               
-                await _svc.ChotPhieuAsync(request);
-                return Ok(new WorkflowResult
-                {
-                    Success = true,
-                    Message = "Đã chốt phiếu thành công.",
-                    AffectedRows = 1
-                });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new WorkflowResult
-                {
-                    Success = false,
-                    Message = $"Lỗi khi chốt phiếu: {ex.Message}",
-                    AffectedRows = 0
-                });
-            }
+                Success = true,
+                Message = "Đã chốt phiếu thành công.",
+                AffectedRows = 1
+            });
         }
 
         [HttpPost("huy-chot-phieu")]

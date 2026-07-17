@@ -364,6 +364,7 @@ namespace dataproduct.api.Repositories
             }
 
             phieu.TinhTrang = 5;
+            phieu.IsLock = 1;
 
             await _context.SaveChangesAsync();
         }
@@ -387,6 +388,7 @@ namespace dataproduct.api.Repositories
             }
 
             phieu.TinhTrang = 1;
+            phieu.IsLock = 0;
 
             await _context.SaveChangesAsync();
         }
