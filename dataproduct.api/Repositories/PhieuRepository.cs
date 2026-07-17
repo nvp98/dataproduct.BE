@@ -2,7 +2,6 @@ using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
-using dataproduct.api.Repositories.PhieuSearchFilters;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
 using dataproduct.api.Utils;
@@ -20,20 +19,13 @@ namespace dataproduct.api.Repositories
         private readonly PheDuyetService _pdservice;
         private readonly IPheDuyetRepository _pheDuyetRepo;
         private readonly ProductDataMasterDbContext _mastercontext;
-        private readonly IEnumerable<IPhieuSearchFilterProvider> _searchFilterProviders;
 
-        public PhieuRepository(
-            ProductFormContext context,
-            PheDuyetService pdservice,
-            IPheDuyetRepository pheDuyetRepo,
-            ProductDataMasterDbContext mastercontext,
-            IEnumerable<IPhieuSearchFilterProvider> searchFilterProviders)
+        public PhieuRepository(ProductFormContext context, PheDuyetService pdservice, IPheDuyetRepository pheDuyetRepo, ProductDataMasterDbContext mastercontext)
         {
             _context = context;
             _pdservice = pdservice;
             _pheDuyetRepo = pheDuyetRepo;
             _mastercontext = mastercontext;
-            _searchFilterProviders = searchFilterProviders;
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -367,39 +359,111 @@ namespace dataproduct.api.Repositories
                 .AsQueryable();
 
             // ===== BƯỚC 3: Filter theo LoaiVung =====
-            // Hàm này KHÔNG chứa logic riêng cho bất kỳ MaBm nào. Các BM có luồng phân quyền/tìm kiếm
-            // khác chuẩn (không dùng Scope, không dùng BmPheDuyet...) được đăng ký qua
-            // IPhieuSearchFilterProvider (thư mục Repositories/PhieuSearchFilters) — muốn thêm ngoại lệ
-            // cho 1 BM mới thì viết provider mới, không sửa switch bên dưới.
             switch (loaiVung)
             {
-                // LoaiVung 1 (Việc tôi bắt đầu): hiển thị TẤT CẢ phiếu user có quyền 1|4 (không lọc TinhTrang).
-                // FE tự kiểm tra TinhTrang + NguoiTaoId để ẩn/hiện nút thao tác:
-                //   - TinhTrang ∈ {0, 3, 7} → mọi user có quyền được thao tác
-                //   - TinhTrang khác → chỉ NguoiTaoId hoặc người phê duyệt CapDuyet=0 mới được thao tác
                 case 1: // Việc tôi bắt đầu — quyền 1|4, lọc MaKhuVuc → Scope
-                case 2: // Việc đến tôi — quyền 2|4 + phê duyệt (scope-based)
-                case 3: // Chỉ xem — quyền 5, lọc MaKhuVuc → Scope
-                {
-                    if (!request.UserId.HasValue || request.UserId.Value <= 0)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-
-                    var userId = request.UserId.Value;
-
-                    // MaBm đã có provider riêng → loại khỏi query mặc định, để tránh trùng/mâu thuẫn
-                    var specialMaBms = _searchFilterProviders
-                        .SelectMany(p => p.MaBms)
-                        .ToHashSet();
-
-                    var scopedBase = _context.BmPhieus
-                        .Where(x => x.IsDelete != 1 && x.IsLock != 1
-                                 && x.MaBm != null && !specialMaBms.Contains(x.MaBm));
-
-                    IQueryable<BmPhieu> regularQuery = loaiVung switch
                     {
-                        1 => PhieuSearchFilterHelpers.WithScopeBasedXuLy(scopedBase, _context, userId),
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                        2 => scopedBase.Where(x =>
+                        var userId = request.UserId.Value;
+
+                        // Hiển thị TẤT CẢ phiếu user có quyền 1|4 (như vùng 3 nhưng quyền khác).
+                        // FE tự kiểm tra TinhTrang + NguoiTaoId để ẩn/hiện nút thao tác:
+                        //   - TinhTrang ∈ {0, 3, 7} → mọi user có quyền được thao tác
+                        //   - TinhTrang khác → chỉ NguoiTaoId hoặc người phê duyệt CapDuyet=0 mới được thao tác
+
+                        // --- TRƯỚC: chỉ hiển thị phiếu tinhTrang 0|3|7 hoặc là người tạo (comment để revert) ---
+                        // var hrc1LoTLQuery1 = _context.BmPhieus
+                        //     .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                        //              && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
+                        //     .Where(x => _context.BmQuyenXls.Any(q =>
+                        //         q.IdTaiKhoan == userId &&
+                        //         q.MaBm == x.MaBm &&
+                        //         (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                        //     ) && (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+                        // var regularQuery1 = _context.BmPhieus
+                        //     .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                        //              && x.MaBm != "HRC1_LoThoi" && x.MaBm != "HRC1_TinhLuyen")
+                        //     .Where(x =>
+                        //         x.MaBm != null &&
+                        //         _context.BmQuyenXls.Any(q =>
+                        //             q.IdTaiKhoan == userId &&
+                        //             q.MaBm == x.MaBm &&
+                        //             (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                        //             (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                        //         ) &&
+                        //         (x.NguoiTaoId == userId || x.TinhTrang == 0 || x.TinhTrang == 7 || x.TinhTrang == 3));
+
+                        // HRC1_LoThoi/TinhLuyen: không có scope
+                        var hrc1LoTLQuery1 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
+                            .Where(x => _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                            ));
+
+                        var regularQuery1 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && x.MaBm != "HRC1_LoThoi" && x.MaBm != "HRC1_TinhLuyen")
+                            .Where(x =>
+                                x.MaBm != null &&
+                                _context.BmQuyenXls.Any(q =>
+                                    q.IdTaiKhoan == userId &&
+                                    q.MaBm == x.MaBm &&
+                                    (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                    (q.QuyenChucNang == 1 || q.QuyenChucNang == 4)
+                                ));
+
+                        query = regularQuery1.Union(hrc1LoTLQuery1);
+                        break;
+                    }
+
+                case 2: // Việc đến tôi — quyền 2|4
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+
+                        var userId = request.UserId.Value;
+
+                        // Quyền mở rộng (extraQuyens, vd "Xác nhận PCN") khớp đúng vùng 2 — FE tự tính từ
+                        // bmQuyenConfig.ts và gửi lên qua request.ExtraQuyenChucNangs, BE không hard-code giá trị.
+                        var extraQuyens = request.ExtraQuyenChucNangs ?? new List<byte>();
+
+                        // HRC1_BBGN_ThepLong: không phê duyệt theo phiếu (user xử lý từng mẻ trong phiếu),
+                        // nên không cần BmPheDuyet như regularQuery2 — nhưng vẫn phải khớp đúng scope (MaKhuVuc == Scope)
+                        // theo BmQuyenXl, cho quyền 2|4 (Xác nhận đúc) HOẶC bất kỳ quyền mở rộng nào trong extraQuyens.
+                        var hrc1BbgnQuery = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && x.MaBm == "HRC1_BBGN_ThepLong")
+                            .Where(x => _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                (q.QuyenChucNang == 2 || q.QuyenChucNang == 4 ||
+                                 (q.QuyenChucNang != null && extraQuyens.Contains(q.QuyenChucNang.Value)))
+                            ));
+
+                        // HRC1_LoThoi/TinhLuyen: phiếu không có scope, trả nếu user có quyền 2|4 cho maBm
+                        var hrc1LoTLQuery2 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
+                            .Where(x => _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                (q.QuyenChucNang == 2 || q.QuyenChucNang == 4)
+                            ));
+
+                        // Các loại khác: quyền 2|4 + phê duyệt (scope-based)
+                        var regularQuery2 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && x.MaBm != "HRC1_BBGN_ThepLong"
+                                     && x.MaBm != "HRC1_LoThoi"
+                                     && x.MaBm != "HRC1_TinhLuyen")
+                            .Where(x =>
+                                x.MaBm != null &&
                                 _context.BmQuyenXls.Any(q =>
                                     q.IdTaiKhoan == userId &&
                                     q.MaBm == x.MaBm &&
@@ -411,27 +475,53 @@ namespace dataproduct.api.Repositories
                                     pd.CapDuyet != null && pd.CapDuyet != 0 &&
                                     pd.NguoiDuyetId == userId
                                 ) &&
-                                x.TinhTrang != 0),
+                                x.TinhTrang != 0
+                            );
 
-                        3 => PhieuSearchFilterHelpers.WithScopeBasedXem(scopedBase, _context, userId),
+                        query = regularQuery2.Union(hrc1BbgnQuery).Union(hrc1LoTLQuery2);
+                        break;
+                    }
 
-                        _ => _context.BmPhieus.Where(x => false),
-                    };
+                case 3: // Chỉ xem — quyền 5
+                    {
+                        if (!request.UserId.HasValue || request.UserId.Value <= 0)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    // Hợp nhất với kết quả từ từng provider đăng ký cho loaiVung hiện tại
-                    query = _searchFilterProviders.Aggregate(
-                        regularQuery,
-                        (acc, provider) => acc.Union(provider.BuildQuery(_context, loaiVung, userId)));
+                        var userId = request.UserId.Value;
 
-                    break;
-                }
+                        // HRC1_LoThoi/TinhLuyen: không có scope, chỉ cần quyền 5 cho maBm
+                        var hrc1LoTLQuery3 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && (x.MaBm == "HRC1_LoThoi" || x.MaBm == "HRC1_TinhLuyen"))
+                            .Where(x => _context.BmQuyenXls.Any(q =>
+                                q.IdTaiKhoan == userId &&
+                                q.MaBm == x.MaBm &&
+                                q.QuyenChucNang == 5
+                            ));
+
+                        var regularQuery3 = _context.BmPhieus
+                            .Where(x => x.IsDelete != 1 && x.IsLock != 1
+                                     && x.MaBm != "HRC1_LoThoi" && x.MaBm != "HRC1_TinhLuyen")
+                            .Where(x =>
+                                x.MaBm != null &&
+                                _context.BmQuyenXls.Any(q =>
+                                    q.IdTaiKhoan == userId &&
+                                    q.MaBm == x.MaBm &&
+                                    (q.MaKhuVuc == "ALL" || q.MaKhuVuc == x.Scope.ToString()) &&
+                                    q.QuyenChucNang == 5
+                                )
+                            );
+
+                        query = regularQuery3.Union(hrc1LoTLQuery3);
+                        break;
+                    }
 
                 case 4: // Thống kê — chỉ PKH / Admin, không filter theo user
-                {
-                    if (request.IsThongKeUser != true)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-                    break;
-                }
+                    {
+                        if (request.IsThongKeUser != true)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        break;
+                    }
 
                 default:
                     return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
@@ -460,17 +550,12 @@ namespace dataproduct.api.Repositories
 
                 if (pairs.Count > 0)
                 {
-                    // BM nào có provider khai HasScope=false thì phiếu không có Scope → lọc chỉ theo MaBm
-                    var noScopeMaBms = _searchFilterProviders
-                        .Where(p => !p.HasScope)
-                        .SelectMany(p => p.MaBms)
-                        .ToHashSet();
-
                     IQueryable<BmPhieu>? filtered = null;
                     foreach (var pair in pairs)
                     {
                         var lMaBm = pair.MaBm; var lScope = pair.Scope;
-                        var sub = noScopeMaBms.Contains(lMaBm)
+                        // HRC1_LoThoi/TinhLuyen: phiếu không có scope, lọc chỉ theo maBm
+                        var sub = (lMaBm == "HRC1_LoThoi" || lMaBm == "HRC1_TinhLuyen")
                             ? query.Where(x => x.MaBm == lMaBm)
                             : query.Where(x => x.MaBm == lMaBm && x.Scope == lScope);
                         filtered = filtered == null ? sub : filtered.Union(sub);
@@ -502,17 +587,18 @@ namespace dataproduct.api.Repositories
 
             var result = data.Select(x => new SearchPhieuResponseModel
             {
-                Idphieu    = x.Idphieu,
-                SoPhieu    = x.SoPhieu,
-                MaBm       = x.MaBm,
-                NgaySX     = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
-                Ca         = x.Ca,
-                Kip        = x.Kip,
-                Scope      = x.Scope,
-                MayDuc     = x.MayDuc,
-                TinhTrang  = x.TinhTrang,
-                NguoiTao   = x.NguoiTaoId,
-                TenScope   = x.TenScope
+                Idphieu = x.Idphieu,
+                SoPhieu = x.SoPhieu,
+                MaBm = x.MaBm,
+                NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
+                Ca = x.Ca,
+                Kip = x.Kip,
+                Scope = x.Scope,
+                MayDuc = x.MayDuc,
+                TinhTrang = x.TinhTrang,
+                NguoiTao = x.NguoiTaoId,
+                TenScope = x.TenScope,
+                IsCheck = x.IsCheck,
             }).ToList();
             foreach (var item in result)
             {
