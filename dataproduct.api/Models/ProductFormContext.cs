@@ -782,6 +782,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.MayDuc).HasColumnName("MayDuc");
             entity.Property(e => e.IsTrungIDSlab).HasColumnName("IsTrungIDSlab");
             entity.Property(e => e.IsDiffMacThep).HasColumnName("IsDiffMacThep");
+            entity.Property(e => e.IsSaiLotName).HasColumnName("IsSaiLotName").HasDefaultValue(false);
             entity.Property(e => e.Line).HasColumnName("Line");
             entity.Property(e => e.PhanLoai).HasColumnName("PhanLoai").HasMaxLength(20);
 

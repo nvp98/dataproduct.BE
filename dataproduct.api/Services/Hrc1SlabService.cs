@@ -5,8 +5,9 @@ using dataproduct.api.Models;
 using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using System.Net.Http.Json;
+using System.Data;
 using System.Text;
 
 namespace dataproduct.api.Services
@@ -14,27 +15,26 @@ namespace dataproduct.api.Services
     public class Hrc1SlabService
     {
         private readonly IHrc1SlabRepository _repo;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ProductFormContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly IConverter _pdfConverter;
         private readonly IConfiguration _config;
-        private const string TscApiBase = "http://10.192.49.39:5027/tsc";
+        private readonly string _sqlConnStr;
 
         public Hrc1SlabService(
             IHrc1SlabRepository repo,
-            IHttpClientFactory httpClientFactory,
             ProductFormContext context,
             IWebHostEnvironment env,
             IConverter pdfConverter,
             IConfiguration config)
         {
             _repo = repo;
-            _httpClientFactory = httpClientFactory;
             _context = context;
             _env = env;
             _pdfConverter = pdfConverter;
             _config = config;
+            _sqlConnStr = config.GetConnectionString("DbConnectionString")
+                ?? throw new InvalidOperationException("DbConnectionString is not configured.");
         }
 
         // ── Sync / Search / Workflow ─────────────────────────────────────────
@@ -43,22 +43,8 @@ namespace dataproduct.api.Services
         {
             var (fromDate, toDate) = CalculateDateRange(ngaySX, caSX);
 
-            var url = $"{TscApiBase}?fromDate={fromDate:yyyy-MM-ddTHH:mm:ss}&toDate={toDate:yyyy-MM-ddTHH:mm:ss}";
+            var items = await GetTscSlabDataAsync(fromDate, toDate);
 
-            using var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(120);
-
-            var response = await client.GetFromJsonAsync<TscApiResponse>(url)
-                ?? throw new Exception("TSC API trả về null");
-
-            if (!response.Success)
-                throw new Exception($"TSC API báo lỗi (count={response.Count})");
-
-            var items = (response.Data ?? [])
-                .Where(x => !string.IsNullOrEmpty(x.PIECE_ID)
-                         && (x.LENGTH == null || x.LENGTH >= 16000)
-                         && (x.SLAB_ID == null || !x.SLAB_ID.Contains("GHOST", StringComparison.OrdinalIgnoreCase)))
-                .ToList();
             var result = await _repo.UpsertFromApiAsync(items);
 
             // Fill MacThep cho các slab cũ chưa có (batch hiện tại đã được fill trong UpsertFromApiAsync)
@@ -70,6 +56,45 @@ namespace dataproduct.api.Services
             // Lưu ý: Sync không lưu MaVatTu. MaVatTu chỉ được snapshot khi Đúc xác nhận (XacNhanAsync);
             // trước khi xác nhận, /slabs-by-phieu sẽ tự join bảng MaVatTu theo MacThep để hiển thị.
             return result;
+        }
+
+        /// <summary>
+        /// Gọi usp_HRC1_GetTscSlabData (Linked Server DATA_TSC_HIS → vw_TSC_DATA_IT).
+        /// SP đã lọc sẵn PIECE_ID/LENGTH/GHOST theo @FromDate..@ToDate, nên kết quả trả về
+        /// có thể dùng thẳng cho UpsertFromApiAsync, không cần lọc lại ở C#.
+        /// </summary>
+        private async Task<List<TscSlabItem>> GetTscSlabDataAsync(DateTime fromDate, DateTime toDate)
+        {
+            var items = new List<TscSlabItem>();
+
+            await using var conn = new SqlConnection(_sqlConnStr);
+            await conn.OpenAsync();
+
+            await using var cmd = new SqlCommand("usp_HRC1_GetTscSlabData", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.CommandTimeout = 120;
+            cmd.Parameters.Add("@FromDate", SqlDbType.DateTime).Value = fromDate;
+            cmd.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = toDate;
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                items.Add(new TscSlabItem
+                {
+                    SLAB_ID = reader.IsDBNull(0) ? null : reader.GetString(0),
+                    PIECE_ID = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    CA = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    HEAT_ID = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    CUT_DATE = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                    THICKNESS = reader.IsDBNull(5) ? null : reader.GetDecimal(5),
+                    LENGTH = reader.IsDBNull(6) ? null : reader.GetDecimal(6),
+                    WEIGHT = reader.IsDBNull(7) ? null : reader.GetDecimal(7),
+                    WIDTH_HEAD = reader.IsDBNull(8) ? null : reader.GetDecimal(8),
+                    TSC_NO = reader.IsDBNull(9) ? null : reader.GetString(9),
+                });
+            }
+
+            return items;
         }
 
         public Task<(IEnumerable<Hrc1SlabItem> Data, int TotalCount)> SearchAsync(Hrc1SlabSearchRequest req)

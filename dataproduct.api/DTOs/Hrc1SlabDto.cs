@@ -18,14 +18,7 @@ namespace dataproduct.api.DTOs
         public string Message { get; set; } = "";
     }
 
-    // ── TSC API response models ────────────────────────────────────────────────
-
-    public class TscApiResponse
-    {
-        public bool Success { get; set; }
-        public int Count { get; set; }
-        public List<TscSlabItem>? Data { get; set; }
-    }
+    // ── TSC slab data (usp_HRC1_GetTscSlabData) ─────────────────────────────────
 
     public class TscSlabItem
     {
