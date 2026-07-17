@@ -116,7 +116,6 @@ namespace dataproduct.api.Services
                     var oldMe = existing.Me;
                     existing.Me = me;
                     existing.MayDuc = GetString(row, "mayDuc");
-                    existing.IdMacThep = TryParseInt(row, "idMacThep");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
                     existing.KLLFSauThep = klLFSauThep;
@@ -162,7 +161,6 @@ namespace dataproduct.api.Services
                     {
                         Me = me,
                         MayDuc = GetString(row, "mayDuc"),
-                        IdMacThep = TryParseInt(row, "idMacThep"),
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
@@ -197,12 +195,31 @@ namespace dataproduct.api.Services
             if (toInsert.Any())
                 await _context.BBGN_ThepLongs.AddRangeAsync(toInsert);
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // Unique index UX_BBGN_ThepLong_IdPhieu_Me (migration bbgn_theplong_unique_idphieu_me.sql)
+                // chặn insert trùng (IdPhieu, Me) — xảy ra khi 2 request Lưu cho cùng 1 dòng mới
+                // (chưa có Id) được gửi gần nhau (double-click, "Làm mới dữ liệu" trong lúc đang Lưu...).
+                // Trả về cảnh báo thay vì để lộ lỗi 500 SQL thô cho FE.
+                warnings.Add(
+                    "Một số mẻ vừa được lưu trùng lúc từ nơi khác (có thể do bấm Lưu nhiều lần hoặc " +
+                    "\"Làm mới dữ liệu\" trong lúc đang lưu). Vui lòng bấm \"Làm mới dữ liệu\" để kiểm tra lại trước khi tiếp tục.");
+                return warnings;
+            }
 
             await UpdateDuplicateFlagsForMesAsync(affectedMes);
 
             return warnings;
         }
+
+        /// <summary>SQL Server: 2601/2627 = vi phạm unique index/constraint.</summary>
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
+            ex.InnerException is SqlException sqlEx &&
+            sqlEx.Errors.Cast<SqlError>().Any(e => e.Number is 2601 or 2627);
 
 
         private decimal? SumValues(params decimal?[] values)
@@ -559,9 +576,9 @@ namespace dataproduct.api.Services
 
             var nhomPhanLoai = await (
                 from row in baseQuery
-                where row.IdMacThep.HasValue
-                join mt in _context.MacTheps on row.IdMacThep!.Value equals mt.Id
-                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                where row.MacThepBKMIS != null
+                join mt in _context.MacTheps on row.MacThepBKMIS equals mt.TenMacThep
+                where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 2
                 join nhom in _context.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                 group row by nhom.TenNhom into g
                 orderby g.Key
@@ -728,8 +745,7 @@ namespace dataproduct.api.Services
                 var keyword = request.SearchString.Trim();
                 query = query.Where(x =>
                     (x.Me ?? string.Empty).Contains(keyword) ||
-                    (x.MacThep ?? string.Empty).Contains(keyword) ||
-                    _context.MacTheps.Any(m => m.Id == x.IdMacThep && m.TenMacThep.Contains(keyword)));
+                    (x.MacThepBKMIS ?? string.Empty).Contains(keyword));
             }
 
             if (!string.IsNullOrWhiteSpace(request.ThungSo))
@@ -753,12 +769,12 @@ namespace dataproduct.api.Services
             if (!string.IsNullOrWhiteSpace(request.PhanLoaiNhom))
             {
                 var phanLoaiNhom = request.PhanLoaiNhom.Trim();
-                var matchingMacThepIds = _context.MacTheps
-                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue &&
+                var matchingMacThepNames = _context.MacTheps
+                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue && m.NhaMay == 2 &&
                         _context.NhomPhanLoaiMacTheps
                             .Any(n => n.Id == m.Id_NhomPhanLoaiMacThep.Value && n.TenNhom.Contains(phanLoaiNhom)))
-                    .Select(m => m.Id);
-                query = query.Where(x => x.IdMacThep.HasValue && matchingMacThepIds.Contains(x.IdMacThep.Value));
+                    .Select(m => m.TenMacThep);
+                query = query.Where(x => x.MacThepBKMIS != null && matchingMacThepNames.Contains(x.MacThepBKMIS));
             }
 
             if (request.IsTrungMeThoi.HasValue)
@@ -770,13 +786,18 @@ namespace dataproduct.api.Services
             return query;
         }
 
+        /// <summary>Suy ra Nhóm phân loại mác thép từ MacThepBKMIS (đồng bộ tự động), match theo tên với MacThep.TenMacThep.</summary>
         private async Task ResolveMacThepNamesAsync(List<BBGN_ThepLong> rows)
         {
-            var ids = rows.Where(x => x.IdMacThep.HasValue).Select(x => x.IdMacThep!.Value).Distinct().ToList();
-            if (ids.Count == 0) return;
+            var bkmisNames = rows
+                .Where(x => !string.IsNullOrWhiteSpace(x.MacThepBKMIS))
+                .Select(x => x.MacThepBKMIS!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (bkmisNames.Count == 0) return;
 
             var macTheps = await _context.MacTheps
-                .Where(x => ids.Contains(x.Id))
+                .Where(x => bkmisNames.Contains(x.TenMacThep) && x.NhaMay == 2 && x.IsLock != true)
                 .ToListAsync();
 
             var nhomIds = macTheps
@@ -791,12 +812,11 @@ namespace dataproduct.api.Services
                     .ToDictionaryAsync(x => x.Id, x => x.TenNhom)
                 : new Dictionary<int, string>();
 
-            var macThepMap = macTheps.ToDictionary(x => x.Id);
+            var macThepMap = macTheps.ToDictionary(x => x.TenMacThep, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var row in rows.Where(x => x.IdMacThep.HasValue))
+            foreach (var row in rows.Where(x => !string.IsNullOrWhiteSpace(x.MacThepBKMIS)))
             {
-                if (!macThepMap.TryGetValue(row.IdMacThep!.Value, out var mt)) continue;
-                row.MacThep = mt.TenMacThep;
+                if (!macThepMap.TryGetValue(row.MacThepBKMIS!.Trim(), out var mt)) continue;
                 if (mt.Id_NhomPhanLoaiMacThep.HasValue &&
                     nhomMap.TryGetValue(mt.Id_NhomPhanLoaiMacThep.Value, out var tenNhom))
                     row.TenNhomPhanLoaiMacThep = tenNhom;

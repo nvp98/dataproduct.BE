@@ -78,9 +78,10 @@ namespace dataproduct.api.Controllers
             bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
-            string? SortThuTu,
             int? IdNhom,
             bool? chuaMappingNM,
+            string? SortBy,
+            string? SortOrder,
             int page = 1,
             int pageSize = 10
         )
@@ -97,9 +98,10 @@ namespace dataproduct.api.Controllers
                 IsUsedThongKe,
                 FromDate,
                 ToDate,
-                SortThuTu,
                 IdNhom,
                 chuaMappingNM,
+                SortBy,
+                SortOrder,
                 page,
                 pageSize
             );

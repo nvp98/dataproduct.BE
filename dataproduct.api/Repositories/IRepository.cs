@@ -117,14 +117,17 @@ namespace dataproduct.api.Repositories
             bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
-            string? SortThuTu,
             int? IdNhom,
             bool? chuaMappingNM,
+            string? SortBy,
+            string? SortOrder,
             int page,
             int pageSize
         );
         Task<bool> ExistsByTenHienThiAsync(string tenHienThi, int? excludeId = null);
         Task<bool> IsInUseAsync(int id);
+        /// <summary>Tìm Header_Key khác đang dùng cùng giá trị thứ tự ở cùng cột (nếu có).</summary>
+        Task<Header_Key?> FindDuplicateThuTuAsync(ThuTuColumn column, int value, int? excludeId = null);
     }
     public interface IHeaderMappingRepository
     {
@@ -392,6 +395,7 @@ namespace dataproduct.api.Repositories
         // Chi tiết nạp liệu theo phiếu
         Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
         Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_NL_ChiTiet> entities);
         Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
 
         // Phiếu

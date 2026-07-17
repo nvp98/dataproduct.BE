@@ -56,17 +56,24 @@ public class HRC1_MeThep
     [MaxLength(500)]
     public string? GhiChuDuc { get; set; }
 
+    [MaxLength(500)]
+    public string? GhiChuPCN { get; set; }
+
     // LT/Đúc: 0=chờ xử lý, 1=đã xác nhận, 2=đã chốt
     // TL:     0=chờ xử lý, 1=đã nhận, 2=đã xác nhận, 3=đã chốt
     public int? TrangThaiLo { get; set; }
     public int? TrangThaiTL { get; set; }
     public int? TrangThaiDuc { get; set; }
+    public bool? TrangThaiPCN { get; set; }    // null/false=chờ, true=đã xác nhận PCN — chỉ áp dụng mẻ IsThuNghiem=true
+    public bool? TrangThaiChotPCN { get; set; } // null/false=chưa chốt, true=đã chốt PCN — khóa vĩnh viễn, không cho xác nhận/hủy xác nhận PCN nữa
 
     public int? CapNhatBoi { get; set; }       // ID_TaiKhoan (lò thổi cuối)
     public DateTime? CapNhatLuc { get; set; }
     public int? CapNhatBoiTL { get; set; }     // ID_TaiKhoan (tinh luyện cuối)
     public int? CapNhatBoiDuc { get; set; }    // ID_TaiKhoan (máy đúc cuối)
     public int? CapNhatBoiChot { get; set; }   // ID_TaiKhoan (người chốt/bỏ chốt mẻ)
+    public int? CapNhatBoiPCN { get; set; }    // ID_TaiKhoan (người xác nhận/bỏ xác nhận PCN cuối)
+    public int? CapNhatChotPCNBoi { get; set; } // ID_TaiKhoan (người chốt/bỏ chốt PCN cuối)
 
     public DateTime NgayTao { get; set; }      // set by SQL DEFAULT GETDATE() on insert; không thay đổi sau khi tạo
     public DateTime? NgayNhanTL { get; set; }  // ngày TL nhận mẻ (date-only; dùng để lọc ngày cho phiếu máy đúc)

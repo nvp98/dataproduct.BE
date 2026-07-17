@@ -42,11 +42,17 @@ namespace dataproduct.api.Services
             return data.Select(ToDto);
         }
 
+        /// <summary>Quyền mở rộng riêng theo BM (value >= 6, khai báo ở FE trong bmQuyenConfig.ts, vd "Xác nhận PCN").</summary>
+        private const byte EXTRA_QUYEN_THRESHOLD = 6;
+
         /// <summary>
         /// Lấy danh sách MaBM cho menu:
         /// - processing (Việc tôi bắt đầu): MaBM có QuyenChucNang = 1 (XULY) hoặc 4 (XULY_VA_PHEDUYET).
         /// - approving (Việc đến tôi): MaBM có QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET).
         /// - viewing (Chỉ xem): MaBM có QuyenChucNang = 5 (XEM).
+        /// - extraQuyens: raw (MaBm, QuyenChucNang) cho các quyền mở rộng (>= 6) — BE không biết BM nào
+        ///   dùng vùng nào cho quyền này, chỉ pass-through; FE (bmQuyenConfig.ts, field `extraQuyens[].vung`)
+        ///   tự tra và cộng vào đúng vùng menu tương ứng.
         /// MaBM có trong nhiều list thì FE có thể hiển thị theo nhu cầu.
         /// </summary>
         public async Task<MenuPermissionsDto> GetMenuPermissionsAsync(int idTaiKhoan)
@@ -66,7 +72,7 @@ namespace dataproduct.api.Services
                 .Distinct()
                 .ToList();
 
-            // Việc đến tôi: QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET) từ BM_QuyenXL
+            // Việc đến tôi: QuyenChucNang = 2 (PHEDUYET) hoặc 4 (XULY_VA_PHEDUYET)
             var approving = data
                 .Where(x =>
                 {
@@ -94,12 +100,20 @@ namespace dataproduct.api.Services
                 .Distinct()
                 .ToList();
 
+            // Quyền mở rộng riêng theo BM (>= 6) — trả raw để FE tự map sang vùng qua bmQuyenConfig.ts
+            var extraQuyens = data
+                .Where(x => x.MaBm != null && x.QuyenChucNang >= EXTRA_QUYEN_THRESHOLD)
+                .Select(x => new ExtraQuyenMenuItemDto(x.MaBm!.Trim(), x.QuyenChucNang!.Value))
+                .Distinct()
+                .ToList();
+
             return new MenuPermissionsDto
             {
                 ProcessingForms = processing,
                 ApprovingForms = approving,
                 ViewingForms = viewing,
-                ChotPhieuForms = chotPhieu
+                ChotPhieuForms = chotPhieu,
+                ExtraQuyens = extraQuyens
             };
         }
 

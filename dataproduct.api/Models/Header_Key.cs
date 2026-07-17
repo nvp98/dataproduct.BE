@@ -37,3 +37,13 @@ public partial class Header_Key
     /// giá trị được cộng vào cột nhóm (IDHeaderKey = -Header_Nhom.Id).</summary>
     public int? ID_NhomKey { get; set; }
 }
+
+/// <summary>Các cột "thứ tự" của Header_Key — mỗi cột là 1 không gian số thứ tự độc lập
+/// (vd TT_TK_BOF=1 và TT_TK_LFRH=1 không phải trùng nhau).</summary>
+public enum ThuTuColumn
+{
+    TK_BOF,
+    TK_LFRH,
+    Excel_BOF,
+    Excel_LFRH
+}

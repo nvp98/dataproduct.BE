@@ -384,7 +384,7 @@ namespace dataproduct.api.Repositories
                     if (!request.UserId.HasValue || request.UserId.Value <= 0)
                         return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
 
-                    var userId = request.UserId.Value;
+                        var userId = request.UserId.Value;
 
                     // MaBm đã có provider riêng → loại khỏi query mặc định, để tránh trùng/mâu thuẫn
                     var specialMaBms = _searchFilterProviders
@@ -427,11 +427,11 @@ namespace dataproduct.api.Repositories
                 }
 
                 case 4: // Thống kê — chỉ PKH / Admin, không filter theo user
-                {
-                    if (request.IsThongKeUser != true)
-                        return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
-                    break;
-                }
+                    {
+                        if (request.IsThongKeUser != true)
+                            return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
+                        break;
+                    }
 
                 default:
                     return (Enumerable.Empty<SearchPhieuResponseModel>(), 0);
@@ -502,17 +502,18 @@ namespace dataproduct.api.Repositories
 
             var result = data.Select(x => new SearchPhieuResponseModel
             {
-                Idphieu    = x.Idphieu,
-                SoPhieu    = x.SoPhieu,
-                MaBm       = x.MaBm,
-                NgaySX     = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
-                Ca         = x.Ca,
-                Kip        = x.Kip,
-                Scope      = x.Scope,
-                MayDuc     = x.MayDuc,
-                TinhTrang  = x.TinhTrang,
-                NguoiTao   = x.NguoiTaoId,
-                TenScope   = x.TenScope
+                Idphieu = x.Idphieu,
+                SoPhieu = x.SoPhieu,
+                MaBm = x.MaBm,
+                NgaySX = x.NgaySX.HasValue ? x.NgaySX.Value : DateOnly.MinValue,
+                Ca = x.Ca,
+                Kip = x.Kip,
+                Scope = x.Scope,
+                MayDuc = x.MayDuc,
+                TinhTrang = x.TinhTrang,
+                NguoiTao = x.NguoiTaoId,
+                TenScope = x.TenScope,
+                IsCheck = x.IsCheck,
             }).ToList();
             foreach (var item in result)
             {

@@ -736,10 +736,26 @@ namespace dataproduct.api.Repositories
 
         // Helper: chỉ add placeholder "—" cho nhóm thực sự không có NVL nào sau tất cả các bước
 
+        //(DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
+        //{
+        //    1 => (ngay.Date.AddHours(7).AddMinutes(30), ngay.Date.AddHours(19).AddMinutes(30)),
+        //    2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
+        //    _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
+        //};
         (DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
         {
-            1 => (ngay.Date.AddHours(7).AddMinutes(30), ngay.Date.AddHours(19).AddMinutes(30)),
-            2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
+            // Ca ngày: 07:31 -> 19:30
+            1 => (
+                ngay.Date.AddHours(7).AddMinutes(31),
+                ngay.Date.AddHours(19).AddMinutes(30)
+            ),
+
+            // Ca đêm: 19:31 -> 07:30 hôm sau
+            2 => (
+                ngay.Date.AddHours(19).AddMinutes(31),
+                ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)
+            ),
+
             _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
         };
         //public async Task<LGNLDuLieuSiLoResult> GetDuLieuSiloPivotAsync(DateTime ngay, int idCa, int idLoCao)
@@ -1127,6 +1143,33 @@ namespace dataproduct.api.Repositories
         {
             await _context.LG_NL_ChiTiet.AddRangeAsync(entities);
             await _context.SaveChangesAsync();
+        }
+
+        // Xóa + ghi mới trong cùng 1 transaction — nếu insert lỗi giữa chừng thì rollback
+        // luôn phần xóa, tránh mất trắng dữ liệu chi tiết của phiếu (trước đây xóa và ghi
+        // là 2 lệnh tách rời, lỗi ở bước ghi sẽ để lại phiếu không còn chi tiết nào).
+        public async Task ReplaceChiTietAsync(Guid idPhieu, List<LG_NL_ChiTiet> entities)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                await _context.LG_NL_ChiTiet
+                    .Where(x => x.IDPhieu == idPhieu)
+                    .ExecuteDeleteAsync();
+
+                if (entities.Count > 0)
+                {
+                    await _context.LG_NL_ChiTiet.AddRangeAsync(entities);
+                    await _context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu)
