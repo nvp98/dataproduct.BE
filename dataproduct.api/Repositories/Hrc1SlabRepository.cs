@@ -499,6 +499,35 @@ namespace dataproduct.api.Repositories
 
         public async Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien)
         {
+            var now = DateTime.Now;
+
+            // PKH: chốt từng slab đã chọn (độc lập với Đúc/Cán/C4, không snapshot MaVatTu)
+            if (loaiXacNhan == "PKH")
+            {
+                var pkhMap = await _context.Hrc1SlabTrangThais
+                    .Where(t => idSlabs.Contains(t.IdSlab))
+                    .ToDictionaryAsync(t => t.IdSlab);
+
+                foreach (var id in idSlabs)
+                {
+                    if (!pkhMap.TryGetValue(id, out var tt))
+                    {
+                        tt = new Hrc1SlabTrangThai { IdSlab = id, NgayTao = now };
+                        _context.Hrc1SlabTrangThais.Add(tt);
+                        pkhMap[id] = tt;
+                    }
+
+                    if (tt.TrangThaiPKH == 1) continue;
+
+                    tt.TrangThaiPKH = 1;
+                    tt.NguoiChotPKH = nguoiThucHien;
+                    tt.NgayChotPKH = now;
+                }
+
+                await _context.SaveChangesAsync();
+                return;
+            }
+
             var slabs = await _context.Hrc1Slabs
                 .Where(s => idSlabs.Contains(s.Id))
                 .ToListAsync();
@@ -506,8 +535,6 @@ namespace dataproduct.api.Repositories
             var trangThaiMap = await _context.Hrc1SlabTrangThais
                 .Where(t => idSlabs.Contains(t.IdSlab))
                 .ToDictionaryAsync(t => t.IdSlab);
-
-            var now = DateTime.Now;
             // Đúc, Cán và C4 đồng cấp, xác nhận song song → snapshot MaVatTu chốt tại lần xác nhận ĐẦU TIÊN
             // (bên nào xác nhận trước), lần xác nhận còn lại không ghi đè snapshot đã có.
             var slabsFirstXacNhan = new List<Hrc1Slab>();
@@ -578,6 +605,23 @@ namespace dataproduct.api.Repositories
 
         public async Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien)
         {
+            if (loaiXacNhan == "PKH")
+            {
+                var pkhRecords = await _context.Hrc1SlabTrangThais
+                    .Where(t => idSlabs.Contains(t.IdSlab) && t.TrangThaiPKH == 1)
+                    .ToListAsync();
+
+                foreach (var t in pkhRecords)
+                {
+                    t.TrangThaiPKH = 0;
+                    t.NguoiChotPKH = null;
+                    t.NgayChotPKH = null;
+                }
+
+                await _context.SaveChangesAsync();
+                return;
+            }
+
             var records = await _context.Hrc1SlabTrangThais
                 .Where(t => idSlabs.Contains(t.IdSlab) && t.TrangThaiPKH == 0)
                 .ToListAsync();
