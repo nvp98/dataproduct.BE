@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(grep -r \"ClosedXML\" *.csproj)",
+      "Bash(cd \"/tmp\")",
+      "Bash(cp \"E:/_Projects/BIEUMAU_SANXUAT/Source/dataproduct.BE/dataproduct.api/wwwroot/templates/HRC2_BB_NauLuyen_BOF.xlsx\" .)",
+      "Bash(unzip -l HRC2_BB_NauLuyen_BOF.xlsx)",
+      "Bash(unzip -p HRC2_BB_NauLuyen_BOF.xlsx xl/worksheets/sheet1.xml)",
+      "Bash(unzip -p HRC2_BB_NauLuyen_BOF.xlsx \"xl/worksheets/_rels/sheet1.xml.rels\")",
+      "Bash(unzip -p HRC2_BB_NauLuyen_BOF.xlsx \"xl/drawings/drawing1.xml\")",
+      "Bash(unzip -p HRC2_BB_NauLuyen_BOF.xlsx \"xl/drawings/_rels/drawing1.xml.rels\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(find E:_ProjectsBIEUMAU_SANXUAT -type f \\\\\\(-iname *CustomTableHRC* -o -iname *HRC2PhuLieuService* \\\\\\))",
+      "Bash(grep:*)",
+      "Bash(dotnet remove:*)"
     ]
   }
 }
