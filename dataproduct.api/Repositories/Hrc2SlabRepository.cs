@@ -37,6 +37,8 @@ namespace dataproduct.api.Repositories
                 query = query.Where(s => s.IsTrungIDSlab == req.IsTrungIDSlab.Value);
             if (req.IsDiffMacThep.HasValue)
                 query = query.Where(s => s.IsDiffMacThep == req.IsDiffMacThep.Value);
+            if (req.IsSaiLotName.HasValue)
+                query = query.Where(s => s.IsSaiLotName == req.IsSaiLotName.Value);
 
             // Date filter via NgaySanXuat
             if (DateOnly.TryParse(req.TuNgay, out var tuNgay))
@@ -541,6 +543,7 @@ namespace dataproduct.api.Repositories
                 MayDuc             = s.MayDuc,
                 IsTrungIDSlab      = s.IsTrungIDSlab,
                 IsDiffMacThep      = s.IsDiffMacThep,
+                IsSaiLotName       = s.IsSaiLotName,
                 Line               = s.Line,
                 SapLastTime        = s.SapLastTime,
                 IsChot             = s.IsChot,

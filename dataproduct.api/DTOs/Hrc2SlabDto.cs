@@ -13,6 +13,7 @@ namespace dataproduct.api.DTOs
         public bool? IsChot { get; set; }
         public bool? IsTrungIDSlab { get; set; }
         public bool? IsDiffMacThep { get; set; }
+        public bool? IsSaiLotName { get; set; }
         public int? TrangThaiKCS { get; set; }
         public int? TrangThaiDuc { get; set; }
         public int? TrangThaiKho { get; set; }
@@ -49,6 +50,7 @@ namespace dataproduct.api.DTOs
         public int? MayDuc { get; set; }
         public bool? IsTrungIDSlab { get; set; }
         public bool? IsDiffMacThep { get; set; }
+        public bool IsSaiLotName { get; set; }
         public int? Line { get; set; }
         public DateOnly? SapLastTime { get; set; }
         public bool IsChot { get; set; }
