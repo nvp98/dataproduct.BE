@@ -15,12 +15,26 @@ namespace dataproduct.api.Services
         private readonly IBMPheDuyetRepository _repo;
         private readonly ProductDataMasterDbContext _contextMaster;
         private readonly IPhieuRepository _phieuRepo;
+        private readonly BBGN_ThepLongService _bbgnThepLongService;
 
-        public BmPheDuyetService(IBMPheDuyetRepository repo, ProductDataMasterDbContext Mastercontext, IPhieuRepository phieuRepo)
+        // Các maBm dùng bảng BBGN_ThepLong làm dữ liệu con theo IdPhieu (xem BBGN_ThepLongService/
+        // HRC2BBGNThepLongInitializer). Khi phiếu clone ("Đề nghị hiệu chỉnh") của các BM này bị
+        // Không xác nhận, phải dọn luôn các record con đã sinh ra theo IdPhieu của phiếu clone.
+        private static readonly HashSet<string> BmCoDuLieuBBGNThepLong = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong", "BBGN_ThepLong"
+        };
+
+        public BmPheDuyetService(
+            IBMPheDuyetRepository repo,
+            ProductDataMasterDbContext Mastercontext,
+            IPhieuRepository phieuRepo,
+            BBGN_ThepLongService bbgnThepLongService)
         {
             _repo = repo;
             _contextMaster = Mastercontext;
             _phieuRepo = phieuRepo;
+            _bbgnThepLongService = bbgnThepLongService;
         }
 
         public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID,int? isCheckDuyet)
@@ -150,6 +164,12 @@ namespace dataproduct.api.Services
                         phieuCha.IsLock = 0;
                         await _phieuRepo.UpdateAsync(phieuCha);
                     }
+
+                    // Dọn dữ liệu con đã sinh theo phiếu clone bị từ chối, tránh mồ côi record
+                    // và tránh đánh trùng mẻ "ma" với dữ liệu của phiếu gốc vừa được mở khóa lại.
+                    if (!string.IsNullOrWhiteSpace(phieu.MaBm) && BmCoDuLieuBBGNThepLong.Contains(phieu.MaBm))
+                        await _bbgnThepLongService.DeleteAllByIdPhieuAsync(phieuId);
+
                     await _repo.DeleteByPhieuIdAsync(phieuId);
                     await _phieuRepo.DeleteAsync(phieuId);
                     return true;

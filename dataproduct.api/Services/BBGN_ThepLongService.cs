@@ -396,6 +396,30 @@ namespace dataproduct.api.Services
             return rows;
         }
 
+        /// <summary>
+        /// Xóa toàn bộ record BBGN_ThepLong sinh ra theo 1 phiếu (dùng khi phiếu "Đề nghị hiệu chỉnh"
+        /// (clone) bị Không xác nhận / bị hủy trước khi có dữ liệu chính thức) và tính lại cờ trùng mẻ
+        /// cho các mẻ bị ảnh hưởng, tránh để phiếu gốc bị đánh trùng "ma" với record đã xóa.
+        /// </summary>
+        public async Task DeleteAllByIdPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BBGN_ThepLongs
+                .Where(x => x.IdPhieu == idPhieu)
+                .ToListAsync();
+
+            if (rows.Count == 0) return;
+
+            var affectedMes = rows
+                .Where(x => !string.IsNullOrWhiteSpace(x.Me))
+                .Select(x => x.Me!)
+                .ToList();
+
+            _context.BBGN_ThepLongs.RemoveRange(rows);
+            await _context.SaveChangesAsync();
+
+            await UpdateDuplicateFlagsForMesAsync(affectedMes);
+        }
+
         public async Task<bool> DeleteRowAsync(int id)
         {
             var row = await _context.BBGN_ThepLongs.FirstOrDefaultAsync(x => x.Id == id);
@@ -425,9 +449,17 @@ namespace dataproduct.api.Services
 
             if (mes.Count == 0) return;
 
-            var rows = await _context.BBGN_ThepLongs
-                .Where(x => x.IsGhost != true && x.Me != null && mes.Contains(x.Me))
-                .ToListAsync();
+            // Bỏ qua các dòng thuộc phiếu đã bị khóa (IsLock, ví dụ phiếu gốc bị khóa khi
+            // "Đề nghị hiệu chỉnh" sinh phiếu clone) hoặc đã xóa: phiếu này không còn hiển thị/
+            // hiệu lực nên không được tính vào việc phát hiện trùng mẻ với phiếu clone đang sửa.
+            var rows = await (
+                from x in _context.BBGN_ThepLongs
+                join p in _context.BmPhieus on x.IdPhieu equals p.Idphieu into pj
+                from p in pj.DefaultIfEmpty()
+                where x.IsGhost != true && x.Me != null && mes.Contains(x.Me)
+                      && p != null && p.IsLock != 1 && p.IsDelete != 1
+                select x
+            ).ToListAsync();
 
             bool changed = false;
             var groups = rows.GroupBy(x => x.Me!.Trim(), StringComparer.OrdinalIgnoreCase);
@@ -701,7 +733,12 @@ namespace dataproduct.api.Services
         {
             var query = _context.BBGN_ThepLongs
                 .AsNoTracking()
-                .Where(x => x.IsGhost != true && x.BieuMau == request.BieuMau);
+                .Where(x => x.IsGhost != true && x.BieuMau == request.BieuMau)
+                // Bỏ các record thuộc phiếu đã bị khóa (IsLock, ví dụ phiếu gốc bị khóa khi có
+                // bản "Đề nghị hiệu chỉnh") hoặc đã xóa: phiếu này không còn hiệu lực nên không
+                // được tính vào thống kê.
+                .Where(x => _context.BmPhieus.Any(p =>
+                    p.Idphieu == x.IdPhieu && p.IsLock != 1 && p.IsDelete != 1));
 
             if (request.TuNgay.HasValue)
             {
