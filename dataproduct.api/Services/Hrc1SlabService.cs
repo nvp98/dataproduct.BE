@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
@@ -16,23 +17,29 @@ namespace dataproduct.api.Services
     {
         private readonly IHrc1SlabRepository _repo;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterCtx;
         private readonly IWebHostEnvironment _env;
         private readonly IConverter _pdfConverter;
         private readonly IConfiguration _config;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _sqlConnStr;
 
         public Hrc1SlabService(
             IHrc1SlabRepository repo,
             ProductFormContext context,
+            ProductDataMasterDbContext masterCtx,
             IWebHostEnvironment env,
             IConverter pdfConverter,
-            IConfiguration config)
+            IConfiguration config,
+            IHttpClientFactory httpClientFactory)
         {
             _repo = repo;
             _context = context;
+            _masterCtx = masterCtx;
             _env = env;
             _pdfConverter = pdfConverter;
             _config = config;
+            _httpClientFactory = httpClientFactory;
             _sqlConnStr = config.GetConnectionString("DbConnectionString")
                 ?? throw new InvalidOperationException("DbConnectionString is not configured.");
         }
@@ -322,6 +329,20 @@ namespace dataproduct.api.Services
             rowsHtml.Append("<td></td>");
             rowsHtml.Append("</tr>");
 
+            var (ducUserId, canUserId, c4UserId) = await GetPhieuSignersAsync(slabs.Select(s => s.Id).ToList());
+            var signerIds = new[] { ducUserId, canUserId, c4UserId }
+                .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
+            var userMap = signerIds.Count > 0
+                ? await _masterCtx.Tbl_TaiKhoan
+                    .Include(t => t.ViTri)
+                    .Where(t => signerIds.Contains(t.ID_TaiKhoan))
+                    .ToDictionaryAsync(t => t.ID_TaiKhoan)
+                : new Dictionary<int, TaiKhoan>();
+
+            var (ducSigImg, ducSigTen) = await BuildSigPartsAsync(ducUserId, userMap);
+            var (canSigImg, canSigTen) = await BuildSigPartsAsync(canUserId, userMap);
+            var (c4SigImg, c4SigTen) = await BuildSigPartsAsync(c4UserId, userMap);
+
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BBXNSL_PhoiTam.html");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy template HTML: {templatePath}");
@@ -333,7 +354,13 @@ namespace dataproduct.api.Services
                 .Replace("{{ngaySX}}", ngaySX)
                 .Replace("{{ca}}", ca)
                 .Replace("{{kip}}", kip)
-                .Replace("{{TABLE_BODY}}", rowsHtml.ToString());
+                .Replace("{{TABLE_BODY}}", rowsHtml.ToString())
+                .Replace("{{DucKyImgHtml}}", ducSigImg)
+                .Replace("{{DucKyTenHtml}}", ducSigTen)
+                .Replace("{{CanKyImgHtml}}", canSigImg)
+                .Replace("{{CanKyTenHtml}}", canSigTen)
+                .Replace("{{C4KyImgHtml}}", c4SigImg)
+                .Replace("{{C4KyTenHtml}}", c4SigTen);
 
             var doc = new HtmlToPdfDocument
             {
@@ -397,6 +424,75 @@ namespace dataproduct.api.Services
             var range = ws.Range(fromRow, 1, toRow, lastCol);
             range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
             range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        }
+
+        // Với mỗi vai trò (Đúc/Cán/C4), lấy người xác nhận GẦN NHẤT trong số các slab thuộc phiếu
+        // (thông thường xác nhận là hành động hàng loạt nên cùng 1 người; trường hợp lệch người giữa
+        // các đợt xác nhận thì ưu tiên người xác nhận sau cùng làm đại diện chữ ký).
+        private async Task<(int? Duc, int? Can, int? C4)> GetPhieuSignersAsync(List<int> slabIds)
+        {
+            if (slabIds.Count == 0) return (null, null, null);
+
+            var trangThais = await _context.Hrc1SlabTrangThais
+                .AsNoTracking()
+                .Where(t => slabIds.Contains(t.IdSlab))
+                .ToListAsync();
+
+            int? ducUserId = trangThais
+                .Where(t => t.NguoiXacNhanDuc != null)
+                .OrderByDescending(t => t.NgayXacNhanDuc)
+                .Select(t => t.NguoiXacNhanDuc)
+                .FirstOrDefault();
+
+            int? canUserId = trangThais
+                .Where(t => t.NguoiXacNhanCan != null)
+                .OrderByDescending(t => t.NgayXacNhanCan)
+                .Select(t => t.NguoiXacNhanCan)
+                .FirstOrDefault();
+
+            int? c4UserId = trangThais
+                .Where(t => t.NguoiXacNhanC4 != null)
+                .OrderByDescending(t => t.NgayXacNhanC4)
+                .Select(t => t.NguoiXacNhanC4)
+                .FirstOrDefault();
+
+            return (ducUserId, canUserId, c4UserId);
+        }
+
+        private async Task<(string ImgHtml, string TenHtml)> BuildSigPartsAsync(int? userId, Dictionary<int, TaiKhoan> userMap)
+        {
+            if (userId == null || !userMap.TryGetValue(userId.Value, out var u))
+                return ("", "");
+
+            var imgTag = await FormatChuKyImgAsync(u.ChuKy);
+            var name = System.Net.WebUtility.HtmlEncode(u.HoVaTen ?? "");
+            var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
+            var tenHtml = !string.IsNullOrEmpty(chucVu)
+                ? $"{name}<div style=\"font-weight:normal;font-size:9pt;color:#555;\">{chucVu}</div>"
+                : name;
+            return (imgTag, tenHtml);
+        }
+
+        private async Task<string> FormatChuKyImgAsync(string? chuKy)
+        {
+            if (string.IsNullOrWhiteSpace(chuKy)) return "";
+
+            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+                return $"<img src=\"{chuKy}\" style=\"max-width:120px;max-height:50px;\" />";
+
+            string url = chuKy.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? chuKy
+                : (_config.GetValue<string>("AppSettings:Domain") ?? "https://report.hoaphatdungquat.vn").TrimEnd('/') + chuKy;
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(10);
+                var bytes = await client.GetByteArrayAsync(url);
+                var mime = url.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+                return $"<img src=\"data:{mime};base64,{Convert.ToBase64String(bytes)}\" style=\"max-width:120px;max-height:50px;\" />";
+            }
+            catch { return ""; }
         }
 
         private async Task<BmPhieu?> GetPhieuForExportAsync(Guid idPhieu)
