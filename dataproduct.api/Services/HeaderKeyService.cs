@@ -62,6 +62,7 @@ namespace dataproduct.api.Services
             existing.ThuTu_Excel_BOF = entity.ThuTu_Excel_BOF;
             existing.ThuTu_Excel_LFRH = entity.ThuTu_Excel_LFRH;
             existing.ID_NhomKey = entity.ID_NhomKey;
+            existing.MaVatTuChiPhi = entity.MaVatTuChiPhi;
             // KeyGuid không được thay đổi khi update
             await _repo.UpdateAsync(existing);
             return true;

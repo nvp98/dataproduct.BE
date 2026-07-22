@@ -36,6 +36,9 @@ public partial class Header_Key
     /// <summary>FK → Header_Nhom.Id. Khi có giá trị, Header_Key này bị ẩn khỏi cột riêng;
     /// giá trị được cộng vào cột nhóm (IDHeaderKey = -Header_Nhom.Id).</summary>
     public int? ID_NhomKey { get; set; }
+
+    /// <summary>Mã vật tư bên hệ thống chi phí. NULL = không feed sang ChiPhi_ProductionData.</summary>
+    public string? MaVatTuChiPhi { get; set; }
 }
 
 /// <summary>Các cột "thứ tự" của Header_Key — mỗi cột là 1 không gian số thứ tự độc lập
