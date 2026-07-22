@@ -849,7 +849,19 @@ namespace dataproduct.api.Services
                     .ToDictionaryAsync(x => x.Id, x => x.TenNhom)
                 : new Dictionary<int, string>();
 
-            var macThepMap = macTheps.ToDictionary(x => x.TenMacThep, StringComparer.OrdinalIgnoreCase);
+            // Dữ liệu MacThep không có ràng buộc unique trên TenMacThep, thực tế đã ghi nhận
+            // các bản ghi trùng tên (khác Id) cho cùng NhaMay, ví dụ "SAE1010-2". Nhóm theo tên
+            // (không phân biệt hoa/thường) và ưu tiên bản ghi đã xác nhận / mới nhất để tránh lỗi
+            // "An item with the same key has already been added" khi ToDictionary.
+            var macThepMap = macTheps
+                .GroupBy(x => x.TenMacThep, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.IsXacNhan == true)
+                          .ThenByDescending(x => x.NgayTao)
+                          .ThenByDescending(x => x.Id)
+                          .First(),
+                    StringComparer.OrdinalIgnoreCase);
 
             foreach (var row in rows.Where(x => !string.IsNullOrWhiteSpace(x.MacThepBKMIS)))
             {
