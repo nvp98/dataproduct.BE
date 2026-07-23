@@ -108,6 +108,13 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<SiLoTon> SiLoTon { get; set; }
     public virtual DbSet<LG_NKVHPT_DuLieu> LG_NKVHPT_DuLieu { get; set; }
     public virtual DbSet<LG_NKVHPT_ChiTiet> LG_NKVHPT_ChiTiet { get; set; }
+    public virtual DbSet<LG_NhomPhanBo> LG_NhomPhanBo { get; set; }
+    public virtual DbSet<LG_NVL_NhomPhanBo> LG_NVL_NhomPhanBo { get; set; }
+    public virtual DbSet<LG_Map_Xuong_LoCao> LG_Map_Xuong_LoCao { get; set; }
+    public virtual DbSet<LG_BienBanNhanQHLCCVH> LG_BienBanNhanQHLCCVH { get; set; }
+    public virtual DbSet<LG_TyLePhanBo> LG_TyLePhanBo { get; set; }
+    public virtual DbSet<LG_KetQuaPhanBo> LG_KetQuaPhanBo { get; set; }
+    public virtual DbSet<LG_Map_NvlCVH_LoCao> LG_Map_NvlCVH_LoCao { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
@@ -747,6 +754,21 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.GiaTri).HasPrecision(18, 3);
             entity.Property(e => e.GiaTri_Goc).HasPrecision(18, 3);
             entity.Property(e => e.QuyKho).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<LG_BienBanNhanQHLCCVH>(entity =>
+        {
+            entity.Property(e => e.KhoiLuongNhanVe).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<LG_TyLePhanBo>(entity =>
+        {
+            entity.Property(e => e.TyLe).HasPrecision(9, 6);
+        });
+        modelBuilder.Entity<LG_KetQuaPhanBo>(entity =>
+        {
+            entity.Property(e => e.KhoiLuongNapLieu).HasPrecision(18, 3);
+            entity.Property(e => e.TyLePhanBo).HasPrecision(9, 6);
+            entity.Property(e => e.KhoiLuongPhanBo).HasPrecision(18, 3);
+            entity.Property(e => e.KhoiLuongChotCuoi).HasPrecision(18, 3);
         });
         modelBuilder.Entity<BkHrc2Slab>(entity =>
         {

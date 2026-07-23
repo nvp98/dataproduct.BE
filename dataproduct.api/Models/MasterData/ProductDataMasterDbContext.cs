@@ -25,6 +25,9 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<Tbl_MeThoi> Tbl_MeThoi { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat> Tbl_BM_16_LoSanXuat { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat_TaiKhoan> Tbl_BM_16_LoSanXuat_TaiKhoan { get; set; }
+    public DbSet<Tbl_BienBanGiaoNhan> Tbl_BienBanGiaoNhan { get; set; }
+    public DbSet<Tbl_ChiTiet_BienBanGiaoNhan> Tbl_ChiTiet_BienBanGiaoNhan { get; set; }
+    public DbSet<Tbl_Xuong> Tbl_Xuong { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         //modelBuilder.Entity<TaiKhoan>(entity =>

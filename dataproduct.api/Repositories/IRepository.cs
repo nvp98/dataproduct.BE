@@ -408,6 +408,72 @@ namespace dataproduct.api.Repositories
         Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
     }
 
+    // ─── Phân bổ dữ liệu (QHLC / CVH / Than cốc <10mm) ────────────────────────
+
+    public interface INhomPhanBoRepository
+    {
+        Task<List<LG_NhomPhanBo>> GetListAsync(byte? loaiPhanBo);
+        Task<LG_NhomPhanBo?> GetByIdAsync(int id);
+        Task<LG_NhomPhanBo> AddAsync(LG_NhomPhanBo entity);
+        Task<LG_NhomPhanBo?> UpdateAsync(int id, LG_NhomPhanBo entity);
+        Task<bool> DeleteAsync(int id);
+
+        Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo);
+        Task<LG_NVL_NhomPhanBo> AddNvlAsync(LG_NVL_NhomPhanBo entity);
+        Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl);
+
+        // Toàn bộ nhóm + NVL thành viên của 1 loại phân bổ, dùng cho PhanBoService.TinhPhanBoAsync
+        Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo);
+
+        Task<Dictionary<int, LG_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string?>> GetTenNvlMapAsync(IEnumerable<int> idNvlList);
+    }
+
+    public interface ITyLePhanBoRepository
+    {
+        Task<List<LG_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay);
+
+        // Tỷ lệ hiệu lực tại (ngay, ca) cho từng NVL: ưu tiên bản ghi đúng ca, fallback bản ghi Ca=NULL (áp dụng chung cả ngày)
+        Task<Dictionary<int, decimal>> GetHieuLucMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte? ca);
+
+        // Ghi đè nếu đã có bản ghi cho đúng (IDNVL, Ngay, Ca) — cho phép sửa nhiều lần trước khi chốt
+        Task<LG_TyLePhanBo> UpsertAsync(LG_TyLePhanBo entity);
+    }
+
+    public interface INapLieuPhanBoRepository
+    {
+        // SUM(QuyKho) GROUP BY IDCa, IDNVL cho 1 ngày + 1 lò cao (bỏ Kíp) — dùng LG_NL_ChiTiet.QuyKho có sẵn, không cần view
+        Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao);
+
+        // G của CVH: SUM(QuyKho) cho danh sách NVL "than cốc hoàn" đại diện theo lò cao
+        Task<List<TongNhanVeDto>> GetNapLieuTheoNvlListAsync(DateTime ngay, IEnumerable<int> idNvlList);
+
+        Task<Dictionary<int, int>> GetMapNvlCvhLoCaoAsync(); // IDLoCao -> IDNVL
+    }
+
+    public interface IBienBanNhanRepository
+    {
+        Task<List<LG_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo);
+        Task UpsertAsync(LG_BienBanNhanQHLCCVH entity); // match theo (Ngay, Ca, IDLoCao, LoaiPhanBo)
+        Task<Dictionary<int, int>> GetMapXuongLoCaoAsync(); // ID_Xuong -> IDLoCao
+    }
+
+    public interface IKetQuaPhanBoRepository
+    {
+        Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo);
+        Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
+        Task<List<LG_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
+        Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan);
+        Task<List<LG_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
+    }
+
+    public interface IBienBanGiaoNhanSourceRepository
+    {
+        // Dùng chung cho QHLC (idVatTu=470) và Than cốc <10mm (idVatTu=484)
+        // SUM(KL_QuyKho_BG) GROUP BY Ca, ID_Xuong_BG WHERE ID_TrangThai_BBGN=1 AND ID_Xuong_BG IN idXuongList (bỏ Kíp)
+        Task<List<(int IdXuong, byte? Ca, decimal KhoiLuong)>> GetTongNhanVeAsync(DateTime ngay, int idVatTu, IEnumerable<int> idXuongList);
+    }
+
     public interface IHrc1SlabRepository
     {
         Task<Hrc1SlabSyncResult> UpsertFromApiAsync(List<TscSlabItem> items);
