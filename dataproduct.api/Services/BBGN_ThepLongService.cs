@@ -392,6 +392,8 @@ namespace dataproduct.api.Services
                     .ToListAsync();
             }
 
+            rows = SortRowsByThoiGian(rows, request.Ca, request.NgaySX);
+
             await ResolveMacThepNamesAsync(rows);
             return rows;
         }
@@ -501,11 +503,36 @@ namespace dataproduct.api.Services
         {
             var rows = await _context.BBGN_ThepLongs
                 .Where(x => x.IdPhieu == idPhieu && x.IsGhost != true)
-                .OrderBy(x => x.ThoiGian)
-                .ThenBy(x => x.Id)
                 .ToListAsync();
+
+            var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == idPhieu);
+            rows = SortRowsByThoiGian(rows, phieu?.Ca, phieu?.NgaySX);
+
             await ResolveMacThepNamesAsync(rows);
             return rows;
+        }
+
+        /// <summary>
+        /// Ca 2 chạy từ 19:45 hôm nay → 19:45 hôm sau: ThoiGian &lt; "19:45" thuộc ngày hôm sau,
+        /// nên không thể sort trực tiếp theo chuỗi "HH:mm" (sẽ đẩy nhầm các giờ đầu ca 2 lên đầu
+        /// danh sách). Quy về sort-key "yyyy-MM-dd HH:mm" theo đúng thời điểm thực tế rồi mới sort.
+        /// </summary>
+        private static List<BBGN_ThepLong> SortRowsByThoiGian(List<BBGN_ThepLong> rows, int? ca, DateOnly? ngaySX)
+        {
+            var baseNgay = ngaySX ?? DateOnly.FromDateTime(DateTime.Today);
+
+            string SortKey(BBGN_ThepLong r)
+            {
+                if (string.IsNullOrWhiteSpace(r.ThoiGian)) return "9999-12-31 99:99";
+                var isNextDay = ca == 2 && string.Compare(r.ThoiGian, "19:45", StringComparison.Ordinal) < 0;
+                var ngay = isNextDay ? baseNgay.AddDays(1) : baseNgay;
+                return $"{ngay:yyyy-MM-dd} {r.ThoiGian}";
+            }
+
+            return rows
+                .OrderBy(SortKey, StringComparer.Ordinal)
+                .ThenBy(x => x.Id)
+                .ToList();
         }
 
         public async Task<PagedResult<BBGN_ThepLong>> SearchThongKeAsync(SearchThongKeBBGNThepLongRequest request)
@@ -913,7 +940,7 @@ namespace dataproduct.api.Services
                   <td>{stt++}</td>
                   <td>{r.MayDuc ?? ""}</td>
                   <td{meStyle}>{r.Me ?? ""}</td>
-                  <td>{r.MacThep ?? ""}</td>
+                  <td>{r.MacThepBKMIS ?? ""}</td>
                   <td>{r.ThungSo ?? ""}</td>
                   <td>{r.ThoiGian ?? ""}</td>
                   <td>{(r.KlLan1.HasValue ? r.KlLan1.Value.ToString("0.##") : "")}</td>
@@ -1032,7 +1059,7 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 3).Value = row.Me ?? "";                                                   // C - Mẻ
                 ws.Cell(r, 3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 
-                ws.Cell(r, 4).Value = row.MacThep ?? "";                                              // D - Mác thép
+                ws.Cell(r, 4).Value = row.MacThepBKMIS ?? "";                                        // D - Mác thép
                 ws.Cell(r, 5).Value = row.ThungSo ?? "";                                              // E - Thùng số
                 ws.Cell(r, 5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 
