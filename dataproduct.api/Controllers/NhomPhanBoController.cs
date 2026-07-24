@@ -50,9 +50,9 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpGet("{id}/get-nvl")]
-        public async Task<IActionResult> GetNvl(int id)
+        public async Task<IActionResult> GetNvl(int id, [FromQuery] DateTime ngay, [FromQuery] byte ca)
         {
-            try { return Ok(await _service.GetNvlByNhomAsync(id)); }
+            try { return Ok(await _service.GetNvlByNhomAsync(id, ngay, ca)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
@@ -65,11 +65,11 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpDelete("{id}/remove-nvl/{idNvl}")]
-        public async Task<IActionResult> RemoveNvl(int id, int idNvl)
+        public async Task<IActionResult> RemoveNvl(int id, int idNvl, [FromQuery] DateTime ngay, [FromQuery] byte ca)
         {
             try
             {
-                var ok = await _service.RemoveNvlAsync(id, idNvl);
+                var ok = await _service.RemoveNvlAsync(id, idNvl, ngay, ca);
                 return ok ? Ok(new { message = "Đã xóa thành công." }) : NotFound(new { message = "Không tìm thấy NVL trong nhóm." });
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }

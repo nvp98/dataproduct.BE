@@ -28,6 +28,7 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<Tbl_BienBanGiaoNhan> Tbl_BienBanGiaoNhan { get; set; }
     public DbSet<Tbl_ChiTiet_BienBanGiaoNhan> Tbl_ChiTiet_BienBanGiaoNhan { get; set; }
     public DbSet<Tbl_Xuong> Tbl_Xuong { get; set; }
+    public DbSet<TongNhanVeBbgnResult> TongNhanVeBbgnResults { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         //modelBuilder.Entity<TaiKhoan>(entity =>
@@ -50,6 +51,7 @@ public partial class ProductDataMasterDbContext : DbContext
             
 
         modelBuilder.Entity<TonSiLoLoCaResult>().HasNoKey().ToView(null);
+        modelBuilder.Entity<TongNhanVeBbgnResult>().HasNoKey().ToView(null);
 
         // Cấu hình entity keyless cho stored procedure results
         modelBuilder.Entity<StoredProcedureScalarResult>(entity =>

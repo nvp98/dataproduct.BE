@@ -56,10 +56,10 @@ namespace dataproduct.api.Repositories
             return true;
         }
 
-        public async Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo)
+        public async Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca)
         {
             var thanhVien = await _context.LG_NVL_NhomPhanBo
-                .Where(x => !x.IsDelete && x.IDNhomPhanBo == idNhomPhanBo)
+                .Where(x => !x.IsDelete && x.IDNhomPhanBo == idNhomPhanBo && x.Ngay == ngay.Date && x.Ca == ca)
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -77,7 +77,10 @@ namespace dataproduct.api.Repositories
                     Id = x.ID,
                     IdNvl = x.IDNVL,
                     TenNvl = tenNvlMap.GetValueOrDefault(x.IDNVL),
-                    IdNhomPhanBo = x.IDNhomPhanBo
+                    IdNhomPhanBo = x.IDNhomPhanBo,
+                    Ngay = x.Ngay,
+                    Ca = x.Ca,
+                    IdLoCao = x.IDLoCao
                 })
                 .ToList();
         }
@@ -89,17 +92,19 @@ namespace dataproduct.api.Repositories
             return entity;
         }
 
-        public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl)
+        public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca)
         {
             var existing = await _context.LG_NVL_NhomPhanBo
-                .FirstOrDefaultAsync(x => x.IDNhomPhanBo == idNhomPhanBo && x.IDNVL == idNvl && !x.IsDelete);
+                .FirstOrDefaultAsync(x => x.IDNhomPhanBo == idNhomPhanBo && x.IDNVL == idNvl
+                    && x.Ngay == ngay.Date && x.Ca == ca && !x.IsDelete);
             if (existing == null) return false;
             existing.IsDelete = true;
             await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo)
+        public async Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(
+            byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao)
         {
             var nhoms = await _context.LG_NhomPhanBo
                 .Where(x => !x.IsDelete && x.LoaiPhanBo == loaiPhanBo)
@@ -109,7 +114,8 @@ namespace dataproduct.api.Repositories
 
             var nhomIds = nhoms.Select(x => x.ID).ToList();
             var thanhViens = await _context.LG_NVL_NhomPhanBo
-                .Where(x => !x.IsDelete && nhomIds.Contains(x.IDNhomPhanBo))
+                .Where(x => !x.IsDelete && nhomIds.Contains(x.IDNhomPhanBo)
+                    && x.Ngay == ngay.Date && x.Ca == ca && x.IDLoCao == idLoCao)
                 .AsNoTracking()
                 .ToListAsync();
 

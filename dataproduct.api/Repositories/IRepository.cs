@@ -418,12 +418,13 @@ namespace dataproduct.api.Repositories
         Task<LG_NhomPhanBo?> UpdateAsync(int id, LG_NhomPhanBo entity);
         Task<bool> DeleteAsync(int id);
 
-        Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo);
+        // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngay, Ca), không kế thừa
+        Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca);
         Task<LG_NVL_NhomPhanBo> AddNvlAsync(LG_NVL_NhomPhanBo entity);
-        Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl);
+        Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca);
 
-        // Toàn bộ nhóm + NVL thành viên của 1 loại phân bổ, dùng cho PhanBoService.TinhPhanBoAsync
-        Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo);
+        // Toàn bộ nhóm + NVL thành viên của 1 loại phân bổ tại đúng (Ngay, Ca, Lò cao), dùng cho PhanBoService.TinhPhanBoAsync
+        Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao);
 
         Task<Dictionary<int, LG_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
         Task<Dictionary<int, string?>> GetTenNvlMapAsync(IEnumerable<int> idNvlList);

@@ -1,11 +1,13 @@
 using dataproduct.api.Models.MasterData;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Repositories
 {
-    // Đọc Tbl_BienBanGiaoNhan/Tbl_ChiTiet_BienBanGiaoNhan (PRODUCTDATA) — dùng chung cho
-    // QHLC (ID_VatTu=470) và Than cốc <10mm (ID_VatTu=484). Không LINQ-join chéo sang
-    // ProductFormContext (LG_Map_Xuong_LoCao) ở đây — việc map ID_Xuong -> IDLoCao gộp ở Service.
+    // Đọc BBGN (Tbl_BienBanGiaoNhan/Tbl_ChiTiet_BienBanGiaoNhan, PRODUCTDATA) qua stored procedure
+    // sp_LG_PhanBo_TongNhanVe_BBGN — dùng chung cho QHLC (ID_VatTu=470) và Than cốc <10mm (ID_VatTu=484).
+    // SP không lọc theo Xưởng — việc map ID_Xuong -> IDLoCao (LG_Map_Xuong_LoCao, ở PRODUCT_FORM,
+    // khác database) và lọc/gộp theo lò cao thực hiện ở tầng C# (PhanBoService).
     public class BienBanGiaoNhanSourceRepository : IBienBanGiaoNhanSourceRepository
     {
         private readonly ProductDataMasterDbContext _context;
@@ -20,20 +22,17 @@ namespace dataproduct.api.Repositories
         {
             var idXuongs = idXuongList.ToList();
 
-            var query = from bb in _context.Tbl_BienBanGiaoNhan
-                        join ct in _context.Tbl_ChiTiet_BienBanGiaoNhan on bb.ID_BBGN equals ct.ID_BBGN
-                        where bb.ThoiGianXuLyBG != null
-                            && bb.ThoiGianXuLyBG.Value.Date == ngay.Date
-                            && bb.ID_TrangThai_BBGN == 1
-                            && bb.ID_Xuong_BG != null && idXuongs.Contains(bb.ID_Xuong_BG.Value)
-                            && ct.ID_VatTu == idVatTu
-                        group ct by new { bb.ID_Xuong_BG, bb.Ca } into g
-                        select new { g.Key.ID_Xuong_BG, g.Key.Ca, KhoiLuong = g.Sum(x => x.KL_QuyKho_BG ?? 0) };
+            var raw = await _context.TongNhanVeBbgnResults
+                .FromSqlRaw(
+                    "EXEC dbo.sp_LG_PhanBo_TongNhanVe_BBGN @Ngay, @IdVatTu",
+                    new SqlParameter("@Ngay", ngay.Date),
+                    new SqlParameter("@IdVatTu", idVatTu))
+                .AsNoTracking()
+                .ToListAsync();
 
-            var rows = await query.AsNoTracking().ToListAsync();
-
-            return rows
-                .Select(r => (r.ID_Xuong_BG!.Value, ParseCa(r.Ca), (decimal)r.KhoiLuong))
+            return raw
+                .Where(r => idXuongs.Contains(r.IdXuong))
+                .Select(r => (r.IdXuong, ParseCa(r.Ca), (decimal)r.KhoiLuong))
                 .ToList();
         }
 

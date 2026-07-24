@@ -61,8 +61,9 @@ namespace dataproduct.api.Services
 
         public async Task<bool> DeleteAsync(int id) => await _repo.DeleteAsync(id);
 
-        public async Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo)
-            => await _repo.GetNvlByNhomAsync(idNhomPhanBo);
+        // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngày, Ca), không kế thừa từ ngày/ca trước
+        public async Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca)
+            => await _repo.GetNvlByNhomAsync(idNhomPhanBo, ngay, ca);
 
         // Với nhóm PP1 (tỷ trọng + dòng dư), "dòng dư" (NVL nhận phần bù trừ do làm tròn) được
         // PhanBoService TỰ ĐỘNG chọn theo khối lượng nạp liệu (E) lớn nhất tại thời điểm tính —
@@ -76,16 +77,19 @@ namespace dataproduct.api.Services
             {
                 IDNVL = dto.IdNvl,
                 IDNhomPhanBo = idNhomPhanBo,
+                Ngay = dto.Ngay.Date,
+                Ca = dto.Ca,
+                IDLoCao = dto.IdLoCao,
                 ThuTuUuTien = 0
             };
             await _repo.AddNvlAsync(entity);
 
-            var list = await _repo.GetNvlByNhomAsync(idNhomPhanBo);
+            var list = await _repo.GetNvlByNhomAsync(idNhomPhanBo, dto.Ngay, dto.Ca);
             return list.First(x => x.IdNvl == dto.IdNvl);
         }
 
-        public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl)
-            => await _repo.RemoveNvlAsync(idNhomPhanBo, idNvl);
+        public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca)
+            => await _repo.RemoveNvlAsync(idNhomPhanBo, idNvl, ngay, ca);
 
         private static NhomPhanBoDto MapNhom(LG_NhomPhanBo x) => new()
         {

@@ -123,12 +123,7 @@ namespace dataproduct.api.Services
             var bienBans = await _bienBanRepo.GetByNgayAsync(ngay, loaiPhanBo);
             if (bienBans.Count == 0) return new List<LG_KetQuaPhanBo>();
 
-            var nhomVaThanhVien = await _nhomRepo.GetNhomVaThanhVienAsync(LoaiPhanBoChoNhom(loaiPhanBo));
-            if (nhomVaThanhVien.Count == 0) return new List<LG_KetQuaPhanBo>();
-
-            var pp2Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyLeNhapTay).ToList();
-            var pp1Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyTrongDongDu).ToList();
-
+            var loaiPhanBoChoNhom = LoaiPhanBoChoNhom(loaiPhanBo);
             var result = new List<LG_KetQuaPhanBo>();
 
             foreach (var locaoGroup in bienBans.GroupBy(b => b.IDLoCao))
@@ -138,7 +133,16 @@ namespace dataproduct.api.Services
 
                 foreach (var bienBan in locaoGroup)
                 {
-                    var ca = bienBan.Ca;
+                    if (bienBan.Ca == null) continue; // không xác định được ca thì không tra được cấu hình nhóm/NVL
+                    var ca = bienBan.Ca.Value;
+
+                    // NVL thuộc nhóm là cấu hình RIÊNG cho đúng (ngày, ca, lò cao) này — không kế thừa từ ca/ngày khác
+                    var nhomVaThanhVien = await _nhomRepo.GetNhomVaThanhVienAsync(loaiPhanBoChoNhom, ngay, ca, idLoCao);
+                    if (nhomVaThanhVien.Count == 0) continue;
+
+                    var pp2Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyLeNhapTay).ToList();
+                    var pp1Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyTrongDongDu).ToList();
+
                     var eForCa = eList.Where(x => x.Ca == ca).ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieu);
                     var g = bienBan.KhoiLuongNhanVe;
 
@@ -365,6 +369,13 @@ namespace dataproduct.api.Services
 
             var validateCvh = await BuildValidateAsync(ngay, (byte)LoaiPhanBoEnum.Cvh, idLoCao, ca, rowsCvh.Sum(r => r.KhoiLuongPhanBo));
             var validateThanCoc10 = await BuildValidateAsync(ngay, (byte)LoaiPhanBoEnum.ThanCoc10, idLoCao, ca, rowsThanCoc10.Sum(r => r.KhoiLuongPhanBo));
+
+            // G của CVH/Than cốc <10mm — dùng chung cho toàn bộ bảng, lấy lại từ kết quả validate đã tính
+            foreach (var k in ketQua)
+            {
+                k.KhoiLuongNhanVeCvh = validateCvh.TongNhanVe;
+                k.KhoiLuongNhanVeThanCoc10 = validateThanCoc10.TongNhanVe;
+            }
 
             return new KetQuaThanCocQueryResultDto
             {

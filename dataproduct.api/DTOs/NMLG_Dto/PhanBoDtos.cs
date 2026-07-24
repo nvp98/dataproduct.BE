@@ -33,11 +33,17 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdNvl { get; set; }
         public string? TenNvl { get; set; }   // join từ LG_NL_NVL
         public int IdNhomPhanBo { get; set; }
+        public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int IdLoCao { get; set; }
     }
 
     public class AddNvlNhomPhanBoDto
     {
         public int IdNvl { get; set; }
+        public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int IdLoCao { get; set; }
     }
 
     // ─── Tỷ lệ phân bổ (PP2 — nhập tay) ────────────────────────────────────────
@@ -129,7 +135,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public decimal KhoiLuongNapLieu { get; set; }         // E (dùng chung)
         public decimal KhoiLuongNapLieuNhom { get; set; }     // Tổng E của cả nhóm (SUM E các NVL thành viên)
         public decimal TyLePhanBo { get; set; }               // % (dùng chung, snapshot từ CVH)
+        public decimal KhoiLuongNhanVeCvh { get; set; }         // G_CVH — lấy từ biểu nạp liệu, dùng chung cho cả bảng
         public decimal KhoiLuongPhanBoCvh { get; set; }        // H_CVH
+        public decimal KhoiLuongNhanVeThanCoc10 { get; set; }   // G_ThanCoc10 — lấy từ biên bản giao nhận, dùng chung cho cả bảng
         public decimal KhoiLuongPhanBoThanCoc10 { get; set; }  // H_ThanCoc10
         public decimal KhoiLuongChotCuoi { get; set; }         // I = E + H_CVH + H_ThanCoc10
         public bool LaDongConLai { get; set; }

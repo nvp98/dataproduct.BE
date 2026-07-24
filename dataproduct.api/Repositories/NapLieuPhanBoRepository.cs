@@ -13,6 +13,9 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
+        // Dùng GiaTri (giá trị từng dòng chi tiết, không lặp lại) — KHÔNG dùng QuyKho vì QuyKho được
+        // tính 1 lần cho cả phiếu rồi lưu LẶP LẠI trên mọi dòng cùng (IDPhieu, IDNVL), SUM trực tiếp
+        // sẽ nhân giá trị thật lên theo số dòng chi tiết trong phiếu.
         public async Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao)
         {
             return await _context.LG_NL_ChiTiet
@@ -41,7 +44,7 @@ namespace dataproduct.api.Repositories
                     Ngay = ngay.Date,
                     Ca = (byte?)g.Key.IDCa,
                     IdLoCao = g.Key.IDLoCao ?? 0,
-                    KhoiLuongNhanVe = g.Sum(x => x.QuyKho ?? 0)
+                    KhoiLuongNhanVe = g.Sum(x => x.GiaTri ?? 0)
                 })
                 .AsNoTracking()
                 .ToListAsync();
