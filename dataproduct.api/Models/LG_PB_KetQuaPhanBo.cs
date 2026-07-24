@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace dataproduct.api.Models
 {
-    public class LG_KetQuaPhanBo
+    public class LG_PB_KetQuaPhanBo
     {
         [Key]
         public int ID { get; set; }

@@ -45,7 +45,7 @@ namespace dataproduct.api.Services
                     throw new InvalidOperationException($"Ngày {dto.Ngay:dd/MM/yyyy} đã chốt, không thể sửa tỷ lệ.");
             }
 
-            var entity = new LG_TyLePhanBo
+            var entity = new LG_PB_TyLePhanBo
             {
                 IDNVL = dto.IdNvl,
                 Ngay = dto.Ngay.Date,

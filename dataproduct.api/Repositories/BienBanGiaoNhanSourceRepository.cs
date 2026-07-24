@@ -6,7 +6,7 @@ namespace dataproduct.api.Repositories
 {
     // Đọc BBGN (Tbl_BienBanGiaoNhan/Tbl_ChiTiet_BienBanGiaoNhan, PRODUCTDATA) qua stored procedure
     // sp_LG_PhanBo_TongNhanVe_BBGN — dùng chung cho QHLC (ID_VatTu=470) và Than cốc <10mm (ID_VatTu=484).
-    // SP không lọc theo Xưởng — việc map ID_Xuong -> IDLoCao (LG_Map_Xuong_LoCao, ở PRODUCT_FORM,
+    // SP không lọc theo Xưởng — việc map ID_Xuong -> IDLoCao (LG_PB_Map_Xuong_LoCao, ở PRODUCT_FORM,
     // khác database) và lọc/gộp theo lò cao thực hiện ở tầng C# (PhanBoService).
     public class BienBanGiaoNhanSourceRepository : IBienBanGiaoNhanSourceRepository
     {

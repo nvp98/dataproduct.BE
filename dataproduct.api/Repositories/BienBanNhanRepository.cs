@@ -12,23 +12,23 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<List<LG_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo)
+        public async Task<List<LG_PB_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo)
         {
-            return await _context.LG_BienBanNhanQHLCCVH
+            return await _context.LG_PB_BienBanNhanQHLCCVH
                 .Where(x => !x.IsDelete && x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo)
                 .AsNoTracking()
                 .ToListAsync();
         }
 
-        public async Task UpsertAsync(LG_BienBanNhanQHLCCVH entity)
+        public async Task UpsertAsync(LG_PB_BienBanNhanQHLCCVH entity)
         {
-            var existing = await _context.LG_BienBanNhanQHLCCVH.FirstOrDefaultAsync(x =>
+            var existing = await _context.LG_PB_BienBanNhanQHLCCVH.FirstOrDefaultAsync(x =>
                 x.Ngay == entity.Ngay && x.Ca == entity.Ca && x.IDLoCao == entity.IDLoCao && x.LoaiPhanBo == entity.LoaiPhanBo);
 
             if (existing == null)
             {
                 entity.NgayNhap = DateTime.Now;
-                await _context.LG_BienBanNhanQHLCCVH.AddAsync(entity);
+                await _context.LG_PB_BienBanNhanQHLCCVH.AddAsync(entity);
             }
             else
             {
@@ -42,7 +42,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<Dictionary<int, int>> GetMapXuongLoCaoAsync()
         {
-            return await _context.LG_Map_Xuong_LoCao
+            return await _context.LG_PB_Map_Xuong_LoCao
                 .AsNoTracking()
                 .ToDictionaryAsync(x => x.ID_Xuong, x => x.IDLoCao);
         }

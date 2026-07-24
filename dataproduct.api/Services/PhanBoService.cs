@@ -60,7 +60,7 @@ namespace dataproduct.api.Services
 
                     foreach (var g in grouped)
                     {
-                        await _bienBanRepo.UpsertAsync(new LG_BienBanNhanQHLCCVH
+                        await _bienBanRepo.UpsertAsync(new LG_PB_BienBanNhanQHLCCVH
                         {
                             Ngay = ngay,
                             Ca = g.Ca,
@@ -79,7 +79,7 @@ namespace dataproduct.api.Services
                 var rows = await _napLieuRepo.GetNapLieuTheoNvlListAsync(ngay, mapCvh.Values);
                 foreach (var r in rows)
                 {
-                    await _bienBanRepo.UpsertAsync(new LG_BienBanNhanQHLCCVH
+                    await _bienBanRepo.UpsertAsync(new LG_PB_BienBanNhanQHLCCVH
                     {
                         Ngay = ngay,
                         Ca = r.Ca,
@@ -118,13 +118,13 @@ namespace dataproduct.api.Services
         private static byte LoaiPhanBoChoNhom(byte loaiPhanBo) =>
             loaiPhanBo == (byte)LoaiPhanBoEnum.ThanCoc10 ? (byte)LoaiPhanBoEnum.Cvh : loaiPhanBo;
 
-        private async Task<List<LG_KetQuaPhanBo>> TinhChoLoaiAsync(DateTime ngay, byte loaiPhanBo, int idNguoiTao)
+        private async Task<List<LG_PB_KetQuaPhanBo>> TinhChoLoaiAsync(DateTime ngay, byte loaiPhanBo, int idNguoiTao)
         {
             var bienBans = await _bienBanRepo.GetByNgayAsync(ngay, loaiPhanBo);
-            if (bienBans.Count == 0) return new List<LG_KetQuaPhanBo>();
+            if (bienBans.Count == 0) return new List<LG_PB_KetQuaPhanBo>();
 
             var loaiPhanBoChoNhom = LoaiPhanBoChoNhom(loaiPhanBo);
-            var result = new List<LG_KetQuaPhanBo>();
+            var result = new List<LG_PB_KetQuaPhanBo>();
 
             foreach (var locaoGroup in bienBans.GroupBy(b => b.IDLoCao))
             {
@@ -147,7 +147,7 @@ namespace dataproduct.api.Services
                     var g = bienBan.KhoiLuongNhanVe;
 
                     // Pass 1: PP2 — tỷ lệ nhập tay
-                    var pp2Ket = new List<(LG_NhomPhanBo Nhom, LG_NVL_NhomPhanBo Tv, decimal E, decimal F, decimal H)>();
+                    var pp2Ket = new List<(LG_PB_NhomPhanBo Nhom, LG_PB_NVL_NhomPhanBo Tv, decimal E, decimal F, decimal H)>();
                     decimal tongHPp2 = 0;
 
                     if (pp2Nhoms.Count > 0)
@@ -171,7 +171,7 @@ namespace dataproduct.api.Services
                     }
 
                     // Pass 2: PP1 — tỷ trọng nội bộ + dòng dư, chia phần còn lại (G - tổng H các nhóm PP2)
-                    var pp1Ket = new List<(LG_NhomPhanBo Nhom, LG_NVL_NhomPhanBo Tv, decimal E, decimal F, decimal H, bool LaDongDu)>();
+                    var pp1Ket = new List<(LG_PB_NhomPhanBo Nhom, LG_PB_NVL_NhomPhanBo Tv, decimal E, decimal F, decimal H, bool LaDongDu)>();
                     var conLai = g - tongHPp2;
 
                     if (pp1Nhoms.Count > 0)
@@ -226,7 +226,7 @@ namespace dataproduct.api.Services
             return result;
         }
 
-        private static LG_KetQuaPhanBo BuildRow(
+        private static LG_PB_KetQuaPhanBo BuildRow(
             DateTime ngay, byte? ca, int idLoCao, byte loaiPhanBo, int idNvl, int idNhom, int idBienBan,
             decimal e, decimal f, decimal h, bool laDongDu, int idNguoiTao) => new()
         {

@@ -412,33 +412,33 @@ namespace dataproduct.api.Repositories
 
     public interface INhomPhanBoRepository
     {
-        Task<List<LG_NhomPhanBo>> GetListAsync(byte? loaiPhanBo);
-        Task<LG_NhomPhanBo?> GetByIdAsync(int id);
-        Task<LG_NhomPhanBo> AddAsync(LG_NhomPhanBo entity);
-        Task<LG_NhomPhanBo?> UpdateAsync(int id, LG_NhomPhanBo entity);
+        Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo);
+        Task<LG_PB_NhomPhanBo?> GetByIdAsync(int id);
+        Task<LG_PB_NhomPhanBo> AddAsync(LG_PB_NhomPhanBo entity);
+        Task<LG_PB_NhomPhanBo?> UpdateAsync(int id, LG_PB_NhomPhanBo entity);
         Task<bool> DeleteAsync(int id);
 
         // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngay, Ca), không kế thừa
         Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca);
-        Task<LG_NVL_NhomPhanBo> AddNvlAsync(LG_NVL_NhomPhanBo entity);
+        Task<LG_PB_NVL_NhomPhanBo> AddNvlAsync(LG_PB_NVL_NhomPhanBo entity);
         Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca);
 
         // Toàn bộ nhóm + NVL thành viên của 1 loại phân bổ tại đúng (Ngay, Ca, Lò cao), dùng cho PhanBoService.TinhPhanBoAsync
-        Task<List<(LG_NhomPhanBo Nhom, List<LG_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao);
+        Task<List<(LG_PB_NhomPhanBo Nhom, List<LG_PB_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao);
 
-        Task<Dictionary<int, LG_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, LG_PB_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
         Task<Dictionary<int, string?>> GetTenNvlMapAsync(IEnumerable<int> idNvlList);
     }
 
     public interface ITyLePhanBoRepository
     {
-        Task<List<LG_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay);
+        Task<List<LG_PB_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay);
 
         // Tỷ lệ hiệu lực tại (ngay, ca) cho từng NVL: ưu tiên bản ghi đúng ca, fallback bản ghi Ca=NULL (áp dụng chung cả ngày)
         Task<Dictionary<int, decimal>> GetHieuLucMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte? ca);
 
         // Ghi đè nếu đã có bản ghi cho đúng (IDNVL, Ngay, Ca) — cho phép sửa nhiều lần trước khi chốt
-        Task<LG_TyLePhanBo> UpsertAsync(LG_TyLePhanBo entity);
+        Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity);
     }
 
     public interface INapLieuPhanBoRepository
@@ -454,18 +454,18 @@ namespace dataproduct.api.Repositories
 
     public interface IBienBanNhanRepository
     {
-        Task<List<LG_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo);
-        Task UpsertAsync(LG_BienBanNhanQHLCCVH entity); // match theo (Ngay, Ca, IDLoCao, LoaiPhanBo)
+        Task<List<LG_PB_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo);
+        Task UpsertAsync(LG_PB_BienBanNhanQHLCCVH entity); // match theo (Ngay, Ca, IDLoCao, LoaiPhanBo)
         Task<Dictionary<int, int>> GetMapXuongLoCaoAsync(); // ID_Xuong -> IDLoCao
     }
 
     public interface IKetQuaPhanBoRepository
     {
         Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo);
-        Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
-        Task<List<LG_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
+        Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
+        Task<List<LG_PB_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
         Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan);
-        Task<List<LG_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
+        Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
     }
 
     public interface IBienBanGiaoNhanSourceRepository

@@ -52,7 +52,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<Dictionary<int, int>> GetMapNvlCvhLoCaoAsync()
         {
-            return await _context.LG_Map_NvlCVH_LoCao
+            return await _context.LG_PB_Map_NvlCVH_LoCao
                 .AsNoTracking()
                 .ToDictionaryAsync(x => x.IDLoCao, x => x.IDNVL);
         }

@@ -12,9 +12,9 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<List<LG_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay)
+        public async Task<List<LG_PB_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay)
         {
-            return await _context.LG_TyLePhanBo
+            return await _context.LG_PB_TyLePhanBo
                 .Where(x => !x.IsDelete && x.IDNVL == idNvl
                     && (tuNgay == null || x.Ngay >= tuNgay)
                     && (denNgay == null || x.Ngay <= denNgay))
@@ -27,7 +27,7 @@ namespace dataproduct.api.Repositories
         public async Task<Dictionary<int, decimal>> GetHieuLucMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte? ca)
         {
             var ids = idNvlList.ToList();
-            var candidates = await _context.LG_TyLePhanBo
+            var candidates = await _context.LG_PB_TyLePhanBo
                 .Where(x => !x.IsDelete && ids.Contains(x.IDNVL) && x.Ngay == ngay.Date
                     && (x.Ca == ca || x.Ca == null))
                 .AsNoTracking()
@@ -44,15 +44,15 @@ namespace dataproduct.api.Repositories
             return result;
         }
 
-        public async Task<LG_TyLePhanBo> UpsertAsync(LG_TyLePhanBo entity)
+        public async Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity)
         {
-            var existing = await _context.LG_TyLePhanBo.FirstOrDefaultAsync(x =>
+            var existing = await _context.LG_PB_TyLePhanBo.FirstOrDefaultAsync(x =>
                 x.IDNVL == entity.IDNVL && x.Ngay == entity.Ngay && x.Ca == entity.Ca);
 
             if (existing == null)
             {
                 entity.NgayNhap = DateTime.Now;
-                await _context.LG_TyLePhanBo.AddAsync(entity);
+                await _context.LG_PB_TyLePhanBo.AddAsync(entity);
                 await _context.SaveChangesAsync();
                 return entity;
             }

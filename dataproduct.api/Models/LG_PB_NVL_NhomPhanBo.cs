@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace dataproduct.api.Models
 {
     // Cấu hình RIÊNG cho từng (Ngay, Ca, IDLoCao) — không kế thừa từ ngày/ca trước
-    public class LG_NVL_NhomPhanBo
+    public class LG_PB_NVL_NhomPhanBo
     {
         [Key]
         public int ID { get; set; }

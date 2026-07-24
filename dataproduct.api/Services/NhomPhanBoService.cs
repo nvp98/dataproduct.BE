@@ -24,7 +24,7 @@ namespace dataproduct.api.Services
         {
             ValidateLoaiPhanBo(dto.LoaiPhanBo);
 
-            var entity = new LG_NhomPhanBo
+            var entity = new LG_PB_NhomPhanBo
             {
                 TenNhom = dto.TenNhom,
                 LoaiPhanBo = dto.LoaiPhanBo,
@@ -47,7 +47,7 @@ namespace dataproduct.api.Services
         {
             ValidateLoaiPhanBo(dto.LoaiPhanBo);
 
-            var entity = new LG_NhomPhanBo
+            var entity = new LG_PB_NhomPhanBo
             {
                 TenNhom = dto.TenNhom,
                 LoaiPhanBo = dto.LoaiPhanBo,
@@ -73,7 +73,7 @@ namespace dataproduct.api.Services
             _ = await _repo.GetByIdAsync(idNhomPhanBo)
                 ?? throw new InvalidOperationException("Không tìm thấy nhóm phân bổ.");
 
-            var entity = new LG_NVL_NhomPhanBo
+            var entity = new LG_PB_NVL_NhomPhanBo
             {
                 IDNVL = dto.IdNvl,
                 IDNhomPhanBo = idNhomPhanBo,
@@ -91,7 +91,7 @@ namespace dataproduct.api.Services
         public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca)
             => await _repo.RemoveNvlAsync(idNhomPhanBo, idNvl, ngay, ca);
 
-        private static NhomPhanBoDto MapNhom(LG_NhomPhanBo x) => new()
+        private static NhomPhanBoDto MapNhom(LG_PB_NhomPhanBo x) => new()
         {
             Id = x.ID,
             TenNhom = x.TenNhom,

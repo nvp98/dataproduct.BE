@@ -100,7 +100,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public decimal KhoiLuongNapLieu { get; set; }       // E
         public decimal KhoiLuongNapLieuNhom { get; set; }   // Tổng E của cả nhóm (SUM E các NVL thành viên)
         public decimal TyLePhanBo { get; set; }             // F
-        public decimal KhoiLuongNhanVe { get; set; }        // G — lấy từ biên bản giao nhận (LG_BienBanNhanQHLCCVH), dùng chung cho cả bảng
+        public decimal KhoiLuongNhanVe { get; set; }        // G — lấy từ biên bản giao nhận (LG_PB_BienBanNhanQHLCCVH), dùng chung cho cả bảng
         public decimal KhoiLuongPhanBo { get; set; }        // H
         public decimal KhoiLuongChotCuoi { get; set; }      // I = E + H
         public bool LaDongConLai { get; set; }
