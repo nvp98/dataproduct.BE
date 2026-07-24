@@ -67,6 +67,11 @@ namespace dataproduct.api.DTOs
         public int TrangThaiDuc { get; set; }
         public int TrangThaiKho { get; set; }
         public int TrangThaiPKH { get; set; }
+        // Người xử lý từng bước (HoVaTen, resolve từ NguoiChuyenKCS/NguoiXacNhanDuc/NguoiXacNhanKho/NguoiChotPKH)
+        public string? NguoiChuyenBBSL { get; set; }
+        public string? NguoiXacNhanDuc { get; set; }
+        public string? NguoiXacNhanKho { get; set; }
+        public string? NguoiXacNhanPKH { get; set; }
     }
 
     public class Hrc2SlabTongHopItem

@@ -151,6 +151,7 @@ namespace dataproduct.api.Services
         {
             var phieu = await GetPhieuForExportAsync(idPhieu);
             var slabs = await GetSlabsForExportAsync(idPhieu);
+            var tenVatTuMap = await _repo.GetTenVatTuMapAsync(slabs.Select(s => s.MacThep));
 
             var soPhieu = phieu?.SoPhieu ?? "";
             var ngaySX = phieu?.NgaySX?.ToString("dd/MM/yyyy") ?? "";
@@ -161,6 +162,9 @@ namespace dataproduct.api.Services
 
             using var workbook = new XLWorkbook(templatePath);
             var ws = workbook.Worksheet(1);
+
+            ws.Cell(3, 1).Value = BuildInfoKip(phieu?.Ca, phieu?.Kip, phieu?.NgaySX);
+            SetThanhPhanCell(ws, 4, await BuildThanhPhanTextAsync(slabs));
 
             const int startRow = 6;
             var rowIndex = startRow;
@@ -173,7 +177,8 @@ namespace dataproduct.api.Services
 
                 ws.Cell(rowIndex, 1).Value = stt;
                 ws.Cell(rowIndex, 2).Value = slab.MaVatTu ?? "";
-                ws.Cell(rowIndex, 3).Value = BuildMacPhoi(slab.ChieuDay, slab.ChieuRong, slab.ChieuDai, slab.MacThep);
+                tenVatTuMap.TryGetValue(slab.MacThep ?? "", out var tenVatTu);
+                ws.Cell(rowIndex, 3).Value = BuildSanPhamLabel(tenVatTu, slab.MacThep);
                 ws.Cell(rowIndex, 4).Value = slab.MaMe ?? "";
                 ws.Cell(rowIndex, 5).Value = slab.IDSlab;
                 ws.Cell(rowIndex, 6).Value = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
@@ -236,6 +241,9 @@ namespace dataproduct.api.Services
 
             using var workbook = new XLWorkbook(templatePath);
             var ws = workbook.Worksheet(1);
+
+            ws.Cell(3, 1).Value = BuildInfoKip(phieu?.Ca, phieu?.Kip, phieu?.NgaySX);
+            SetThanhPhanCell(ws, 4, await BuildThanhPhanTextAsync(slabs));
 
             const int startRow = 6;
             var rowIndex = startRow;
@@ -401,22 +409,67 @@ namespace dataproduct.api.Services
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private static string BuildMacPhoi(decimal? chieuDay, decimal? chieuRong, decimal? chieuDai, string? macThep)
-        {
-            var hasKt = chieuDay != null && chieuRong != null && chieuDai != null;
-            var kt = hasKt ? $"{chieuDay}x{chieuRong}x{chieuDai}" : null;
-            if (kt == null && string.IsNullOrWhiteSpace(macThep)) return "-";
-            var parts = new[] { "Phôi tấm", kt != null ? $"{kt}mm" : null, macThep }
-                .Where(p => !string.IsNullOrWhiteSpace(p))
-                .ToArray();
-            return string.Join(" ", parts);
-        }
-
         private static string BuildSanPhamLabel(string? tenVatTu, string? macThep)
         {
             if (!string.IsNullOrWhiteSpace(tenVatTu)) return tenVatTu!;
             if (!string.IsNullOrWhiteSpace(macThep)) return macThep!;
             return "-";
+        }
+
+        private static string BuildInfoKip(int? ca, string? kip, DateOnly? ngaySX)
+        {
+            var caVal = ca ?? 1;
+            var ngay = ngaySX ?? DateOnly.FromDateTime(DateTime.Today);
+
+            var (gioBatDau, gioKetThuc, ngayKetThuc) = caVal == 2
+                ? ("20 giờ 00", "08 giờ 00", ngay.AddDays(1))
+                : ("08 giờ 00", "20 giờ 00", ngay);
+
+            return $"Kíp {caVal}{kip}   Từ {gioBatDau} ngày {ngay:dd/MM/yyyy}   đến {gioKetThuc} ngày {ngayKetThuc:dd/MM/yyyy}";
+        }
+
+        // Dòng "Thành phần" (Đúc/Cán/GĐ-PGĐ NM xác nhận gần nhất) — cùng nguồn dữ liệu với
+        // DucKyTenHtml/CanKyTenHtml/C4KyTenHtml ở ExportTongHopPdfAsync, nhưng render dạng text
+        // thuần theo format "THÀNH PHẦN" của BBGN_ThepLong.html thay vì HTML chữ ký.
+        private async Task<string> BuildThanhPhanTextAsync(List<Hrc1Slab> slabs)
+        {
+            var (ducUserId, canUserId, c4UserId) = await GetPhieuSignersAsync(slabs.Select(s => s.Id).ToList());
+            var signerIds = new[] { ducUserId, canUserId, c4UserId }
+                .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
+            var userMap = signerIds.Count > 0
+                ? await _masterCtx.Tbl_TaiKhoan
+                    .Include(t => t.ViTri)
+                    .Where(t => signerIds.Contains(t.ID_TaiKhoan))
+                    .ToDictionaryAsync(t => t.ID_TaiKhoan)
+                : new Dictionary<int, TaiKhoan>();
+
+            string Line(string label, int? userId)
+            {
+                if (userId == null || !userMap.TryGetValue(userId.Value, out var u))
+                    return $"{label}: Ông/Bà: -";
+                var chucVu = u.ViTri?.TenViTri;
+                return string.IsNullOrWhiteSpace(chucVu)
+                    ? $"{label}: Ông/Bà: {u.HoVaTen}"
+                    : $"{label}: Ông/Bà: {u.HoVaTen}   Chức vụ: {chucVu}";
+            }
+
+            return string.Join("\n", new[]
+            {
+                "Chúng tôi gồm:",
+                Line("1. Đúc", ducUserId),
+                Line("2. Cán", canUserId),
+                Line("3. GĐ/PGĐ NM", c4UserId),
+            });
+        }
+
+        private static void SetThanhPhanCell(IXLWorksheet ws, int row, string text)
+        {
+            var cell = ws.Cell(row, 1);
+            cell.Value = text;
+            cell.Style.Alignment.SetWrapText(true);
+            cell.Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Left);
+            cell.Style.Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+            ws.Row(row).Height = 60;
         }
 
         private static void SetThinBorders(IXLWorksheet ws, int fromRow, int toRow, int lastCol)

@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,33 @@ namespace dataproduct.api.Repositories
     public class Hrc2SlabRepository : IHrc2SlabRepository
     {
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
         private const string MaBm = "HRC2_BBGN_PhoiTam";
 
-        public Hrc2SlabRepository(ProductFormContext context)
+        public Hrc2SlabRepository(ProductFormContext context, ProductDataMasterDbContext masterContext)
         {
             _context = context;
+            _masterContext = masterContext;
+        }
+
+        // Batch resolve HoVaTen cho danh sách NguoiXử lý (NguoiChuyenKCS/NguoiXacNhanDuc/NguoiXacNhanKho/NguoiChotPKH)
+        // để tránh N+1 query khi map từng dòng slab.
+        private async Task<Dictionary<int, string?>> GetUserNamesAsync(IEnumerable<BkHrc2SlabTrangThai?> trangThais)
+        {
+            var userIds = trangThais
+                .Where(t => t != null)
+                .SelectMany(t => new[] { t!.NguoiChuyenKCS, t.NguoiXacNhanDuc, t.NguoiXacNhanKho, t.NguoiChotPKH })
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+
+            if (userIds.Count == 0) return new Dictionary<int, string?>();
+
+            return await _masterContext.Tbl_TaiKhoan
+                .AsNoTracking()
+                .Where(t => userIds.Contains(t.ID_TaiKhoan))
+                .ToDictionaryAsync(t => t.ID_TaiKhoan, t => t.HoVaTen);
         }
 
         // ── Search ────────────────────────────────────────────────────────────
@@ -234,6 +257,7 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
 
             var ttMap = ttList.ToDictionary(t => t.IdSlab);
+            var userNames = await GetUserNamesAsync(ttList);
 
             return slabs
                 .OrderBy(s => s.ShiftName)
@@ -241,7 +265,7 @@ namespace dataproduct.api.Repositories
                 .Select(s =>
                 {
                     ttMap.TryGetValue(s.Id, out var tt);
-                    return MapToItem(s, tt, phieu);
+                    return MapToItem(s, tt, phieu, userNames);
                 })
                 .ToList();
         }
@@ -366,7 +390,6 @@ namespace dataproduct.api.Repositories
             }
 
             phieu.TinhTrang = 5;
-            phieu.IsLock = 1;
 
             await _context.SaveChangesAsync();
         }
@@ -502,18 +525,24 @@ namespace dataproduct.api.Repositories
                     .ToDictionaryAsync(p => p.Idphieu)
                 : [];
 
+            var userNames = await GetUserNamesAsync(ttMap.Values);
+
             return slabs.Select(s =>
             {
                 ttMap.TryGetValue(s.Id, out var tt);
                 BmPhieu? linkedPhieu = phieu;
                 if (linkedPhieu == null && tt?.IdPhieuBBSL != null)
                     phieuMap.TryGetValue(tt.IdPhieuBBSL.Value, out linkedPhieu);
-                return MapToItem(s, tt, linkedPhieu);
+                return MapToItem(s, tt, linkedPhieu, userNames);
             }).ToList();
         }
 
-        private static Hrc2SlabItem MapToItem(BkHrc2Slab s, BkHrc2SlabTrangThai? tt, BmPhieu? phieu)
+        private static Hrc2SlabItem MapToItem(
+            BkHrc2Slab s, BkHrc2SlabTrangThai? tt, BmPhieu? phieu, Dictionary<int, string?> userNames)
         {
+            string? ResolveName(int? userId) =>
+                userId.HasValue && userNames.TryGetValue(userId.Value, out var name) ? name : null;
+
             return new Hrc2SlabItem
             {
                 Id                 = s.Id,
@@ -558,6 +587,10 @@ namespace dataproduct.api.Repositories
                 NgayXuLy           = phieu?.NgaySX?.ToString("yyyy-MM-dd"),
                 CaBBSL             = phieu?.Ca,
                 KipBBSL            = phieu?.Kip,
+                NguoiChuyenBBSL    = ResolveName(tt?.NguoiChuyenKCS),
+                NguoiXacNhanDuc    = ResolveName(tt?.NguoiXacNhanDuc),
+                NguoiXacNhanKho    = ResolveName(tt?.NguoiXacNhanKho),
+                NguoiXacNhanPKH    = ResolveName(tt?.NguoiChotPKH),
             };
         }
     }
