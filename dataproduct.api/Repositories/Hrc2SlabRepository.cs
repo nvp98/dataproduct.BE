@@ -63,11 +63,11 @@ namespace dataproduct.api.Repositories
             if (req.IsSaiLotName.HasValue)
                 query = query.Where(s => s.IsSaiLotName == req.IsSaiLotName.Value);
 
-            // Date filter via NgaySanXuat
+            // Date filter via NgaySXTheoCa (ngày sản xuất suy từ ShiftName, không phải NgaySanXuat)
             if (DateOnly.TryParse(req.TuNgay, out var tuNgay))
-                query = query.Where(s => s.NgaySanXuat >= tuNgay);
+                query = query.Where(s => s.NgaySXTheoCa >= tuNgay);
             if (DateOnly.TryParse(req.DenNgay, out var denNgay))
-                query = query.Where(s => s.NgaySanXuat < denNgay.AddDays(1));
+                query = query.Where(s => s.NgaySXTheoCa < denNgay.AddDays(1));
 
             // Workflow filter
             if (req.TrangThaiKCS.HasValue)
@@ -109,9 +109,9 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrEmpty(ca))  query = query.Where(s => s.CaSanXuat == ca);
             if (!string.IsNullOrEmpty(kip)) query = query.Where(s => s.KipSanXuat == kip);
             if (DateOnly.TryParse(tuNgay, out var fromDt))
-                query = query.Where(s => s.NgaySanXuat >= fromDt);
+                query = query.Where(s => s.NgaySXTheoCa >= fromDt);
             if (DateOnly.TryParse(denNgay, out var toDt))
-                query = query.Where(s => s.NgaySanXuat < toDt.AddDays(1));
+                query = query.Where(s => s.NgaySXTheoCa < toDt.AddDays(1));
 
             return await query
                 .GroupBy(s => new { s.MeThep, s.MacThep, s.ChieuDay, s.ChieuRong, s.ChieuDai, s.PhanLoai })
@@ -548,6 +548,7 @@ namespace dataproduct.api.Repositories
                 Id                 = s.Id,
                 BkmisId            = s.BkmisId,
                 NgaySanXuat        = s.NgaySanXuat?.ToString("yyyy-MM-dd"),
+                NgaySXTheoCa       = s.NgaySXTheoCa?.ToString("yyyy-MM-dd"),
                 ShiftName          = s.ShiftName,
                 CaSanXuat          = s.CaSanXuat,
                 KipSanXuat         = s.KipSanXuat,

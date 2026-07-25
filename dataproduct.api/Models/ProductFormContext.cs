@@ -754,6 +754,7 @@ public partial class ProductFormContext : DbContext
 
             entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
             entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
+            entity.Property(e => e.NgaySXTheoCa).HasColumnName("NgaySXTheoCa");
             entity.Property(e => e.IdSlab).HasColumnName("IDSlab").HasMaxLength(100);
             entity.Property(e => e.ShiftName).HasMaxLength(50);
             entity.Property(e => e.CaSanXuat).HasColumnType("nchar(1)");
