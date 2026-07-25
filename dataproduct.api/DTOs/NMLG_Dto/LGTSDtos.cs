@@ -110,6 +110,36 @@ namespace dataproduct.api.DTOs.NMLG_Dto
 
     public class UpdateLGTSMappingDto : CreateLGTSMappingDto { }
 
+    // ─── Sao chép mapping từ ca gần nhất có dữ liệu ──────────────────────────
+
+    public class CopyLGTSMappingFromPreviousShiftDto
+    {
+        public int IdLoCao { get; set; }
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+    }
+
+    /// <summary>
+    /// Kết quả sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu.
+    /// Found = false khi lùi hết ShiftsSearched ca mà không tìm thấy ca nào có mapping.
+    /// DraftPrefill: idSiLo -> idNVL, chỉ dành cho silo ĐÃ có mapping ở ca hiện tại
+    /// (không ghi đè DB, FE dùng để pre-fill ô chọn NVL trong bảng nháp).
+    /// MessageType: "success" | "info" | "warning" | "error" — FE map sang antd message.
+    /// </summary>
+    public class CopyLGTSMappingFromPreviousShiftResultDto
+    {
+        public bool Found { get; set; }
+        public DateTime? SourceNgay { get; set; }
+        public int? SourceCa { get; set; }
+        public int ShiftsSearched { get; set; }
+        public int CreatedCount { get; set; }
+        public int FailedCount { get; set; }
+        public int NoNvlCount { get; set; }
+        public Dictionary<int, int> DraftPrefill { get; set; } = new();
+        public string MessageType { get; set; } = "info";
+        public string Message { get; set; } = string.Empty;
+    }
+
     // ─── View: SiLo + NVL theo Ngày/Ca/LoCao (dùng trong tạo phiếu tồn silo) ───
 
     public class LGTSSiLoMappingViewDto
