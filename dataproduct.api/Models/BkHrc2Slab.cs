@@ -5,6 +5,7 @@ public class BkHrc2Slab
     public int Id { get; set; }
     public int? BkmisId { get; set; }
     public DateOnly? NgaySanXuat { get; set; }
+    public DateOnly? NgaySXTheoCa { get; set; }
     public string? IdSlab { get; set; }
     public string? ShiftName { get; set; }
     public string? CaSanXuat { get; set; }

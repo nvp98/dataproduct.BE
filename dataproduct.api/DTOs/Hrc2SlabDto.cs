@@ -26,6 +26,7 @@ namespace dataproduct.api.DTOs
         public int Id { get; set; }
         public int? BkmisId { get; set; }
         public string? NgaySanXuat { get; set; }
+        public string? NgaySXTheoCa { get; set; }
         public string? ShiftName { get; set; }
         public string? CaSanXuat { get; set; }
         public string? KipSanXuat { get; set; }
