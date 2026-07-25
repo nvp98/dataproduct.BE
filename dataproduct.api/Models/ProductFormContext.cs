@@ -391,10 +391,14 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<DLNM_HRC2>(entity =>
         {
-            // HasTrigger: báo cho EF Core biết bảng có trigger (trg_DLNM_HRC2_ChiPhi_SoftDelete — xem
+            // HasTrigger: báo cho EF Core biết bảng có trigger (xem
             // .claude/migrations/hrc2_header_key_chiphi_productiondata.sql) để KHÔNG dùng OUTPUT clause khi
             // INSERT/UPDATE — SQL Server không cho phép OUTPUT (không INTO) trên bảng có trigger.
-            entity.ToTable("DLNM_HRC2", tb => tb.HasTrigger("trg_DLNM_HRC2_ChiPhi_SoftDelete"));
+            entity.ToTable("DLNM_HRC2", tb =>
+            {
+                tb.HasTrigger("trg_DLNM_HRC2_ChiPhi_SoftDelete");
+                tb.HasTrigger("trg_DLNM_HRC2_ChiPhi_GangLong");
+            });
             entity.Property(e => e.ID).HasColumnName("ID");
             entity.Property(e => e.REPORT_NO).HasColumnName("REPORT_NO");
             entity.Property(e => e.NgaySx).HasColumnName("NgaySX");
