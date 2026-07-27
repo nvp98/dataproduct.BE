@@ -392,6 +392,11 @@ namespace dataproduct.api.Repositories
         Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
             int idLoCao, DateTime ngay, int idCa);
 
+        // Sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu — nếu ca liền kề
+        // chưa có mapping thì tự động lùi tiếp cho đến khi tìm được hoặc hết giới hạn tìm kiếm
+        Task<CopyMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int idCa);
+
         // Chi tiết nạp liệu theo phiếu
         Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
         Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);

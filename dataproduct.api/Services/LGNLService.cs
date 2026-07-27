@@ -291,6 +291,12 @@ namespace dataproduct.api.Services
             int idLoCao, DateTime ngay, int idCa)
             => _repo.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
 
+        // ─── Sao chép mapping từ ca gần nhất có dữ liệu ─────────────
+
+        public Task<CopyMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int idCa)
+            => _repo.CopyMappingFromPreviousShiftAsync(idLoCao, ngay, idCa);
+
         // ─── Đổi NVL cho silo tại thời điểm cụ thể trong ca ─────────
 
         public async Task<LG_NL_Mapping> ChangeSiLoNVLAsync(

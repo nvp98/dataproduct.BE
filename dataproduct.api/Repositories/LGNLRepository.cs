@@ -277,6 +277,105 @@ namespace dataproduct.api.Repositories
                 .OrderBy(x => x.ThuTu)
                 .ToList();
         }
+        // Số ca tối đa lùi lại để tìm mapping (30 ngày x 2 ca) — tránh vòng lặp vô hạn
+        // nếu dữ liệu chưa từng được cấu hình.
+        private const int MaxShiftLookback = 60;
+
+        // Ca liền trước: Ca1 -> Ca2 hôm trước, Ca2 -> Ca1 cùng ngày.
+        private static (DateTime Ngay, int Ca) GetPrevShift(DateTime ngay, int caNum)
+        {
+            var prevCa = caNum == 1 ? 2 : 1;
+            var prevNgay = caNum == 1 ? ngay.Date.AddDays(-1) : ngay.Date;
+            return (prevNgay, prevCa);
+        }
+
+        // Sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu, thay vì chỉ đúng ca liền kề:
+        // nếu ca liền kề cũng chưa có mapping, tiếp tục lùi dần cho đến khi tìm được ca có
+        // mapping hoặc hết MaxShiftLookback.
+        public async Task<CopyMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int idCa)
+        {
+            var sourceNgay = ngay.Date;
+            var sourceCa = idCa;
+            List<LGNLSiloSnapshotDto> mappedSource = [];
+            var shiftsSearched = 0;
+
+            for (var i = 0; i < MaxShiftLookback; i++)
+            {
+                (sourceNgay, sourceCa) = GetPrevShift(sourceNgay, sourceCa);
+                shiftsSearched++;
+
+                var snapshot = await GetSiloSnapshotAsync(idLoCao, sourceNgay, sourceCa);
+                mappedSource = snapshot.Where(x => x.IdNVL != null).ToList();
+                if (mappedSource.Count > 0) break;
+            }
+
+            if (mappedSource.Count == 0)
+            {
+                return new CopyMappingFromPreviousShiftResultDto
+                {
+                    Found = false,
+                    ShiftsSearched = shiftsSearched,
+                    Message = $"Không tìm thấy ca nào có mapping trong {MaxShiftLookback} ca gần nhất để sao chép"
+                };
+            }
+
+            var currentSnapshot = await GetSiloSnapshotAsync(idLoCao, ngay.Date, idCa);
+            var alreadyMappedIds = currentSnapshot
+                .Where(x => x.IdNVL != null)
+                .Select(x => x.IdSiLo)
+                .ToHashSet();
+
+            var toCreate = mappedSource.Where(x => !alreadyMappedIds.Contains(x.IdSiLo)).ToList();
+
+            if (toCreate.Count == 0)
+            {
+                return new CopyMappingFromPreviousShiftResultDto
+                {
+                    Found = true,
+                    SourceNgay = sourceNgay,
+                    SourceCa = sourceCa,
+                    ShiftsSearched = shiftsSearched,
+                    CreatedCount = 0,
+                    TotalToCreate = 0,
+                    Message = "Tất cả Silo đã được map ở ca hiện tại, không cần sao chép"
+                };
+            }
+
+            var createdCount = 0;
+            foreach (var item in toCreate)
+            {
+                try
+                {
+                    await AddMappingAsync(new LG_NL_Mapping
+                    {
+                        Ngay = ngay.Date,
+                        IDCa = idCa,
+                        IDLoCao = idLoCao,
+                        IDSiLo = item.IdSiLo,
+                        IDNVL = item.IdNVL!.Value,
+                        GhiChu = null,
+                    });
+                    createdCount++;
+                }
+                catch
+                {
+                    // bỏ qua lỗi từng item, tiếp tục
+                }
+            }
+
+            return new CopyMappingFromPreviousShiftResultDto
+            {
+                Found = true,
+                SourceNgay = sourceNgay,
+                SourceCa = sourceCa,
+                ShiftsSearched = shiftsSearched,
+                CreatedCount = createdCount,
+                TotalToCreate = toCreate.Count,
+                Message = $"Đã sao chép {createdCount}/{toCreate.Count} mapping từ Ca {sourceCa} ngày {sourceNgay:dd/MM/yyyy}"
+            };
+        }
+
         public async Task<LG_NL_Mapping?> GetMappingByIdAsync(int id)
             => await _context.LG_NL_Mapping.FindAsync(id);
 
