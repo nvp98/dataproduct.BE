@@ -391,7 +391,14 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<DLNM_HRC2>(entity =>
         {
-            entity.ToTable("DLNM_HRC2");
+            // HasTrigger: báo cho EF Core biết bảng có trigger (xem
+            // .claude/migrations/hrc2_header_key_chiphi_productiondata.sql) để KHÔNG dùng OUTPUT clause khi
+            // INSERT/UPDATE — SQL Server không cho phép OUTPUT (không INTO) trên bảng có trigger.
+            entity.ToTable("DLNM_HRC2", tb =>
+            {
+                tb.HasTrigger("trg_DLNM_HRC2_ChiPhi_SoftDelete");
+                tb.HasTrigger("trg_DLNM_HRC2_ChiPhi_GangLong");
+            });
             entity.Property(e => e.ID).HasColumnName("ID");
             entity.Property(e => e.REPORT_NO).HasColumnName("REPORT_NO");
             entity.Property(e => e.NgaySx).HasColumnName("NgaySX");
@@ -481,7 +488,12 @@ public partial class ProductFormContext : DbContext
         });
         modelBuilder.Entity<PhuLieu_HRC2>(entity =>
         {
-            entity.ToTable("PhuLieu_HRC2", tb => tb.HasTrigger("TR_PhuLieu_HRC2_Upsert_PhuLieu_NM"));
+            entity.ToTable("PhuLieu_HRC2", tb =>
+            {
+                tb.HasTrigger("TR_PhuLieu_HRC2_Upsert_PhuLieu_NM");
+                // trg_PhuLieu_HRC2_ChiPhi: xem .claude/migrations/hrc2_header_key_chiphi_productiondata.sql
+                tb.HasTrigger("trg_PhuLieu_HRC2_ChiPhi");
+            });
             entity.Property(e => e.ID).HasColumnName("Id");
             entity.Property(e => e.REPORT_NO).HasColumnName("REPORT_NO");
             entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
@@ -516,7 +528,11 @@ public partial class ProductFormContext : DbContext
         });
         modelBuilder.Entity<STD_NXT_TOTAL_HRC2>(entity =>
         {
-            entity.ToTable("STD_NXT_TOTAL_HRC2");
+            entity.ToTable("STD_NXT_TOTAL_HRC2", tb =>
+            {
+                // trg_STD_NXT_TOTAL_HRC2_ChiPhi_PhanBo: xem .claude/migrations/hrc2_header_key_chiphi_productiondata.sql
+                tb.HasTrigger("trg_STD_NXT_TOTAL_HRC2_ChiPhi_PhanBo");
+            });
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.Ca).HasColumnName("Ca");
             entity.Property(e => e.NgaySX).HasColumnName("NgaySX");

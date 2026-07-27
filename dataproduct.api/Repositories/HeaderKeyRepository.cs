@@ -109,6 +109,7 @@ namespace dataproduct.api.Repositories
                 LoaiExcel = h.LoaiExcel,
                 ThuTu_Excel_BOF = h.ThuTu_Excel_BOF,
                 ThuTu_Excel_LFRH = h.ThuTu_Excel_LFRH,
+                MaVatTuChiPhi = h.MaVatTuChiPhi,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
                     : new List<HeaderMapping_ResponseModel>()
@@ -203,7 +204,8 @@ namespace dataproduct.api.Repositories
                     LoaiExcel = hk != null ? hk.LoaiExcel : null,
                     ThuTu_Excel_BOF = hk != null ? hk.ThuTu_Excel_BOF : null,
                     ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null,
-                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null
+                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null,
+                    MaVatTuChiPhi = hk != null ? hk.MaVatTuChiPhi : null
                 };
 
             // (2) HeaderKey chưa được móc nối
@@ -235,7 +237,8 @@ namespace dataproduct.api.Repositories
                     LoaiExcel = hk.LoaiExcel,
                     ThuTu_Excel_BOF = hk.ThuTu_Excel_BOF,
                     ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH,
-                    ID_NhomKey = hk.ID_NhomKey
+                    ID_NhomKey = hk.ID_NhomKey,
+                    MaVatTuChiPhi = hk.MaVatTuChiPhi
                 };
 
             // (3) PhuLieu_NM chưa được móc nối
@@ -267,7 +270,8 @@ namespace dataproduct.api.Repositories
                     LoaiExcel = null,
                     ThuTu_Excel_BOF = null,
                     ThuTu_Excel_LFRH = null,
-                    ID_NhomKey = null
+                    ID_NhomKey = null,
+                    MaVatTuChiPhi = null
                 };
 
             // Union 3 tập dữ liệu thành 1 query

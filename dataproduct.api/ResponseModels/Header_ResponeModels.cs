@@ -51,6 +51,7 @@ namespace dataproduct.api.ResponseModels
         public byte? LoaiExcel { get; set; }
         public int? ThuTu_Excel_BOF { get; set; }
         public int? ThuTu_Excel_LFRH { get; set; }
+        public string? MaVatTuChiPhi { get; set; }
         public List<HeaderMapping_ResponseModel> HeaderMappings { get; set; } = new List<HeaderMapping_ResponseModel>();
     }
     public class HeaderMapping_ResponseModel
@@ -90,5 +91,6 @@ namespace dataproduct.api.ResponseModels
         public int? ThuTu_Excel_LFRH { get; set; }
         public int? ID_NhomKey { get; set; }
         public string? TenNhom { get; set; }
+        public string? MaVatTuChiPhi { get; set; }
     }
 }
