@@ -11,6 +11,7 @@ namespace dataproduct.api.Models
         public int IDLoCao { get; set; }
         public byte LoaiPhanBo { get; set; }
         public int IDNVL { get; set; }
+        public string? MaCongDoanChiPhi { get; set; } // DQ1 / DQ2
         public int IDNhomPhanBo { get; set; }
         public int IDBienBanNhan { get; set; }
         public decimal KhoiLuongNapLieu { get; set; }

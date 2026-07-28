@@ -113,6 +113,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_PB_Map_Xuong_LoCao> LG_PB_Map_Xuong_LoCao { get; set; }
     public virtual DbSet<LG_PB_BienBanNhanQHLCCVH> LG_PB_BienBanNhanQHLCCVH { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
+    public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
     public virtual DbSet<LG_PB_KetQuaPhanBo> LG_PB_KetQuaPhanBo { get; set; }
     public virtual DbSet<LG_PB_Map_NvlCVH_LoCao> LG_PB_Map_NvlCVH_LoCao { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -760,6 +761,10 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KhoiLuongNhanVe).HasPrecision(18, 3);
         });
         modelBuilder.Entity<LG_PB_TyLePhanBo>(entity =>
+        {
+            entity.Property(e => e.TyLe).HasPrecision(9, 6);
+        });
+        modelBuilder.Entity<LG_PB_TyLeNhom>(entity =>
         {
             entity.Property(e => e.TyLe).HasPrecision(9, 6);
         });

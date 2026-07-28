@@ -428,6 +428,8 @@ namespace dataproduct.api.Repositories
 
         Task<Dictionary<int, LG_PB_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
         Task<Dictionary<int, string?>> GetTenNvlMapAsync(IEnumerable<int> idNvlList);
+
+        Task<(DateTime Ngay, byte Ca)?> GetCaLienKe(int loaiPhanBo, int idLoCao, DateTime ngay, byte ca);
     }
 
     public interface ITyLePhanBoRepository
@@ -439,6 +441,10 @@ namespace dataproduct.api.Repositories
 
         // Ghi đè nếu đã có bản ghi cho đúng (IDNVL, Ngay, Ca) — cho phép sửa nhiều lần trước khi chốt
         Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity);
+
+        // % theo nhóm (chỉ nhóm PP2), scoped (IDNhomPhanBo, Ngay, Ca, IDLoCao) — cascade xuống LG_PB_TyLePhanBo ở tầng Service
+        Task<LG_PB_TyLeNhom?> GetTyLeNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca, int idLoCao);
+        Task<LG_PB_TyLeNhom> UpsertTyLeNhomAsync(LG_PB_TyLeNhom entity);
     }
 
     public interface INapLieuPhanBoRepository
@@ -466,6 +472,10 @@ namespace dataproduct.api.Repositories
         Task<List<LG_PB_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
         Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan);
         Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
+
+        // Gán/sửa Mã công đoạn chi phí (DQ1/DQ2) cho toàn bộ dòng NHÁP (TrangThai=0) của 1 NVL trong ngày —
+        // trả về số dòng đã cập nhật (0 nếu ngày đã chốt hoặc NVL không có dòng kết quả nào).
+        Task<int> UpdateMaCongDoanChiPhiAsync(DateTime ngay, int idNvl, string? maCongDoanChiPhi);
     }
 
     public interface IBienBanGiaoNhanSourceRepository

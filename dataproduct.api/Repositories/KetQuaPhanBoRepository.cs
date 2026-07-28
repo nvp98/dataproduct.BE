@@ -81,5 +81,13 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<int> UpdateMaCongDoanChiPhiAsync(DateTime ngay, int idNvl, string? maCongDoanChiPhi)
+        {
+            return await _context.LG_PB_KetQuaPhanBo
+                .Where(x => x.Ngay == ngay.Date && x.IDNVL == idNvl && x.TrangThai == 0)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.MaCongDoanChiPhi, maCongDoanChiPhi));
+        }
+
     }
 }

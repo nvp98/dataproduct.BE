@@ -141,5 +141,36 @@ namespace dataproduct.api.Repositories
                 .AsNoTracking()
                 .ToDictionaryAsync(x => x.ID, x => x.TenNVL_NM);
         }
+        public async Task<(DateTime Ngay, byte Ca)?> GetCaLienKe(int loaiPhanBo, int idLoCao, DateTime ngay, byte ca)
+        {
+            // Distinct() PHẢI đứng trước OrderBy() — nếu orderby nằm trong subquery bị Distinct() bọc
+            // ngoài, SQL Server không đảm bảo giữ đúng thứ tự đó nên FirstOrDefaultAsync() có thể lấy
+            // nhầm dòng không phải mới nhất.
+            var result = await (
+                from tv in _context.LG_PB_NVL_NhomPhanBo
+                join nhom in _context.LG_PB_NhomPhanBo
+                    on tv.IDNhomPhanBo equals nhom.ID
+                where !tv.IsDelete
+                   && nhom.LoaiPhanBo == loaiPhanBo
+                   && tv.IDLoCao == idLoCao
+                   && (
+                            tv.Ngay < ngay
+                         || (tv.Ngay == ngay && tv.Ca < ca)
+                      )
+                select new
+                {
+                    tv.Ngay,
+                    tv.Ca
+                })
+                .Distinct()
+                .OrderByDescending(x => x.Ngay)
+                .ThenByDescending(x => x.Ca)
+                .FirstOrDefaultAsync();
+
+            if (result == null)
+                return null;
+
+            return (result.Ngay, result.Ca);
+        }
     }
 }

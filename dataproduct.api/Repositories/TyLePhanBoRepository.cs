@@ -65,5 +65,35 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
             return existing;
         }
+
+        public async Task<LG_PB_TyLeNhom?> GetTyLeNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca, int idLoCao)
+        {
+            return await _context.LG_PB_TyLeNhom
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.IDNhomPhanBo == idNhomPhanBo && x.Ngay == ngay.Date
+                    && x.Ca == ca && x.IDLoCao == idLoCao);
+        }
+
+        public async Task<LG_PB_TyLeNhom> UpsertTyLeNhomAsync(LG_PB_TyLeNhom entity)
+        {
+            var existing = await _context.LG_PB_TyLeNhom.FirstOrDefaultAsync(x =>
+                x.IDNhomPhanBo == entity.IDNhomPhanBo && x.Ngay == entity.Ngay
+                && x.Ca == entity.Ca && x.IDLoCao == entity.IDLoCao);
+
+            if (existing == null)
+            {
+                entity.NgayNhap = DateTime.Now;
+                await _context.LG_PB_TyLeNhom.AddAsync(entity);
+                await _context.SaveChangesAsync();
+                return entity;
+            }
+
+            existing.TyLe = entity.TyLe;
+            existing.GhiChu = entity.GhiChu;
+            existing.IDNguoiNhap = entity.IDNguoiNhap;
+            existing.NgayNhap = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return existing;
+        }
     }
 }

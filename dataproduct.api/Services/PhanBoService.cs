@@ -123,6 +123,13 @@ namespace dataproduct.api.Services
             var bienBans = await _bienBanRepo.GetByNgayAsync(ngay, loaiPhanBo);
             if (bienBans.Count == 0) return new List<LG_PB_KetQuaPhanBo>();
 
+            // Giữ lại Mã công đoạn chi phí đã gán tay trước khi dòng cũ bị xoá bởi ReplaceNhapAsync
+            var rowsHienTai = await _ketQuaRepo.GetByNgayAsync(ngay, loaiPhanBo, null);
+            var maCongDoanMap = new Dictionary<int, string?>();
+            foreach (var r in rowsHienTai)
+                if (!string.IsNullOrEmpty(r.MaCongDoanChiPhi))
+                    maCongDoanMap[r.IDNVL] = r.MaCongDoanChiPhi;
+
             var loaiPhanBoChoNhom = LoaiPhanBoChoNhom(loaiPhanBo);
             var result = new List<LG_PB_KetQuaPhanBo>();
 
@@ -216,10 +223,10 @@ namespace dataproduct.api.Services
                     }
 
                     foreach (var (nhom, tv, e, f, h) in pp2Ket)
-                        result.Add(BuildRow(ngay, ca, idLoCao, loaiPhanBo, tv.IDNVL, nhom.ID, bienBan.ID, e, f, h, false, idNguoiTao));
+                        result.Add(BuildRow(ngay, ca, idLoCao, loaiPhanBo, tv.IDNVL, nhom.ID, bienBan.ID, e, f, h, false, idNguoiTao, maCongDoanMap.GetValueOrDefault(tv.IDNVL)));
 
                     foreach (var (nhom, tv, e, f, h, laDongDu) in pp1Ket)
-                        result.Add(BuildRow(ngay, ca, idLoCao, loaiPhanBo, tv.IDNVL, nhom.ID, bienBan.ID, e, f, h, laDongDu, idNguoiTao));
+                        result.Add(BuildRow(ngay, ca, idLoCao, loaiPhanBo, tv.IDNVL, nhom.ID, bienBan.ID, e, f, h, laDongDu, idNguoiTao, maCongDoanMap.GetValueOrDefault(tv.IDNVL)));
                 }
             }
 
@@ -228,13 +235,14 @@ namespace dataproduct.api.Services
 
         private static LG_PB_KetQuaPhanBo BuildRow(
             DateTime ngay, byte? ca, int idLoCao, byte loaiPhanBo, int idNvl, int idNhom, int idBienBan,
-            decimal e, decimal f, decimal h, bool laDongDu, int idNguoiTao) => new()
+            decimal e, decimal f, decimal h, bool laDongDu, int idNguoiTao, string? maCongDoanChiPhi) => new()
         {
             Ngay = ngay,
             Ca = ca,
             IDLoCao = idLoCao,
             LoaiPhanBo = loaiPhanBo,
             IDNVL = idNvl,
+            MaCongDoanChiPhi = maCongDoanChiPhi,
             IDNhomPhanBo = idNhom,
             IDBienBanNhan = idBienBan,
             KhoiLuongNapLieu = e,
@@ -273,6 +281,7 @@ namespace dataproduct.api.Services
                 LoaiPhanBo = r.LoaiPhanBo,
                 IdNvl = r.IDNVL,
                 TenNvl = tenNvlMap.GetValueOrDefault(r.IDNVL),
+                MaCongDoanChiPhi = r.MaCongDoanChiPhi,
                 IdNhomPhanBo = r.IDNhomPhanBo,
                 TenNhomPhanBo = nhomMap.TryGetValue(r.IDNhomPhanBo, out var nhom) ? nhom.TenNhom : null,
                 PhuongThucPhanBo = nhomMap.TryGetValue(r.IDNhomPhanBo, out var nhom2) ? nhom2.PhuongThucPhanBo : (byte)0,
@@ -348,6 +357,7 @@ namespace dataproduct.api.Services
                     Ca = goc.Ca,
                     IdNvl = goc.IDNVL,
                     TenNvl = tenNvlMap.GetValueOrDefault(goc.IDNVL),
+                    MaCongDoanChiPhi = goc.MaCongDoanChiPhi,
                     IdNhomPhanBo = goc.IDNhomPhanBo,
                     TenNhomPhanBo = nhomMap.TryGetValue(goc.IDNhomPhanBo, out var nhom) ? nhom.TenNhom : null,
                     PhuongThucPhanBo = nhomMap.TryGetValue(goc.IDNhomPhanBo, out var nhom2) ? nhom2.PhuongThucPhanBo : (byte)0,
@@ -383,6 +393,15 @@ namespace dataproduct.api.Services
                 ValidateCvh = validateCvh,
                 ValidateThanCoc10 = validateThanCoc10
             };
+        }
+
+        // ─── Gán/sửa Mã công đoạn chi phí (DQ1/DQ2) cho 1 NVL trong ngày ───────────────
+
+        public async Task UpdateMaCongDoanChiPhiAsync(DateTime ngay, int idNvl, string? maCongDoanChiPhi)
+        {
+            var soDongCapNhat = await _ketQuaRepo.UpdateMaCongDoanChiPhiAsync(ngay.Date, idNvl, maCongDoanChiPhi);
+            if (soDongCapNhat == 0)
+                throw new InvalidOperationException("Không tìm thấy dòng kết quả phân bổ để cập nhật (có thể ngày đã chốt hoặc NVL chưa có kết quả).");
         }
 
         // ─── Chốt (khóa toàn bộ 3 loại phân bổ của 1 ngày) ─────────────────────────────
@@ -440,6 +459,7 @@ namespace dataproduct.api.Services
                 LoaiPhanBo = r.LoaiPhanBo,
                 IdNvl = r.IDNVL,
                 TenNvl = tenNvlMap.GetValueOrDefault(r.IDNVL),
+                MaCongDoanChiPhi = r.MaCongDoanChiPhi,
                 IdNhomPhanBo = r.IDNhomPhanBo,
                 TenNhomPhanBo = nhomMap.TryGetValue(r.IDNhomPhanBo, out var nhom) ? nhom.TenNhom : null,
                 PhuongThucPhanBo = nhomMap.TryGetValue(r.IDNhomPhanBo, out var nhom2) ? nhom2.PhuongThucPhanBo : (byte)0,

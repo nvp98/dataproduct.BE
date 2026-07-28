@@ -62,7 +62,11 @@ public partial class ProductDataMasterDbContext : DbContext
             entity.Property(e => e.Result)
                 .HasColumnName("Result"); // Có thể là "Result", "TotalKL", hoặc tên cột khác
         });
-
+        modelBuilder.Entity<LG_NKVHPT_ChiTiet>(entity =>
+        {
+            entity.ToTable("LG_NKVHPT_ChiTiet",
+                tb => tb.HasTrigger("trg_LG_NKVHPT_ChiTiet_Sync_ThanPCI"));
+        });
         base.OnModelCreating(modelBuilder);
     }
 }

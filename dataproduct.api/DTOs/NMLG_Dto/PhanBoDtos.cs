@@ -71,6 +71,50 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdNguoiNhap { get; set; }
     }
 
+    // ─── % theo nhóm (chỉ nhóm PP2 — cascade xuống từng NVL thành viên) ────────
+
+    public class TyLeNhomDto
+    {
+        public int IdNhomPhanBo { get; set; }
+        public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int IdLoCao { get; set; }
+        public decimal TyLe { get; set; }
+        public string? GhiChu { get; set; }
+        public int IdNguoiNhap { get; set; }
+        public DateTime NgayNhap { get; set; }
+    }
+
+    public class CreateTyLeNhomDto
+    {
+        public int IdNhomPhanBo { get; set; }
+        public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int IdLoCao { get; set; }
+        public decimal TyLe { get; set; }
+        public string? GhiChu { get; set; }
+        public int IdNguoiNhap { get; set; }
+    }
+
+    // ─── Sao chép cấu hình nhóm/NVL/% từ ca liền kề gần nhất có cấu hình (cùng Lò cao) ─
+
+    public class SaoChepNhomPhanBoRequestDto
+    {
+        public byte LoaiPhanBo { get; set; }
+        public DateTime NgayDich { get; set; }
+        public byte CaDich { get; set; }
+        public int IdLoCaoDich { get; set; }
+        public int IdNguoiThucHien { get; set; }
+    }
+
+    public class SaoChepNhomPhanBoResultDto
+    {
+        public int SoNvlDaCopy { get; set; }
+        public int SoTyLeDaCopy { get; set; }
+        public DateTime NgayNguon { get; set; }
+        public byte CaNguon { get; set; }
+    }
+
     // ─── Tính / chốt phân bổ ───────────────────────────────────────────────────
 
     public class TinhPhanBoRequestDto
@@ -85,6 +129,13 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdNguoiXacNhan { get; set; }
     }
 
+    public class UpdateMaCongDoanChiPhiRequestDto
+    {
+        public DateTime Ngay { get; set; }
+        public int IdNvl { get; set; }
+        public string? MaCongDoanChiPhi { get; set; } // DQ1 / DQ2
+    }
+
     public class KetQuaPhanBoDto
     {
         public int Id { get; set; }
@@ -94,6 +145,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public byte LoaiPhanBo { get; set; }
         public int IdNvl { get; set; }
         public string? TenNvl { get; set; }
+        public string? MaCongDoanChiPhi { get; set; }       // DQ1 / DQ2
         public int IdNhomPhanBo { get; set; }
         public string? TenNhomPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }
@@ -129,6 +181,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public byte? Ca { get; set; }
         public int IdNvl { get; set; }
         public string? TenNvl { get; set; }
+        public string? MaCongDoanChiPhi { get; set; }         // DQ1 / DQ2
         public int IdNhomPhanBo { get; set; }
         public string? TenNhomPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }

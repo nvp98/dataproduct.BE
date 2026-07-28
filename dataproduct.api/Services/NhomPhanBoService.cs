@@ -8,10 +8,16 @@ namespace dataproduct.api.Services
     public class NhomPhanBoService
     {
         private readonly INhomPhanBoRepository _repo;
+        private readonly ITyLePhanBoRepository _tyLeRepo;
+        private readonly IKetQuaPhanBoRepository _ketQuaRepo;
 
-        public NhomPhanBoService(INhomPhanBoRepository repo)
+        private static readonly byte[] TatCaLoaiPhanBo = { 1, 2, 3 };
+
+        public NhomPhanBoService(INhomPhanBoRepository repo, ITyLePhanBoRepository tyLeRepo, IKetQuaPhanBoRepository ketQuaRepo)
         {
             _repo = repo;
+            _tyLeRepo = tyLeRepo;
+            _ketQuaRepo = ketQuaRepo;
         }
 
         public async Task<List<NhomPhanBoDto>> GetListAsync(byte? loaiPhanBo)
@@ -70,7 +76,7 @@ namespace dataproduct.api.Services
         // không cần cấu hình tay ở đây, kể cả khi nhóm chỉ có 1 NVL.
         public async Task<NvlNhomPhanBoDto> AddNvlAsync(int idNhomPhanBo, AddNvlNhomPhanBoDto dto)
         {
-            _ = await _repo.GetByIdAsync(idNhomPhanBo)
+            var nhom = await _repo.GetByIdAsync(idNhomPhanBo)
                 ?? throw new InvalidOperationException("Không tìm thấy nhóm phân bổ.");
 
             var entity = new LG_PB_NVL_NhomPhanBo
@@ -84,8 +90,155 @@ namespace dataproduct.api.Services
             };
             await _repo.AddNvlAsync(entity);
 
+            // Nhóm PP2 (tỷ lệ nhập tay) đã có % nhóm cấu hình sẵn cho đúng (Ngày, Ca, Lò cao) này
+            // → NVL mới thêm vào tự động lấy % đó, không cần nhập tay lại.
+            if (nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyLeNhapTay)
+            {
+                var tyLeNhom = await _tyLeRepo.GetTyLeNhomAsync(idNhomPhanBo, dto.Ngay.Date, dto.Ca, dto.IdLoCao);
+                if (tyLeNhom != null)
+                {
+                    await _tyLeRepo.UpsertAsync(new LG_PB_TyLePhanBo
+                    {
+                        IDNVL = dto.IdNvl,
+                        Ngay = dto.Ngay.Date,
+                        Ca = dto.Ca,
+                        TyLe = tyLeNhom.TyLe,
+                        IDNguoiNhap = tyLeNhom.IDNguoiNhap
+                    });
+                }
+            }
+
             var list = await _repo.GetNvlByNhomAsync(idNhomPhanBo, dto.Ngay, dto.Ca);
             return list.First(x => x.IdNvl == dto.IdNvl);
+        }
+
+        public async Task<SaoChepNhomPhanBoResultDto> SaoChepAsync(SaoChepNhomPhanBoRequestDto dto)
+        {
+            // Kiểm tra ngày đích đã chốt
+            foreach (var loai in TatCaLoaiPhanBo)
+            {
+                if (await _ketQuaRepo.IsNgayDaChotAsync(dto.NgayDich.Date, loai))
+                    throw new InvalidOperationException(
+                        $"Ngày đích {dto.NgayDich:dd/MM/yyyy} đã chốt, không thể sao chép vào.");
+            }
+
+            // Tìm ca có cấu hình gần nhất
+            var caLienKe = await _repo.GetCaLienKe(
+                dto.LoaiPhanBo,
+                dto.IdLoCaoDich,
+                dto.NgayDich.Date,
+                dto.CaDich);
+
+            if (caLienKe == null)
+                throw new InvalidOperationException("Không tìm thấy cấu hình ca trước để sao chép.");
+
+            var (ngayNguon, caNguon) = caLienKe.Value;
+
+            // Lấy dữ liệu nguồn
+            var nguon = await _repo.GetNhomVaThanhVienAsync(
+                dto.LoaiPhanBo,
+                ngayNguon,
+                caNguon,
+                dto.IdLoCaoDich);
+
+            if (!nguon.Any())
+                throw new InvalidOperationException("Ca nguồn không có cấu hình để sao chép.");
+
+            // Lấy dữ liệu đích
+            var dich = await _repo.GetNhomVaThanhVienAsync(
+                dto.LoaiPhanBo,
+                dto.NgayDich.Date,
+                dto.CaDich,
+                dto.IdLoCaoDich);
+
+            var dichMemberMap = dich.ToDictionary(
+                x => x.Nhom.ID,
+                x => x.ThanhVien.Select(t => t.IDNVL).ToHashSet());
+
+            var soNvlDaCopy = 0;
+            var soTyLeDaCopy = 0;
+
+            foreach (var (nhom, thanhVienNguon) in nguon)
+            {
+                if (thanhVienNguon.Count == 0)
+                    continue;
+
+                var laPp2 = nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyLeNhapTay;
+
+                var daCoODich = dichMemberMap.GetValueOrDefault(nhom.ID)
+                                ?? new HashSet<int>();
+
+                var tyLeNguonMap = laPp2
+                    ? await _tyLeRepo.GetHieuLucMapAsync(
+                        thanhVienNguon.Select(x => x.IDNVL),
+                        ngayNguon,
+                        caNguon)
+                    : new Dictionary<int, decimal>();
+
+                foreach (var tv in thanhVienNguon)
+                {
+                    if (!daCoODich.Contains(tv.IDNVL))
+                    {
+                        await _repo.AddNvlAsync(new LG_PB_NVL_NhomPhanBo
+                        {
+                            IDNVL = tv.IDNVL,
+                            IDNhomPhanBo = nhom.ID,
+                            Ngay = dto.NgayDich.Date,
+                            Ca = dto.CaDich,
+                            IDLoCao = dto.IdLoCaoDich,
+                            ThuTuUuTien = tv.ThuTuUuTien
+                        });
+
+                        soNvlDaCopy++;
+                    }
+
+                    if (laPp2 &&
+                        tyLeNguonMap.TryGetValue(tv.IDNVL, out var tyLe))
+                    {
+                        await _tyLeRepo.UpsertAsync(new LG_PB_TyLePhanBo
+                        {
+                            IDNVL = tv.IDNVL,
+                            Ngay = dto.NgayDich.Date,
+                            Ca = dto.CaDich,
+                            TyLe = tyLe,
+                            IDNguoiNhap = dto.IdNguoiThucHien
+                        });
+
+                        soTyLeDaCopy++;
+                    }
+                }
+
+                if (laPp2)
+                {
+                    var tyLeNhomNguon = await _tyLeRepo.GetTyLeNhomAsync(
+                        nhom.ID,
+                        ngayNguon,
+                        caNguon,
+                        dto.IdLoCaoDich);
+
+                    if (tyLeNhomNguon != null)
+                    {
+                        await _tyLeRepo.UpsertTyLeNhomAsync(new LG_PB_TyLeNhom
+                        {
+                            IDNhomPhanBo = nhom.ID,
+                            Ngay = dto.NgayDich.Date,
+                            Ca = dto.CaDich,
+                            IDLoCao = dto.IdLoCaoDich,
+                            TyLe = tyLeNhomNguon.TyLe,
+                            GhiChu = tyLeNhomNguon.GhiChu,
+                            IDNguoiNhap = dto.IdNguoiThucHien
+                        });
+                    }
+                }
+            }
+
+            return new SaoChepNhomPhanBoResultDto
+            {
+                SoNvlDaCopy = soNvlDaCopy,
+                SoTyLeDaCopy = soTyLeDaCopy,
+                NgayNguon = ngayNguon,
+                CaNguon = caNguon
+            };
         }
 
         public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca)
