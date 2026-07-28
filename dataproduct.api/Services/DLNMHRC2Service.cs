@@ -1052,7 +1052,8 @@ namespace dataproduct.api.Services
         public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
         {
             // Sync dữ liệu HRC2 mới nhất từ NM về DB hiện tại trước khi group/sum
-            await _hrc2NMSyncService.SyncFromNmStoredProcAsync();
+            // LoaiBM/Scope = null: gộp toàn bộ BOF/LF/RH + mọi Scope cho đúng Ngày/Ca này
+            await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
             var result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
             if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
             {

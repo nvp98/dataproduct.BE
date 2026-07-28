@@ -33,11 +33,17 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Gọi store để sync dữ liệu HRC2 mới nhất từ NM về DB hiện tại (DLNM_HRC2 + PhuLieu_HRC2).
         /// Store này do bạn tạo và chịu trách nhiệm insert/update dữ liệu.
+        /// LoaiBM/Scope truyền NULL để không giới hạn (dùng cho các API cần gộp toàn bộ BieuMau/Scope
+        /// trong 1 Ngày/Ca, ví dụ filterSTD_NXT).
         /// </summary>
-        public async Task SyncFromNmStoredProcAsync()
+        public async Task SyncFromNmStoredProcAsync(DateTime ngay, int ca, string? loaiBM, int? scope)
         {
-            // Store không có tham số
-            await _context.Database.ExecuteSqlRawAsync("EXEC dbo.sp_Sync_HRC2_FromNM");
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.sp_Sync_HRC2_FromNM @Ngay, @Ca, @LoaiBM, @Scope",
+                new SqlParameter("@Ngay", ngay.Date),
+                new SqlParameter("@Ca", ca),
+                new SqlParameter("@LoaiBM", (object?)loaiBM ?? DBNull.Value),
+                new SqlParameter("@Scope", (object?)scope ?? DBNull.Value));
         }
 
         // private async Task EnsureGangLongMetricsAsync(SyncFromNM_HRC2_Request request)
@@ -290,7 +296,7 @@ namespace dataproduct.api.Services
             }
 
             // 1) Sync dữ liệu mới nhất từ NM về DB hiện tại
-            await SyncFromNmStoredProcAsync();
+            await SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
 
             // 2) Bổ sung GangLong metrics (DB khác) khi cần
             await EnsureGangLongMetricsAsync(request);
