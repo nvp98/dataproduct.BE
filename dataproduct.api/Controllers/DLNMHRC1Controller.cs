@@ -96,6 +96,21 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        /// <summary>"Làm mới" trên trang Sổ Xuất-Nhập-Tồn HRC1 — sync BOF từ NM rồi group theo (BieuMau, Scope, PhuLieuID).</summary>
+        [HttpPost("filterSTD_NXT")]
+        public async Task<IActionResult> FilterSTD_NXT([FromBody] FilterSTD_NXTRequest_HRC1 request)
+        {
+            try
+            {
+                var result = await _service.FilterSTD_NXTAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
         [HttpPost("search-thongke")]
         public async Task<IActionResult> SearchThongKe([FromBody] SearchThongKeHrc1 dto)
         {

@@ -67,5 +67,33 @@ namespace dataproduct.api.Services
             await _repo.UpdateAsync(existing);
             return existing.DangSuDung;
         }
+
+        /// <summary>Bật/tắt danh sách mặc định cho Sổ Xuất-Nhập-Tồn HRC1 (dùng khi khởi tạo phiếu
+        /// HRC1_STD_NXT đầu tiên — chưa có ca trước để kế thừa). Xem .claude/hrc1_xnt.md mục 2.2.</summary>
+        public async Task<bool?> ToggleIsUsedNXTAsync(int id)
+        {
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return null;
+
+            existing.IsUsedNXT = !(existing.IsUsedNXT ?? false);
+            await _repo.UpdateAsync(existing);
+            return existing.IsUsedNXT;
+        }
+
+        /// <summary>Xóa phụ liệu — chặn nếu đã được dùng ở phiếu tiêu hao BOF/LF hoặc Sổ Xuất-Nhập-Tồn
+        /// (chi tiết hoặc tổng hợp). Xem Hrc1PhuLieuNmRepository.GetInUseReasonAsync để biết đầy đủ các
+        /// nơi được kiểm tra.</summary>
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var existing = await _repo.GetByIdAsync(id);
+            if (existing == null) return false;
+
+            var reason = await _repo.GetInUseReasonAsync(id);
+            if (reason != null)
+                throw new InvalidOperationException($"Không thể xóa phụ liệu vì {reason}.");
+
+            await _repo.DeleteAsync(existing);
+            return true;
+        }
     }
 }

@@ -41,6 +41,19 @@ namespace dataproduct.api.Repositories
         Task<List<int>> GetActiveDucPhieuScopesAsync(DateOnly ngay, int ca);
         Task<Dictionary<int, decimal?>> ComputeKlThepLongChotAsync(List<int> meIds);
         Task<(List<int> BenGiaoIds, List<int> BenNhanIds)> GetBenGiaoNhanIdsAsync(List<int> meIds);
+
+        /// <summary>
+        /// Liên kết 1 chiều: mẻ TL nhận/nhập liệu → upsert dòng Hrc1TieuHao(BieuMau=LF) cùng
+        /// MeThoi=MaMe, Scope=TL số, Ngày/Ca = đúng công đoạn tinh luyện (không phải Ca đúc đã chuyển).
+        /// Không ghi đè nếu dòng LF đã bị sửa tay (IsEdited=true) — theo đúng nguyên tắc IsEdited chung
+        /// của module Tiêu hao (xem .claude/hrc1_tieuhaoBOF.md mục 3.3).
+        /// </summary>
+        Task UpsertLfTieuHaoFromMeAsync(HRC1_MeThep me, int? scopeTL, DateOnly? ngaySanXuat, int? ca);
+
+        /// <summary>Mẻ rời khỏi TL (hủy nhận / xóa mẻ tay) → xóa mềm dòng LF liên kết vô điều kiện
+        /// (kể cả đã sửa tay) — nhận lại mẻ sẽ tự tạo lại dòng mới.</summary>
+        Task SoftDeleteLfTieuHaoByMeThoiAsync(string? maMe);
+
         void AddMeThep(HRC1_MeThep me);
         void RemoveMeThep(HRC1_MeThep me);
         void AddMePhanCong(HRC1_MePhanCong pc);
@@ -101,8 +114,10 @@ namespace dataproduct.api.Repositories
             _ctx.HRC1_MeTheps.Where(m => meIds.Contains(m.Id)).ToListAsync();
 
         // Mẻ thuộc phiếu máy đúc:
-        // - tinh_luyen: IdMayDucDich + CaTinhLuyen + date(NgayNhanTL) == ngay
-        // - len_thang:  IdMayDucDich + Ca           + date(NgayTao)    == ngay
+        // - tinh_luyen: IdMayDucDich + (CaDucChuyen ?? CaTinhLuyen) + (NgaySXDucChuyen ?? date(NgayNhanTL)) == ngay
+        // - len_thang:  IdMayDucDich + (CaDucChuyen ?? Ca)          + (NgaySXDucChuyen ?? date(NgayTao))    == ngay
+        // NgaySXDucChuyen/CaDucChuyen: override do TL bấm "Chuyển ca" (mẻ luyện xong sát ranh giới ca,
+        // đúc lại rơi vào ca sau) — xem HRC1_BBGNService.ChuyenCaDucAsync.
         public Task<List<HRC1_MeThep>> GetMeThepsByMayDucAsync(DateOnly ngay, int ca, int idMayDuc)
         {
             var ngayStart = ngay.ToDateTime(TimeOnly.MinValue);
@@ -112,15 +127,86 @@ namespace dataproduct.api.Repositories
                 .Where(m => m.IdMayDucDich == idMayDuc
                          && (
                              (m.NgayNhanTL.HasValue
-                                 && m.CaTinhLuyen == ca
-                                 && m.NgayNhanTL.Value >= ngayStart && m.NgayNhanTL.Value < ngayEnd)
+                                 && (m.CaDucChuyen ?? m.CaTinhLuyen) == ca
+                                 && (
+                                     (m.NgaySXDucChuyen.HasValue && m.NgaySXDucChuyen.Value == ngay)
+                                     || (!m.NgaySXDucChuyen.HasValue && m.NgayNhanTL.Value >= ngayStart && m.NgayNhanTL.Value < ngayEnd)
+                                 ))
                              ||
                              (m.DichChuyen == "len_thang"
-                                 && m.Ca == ca
-                                 && m.NgayTao >= ngayStart && m.NgayTao < ngayEnd)
+                                 && (m.CaDucChuyen ?? m.Ca) == ca
+                                 && (
+                                     (m.NgaySXDucChuyen.HasValue && m.NgaySXDucChuyen.Value == ngay)
+                                     || (!m.NgaySXDucChuyen.HasValue && m.NgayTao >= ngayStart && m.NgayTao < ngayEnd)
+                                 ))
                          ))
                 .OrderBy(m => m.NgayNhanTL.HasValue ? m.NgayNhanTL : m.NgayTao)
                 .ToListAsync();
+        }
+
+        public async Task UpsertLfTieuHaoFromMeAsync(HRC1_MeThep me, int? scopeTL, DateOnly? ngaySanXuat, int? ca)
+        {
+            if (string.IsNullOrWhiteSpace(me.MaMe) || ngaySanXuat is null || ca is null) return;
+
+            var existing = await _ctx.Hrc1TieuHaos.FirstOrDefaultAsync(x =>
+                x.BieuMau == "LF" && x.MeThoi == me.MaMe && !x.IsDeleted);
+
+            if (existing == null)
+            {
+                _ctx.Hrc1TieuHaos.Add(new Hrc1TieuHao
+                {
+                    BieuMau = "LF",
+                    Scope = scopeTL,
+                    MeThoi = me.MaMe,
+                    MacThep = me.MacThepBKMIS,
+                    KLThepLong = me.KlThepLong,
+                    NgaySanXuat = ngaySanXuat,
+                    Ca = (byte?)ca,
+                    IsNM = false,
+                    IsEdited = false,
+                    NgayTao = DateTime.Now
+                });
+            }
+            else if (!existing.IsEdited)
+            {
+                existing.Scope = scopeTL;
+                existing.MacThep = me.MacThepBKMIS ?? existing.MacThep;
+                existing.KLThepLong = me.KlThepLong ?? existing.KLThepLong;
+                existing.NgaySanXuat = ngaySanXuat;
+                existing.Ca = (byte?)ca;
+                existing.NgayCapNhat = DateTime.Now;
+            }
+            else
+            {
+                return; // đã sửa tay bên tiêu hao LF — không ghi đè, không cần recalc gì thêm
+            }
+
+            await _ctx.SaveChangesAsync();
+            await _ctx.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", "LF", me.MaMe);
+        }
+
+        public async Task SoftDeleteLfTieuHaoByMeThoiAsync(string? maMe)
+        {
+            if (string.IsNullOrWhiteSpace(maMe)) return;
+
+            // Xóa vô điều kiện (kể cả đã sửa tay) — mẻ rời khỏi TL thì tiêu hao LF không còn ý nghĩa;
+            // nếu TL nhận lại mẻ này sau đó, UpsertLfTieuHaoFromMeAsync sẽ tự tạo lại dòng mới.
+            var rows = await _ctx.Hrc1TieuHaos
+                .Where(x => x.BieuMau == "LF" && x.MeThoi == maMe && !x.IsDeleted)
+                .ToListAsync();
+            if (rows.Count == 0) return;
+
+            // foreach (var r in rows)
+            // {
+            //     r.IsDeleted = true;
+            //     r.NgayXoa = DateTime.Now;
+            // }
+            _ctx.Hrc1TieuHaos.RemoveRange(rows);
+
+            await _ctx.SaveChangesAsync();
+            await _ctx.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", "LF", maMe);
         }
 
         // Phiếu BBGN thép lỏng (công đoạn đúc) theo danh sách ngày — lọc thêm theo Ca ở tầng service
@@ -517,10 +603,12 @@ namespace dataproduct.api.Repositories
             string? tlLt = isLenThang                                                  ? "Lên thẳng"
                          : (m.DichChuyen == "tinh_luyen" || soTLNhan.HasValue)        ? "Tinh luyện"
                          : null;
-            DateOnly? ngayDuc = isLenThang
+            // NgaySXDucChuyen/CaDucChuyen ưu tiên nếu TL đã bấm "Chuyển ca" — phải khớp đúng với
+            // routing thực tế của GetMeThepsByMayDucAsync để thống kê không lệch với phiếu Đúc.
+            DateOnly? ngayDuc = m.NgaySXDucChuyen ?? (isLenThang
                 ? DateOnly.FromDateTime(m.NgayTao)
-                : (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null);
-            int? caDuc = isLenThang ? m.Ca : m.CaTinhLuyen;
+                : (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null));
+            int? caDuc = m.CaDucChuyen ?? (isLenThang ? m.Ca : m.CaTinhLuyen);
             chuyenVeDict.TryGetValue(m.Id, out var chuyenVe);
             return new HRC1_ExportRow
             {
@@ -585,7 +673,7 @@ namespace dataproduct.api.Repositories
             var (mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict) = await LoadMeThepLookupAsync(mes);
 
             if (q.Ca.HasValue)
-                mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca).ToList();
+                mes = mes.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
                 mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
@@ -639,7 +727,7 @@ namespace dataproduct.api.Repositories
 
             // ── Lọc Ca/Kíp in-memory ──
             if (q.Ca.HasValue)
-                allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca).ToList();
+                allMes = allMes.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
                 allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
 
@@ -737,7 +825,7 @@ namespace dataproduct.api.Repositories
             if (q.IsManualTL.HasValue)
                 meQuery = meQuery.Where(m => m.IsManualTL == q.IsManualTL);
             if (q.Ca.HasValue)
-                meQuery = meQuery.Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen) == q.Ca);
+                meQuery = meQuery.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca);
             if (!string.IsNullOrEmpty(q.Kip))
                 meQuery = meQuery.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip);
             // ── 1. Phân loại ──────────────────────────────────────────────────
@@ -750,8 +838,8 @@ namespace dataproduct.api.Repositories
 
             // ── 2. Ca ─────────────────────────────────────────────────────────
             var caRaw = await meQuery
-                .Where(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen).HasValue)
-                .GroupBy(m => (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)!.Value)
+                .Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)).HasValue)
+                .GroupBy(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen))!.Value)
                 .Select(g => new { Ca = g.Key, KlThepLong = g.Sum(m => m.KlThepLong ?? 0) })
                 .OrderBy(x => x.Ca)
                 .ToListAsync();

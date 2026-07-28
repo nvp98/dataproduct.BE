@@ -20,7 +20,9 @@ namespace dataproduct.api.Services
     public class DLNMHRC1Service
     {
         private readonly IDLNMHRC1Repository _repo;
+        private readonly ISTD_NXT_HRC1Repository _stdNxtRepo;
         private readonly HRC1_NMSyncService _syncService;
+        private readonly SyncPhanLoaiService _syncPhanLoaiService;
         private readonly ProductFormContext _context;
         // Dùng cho export Excel/PDF chi tiết phiếu (gộp từ Hrc1PhieuDetailExcelService cũ — tránh sinh
         // thêm file, xem vùng "EXPORT EXCEL/PDF CHI TIẾT PHIẾU" ở cuối class).
@@ -46,16 +48,32 @@ namespace dataproduct.api.Services
             return true;
         }
 
+        // Debounce riêng cho sync Mác thép của LF — key có tiền tố "LFMAC_" để không đụng key sync
+        // BOF ở trên (key đó không phân biệt BieuMau, TL số và Lò số có thể trùng 1-5).
+        private static bool ShouldSyncLfMacThep(DateOnly ngay, int ca, int scope)
+        {
+            var key = $"LFMAC_{ngay:yyyy-MM-dd}_{ca}_{scope}";
+            var now = DateTime.UtcNow;
+            if (_lastSyncTimes.TryGetValue(key, out var last) && now - last < SyncCooldown)
+                return false;
+            _lastSyncTimes[key] = now;
+            return true;
+        }
+
         public DLNMHRC1Service(
             IDLNMHRC1Repository repo,
+            ISTD_NXT_HRC1Repository stdNxtRepo,
             HRC1_NMSyncService syncService,
+            SyncPhanLoaiService syncPhanLoaiService,
             ProductFormContext context,
             PheDuyetService pheDuyetService,
             IConverter pdfConverter,
             IWebHostEnvironment env)
         {
             _repo = repo;
+            _stdNxtRepo = stdNxtRepo;
             _syncService = syncService;
+            _syncPhanLoaiService = syncPhanLoaiService;
             _context = context;
             _pheDuyetService = pheDuyetService;
             _pdfConverter = pdfConverter;
@@ -74,8 +92,55 @@ namespace dataproduct.api.Services
                 await _syncService.SyncHRC1FromNMAsync(request);
 
             var ngay = DateOnly.FromDateTime(request.NgaySX);
+
+            // LF không có nguồn NM riêng cho Mác thép — Mác thép của nó "mượn" từ HRC1_MeThep.MacThepBKMIS
+            // (liên kết 1 chiều từ module BBGN_ThepLong, xem HRC1_BBGNRepository.UpsertLfTieuHaoFromMeAsync).
+            // Field đó tự cập nhật khi có thao tác bên BBGN (nhận mẻ/nhập liệu), nhưng nếu Mác thép được
+            // đồng bộ mới từ Linked Server (nút "Làm mới" bên BBGN) SAU khi mẻ đã liên kết, LF không tự biết —
+            // nên khi "Làm mới dữ liệu" bên LF cũng phải tự đồng bộ lại đúng như BBGN đang làm.
+            if (string.Equals(request.BieuMau, "LF", StringComparison.OrdinalIgnoreCase)
+                && ShouldSyncLfMacThep(ngay, request.Ca, request.Scope))
+                await SyncLfMacThepFromMeThepAsync(ngay, request.Ca, request.Scope);
+
             var allData = await _repo.GetAllAsync(ngay, request.Ca, request.Scope, request.BieuMau ?? "BOF");
             return await _repo.GetAllGroupedBatchAsync(allData);
+        }
+
+        /// <summary>
+        /// Đồng bộ Mác thép cho các dòng Hrc1TieuHao(LF) trong đúng Ngày/Ca/Scope: gọi lại
+        /// SyncPhanLoaiService (Linked Server) để làm mới HRC1_MeThep.MacThepBKMIS theo MaMe, rồi copy
+        /// giá trị đó vào Hrc1TieuHao.MacThep — mirror đúng field mapping của UpsertLfTieuHaoFromMeAsync.
+        /// Không đụng dòng đã IsEdited=true (đã sửa tay bên Tiêu hao).
+        /// </summary>
+        private async Task SyncLfMacThepFromMeThepAsync(DateOnly ngay, int ca, int scope)
+        {
+            var lfRows = await _context.Hrc1TieuHaos
+                .Where(x => x.BieuMau == "LF" && !x.IsDeleted && !x.IsEdited
+                         && x.NgaySanXuat == ngay && x.Ca == (byte)ca && x.Scope == scope
+                         && x.MeThoi != null)
+                .ToListAsync();
+            if (lfRows.Count == 0) return;
+
+            var meThois = lfRows.Select(x => x.MeThoi!).Distinct().ToList();
+
+            await _syncPhanLoaiService.SyncHRC1MeThepAsync(meThois);
+
+            var meThepMap = await _context.HRC1_MeTheps
+                .Where(x => x.MaMe != null && meThois.Contains(x.MaMe))
+                .ToDictionaryAsync(x => x.MaMe!, x => x.MacThepBKMIS);
+
+            bool changed = false;
+            foreach (var row in lfRows)
+            {
+                if (row.MeThoi != null && meThepMap.TryGetValue(row.MeThoi, out var macThep)
+                    && !string.IsNullOrWhiteSpace(macThep) && row.MacThep != macThep)
+                {
+                    row.MacThep = macThep;
+                    row.NgayCapNhat = DateTime.Now;
+                    changed = true;
+                }
+            }
+            if (changed) await _context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -87,6 +152,51 @@ namespace dataproduct.api.Services
             var key = $"{request.NgaySX:yyyy-MM-dd}_{request.Ca}_{request.Scope}";
             _lastSyncTimes[key] = DateTime.MinValue;
             await _syncService.SyncHRC1FromNMAsync(request);
+        }
+
+        /// <summary>
+        /// "Làm mới" trên trang Sổ Xuất-Nhập-Tồn HRC1. Chỉ BOF có sync tự động từ NM (lò 1-5, lò 5 chưa
+        /// có view nguồn nhưng gọi vẫn an toàn — SP_HRC1_BOF_Sync_Full tự bỏ qua nếu không có dữ liệu).
+        /// LF không có SP sync (hoàn toàn nhập tay qua phiếu HRC1_BB_TieuHao_LF) nên không cần trigger gì
+        /// thêm — chỉ đọc thẳng HRC1_TieuHao/HRC1_PhuLieu đã có sẵn. Mirror
+        /// DLNMHRC2Service.FilterSTD_NXTAsync.
+        /// </summary>
+        public async Task<List<FilterSTD_NXTResponse_HRC1>> FilterSTD_NXTAsync(FilterSTD_NXTRequest_HRC1 request)
+        {
+            for (var loThoi = 1; loThoi <= 5; loThoi++)
+            {
+                var syncReq = new SyncFromNM_HRC1_Request
+                {
+                    NgaySX = request.NgaySX,
+                    Ca = request.Ca,
+                    Scope = loThoi,
+                    BieuMau = "BOF",
+                };
+                if (ShouldSync(syncReq))
+                    await _syncService.SyncHRC1FromNMAsync(syncReq);
+            }
+
+            var result = await _repo.GetHRC1GroupedByMaterialAsync(request.NgaySX, request.Ca);
+
+            if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
+            {
+                var phuLieuIds = (request.PhuLieuIds != null && request.PhuLieuIds.Count > 0)
+                    ? request.PhuLieuIds.Where(id => id > 0).Distinct().ToList()
+                    : result.Select(x => x.PhuLieuID).Distinct().ToList();
+
+                if (phuLieuIds.Count > 0)
+                {
+                    await _stdNxtRepo.GetHRC1FilterInitAsync(new InitXuatNhapTonHRC1Request
+                    {
+                        NgaySX = request.NgaySX,
+                        Ca = request.Ca,
+                        IdPhieu = request.IdPhieu.Value,
+                        PhuLieus = phuLieuIds.Select(id => new IdPhuLieuModel { Id_PhuLieu = id }).ToList()
+                    });
+                }
+            }
+
+            return result;
         }
 
         // =========================================================
@@ -950,9 +1060,15 @@ namespace dataproduct.api.Services
             if (!formData.TryGetProperty("table1DynamicColumns", out var dynamicRoot))
                 return Task.FromResult(result);
 
-            var phuGiaCols = dynamicRoot.TryGetProperty("LF_PhuGia", out var lfPhuGiaProp)
-                ? lfPhuGiaProp.EnumerateArray().ToList()
-                : new List<JsonElement>();
+            // "LF_PhuGia": phụ liệu từ danh mục HRC1_PhuLieuNM (hiển thị mặc định); "adjust": cột
+            // "Thêm cột điều chỉnh" — sau khi user chọn/tạo phụ liệu, dataIndex đổi thành phuLieu_{id}
+            // (Loại A, giống hệt cơ chế BOF ở BuildModelToInsert) nên BuildLFPhuLieus xử lý đồng nhất,
+            // không cần phân biệt nguồn gốc cột.
+            var lfColGroups = new List<string> { "LF_PhuGia", "adjust" };
+            var phuGiaCols = lfColGroups
+                .Where(g => dynamicRoot.TryGetProperty(g, out _))
+                .SelectMany(g => dynamicRoot.GetProperty(g).EnumerateArray())
+                .ToList();
 
             if (!formData.TryGetProperty("table1", out var table1Prop))
                 return Task.FromResult(result);

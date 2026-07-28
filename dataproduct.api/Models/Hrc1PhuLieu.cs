@@ -14,6 +14,9 @@ public partial class Hrc1PhuLieu
     public bool IsManual { get; set; }
     public decimal? KLPhuGia_Manual { get; set; }
     public bool IsAddManual { get; set; }
+    /// <summary>True = dòng phân bổ chênh lệch xuất-nhập-tồn (module HRC1_STD_NXT), PhuLieuID vẫn giữ
+    /// nguyên giá trị đang được phân bổ — không phải phụ liệu thực đo. Mirror PhuLieu_HRC2.IsPhanBo.</summary>
+    public bool IsPhanBo { get; set; }
     public bool IsNM { get; set; } = true;
     public bool IsEdited { get; set; }
     public bool IsDeleted { get; set; }

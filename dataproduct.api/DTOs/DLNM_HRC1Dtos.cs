@@ -41,6 +41,18 @@ namespace dataproduct.api.DTOs
         public bool? IsNM { get; set; }
     }
 
+    /// <summary>Request cho "Làm mới" trên trang Sổ Xuất-Nhập-Tồn HRC1 (POST /api/DLNMHRC1/filterSTD_NXT).
+    /// Mirror FilterSTD_NXTRequest của HRC2, đổi HeaderKeyIds -> PhuLieuIds.</summary>
+    public class FilterSTD_NXTRequest_HRC1
+    {
+        public DateTime NgaySX { get; set; }
+        public int Ca { get; set; }
+        /// <summary>Nếu có: sau khi filter sẽ gọi sp_Init_XuatNhapTon_HRC1 để cập nhật dữ liệu phiếu hiện tại.</summary>
+        public Guid? IdPhieu { get; set; }
+        /// <summary>Danh sách PhuLieuID đang hiển thị trên FE (kể cả dòng mới chưa lưu). Dùng cho Init khi có IdPhieu.</summary>
+        public List<int>? PhuLieuIds { get; set; }
+    }
+
     /// <summary>Bộ lọc thống kê tiêu hao HRC1 (BOF) — không có LoaiBM như HRC2 vì HRC1 hiện chỉ có BOF.</summary>
     public class SearchThongKeHrc1
     {

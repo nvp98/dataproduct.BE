@@ -109,6 +109,7 @@ namespace dataproduct.api.Repositories
         Task<SearchThongKeHrc1ApiResponse> SearchThongKeApiAsync(SearchThongKeHrc1 dto);
         Task<List<ThongKeSumItemHrc1>> GetThongKeSumAsync(SearchThongKeHrc1 dto);
         Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request);
+        Task<List<FilterSTD_NXTResponse_HRC1>> GetHRC1GroupedByMaterialAsync(DateTime ngaySX, int ca);
     }
 
     public interface IHeaderKeyRepository
@@ -157,6 +158,17 @@ namespace dataproduct.api.Repositories
         Task<bool> KhongPhanBoAsync(STD_NXT_HRC2_KhongPhanBoDto entity);
         // Task<STD_NXT_HRC2_GetDetailResponse> GetByIdAsync(Guid idPhieu);
         // Task<STD_NXT_HRC2_GetDetailResponse> FilterAsync(DateTime ngaySX, int ca);
+    }
+    public interface ISTD_NXT_HRC1Repository
+    {
+        Task<STD_NXT_HRC1_UpsertResponse> UpsertAsync(STD_NXT_HRC1_UpsertDto entity);
+        Task InitializeHRC1_STD_NXTAsync(BmPhieu phieu);
+        Task GetHRC1FilterInitAsync(InitXuatNhapTonHRC1Request request);
+        Task<STD_NXT_HRC1_GetDetailResponse> GetByPhieuIdAsync(Guid phieuId);
+        Task<STD_NXT_RelatedPhieuStatusResponse> GetRelatedPhieuStatusesAsync(STD_NXT_RelatedPhieuStatusRequest request);
+        Task<bool> PhanBoAsync(STD_NXT_HRC1_PhanBoDto entity);
+        Task<bool> ThuHoiPhanBoAsync(STD_NXT_HRC1_PhanBoDto entity);
+        Task<bool> KhongPhanBoAsync(STD_NXT_HRC1_KhongPhanBoDto entity);
     }
     public interface ICtdPhoiNongRepository
     {
@@ -447,6 +459,12 @@ namespace dataproduct.api.Repositories
         Task<Hrc1PhuLieuNm?> GetByIdAsync(int id);
         Task AddAsync(Hrc1PhuLieuNm entity);
         Task UpdateAsync(Hrc1PhuLieuNm entity);
+        Task DeleteAsync(Hrc1PhuLieuNm entity);
         Task<bool> ExistsByTenPhuLieuAsync(string tenPhuLieu, int? excludeId = null);
+        /// <summary>Trả về lý do (mô tả nơi đang dùng) nếu phụ liệu đã được tham chiếu ở bất kỳ đâu —
+        /// null nếu chưa dùng ở đâu cả, có thể xóa an toàn. Kiểm tra cả 2 nhóm:
+        /// (1) phiếu tiêu hao BOF/LF (HRC1_TieuHao/HRC1_PhuLieu — mẻ đã đo/nhập thực tế),
+        /// (2) Sổ Xuất-Nhập-Tồn (STD_XUAT_NHAP_TON_HRC1/STD_NXT_TOTAL_HRC1 — chi tiết + tổng hợp).</summary>
+        Task<string?> GetInUseReasonAsync(int id);
     }
 }

@@ -259,6 +259,34 @@ namespace dataproduct.api.Controllers
             catch (Exception ex)                 { return StatusCode(500, ex.Message); }
         }
 
+        /// <summary>POST /api/hrc1/tinh-luyen/chuyen-ca-duc — chuyển routing mẻ sang phiếu Đúc ca trước/sau</summary>
+        [HttpPost("tinh-luyen/chuyen-ca-duc")]
+        public async Task<IActionResult> ChuyenCaDuc([FromBody] HRC1_ChuyenCaDucRequest req)
+        {
+            try
+            {
+                await _svc.ChuyenCaDucAsync(req.MeId, req.Huong, LayUserId());
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
+        /// <summary>POST /api/hrc1/tinh-luyen/huy-chuyen-ca-duc</summary>
+        [HttpPost("tinh-luyen/huy-chuyen-ca-duc")]
+        public async Task<IActionResult> HuyChuyenCaDuc([FromBody] HRC1_ChuyenCaDucRequest req)
+        {
+            try
+            {
+                await _svc.HuyChuyenCaDucAsync(req.MeId, LayUserId());
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)      { return NotFound(ex.Message); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex)                 { return StatusCode(500, ex.Message); }
+        }
+
         /// <summary>POST /api/hrc1/tinh-luyen/them-dong</summary>
         [HttpPost("tinh-luyen/them-dong")]
         public async Task<IActionResult> ThemDong([FromBody] HRC1_ThemDongTLRequest req)

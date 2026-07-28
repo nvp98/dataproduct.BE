@@ -314,5 +314,56 @@ namespace dataproduct.api.Repositories
 
             return true;
         }
+
+        /// <summary>
+        /// Group tổng khối lượng phụ liệu đã dùng thực tế (KHÔNG cộng KLPhanBo — đó là output của chính
+        /// module XNT này, tránh vòng lặp tự tham chiếu) theo (BieuMau, Scope, PhuLieuID) cho ngày/ca —
+        /// dùng cho nút "Làm mới" trên Sổ Xuất-Nhập-Tồn HRC1. Đơn giản hơn hẳn bản HRC2
+        /// (GetHRC2GroupedByMaterialAsync) vì không cần join Header_Mapping: HRC1 dùng thẳng danh mục cố
+        /// định HRC1_PhuLieuNM, không có khái niệm "phụ liệu chưa map".
+        /// </summary>
+        public async Task<List<FilterSTD_NXTResponse_HRC1>> GetHRC1GroupedByMaterialAsync(DateTime ngaySX, int ca)
+        {
+            var ngay = DateOnly.FromDateTime(ngaySX);
+            var caByte = (byte)ca;
+
+            var raw = await (
+                from pl in _context.Hrc1PhuLieus
+                join tieuHao in _context.Hrc1TieuHaos on pl.MeID equals tieuHao.ID
+                where tieuHao.NgaySanXuat == ngay
+                      && tieuHao.Ca == caByte
+                      && tieuHao.IsDeleted == false
+                      && pl.IsDeleted == false
+                      && pl.IsPhanBo == false
+                      && pl.PhuLieuID != null
+                select new
+                {
+                    tieuHao.BieuMau,
+                    tieuHao.Scope,
+                    pl.PhuLieuID,
+                    pl.TenPhuLieu,
+                    pl.IsManual,
+                    pl.KLPhuGia,
+                    pl.KLPhuGia_Manual,
+                }
+            ).ToListAsync();
+
+            if (raw.Count == 0)
+                return new List<FilterSTD_NXTResponse_HRC1>();
+
+            var result = raw
+                .GroupBy(x => new { x.BieuMau, Scope = x.Scope ?? 0, PhuLieuID = x.PhuLieuID!.Value })
+                .Select(g => new FilterSTD_NXTResponse_HRC1
+                {
+                    BieuMau = g.Key.BieuMau ?? "",
+                    Scope = g.Key.Scope,
+                    PhuLieuID = g.Key.PhuLieuID,
+                    TenPhuLieu = g.First().TenPhuLieu ?? "",
+                    TotalKLPhuGia = g.Sum(x => x.IsManual ? (x.KLPhuGia_Manual ?? 0) : (x.KLPhuGia ?? 0)),
+                })
+                .ToList();
+
+            return result;
+        }
     }
 }

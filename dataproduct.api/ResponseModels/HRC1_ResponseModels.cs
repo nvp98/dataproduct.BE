@@ -65,6 +65,9 @@ namespace dataproduct.api.ResponseModels
         public int? ChuyenVeMeId { get; set; }       // FK→HRC1_MeThep của mẻ đích
         public string? ChuyenVeMaMe { get; set; }    // MaMe của mẻ đích
         public string? TenMayDucChuyen { get; set; } // Tên máy đúc của mẻ đích
+
+        // Chuyển ca Đúc (routing sang phiếu Đúc ca sau) — không đổi Ca của chính công đoạn TL
+        public bool IsChuyenCaDuc { get; set; }
     }
 
     public class HRC1_ChoNhanMeVm

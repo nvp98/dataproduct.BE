@@ -94,4 +94,16 @@ namespace dataproduct.api.ResponseModels
         public string? TenPhuLieu { get; set; }
         public double? TotalKLPhuGia { get; set; }
     }
+
+    /// <summary>Kết quả group theo (BieuMau, Scope, PhuLieuID) cho nút "Làm mới" trên Sổ Xuất-Nhập-Tồn HRC1.
+    /// Mirror FilterSTD_NXTResponse của HRC2 nhưng đơn giản hơn — không cần PhuLieus/HeaderKeyId vì
+    /// HRC1 dùng thẳng danh mục cố định HRC1_PhuLieuNM, không có khái niệm "chưa map".</summary>
+    public class FilterSTD_NXTResponse_HRC1
+    {
+        public string? BieuMau { get; set; }
+        public int Scope { get; set; }
+        public int PhuLieuID { get; set; }
+        public string? TenPhuLieu { get; set; }
+        public decimal TotalKLPhuGia { get; set; }
+    }
 }

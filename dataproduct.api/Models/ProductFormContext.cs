@@ -59,6 +59,8 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<Hrc1PhuLieuNm> Hrc1PhuLieuNms { get; set; }
     public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
+    public virtual DbSet<STD_XUAT_NHAP_TON_HRC1> STD_XUAT_NHAP_TON_HRC1s { get; set; }
+    public virtual DbSet<STD_NXT_TOTAL_HRC1> STD_NXT_TOTAL_HRC1s { get; set; }
     public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
     public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
 
@@ -539,6 +541,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsManual).HasColumnName("IsManual");
             entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual").HasPrecision(18, 3);
             entity.Property(e => e.IsAddManual).HasColumnName("IsAddManual");
+            entity.Property(e => e.IsPhanBo).HasColumnName("IsPhanBo");
             entity.Property(e => e.IsNM).HasColumnName("IsNM");
             entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
             entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
@@ -557,6 +560,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TenPhuLieuNM).HasColumnName("TenPhuLieuNM");
             entity.Property(e => e.DangSuDung).HasColumnName("DangSuDung");
             entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
             entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
             entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
@@ -589,6 +593,43 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Ca).HasColumnName("Ca");
             entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
             entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
+            entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
+            entity.Property(e => e.TongTonCuoiCa).HasColumnName("TongTonCuoiCa");
+            entity.Property(e => e.TongSuDung).HasColumnName("TongSuDung");
+            entity.Property(e => e.TongSDTrenSoSach).HasColumnName("TongSDTrenSoSach");
+            entity.Property(e => e.ChenhLech).HasColumnName("ChenhLech");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.HasPhanBo).HasColumnName("HasPhanBo");
+        });
+        modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC1>(entity =>
+        {
+            entity.ToTable("STD_XUAT_NHAP_TON_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.ViTri).HasColumnName("ViTri");
+            entity.Property(e => e.TonDauCa).HasColumnName("TonDauCa");
+            entity.Property(e => e.TuongQuanDauCa).HasColumnName("TuongQuanDauCa");
+            entity.Property(e => e.NhapVaoTrongCa).HasColumnName("NhapVaoTrongCa");
+            entity.Property(e => e.TonCuoiCa).HasColumnName("TonCuoiCa");
+            entity.Property(e => e.TuongQuanCuoiCa).HasColumnName("TuongQuanCuoiCa");
+            entity.Property(e => e.TongThucTe).HasColumnName("TongThucTe");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.IDSilo).HasColumnName("IDSilo");
+        });
+        modelBuilder.Entity<STD_NXT_TOTAL_HRC1>(entity =>
+        {
+            entity.ToTable("STD_NXT_TOTAL_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
             entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
             entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
             entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");

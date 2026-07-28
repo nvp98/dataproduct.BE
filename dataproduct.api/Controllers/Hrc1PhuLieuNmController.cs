@@ -60,5 +60,28 @@ namespace dataproduct.api.Controllers
             if (newValue == null) return NotFound();
             return Ok(new { id, dangSuDung = newValue });
         }
+
+        /// <summary>Bật/tắt danh sách mặc định cho Sổ Xuất-Nhập-Tồn HRC1 (HRC1_PhuLieuNM.IsUsedNXT).</summary>
+        [HttpPatch("{id}/toggle-isusednxt")]
+        public async Task<IActionResult> ToggleIsUsedNXT(int id)
+        {
+            var newValue = await _service.ToggleIsUsedNXTAsync(id);
+            if (newValue == null) return NotFound();
+            return Ok(new { id, isUsedNXT = newValue });
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var ok = await _service.DeleteAsync(id);
+                return ok ? NoContent() : NotFound();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
