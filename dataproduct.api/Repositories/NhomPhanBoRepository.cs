@@ -87,9 +87,25 @@ namespace dataproduct.api.Repositories
 
         public async Task<LG_PB_NVL_NhomPhanBo> AddNvlAsync(LG_PB_NVL_NhomPhanBo entity)
         {
-            await _context.LG_PB_NVL_NhomPhanBo.AddAsync(entity);
+            // UNIQUE (IDNVL, IDNhomPhanBo, Ngay, Ca) không phân biệt IsDelete — nếu NVL này đã từng được
+            // thêm rồi xóa (IsDelete=true) đúng (Nhóm, Ngày, Ca) này thì phải khôi phục lại dòng cũ,
+            // không được insert dòng mới (sẽ vi phạm unique constraint và crash).
+            var existing = await _context.LG_PB_NVL_NhomPhanBo.FirstOrDefaultAsync(x =>
+                x.IDNVL == entity.IDNVL && x.IDNhomPhanBo == entity.IDNhomPhanBo
+                && x.Ngay == entity.Ngay && x.Ca == entity.Ca);
+
+            if (existing == null)
+            {
+                await _context.LG_PB_NVL_NhomPhanBo.AddAsync(entity);
+                await _context.SaveChangesAsync();
+                return entity;
+            }
+
+            existing.IsDelete = false;
+            existing.IDLoCao = entity.IDLoCao;
+            existing.ThuTuUuTien = entity.ThuTuUuTien;
             await _context.SaveChangesAsync();
-            return entity;
+            return existing;
         }
 
         public async Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca)
