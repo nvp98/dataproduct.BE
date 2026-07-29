@@ -25,6 +25,10 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<Tbl_MeThoi> Tbl_MeThoi { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat> Tbl_BM_16_LoSanXuat { get; set; }
     public DbSet<Tbl_BM_16_LoSanXuat_TaiKhoan> Tbl_BM_16_LoSanXuat_TaiKhoan { get; set; }
+    public DbSet<Tbl_BienBanGiaoNhan> Tbl_BienBanGiaoNhan { get; set; }
+    public DbSet<Tbl_ChiTiet_BienBanGiaoNhan> Tbl_ChiTiet_BienBanGiaoNhan { get; set; }
+    public DbSet<Tbl_Xuong> Tbl_Xuong { get; set; }
+    public DbSet<TongNhanVeBbgnResult> TongNhanVeBbgnResults { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         //modelBuilder.Entity<TaiKhoan>(entity =>
@@ -47,6 +51,7 @@ public partial class ProductDataMasterDbContext : DbContext
             
 
         modelBuilder.Entity<TonSiLoLoCaResult>().HasNoKey().ToView(null);
+        modelBuilder.Entity<TongNhanVeBbgnResult>().HasNoKey().ToView(null);
 
         // Cấu hình entity keyless cho stored procedure results
         modelBuilder.Entity<StoredProcedureScalarResult>(entity =>
@@ -57,7 +62,11 @@ public partial class ProductDataMasterDbContext : DbContext
             entity.Property(e => e.Result)
                 .HasColumnName("Result"); // Có thể là "Result", "TotalKL", hoặc tên cột khác
         });
-
+        modelBuilder.Entity<LG_NKVHPT_ChiTiet>(entity =>
+        {
+            entity.ToTable("LG_NKVHPT_ChiTiet",
+                tb => tb.HasTrigger("trg_LG_NKVHPT_ChiTiet_Sync_ThanPCI"));
+        });
         base.OnModelCreating(modelBuilder);
     }
 }
