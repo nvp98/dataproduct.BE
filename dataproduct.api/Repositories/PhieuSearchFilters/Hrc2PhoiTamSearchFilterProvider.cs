@@ -9,7 +9,7 @@ namespace dataproduct.api.Repositories.PhieuSearchFilters;
 /// </summary>
 public class Hrc2PhoiTamSearchFilterProvider : IPhieuSearchFilterProvider
 {
-    private const string MaBmValue = "HRC2_BBGN_PhoiTam";
+    private const string MaBmValue = "HRC2_BBSL_PhoiTam";
 
     public IReadOnlyCollection<string> MaBms { get; } = new[] { MaBmValue };
 
