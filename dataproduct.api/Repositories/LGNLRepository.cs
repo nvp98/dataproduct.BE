@@ -553,6 +553,7 @@ namespace dataproduct.api.Repositories
                     NhomHienThi = nh != null ? nh.TenNhom : null,
                     ThuTuNhom = nh != null ? nh.ThuTu : null,
                     TenNVL_TK = n.TenNVL_TK,
+                    MaVatTu = n.MaVatTu,
                     XacNhan = n.XacNhan
                 }
             ).AsNoTracking().ToListAsync();
@@ -578,6 +579,7 @@ namespace dataproduct.api.Repositories
             existing.IDNhomNVL = entity.IDNhomNVL;
             existing.TenNVL_NM = entity.TenNVL_NM;
             existing.TenNVL_TK = entity.TenNVL_TK;
+            existing.MaVatTu = entity.MaVatTu;
             existing.XacNhan = entity.XacNhan;
             existing.ThuTu = entity.ThuTu;
             existing.GhiChu = entity.GhiChu;
