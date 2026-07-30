@@ -567,7 +567,6 @@ namespace dataproduct.api.Services
             });
 
             me.TrangThaiTL = 1;
-            me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
 
@@ -621,7 +620,6 @@ namespace dataproduct.api.Services
                 me.ThungSo = P("thungSo") ? req.ThungSo : me.ThungSo;
                 me.KLLFSauThep = P("kllfSauThep") ? req.KllfSauThep : me.KLLFSauThep;
             }
-            me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
 
@@ -708,7 +706,6 @@ namespace dataproduct.api.Services
             me.IsTrungMeThoi = null;   // mẻ này rời khỏi TL — không còn là bên trùng
                                        // if (me.DichChuyen == "tinh_luyen")
             me.IdMayDucDich = null;
-            me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
 
@@ -769,7 +766,6 @@ namespace dataproduct.api.Services
                 }
 
                 me.TrangThaiDuc = 1;
-                me.CapNhatBoi = userId;
                 me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
 
@@ -799,7 +795,6 @@ namespace dataproduct.api.Services
                 if (me.TrangThaiDuc != 1) continue;
 
                 me.TrangThaiDuc = 0;
-                me.CapNhatBoi = userId;
                 me.CapNhatLuc = now;
                 me.CapNhatBoiDuc = userId;
 
@@ -1324,7 +1319,6 @@ namespace dataproduct.api.Services
                         if (me.IsChot == true) continue;
 
                         me.IsChot = true;
-                        me.CapNhatBoi = userId;
                         me.CapNhatLuc = now;
                         me.CapNhatBoiDuc = userId;
 
@@ -1401,7 +1395,6 @@ namespace dataproduct.api.Services
                     foreach (var me in mes.Where(m => m.IsChot == true))
                     {
                         me.IsChot = false;
-                        me.CapNhatBoi = userId;
                         me.CapNhatLuc = now;
                         me.CapNhatBoiDuc = userId;
 
@@ -1452,9 +1445,8 @@ namespace dataproduct.api.Services
                 case "tl":  me.GhiChuTL  = ghiChu; break;
                 case "duc": me.GhiChuDuc = ghiChu; break;
                 case "pcn": me.GhiChuPCN = ghiChu; break;
-                default:    me.GhiChuLo  = ghiChu; break;
+                default:    me.GhiChuLo  = ghiChu; me.CapNhatBoi = userId; break;
             }
-            me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             await _repo.SaveChangesAsync();
         }

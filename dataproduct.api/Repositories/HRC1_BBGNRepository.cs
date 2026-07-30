@@ -193,7 +193,7 @@ namespace dataproduct.api.Repositories
                             m.TLDichSo,
                             m.DichChuyen,
                             m.TrangThaiTL,
-                            m.CapNhatBoi,
+                            m.CapNhatBoiTL,
                             m.NgayTao,
                             m.NgayNhanTL,
                             TenMayDuc = md != null ? md.TenMayDuc : null
@@ -206,8 +206,8 @@ namespace dataproduct.api.Repositories
             var meIds = raw.Select(m => m.Id).ToList();
 
             // Tra cứu họ tên người nhận từ master DB
-            var userIds = raw.Where(m => m.CapNhatBoi.HasValue && m.TrangThaiTL >= 1)
-                             .Select(m => m.CapNhatBoi!.Value).Distinct().ToList();
+            var userIds = raw.Where(m => m.CapNhatBoiTL.HasValue && m.TrangThaiTL >= 1)
+                             .Select(m => m.CapNhatBoiTL!.Value).Distinct().ToList();
             var names = userIds.Count > 0
                 ? await _masterCtx.Tbl_TaiKhoan
                     .Where(t => userIds.Contains(t.ID_TaiKhoan))
@@ -233,7 +233,7 @@ namespace dataproduct.api.Repositories
                 DichChuyen      = m.DichChuyen,
                 TrangThaiTL     = m.TrangThaiTL,
                 SoTinhLuyenNhan = (m.TrangThaiTL >= 1) && tlScopes.TryGetValue(m.Id, out var sc) ? sc : null,
-                TenNguoiNhan    = (m.TrangThaiTL >= 1) && m.CapNhatBoi.HasValue && names.TryGetValue(m.CapNhatBoi.Value, out var n) ? n : null,
+                TenNguoiNhan    = (m.TrangThaiTL >= 1) && m.CapNhatBoiTL.HasValue && names.TryGetValue(m.CapNhatBoiTL.Value, out var n) ? n : null,
                 NgayTao         = m.NgayTao,
                 NgayNhanTL      = m.NgayNhanTL,
                 TenMayDuc       = m.TenMayDuc
