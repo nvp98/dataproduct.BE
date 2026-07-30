@@ -10,7 +10,7 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly ProductDataMasterDbContext _masterContext;
-        private const string MaBm = "HRC2_BBGN_PhoiTam";
+        private const string MaBm = "HRC2_BBSL_PhoiTam";
 
         public Hrc2SlabRepository(ProductFormContext context, ProductDataMasterDbContext masterContext)
         {

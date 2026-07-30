@@ -18,7 +18,7 @@ namespace dataproduct.api.Services.PhieuEnrichers;
 public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher
 {
     private readonly ProductFormContext _context;
-    public string MaBm => "HRC1_BBGN_PhoiTam";
+    public string MaBm => "HRC1_BBSL_PhoiTam";
 
     public Hrc1BbgnPhoiTamEnricher(ProductFormContext context) => _context = context;
 

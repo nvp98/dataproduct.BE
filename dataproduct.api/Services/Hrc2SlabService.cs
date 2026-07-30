@@ -99,7 +99,7 @@ namespace dataproduct.api.Services
 
             var trangThais = await GetTrangThaisAsync(idPhieu);
 
-            var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC2_BBGN_PhoiTam.xlsx");
+            var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC2_BBSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy file mẫu: {templatePath}");
 
@@ -144,7 +144,7 @@ namespace dataproduct.api.Services
             return new ExportFileResult
             {
                 Content = ms.ToArray(),
-                FileName = $"HRC2_BBGN_PhoiTam_{soPhieu}_{ngaySX.Replace("/", "")}_{DateTime.Now:HHmmss}.xlsx",
+                FileName = $"HRC2_BBSL_PhoiTam_{soPhieu}_{ngaySX.Replace("/", "")}_{DateTime.Now:HHmmss}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
@@ -393,7 +393,7 @@ namespace dataproduct.api.Services
         {
             return await _context.BmPhieus
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC2_BBGN_PhoiTam");
+                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC2_BBSL_PhoiTam");
         }
 
         private static (string SoPhieu, string NgaySX, string Ca, string Kip) ExtractPhieuInfo(BmPhieu? phieu)

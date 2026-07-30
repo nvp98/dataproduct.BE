@@ -156,7 +156,7 @@ namespace dataproduct.api.Services
             var soPhieu = phieu?.SoPhieu ?? "";
             var ngaySX = phieu?.NgaySX?.ToString("dd/MM/yyyy") ?? "";
 
-            var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC1_BBGN_PhoiTam.xlsx");
+            var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC1_BBSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy file mẫu: {templatePath}");
 
@@ -213,7 +213,7 @@ namespace dataproduct.api.Services
             return new ExportFileResult
             {
                 Content = ms.ToArray(),
-                FileName = $"HRC1_BBGN_PhoiTam_{soPhieu}_{ngaySX.Replace("/", "")}_{DateTime.Now:HHmmss}.xlsx",
+                FileName = $"HRC1_BBSL_PhoiTam_{soPhieu}_{ngaySX.Replace("/", "")}_{DateTime.Now:HHmmss}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             };
         }
@@ -552,14 +552,14 @@ namespace dataproduct.api.Services
         {
             return await _context.BmPhieus
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC1_BBGN_PhoiTam");
+                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC1_BBSL_PhoiTam");
         }
 
         private async Task<List<Hrc1Slab>> GetSlabsForExportAsync(Guid idPhieu)
         {
             var phieu = await _context.BmPhieus
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC1_BBGN_PhoiTam");
+                .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == "HRC1_BBSL_PhoiTam");
             if (phieu == null) return [];
 
             // Reuse repository helper

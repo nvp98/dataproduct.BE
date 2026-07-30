@@ -9,7 +9,7 @@ namespace dataproduct.api.Repositories
     {
         private readonly ProductFormContext _context;
         private readonly SyncPhanLoaiService _syncPhanLoai;
-        private const string MaBm = "HRC1_BBGN_PhoiTam";
+        private const string MaBm = "HRC1_BBSL_PhoiTam";
         private const string NhaMayHrc1 = "HRC1";
 
         public Hrc1SlabRepository(ProductFormContext context, SyncPhanLoaiService syncPhanLoai)
@@ -770,10 +770,16 @@ namespace dataproduct.api.Repositories
             var names = macThepList.Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList()!;
             if (names.Count == 0) return new Dictionary<string, MaVatTu>();
 
-            return await _context.MaVatTus
+            var rows = await _context.MaVatTus
                 .AsNoTracking()
-                .Where(x => x.NhaMay == NhaMayHrc1 && names.Contains(x.MacThep))
-                .ToDictionaryAsync(x => x.MacThep, x => x);
+                .Where(x => x.NhaMay == NhaMayHrc1 && x.MacThep != null && names.Contains(x.MacThep))
+                .ToListAsync();
+
+            // GroupBy + First thay vì ToDictionaryAsync trực tiếp: phòng trường hợp dữ liệu cũ (trước khi
+            // áp filtered unique index UX_MaVatTu_NhaMay_MacThep) vẫn còn 2 dòng trùng MacThep, tránh crash.
+            return rows
+                .GroupBy(x => x.MacThep!)
+                .ToDictionary(g => g.Key, g => g.First());
         }
 
         private async Task<int> FillMaVatTuForSlabsAsync(List<Hrc1Slab> slabs, bool overwrite)

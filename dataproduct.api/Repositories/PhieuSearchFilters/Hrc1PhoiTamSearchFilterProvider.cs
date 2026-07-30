@@ -3,13 +3,13 @@ using dataproduct.api.Models;
 namespace dataproduct.api.Repositories.PhieuSearchFilters;
 
 /// <summary>
-/// HRC1_BBGN_PhoiTam: workflow slab (Đúc/Cán/PKH).
+/// HRC1_BBSL_PhoiTam: workflow slab (Đúc/Cán/PKH).
 ///  - loaiVung 1/3: xử lý như phiếu thường (scope-based).
 ///  - loaiVung 2 (Việc đến tôi): không dùng BmPheDuyet, chỉ cần quyền 2|4 cho maBm (không check scope).
 /// </summary>
 public class Hrc1PhoiTamSearchFilterProvider : IPhieuSearchFilterProvider
 {
-    private const string MaBmValue = "HRC1_BBGN_PhoiTam";
+    private const string MaBmValue = "HRC1_BBSL_PhoiTam";
 
     public IReadOnlyCollection<string> MaBms { get; } = new[] { MaBmValue };
 

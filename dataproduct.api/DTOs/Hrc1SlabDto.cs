@@ -175,19 +175,23 @@ namespace dataproduct.api.DTOs
     {
         public int Id { get; set; }
         public string NhaMay { get; set; } = "";
-        public string MacThep { get; set; } = "";
+        public string? MacThep { get; set; }
         public string VatTuCode { get; set; } = "";
         public string TenVatTu { get; set; } = "";
         public bool? IsLock { get; set; }
+        public string? CongDoan { get; set; }
+        public string? KichThuoc { get; set; }
     }
 
     public class MaVatTuUpsertDto
     {
         public string NhaMay { get; set; } = "";
-        public string MacThep { get; set; } = "";
+        public string? MacThep { get; set; }
         public string VatTuCode { get; set; } = "";
         public string? TenVatTu { get; set; }
         public bool? IsLock { get; set; }
+        public string? CongDoan { get; set; }
+        public string? KichThuoc { get; set; }
     }
 
     public class MaVatTuSearchRequest
@@ -195,6 +199,7 @@ namespace dataproduct.api.DTOs
         public string? SearchKey { get; set; }
         public string? NhaMay { get; set; }
         public string? MacThep { get; set; }
+        public string? CongDoan { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 50;
     }

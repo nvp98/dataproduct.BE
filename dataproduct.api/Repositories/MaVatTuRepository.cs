@@ -20,11 +20,14 @@ namespace dataproduct.api.Repositories
             if (!string.IsNullOrWhiteSpace(req.NhaMay))
                 query = query.Where(x => x.NhaMay == req.NhaMay);
             if (!string.IsNullOrWhiteSpace(req.MacThep))
-                query = query.Where(x => x.MacThep.Contains(req.MacThep));
+                query = query.Where(x => x.MacThep != null && x.MacThep.Contains(req.MacThep));
+            if (!string.IsNullOrWhiteSpace(req.CongDoan))
+                query = query.Where(x => x.CongDoan != null && x.CongDoan.Contains(req.CongDoan));
             if (!string.IsNullOrWhiteSpace(req.SearchKey))
                 query = query.Where(x => x.VatTuCode.Contains(req.SearchKey)
                                       || x.TenVatTu.Contains(req.SearchKey)
-                                      || x.MacThep.Contains(req.SearchKey));
+                                      || (x.MacThep != null && x.MacThep.Contains(req.SearchKey))
+                                      || (x.CongDoan != null && x.CongDoan.Contains(req.SearchKey)));
 
             var total = await query.CountAsync();
             var data = await query
@@ -39,7 +42,9 @@ namespace dataproduct.api.Repositories
                     MacThep = x.MacThep,
                     VatTuCode = x.VatTuCode,
                     TenVatTu = x.TenVatTu,
-                    IsLock = x.IsLock
+                    IsLock = x.IsLock,
+                    CongDoan = x.CongDoan,
+                    KichThuoc = x.KichThuoc
                 })
                 .ToListAsync();
 
@@ -56,22 +61,31 @@ namespace dataproduct.api.Repositories
                 MacThep = x.MacThep,
                 VatTuCode = x.VatTuCode,
                 TenVatTu = x.TenVatTu,
-                IsLock = x.IsLock
+                IsLock = x.IsLock,
+                CongDoan = x.CongDoan,
+                KichThuoc = x.KichThuoc
             };
         }
 
         public async Task<MaVatTuItem> CreateAsync(MaVatTuUpsertDto dto)
         {
-            if (await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep))
+            if (!string.IsNullOrWhiteSpace(dto.MacThep) &&
+                await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep))
                 throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại.");
+
+            if (!string.IsNullOrWhiteSpace(dto.CongDoan) &&
+                await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.CongDoan == dto.CongDoan && x.VatTuCode == dto.VatTuCode))
+                throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Công đoạn '{dto.CongDoan}' + Mã vật tư '{dto.VatTuCode}' đã tồn tại.");
 
             var entity = new MaVatTu
             {
                 NhaMay = dto.NhaMay.Trim(),
-                MacThep = dto.MacThep.Trim(),
+                MacThep = dto.MacThep?.Trim(),
                 VatTuCode = dto.VatTuCode.Trim(),
                 TenVatTu = dto.TenVatTu?.Trim() ?? "",
                 IsLock = dto.IsLock,
+                CongDoan = dto.CongDoan?.Trim(),
+                KichThuoc = dto.KichThuoc?.Trim(),
                 NgayTao = DateTime.Now
             };
             _context.MaVatTus.Add(entity);
@@ -84,18 +98,24 @@ namespace dataproduct.api.Repositories
                 MacThep = entity.MacThep,
                 VatTuCode = entity.VatTuCode,
                 TenVatTu = entity.TenVatTu,
-                IsLock = entity.IsLock
+                IsLock = entity.IsLock,
+                CongDoan = entity.CongDoan,
+                KichThuoc = entity.KichThuoc
             };
         }
 
         public async Task<MaVatTuBulkCreateResult> BulkCreateAsync(List<MaVatTuUpsertDto> items)
         {
             var existing = await _context.MaVatTus
-                .Select(x => new { x.NhaMay, x.MacThep })
+                .Select(x => new { x.NhaMay, x.MacThep, x.CongDoan, x.VatTuCode })
                 .ToListAsync();
 
-            var existingKeys = new HashSet<string>(
-                existing.Select(x => $"{x.NhaMay}|{x.MacThep}"),
+            var existingMacThepKeys = new HashSet<string>(
+                existing.Where(x => !string.IsNullOrEmpty(x.MacThep)).Select(x => $"{x.NhaMay}|{x.MacThep}"),
+                StringComparer.OrdinalIgnoreCase);
+
+            var existingCongDoanKeys = new HashSet<string>(
+                existing.Where(x => !string.IsNullOrEmpty(x.CongDoan)).Select(x => $"{x.NhaMay}|{x.CongDoan}|{x.VatTuCode}"),
                 StringComparer.OrdinalIgnoreCase);
 
             var result = new MaVatTuBulkCreateResult();
@@ -104,26 +124,34 @@ namespace dataproduct.api.Repositories
             foreach (var dto in items)
             {
                 var nhaMay = dto.NhaMay?.Trim() ?? "";
-                var macThep = dto.MacThep?.Trim() ?? "";
-                if (string.IsNullOrEmpty(nhaMay) || string.IsNullOrEmpty(macThep)) continue;
+                var macThep = dto.MacThep?.Trim();
+                var congDoan = dto.CongDoan?.Trim();
+                var vatTuCode = dto.VatTuCode?.Trim() ?? "";
+                if (string.IsNullOrEmpty(nhaMay) || string.IsNullOrEmpty(vatTuCode)) continue;
 
-                var key = $"{nhaMay}|{macThep}";
-                if (existingKeys.Contains(key))
+                var macThepKey = !string.IsNullOrEmpty(macThep) ? $"{nhaMay}|{macThep}" : null;
+                var congDoanKey = !string.IsNullOrEmpty(congDoan) ? $"{nhaMay}|{congDoan}|{vatTuCode}" : null;
+
+                var isDup = (macThepKey != null && existingMacThepKeys.Contains(macThepKey))
+                         || (congDoanKey != null && existingCongDoanKeys.Contains(congDoanKey));
+                if (isDup)
                 {
                     result.Skipped++;
-                    result.SkippedItems.Add($"{nhaMay}/{macThep}");
+                    result.SkippedItems.Add($"{nhaMay}/{macThep}/{congDoan}/{vatTuCode}");
                     continue;
                 }
 
                 toAdd.Add(new MaVatTu
                 {
                     NhaMay = nhaMay,
-                    MacThep = macThep,
-                    VatTuCode = dto.VatTuCode.Trim(),
+                    MacThep = string.IsNullOrEmpty(macThep) ? null : macThep,
+                    VatTuCode = vatTuCode,
                     TenVatTu = dto.TenVatTu?.Trim() ?? "",
+                    CongDoan = string.IsNullOrEmpty(congDoan) ? null : congDoan,
                     NgayTao = DateTime.Now
                 });
-                existingKeys.Add(key);
+                if (macThepKey != null) existingMacThepKeys.Add(macThepKey);
+                if (congDoanKey != null) existingCongDoanKeys.Add(congDoanKey);
             }
 
             if (toAdd.Count > 0)
@@ -141,15 +169,22 @@ namespace dataproduct.api.Repositories
             var entity = await _context.MaVatTus.FindAsync(id);
             if (entity == null) return false;
 
-            if (await _context.MaVatTus.AnyAsync(x =>
-                x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.Id != id))
+            if (!string.IsNullOrWhiteSpace(dto.MacThep) &&
+                await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.Id != id))
                 throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại.");
 
+            if (!string.IsNullOrWhiteSpace(dto.CongDoan) &&
+                await _context.MaVatTus.AnyAsync(x =>
+                    x.NhaMay == dto.NhaMay && x.CongDoan == dto.CongDoan && x.VatTuCode == dto.VatTuCode && x.Id != id))
+                throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Công đoạn '{dto.CongDoan}' + Mã vật tư '{dto.VatTuCode}' đã tồn tại.");
+
             entity.NhaMay = dto.NhaMay.Trim();
-            entity.MacThep = dto.MacThep.Trim();
+            entity.MacThep = dto.MacThep?.Trim();
             entity.VatTuCode = dto.VatTuCode.Trim();
             entity.TenVatTu = dto.TenVatTu?.Trim() ?? "";
             entity.IsLock = dto.IsLock;
+            entity.CongDoan = dto.CongDoan?.Trim();
+            entity.KichThuoc = dto.KichThuoc?.Trim();
             await _context.SaveChangesAsync();
             return true;
         }
@@ -169,10 +204,14 @@ namespace dataproduct.api.Repositories
             var names = macThepNames.Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList();
             if (names.Count == 0) return new Dictionary<string, string>();
 
-            return await _context.MaVatTus
+            var rows = await _context.MaVatTus
                 .AsNoTracking()
-                .Where(x => x.NhaMay == nhaMay && names.Contains(x.MacThep))
-                .ToDictionaryAsync(x => x.MacThep, x => x.VatTuCode);
+                .Where(x => x.NhaMay == nhaMay && x.MacThep != null && names.Contains(x.MacThep))
+                .ToListAsync();
+
+            return rows
+                .GroupBy(x => x.MacThep!)
+                .ToDictionary(g => g.Key, g => g.First().VatTuCode);
         }
     }
 }

@@ -890,14 +890,26 @@ public partial class ProductFormContext : DbContext
         {
             entity.ToTable("MaVatTu");
             entity.Property(e => e.NhaMay).HasMaxLength(10).IsRequired();
-            entity.Property(e => e.MacThep).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.MacThep).HasMaxLength(100);
             entity.Property(e => e.VatTuCode).HasMaxLength(200).IsRequired();
             entity.Property(e => e.TenVatTu).HasMaxLength(200);
+            entity.Property(e => e.CongDoan).HasMaxLength(100);
+            entity.Property(e => e.KichThuoc).HasMaxLength(150);
             entity.Property(e => e.NgayTao)
                   .HasColumnType("datetime")
                   .HasDefaultValueSql("GETDATE()")
                   .ValueGeneratedOnAdd();
-            entity.HasIndex(e => new { e.NhaMay, e.MacThep }).IsUnique();
+            // Unique chỉ trong nhóm cột thực sự có giá trị (tránh SQL Server coi nhiều NULL là trùng nhau):
+            // - MacThep có giá trị: 1 Mác thép chỉ map 1 Vật tư/NhaMay (HRC1 Slab phụ thuộc điều này khi snapshot theo MacThep).
+            // - CongDoan có giá trị: 1 Công đoạn + Vật tư chỉ tồn tại 1 lần/NhaMay.
+            entity.HasIndex(e => new { e.NhaMay, e.MacThep })
+                  .IsUnique()
+                  .HasDatabaseName("UX_MaVatTu_NhaMay_MacThep")
+                  .HasFilter("[MacThep] IS NOT NULL");
+            entity.HasIndex(e => new { e.NhaMay, e.CongDoan, e.VatTuCode })
+                  .IsUnique()
+                  .HasDatabaseName("UX_MaVatTu_NhaMay_CongDoan_VatTuCode")
+                  .HasFilter("[CongDoan] IS NOT NULL");
         });
 
         modelBuilder.Entity<Hrc1MaVatTu>(entity =>
