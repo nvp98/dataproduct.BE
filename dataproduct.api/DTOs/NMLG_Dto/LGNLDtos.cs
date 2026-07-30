@@ -133,6 +133,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? NhomHienThi { get; set; }
         public int? ThuTuNhom { get; set; }
         public string? TenNVL_TK { get; set; }
+        public string? MaVatTu { get; set; }
         public bool? XacNhan { get; set; }
         public DateTime? NgayXacNhan { get; set; }
         public int? IdNguoiXacNhan { get; set; }
@@ -143,6 +144,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdLoCao { get; set; }
         public int? IdNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }
@@ -154,6 +156,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int? IdNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
         public string? TenNVL_TK { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public int? ThuTuNhom { get; set; }

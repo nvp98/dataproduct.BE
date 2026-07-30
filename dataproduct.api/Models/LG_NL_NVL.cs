@@ -11,6 +11,7 @@ namespace dataproduct.api.Models
         public int? IDNhomNVL { get; set; }
         public string? TenNVL_NM { get; set; }
         public string? TenNVL_TK { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
 
         public string? GhiChu { get; set; }
