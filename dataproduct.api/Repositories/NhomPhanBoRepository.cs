@@ -41,6 +41,7 @@ namespace dataproduct.api.Repositories
             existing.TenNhom = entity.TenNhom;
             existing.LoaiPhanBo = entity.LoaiPhanBo;
             existing.PhuongThucPhanBo = entity.PhuongThucPhanBo;
+            existing.MaVatTu = entity.MaVatTu;
             existing.ThuTu = entity.ThuTu;
 
             await _context.SaveChangesAsync();

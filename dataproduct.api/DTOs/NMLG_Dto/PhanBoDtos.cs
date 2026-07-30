@@ -8,6 +8,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string TenNhom { get; set; } = string.Empty;
         public byte LoaiPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
     }
 
@@ -16,6 +17,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string TenNhom { get; set; } = string.Empty;
         public byte LoaiPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
     }
 
@@ -24,6 +26,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string TenNhom { get; set; } = string.Empty;
         public byte LoaiPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
     }
 

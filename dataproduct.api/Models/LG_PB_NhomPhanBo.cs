@@ -9,6 +9,7 @@ namespace dataproduct.api.Models
         public string TenNhom { get; set; } = string.Empty;
         public byte LoaiPhanBo { get; set; }
         public byte PhuongThucPhanBo { get; set; }
+        public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
         public bool IsDelete { get; set; }
     }

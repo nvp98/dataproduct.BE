@@ -187,7 +187,6 @@ namespace dataproduct.api.Services
                 IDLoCao     = dto.IdLoCao,
                 IDNhomNVL   = dto.IdNhomNVL,
                 TenNVL_NM   = dto.TenNVL_NM,
-                MaVatTu     = dto.MaVatTu,
                 ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
             };
@@ -203,7 +202,6 @@ namespace dataproduct.api.Services
                 IDNhomNVL   = dto.IdNhomNVL,
                 TenNVL_NM   = dto.TenNVL_NM,
                 TenNVL_TK = dto.TenNVL_TK,
-                MaVatTu = dto.MaVatTu,
                 XacNhan = dto.XacNhan,
                 ThuTu       = dto.ThuTu,
                 GhiChu      = dto.GhiChu,
@@ -265,7 +263,6 @@ namespace dataproduct.api.Services
             IdLoCao     = e.IDLoCao,
             IdNhomNVL   = e.IDNhomNVL,
             TenNVL_NM   = e.TenNVL_NM,
-            MaVatTu     = e.MaVatTu,
             ThuTu       = e.ThuTu,
             GhiChu      = e.GhiChu,
             NgayTao     = e.NgayTao,
