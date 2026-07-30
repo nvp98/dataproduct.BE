@@ -35,6 +35,7 @@ namespace dataproduct.api.Services
                 TenNhom = dto.TenNhom,
                 LoaiPhanBo = dto.LoaiPhanBo,
                 PhuongThucPhanBo = dto.PhuongThucPhanBo,
+                MaVatTu = dto.MaVatTu,
                 ThuTu = dto.ThuTu
             };
             var created = await _repo.AddAsync(entity);
@@ -58,6 +59,7 @@ namespace dataproduct.api.Services
                 TenNhom = dto.TenNhom,
                 LoaiPhanBo = dto.LoaiPhanBo,
                 PhuongThucPhanBo = dto.PhuongThucPhanBo,
+                MaVatTu = dto.MaVatTu,
                 ThuTu = dto.ThuTu
             };
             var updated = await _repo.UpdateAsync(id, entity);
@@ -250,6 +252,7 @@ namespace dataproduct.api.Services
             TenNhom = x.TenNhom,
             LoaiPhanBo = x.LoaiPhanBo,
             PhuongThucPhanBo = x.PhuongThucPhanBo,
+            MaVatTu = x.MaVatTu,
             ThuTu = x.ThuTu
         };
     }
