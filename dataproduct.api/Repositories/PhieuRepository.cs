@@ -514,6 +514,23 @@ namespace dataproduct.api.Repositories
                 NguoiTao   = x.NguoiTaoId,
                 TenScope   = x.TenScope
             }).ToList();
+
+            // NguoiTao lưu ID người sửa cuối (được cập nhật lại mỗi lần lưu phiếu) — resolve tên hiển thị
+            var nguoiTaoIds = result.Where(x => x.NguoiTao.HasValue).Select(x => x.NguoiTao!.Value).Distinct().ToList();
+            if (nguoiTaoIds.Count > 0)
+            {
+                var tenNguoiTaoMap = await _mastercontext.Tbl_TaiKhoan
+                    .Where(tk => nguoiTaoIds.Contains(tk.ID_TaiKhoan))
+                    .Select(tk => new { tk.ID_TaiKhoan, tk.HoVaTen })
+                    .ToDictionaryAsync(tk => tk.ID_TaiKhoan, tk => tk.HoVaTen);
+
+                foreach (var item in result)
+                {
+                    if (item.NguoiTao.HasValue && tenNguoiTaoMap.TryGetValue(item.NguoiTao.Value, out var hoVaTen))
+                        item.TenNguoiTao = hoVaTen;
+                }
+            }
+
             foreach (var item in result)
             {
                 var pheDuyet = await _pdservice.GetPheDuyetPhieuAsync(item.Idphieu);

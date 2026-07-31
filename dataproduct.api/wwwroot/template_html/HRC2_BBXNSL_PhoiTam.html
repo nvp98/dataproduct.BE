@@ -70,7 +70,7 @@
     .sig-cell { display: table-cell; width: 33.3%; vertical-align: top; }
     .sig-title { font-weight: bold; font-size: 8pt; margin-bottom: 3px; }
     .sig-note  { font-size: 7pt; font-style: italic; color: #555; }
-    .sig-space { height: 36px; }
+    .sig-space { height: 36px; margin-bottom: 20px;}
     .sig-name  { font-weight: bold; }
 
     @page { size: A3 landscape; margin: 0; }
@@ -85,14 +85,14 @@
       <img src="{{LogoUrl}}" alt="Logo" />
     </div>
     <div class="header-right">
-      <strong>BM.40/QT.05.15</strong><br />
-      <i>Ngày hiệu lực:</i> 01/04/2025<br />
-      <i>Lần sửa đổi:</i> 01
+      <strong>BM.36/QT.05.15</strong><br />
+      <i>Ngày hiệu lực:</i> 10/10/2025<br />
+      <i>Lần sửa đổi:</i> 02
     </div>
   </div>
 
   <!-- TIÊU ĐỀ -->
-  <div class="title">BIÊN BẢN SẢN LƯỢNG PHÔI TẤM</div>
+  <div class="title">BIÊN BẢN XÁC NHẬN SẢN LƯỢNG PHÔI TẤM</div>
   <div class="sub-title">
     Số phiếu: <strong>{{soPhieu}}</strong>
     &nbsp;|&nbsp;
@@ -161,20 +161,20 @@
     <div class="sig-cell">
       <div class="sig-title">X.ĐPT - NM.HRC2</div>
       <div class="sig-note">(Ký, ghi rõ họ tên)</div>
-      <div class="sig-space"></div>
-      <div class="sig-name"></div>
+      <div class="sig-space">{{DucKyImgHtml}}</div>
+      <div class="sig-name">{{DucKyTenHtml}}</div>
     </div>
     <div class="sig-cell">
       <div class="sig-title">Kho phôi - NM.HRC2</div>
       <div class="sig-note">(Ký, ghi rõ họ tên)</div>
-      <div class="sig-space"></div>
-      <div class="sig-name"></div>
+      <div class="sig-space">{{KhoKyImgHtml}}</div>
+      <div class="sig-name">{{KhoKyTenHtml}}</div>
     </div>
     <div class="sig-cell">
       <div class="sig-title">P.QLCL</div>
       <div class="sig-note">(Ký, ghi rõ họ tên)</div>
-      <div class="sig-space"></div>
-      <div class="sig-name"></div>
+      <div class="sig-space">{{QLCLKyImgHtml}}</div>
+      <div class="sig-name">{{QLCLKyTenHtml}}</div>
     </div>
   </div>
 

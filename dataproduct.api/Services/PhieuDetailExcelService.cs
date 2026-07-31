@@ -315,7 +315,13 @@ namespace dataproduct.api.Services
 
                         if (mappedDict != null && mappedDict.TryGetValue(h.IDHeaderKey, out var mapped))
                         {
-                            klPhuGia = RoundNumber(mapped.KLPhuGiaTotal);
+                            // Header_Key Id=5: KLPhuGia ÷ 0.055, làm tròn không chữ số thập phân
+                            // (đồng bộ với DLNMHRC2Repository.GetByIdGroupedAsync/SearchThongKeApiAsync)
+                            klPhuGia = h.IDHeaderKey == 5
+                                ? (mapped.KLPhuGiaTotal.HasValue
+                                    ? (double?)Math.Round(mapped.KLPhuGiaTotal.Value / 0.055, 0, MidpointRounding.AwayFromZero)
+                                    : null)
+                                : RoundNumber(mapped.KLPhuGiaTotal);
                             klPhuGia_Manual = RoundNumber(mapped.KLPhuGia_Manual);
                             isManual = mapped.IsManual;
                         }
@@ -1660,9 +1666,9 @@ namespace dataproduct.api.Services
 
             string infoKip = $"Kíp {caStr}: Từ {gioBatDauLocal} ngày {ngayStr} đến {gioKetThucLocal} ngày {ngayKetThuc}";
 
-            string bmCode = key.Contains("BOF") ? "BM.08/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00"
-                          : key.Contains("LF")  ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00"
-                          :                       "BM.16/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00";
+            string bmCode = key.Contains("BOF") ? "BM.08/QT.05.15 <br /> Ngày hiệu lực: 05/07/2025 <br /> Lần sửa đổi: 01"
+                          : key.Contains("LF")  ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 02"
+                          :                       "BM.16/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 03";
 
             string thead = key.Contains("BOF") ? PdfThead_BOF(headers, phanBoHeaders)
                          : key.Contains("LF")  ? PdfThead_LF(headers, phanBoHeaders)

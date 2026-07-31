@@ -6,6 +6,10 @@ namespace dataproduct.api.Repositories
 {
     public class MaVatTuRepository : IMaVatTuRepository
     {
+        // Chỉ HRC1 phụ thuộc giả định 1 MacThep = 1 VatTuCode (Hrc1SlabRepository.GetMaVatTuLookupAsync).
+        // Nhà máy khác cho phép nhiều VatTuCode / MacThep — xem mavattu_filtered_unique_indexes.sql.
+        private const string NhaMayHrc1 = "HRC1";
+
         private readonly ProductFormContext _context;
 
         public MaVatTuRepository(ProductFormContext context)
@@ -33,6 +37,7 @@ namespace dataproduct.api.Repositories
             var data = await query
                 .OrderBy(x => x.NhaMay)
                 .ThenBy(x => x.MacThep)
+                .ThenBy(x => x.Id)
                 .Skip((req.Page - 1) * req.PageSize)
                 .Take(req.PageSize)
                 .Select(x => new MaVatTuItem
@@ -69,9 +74,21 @@ namespace dataproduct.api.Repositories
 
         public async Task<MaVatTuItem> CreateAsync(MaVatTuUpsertDto dto)
         {
-            if (!string.IsNullOrWhiteSpace(dto.MacThep) &&
-                await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep))
-                throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại.");
+            if (!string.IsNullOrWhiteSpace(dto.MacThep))
+            {
+                if (dto.NhaMay?.Trim() == NhaMayHrc1)
+                {
+                    if (await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep))
+                        throw new InvalidOperationException(
+                            $"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại (HRC1 chỉ cho phép 1 mã vật tư / mác thép).");
+                }
+                else if (await _context.MaVatTus.AnyAsync(x =>
+                    x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.VatTuCode == dto.VatTuCode))
+                {
+                    throw new InvalidOperationException(
+                        $"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' + Mã vật tư '{dto.VatTuCode}' đã tồn tại.");
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(dto.CongDoan) &&
                 await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.CongDoan == dto.CongDoan && x.VatTuCode == dto.VatTuCode))
@@ -110,8 +127,16 @@ namespace dataproduct.api.Repositories
                 .Select(x => new { x.NhaMay, x.MacThep, x.CongDoan, x.VatTuCode })
                 .ToListAsync();
 
+            // HRC1: dedup theo NhaMay+MacThep (1 MacThep = 1 VatTuCode). Nhà máy khác: dedup theo
+            // NhaMay+MacThep+VatTuCode, cho phép nhiều VatTuCode / MacThep.
             var existingMacThepKeys = new HashSet<string>(
-                existing.Where(x => !string.IsNullOrEmpty(x.MacThep)).Select(x => $"{x.NhaMay}|{x.MacThep}"),
+                existing.Where(x => !string.IsNullOrEmpty(x.MacThep) && x.NhaMay == NhaMayHrc1)
+                        .Select(x => $"{x.NhaMay}|{x.MacThep}"),
+                StringComparer.OrdinalIgnoreCase);
+
+            var existingMacThepVatTuKeys = new HashSet<string>(
+                existing.Where(x => !string.IsNullOrEmpty(x.MacThep) && x.NhaMay != NhaMayHrc1)
+                        .Select(x => $"{x.NhaMay}|{x.MacThep}|{x.VatTuCode}"),
                 StringComparer.OrdinalIgnoreCase);
 
             var existingCongDoanKeys = new HashSet<string>(
@@ -129,10 +154,13 @@ namespace dataproduct.api.Repositories
                 var vatTuCode = dto.VatTuCode?.Trim() ?? "";
                 if (string.IsNullOrEmpty(nhaMay) || string.IsNullOrEmpty(vatTuCode)) continue;
 
-                var macThepKey = !string.IsNullOrEmpty(macThep) ? $"{nhaMay}|{macThep}" : null;
+                var isHrc1 = string.Equals(nhaMay, NhaMayHrc1, StringComparison.OrdinalIgnoreCase);
+                var macThepKey = !string.IsNullOrEmpty(macThep) && isHrc1 ? $"{nhaMay}|{macThep}" : null;
+                var macThepVatTuKey = !string.IsNullOrEmpty(macThep) && !isHrc1 ? $"{nhaMay}|{macThep}|{vatTuCode}" : null;
                 var congDoanKey = !string.IsNullOrEmpty(congDoan) ? $"{nhaMay}|{congDoan}|{vatTuCode}" : null;
 
                 var isDup = (macThepKey != null && existingMacThepKeys.Contains(macThepKey))
+                         || (macThepVatTuKey != null && existingMacThepVatTuKeys.Contains(macThepVatTuKey))
                          || (congDoanKey != null && existingCongDoanKeys.Contains(congDoanKey));
                 if (isDup)
                 {
@@ -151,6 +179,7 @@ namespace dataproduct.api.Repositories
                     NgayTao = DateTime.Now
                 });
                 if (macThepKey != null) existingMacThepKeys.Add(macThepKey);
+                if (macThepVatTuKey != null) existingMacThepVatTuKeys.Add(macThepVatTuKey);
                 if (congDoanKey != null) existingCongDoanKeys.Add(congDoanKey);
             }
 
@@ -169,9 +198,21 @@ namespace dataproduct.api.Repositories
             var entity = await _context.MaVatTus.FindAsync(id);
             if (entity == null) return false;
 
-            if (!string.IsNullOrWhiteSpace(dto.MacThep) &&
-                await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.Id != id))
-                throw new InvalidOperationException($"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại.");
+            if (!string.IsNullOrWhiteSpace(dto.MacThep))
+            {
+                if (dto.NhaMay?.Trim() == NhaMayHrc1)
+                {
+                    if (await _context.MaVatTus.AnyAsync(x => x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.Id != id))
+                        throw new InvalidOperationException(
+                            $"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' đã tồn tại (HRC1 chỉ cho phép 1 mã vật tư / mác thép).");
+                }
+                else if (await _context.MaVatTus.AnyAsync(x =>
+                    x.NhaMay == dto.NhaMay && x.MacThep == dto.MacThep && x.VatTuCode == dto.VatTuCode && x.Id != id))
+                {
+                    throw new InvalidOperationException(
+                        $"Nhà máy '{dto.NhaMay}' + Mác thép '{dto.MacThep}' + Mã vật tư '{dto.VatTuCode}' đã tồn tại.");
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(dto.CongDoan) &&
                 await _context.MaVatTus.AnyAsync(x =>
