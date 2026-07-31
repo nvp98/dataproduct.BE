@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using DinkToPdf;
 using DinkToPdf.Contracts;
@@ -16,22 +17,28 @@ namespace dataproduct.api.Services
     {
         private readonly IHrc2SlabRepository _repo;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterCtx;
         private readonly IWebHostEnvironment _env;
         private readonly IConverter _pdfConverter;
-        private readonly IConfiguration _config;        
+        private readonly IConfiguration _config;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public Hrc2SlabService(
             IHrc2SlabRepository repo,
             ProductFormContext context,
+            ProductDataMasterDbContext masterCtx,
             IWebHostEnvironment env,
             IConverter pdfConverter,
-            IConfiguration config)
+            IConfiguration config,
+            IHttpClientFactory httpClientFactory)
         {
             _repo = repo;
             _context = context;
+            _masterCtx = masterCtx;
             _env = env;
             _pdfConverter = pdfConverter;
             _config = config;
+            _httpClientFactory = httpClientFactory;
         }
 
         public Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req)
@@ -328,6 +335,20 @@ namespace dataproduct.api.Services
             rowsHtml.Append($"<td class=\"num\"><strong>{N3(pivotRows.Sum(r => r.TongKhoiLuong), vi)}</strong></td>");
             rowsHtml.Append("</tr>");
 
+            var (ducUserId, khoUserId, qlclUserId) = await GetPhieuSignersAsync(idPhieu);
+            var signerIds = new[] { ducUserId, khoUserId, qlclUserId }
+                .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
+            var userMap = signerIds.Count > 0
+                ? await _masterCtx.Tbl_TaiKhoan
+                    .Include(t => t.ViTri)
+                    .Where(t => signerIds.Contains(t.ID_TaiKhoan))
+                    .ToDictionaryAsync(t => t.ID_TaiKhoan)
+                : new Dictionary<int, TaiKhoan>();
+
+            var (ducSigImg, ducSigTen) = await BuildSigPartsAsync(ducUserId, userMap);
+            var (khoSigImg, khoSigTen) = await BuildSigPartsAsync(khoUserId, userMap);
+            var (qlclSigImg, qlclSigTen) = await BuildSigPartsAsync(qlclUserId, userMap);
+
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC2_BBXNSL_PhoiTam.html");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy template HTML: {templatePath}");
@@ -341,7 +362,13 @@ namespace dataproduct.api.Services
                 .Replace("{{ngaySX}}", ngaySX)
                 .Replace("{{ca}}", ca)
                 .Replace("{{kip}}", kip)
-                .Replace("{{TABLE_BODY}}", rowsHtml.ToString());
+                .Replace("{{TABLE_BODY}}", rowsHtml.ToString())
+                .Replace("{{DucKyImgHtml}}", ducSigImg)
+                .Replace("{{DucKyTenHtml}}", ducSigTen)
+                .Replace("{{KhoKyImgHtml}}", khoSigImg)
+                .Replace("{{KhoKyTenHtml}}", khoSigTen)
+                .Replace("{{QLCLKyImgHtml}}", qlclSigImg)
+                .Replace("{{QLCLKyTenHtml}}", qlclSigTen);
 
             var doc = new HtmlToPdfDocument
             {
@@ -444,6 +471,71 @@ namespace dataproduct.api.Services
                 .Where(t => t.IdPhieuBBSL == idPhieu && t.TrangThaiKCS == 1)
                 .OrderBy(t => t.Slab.BkmisId)
                 .ToListAsync();
+        }
+
+        // Người ký cho biên bản: X.ĐPT → Đúc, Kho phôi → Kho, P.QLCL → KCS
+        private async Task<(int? Duc, int? Kho, int? Qlcl)> GetPhieuSignersAsync(Guid idPhieu)
+        {
+            var trangThais = await _context.BkHrc2SlabTrangThais
+                .AsNoTracking()
+                .Where(t => t.IdPhieuBBSL == idPhieu)
+                .ToListAsync();
+
+            int? ducUserId = trangThais
+                .Where(t => t.NguoiXacNhanDuc != null)
+                .OrderByDescending(t => t.NgayXacNhanDuc)
+                .Select(t => t.NguoiXacNhanDuc)
+                .FirstOrDefault();
+
+            int? khoUserId = trangThais
+                .Where(t => t.NguoiXacNhanKho != null)
+                .OrderByDescending(t => t.NgayXacNhanKho)
+                .Select(t => t.NguoiXacNhanKho)
+                .FirstOrDefault();
+
+            int? qlclUserId = trangThais
+                .Where(t => t.NguoiChuyenKCS != null)
+                .OrderByDescending(t => t.NgayChuyenKCS)
+                .Select(t => t.NguoiChuyenKCS)
+                .FirstOrDefault();
+
+            return (ducUserId, khoUserId, qlclUserId);
+        }
+
+        private async Task<(string ImgHtml, string TenHtml)> BuildSigPartsAsync(int? userId, Dictionary<int, TaiKhoan> userMap)
+        {
+            if (userId == null || !userMap.TryGetValue(userId.Value, out var u))
+                return ("", "");
+
+            var imgTag = await FormatChuKyImgAsync(u.ChuKy);
+            var name = System.Net.WebUtility.HtmlEncode(u.HoVaTen ?? "");
+            var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
+            var tenHtml = !string.IsNullOrEmpty(chucVu)
+                ? $"{name}<div style=\"font-weight:normal;font-size:9pt;color:#555;\">{chucVu}</div>"
+                : name;
+            return (imgTag, tenHtml);
+        }
+
+        private async Task<string> FormatChuKyImgAsync(string? chuKy)
+        {
+            if (string.IsNullOrWhiteSpace(chuKy)) return "";
+
+            if (chuKy.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+                return $"<img src=\"{chuKy}\" style=\"max-width:120px;max-height:50px;\" />";
+
+            string url = chuKy.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? chuKy
+                : (_config.GetValue<string>("AppSettings:Domain") ?? "https://report.hoaphatdungquat.vn").TrimEnd('/') + chuKy;
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(10);
+                var bytes = await client.GetByteArrayAsync(url);
+                var mime = url.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+                return $"<img src=\"data:{mime};base64,{Convert.ToBase64String(bytes)}\" style=\"max-width:120px;max-height:50px;\" />";
+            }
+            catch { return ""; }
         }
 
         // Dịch getColKeys() của FE sang C# — xác định cột pivot từ loaiPhoi + chatLuongTPHH

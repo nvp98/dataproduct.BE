@@ -2196,7 +2196,11 @@ namespace dataproduct.api.Repositories
                         if (detailById != null)
                         {
                             // Remap child HeaderKey → parent (-NhomId) giống regular path, rồi merge IsManual
+                            // Gộp thêm manualAdjustPhulieus (phụ liệu thêm tay trực tiếp vào Header_Key, không qua ID_PhuLieu)
+                            // — tương tự nhánh REPORT_NO gộp manualOnlyRaw vào mappedRaw — nếu không, các cột chỉ có
+                            // dữ liệu điều chỉnh tay sẽ bị bỏ trống trên bảng thống kê dù đã lưu trong PhuLieu_HRC2.
                             var mappedById = (detailById.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                                .Concat(detailById.manualAdjustPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
                                 .Where(p => p.ID_HeaderKey.HasValue)
                                 .GroupBy(p => childToParentMap.TryGetValue(p.ID_HeaderKey!.Value, out var pid) ? pid : p.ID_HeaderKey!.Value)
                                 .ToDictionary(
