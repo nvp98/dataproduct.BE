@@ -841,18 +841,19 @@ namespace dataproduct.api.Repositories
         //    2 => (ngay.Date.AddHours(19).AddMinutes(30), ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)),
         //    _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
         //};
+        // timeTo của ca này = timeFrom của ca kế tiếp (nửa khoảng [from, to)) để không có gap/overlap
         (DateTime timeFrom, DateTime timeTo) GetTimeRangeByCa(DateTime ngay, int idCa) => idCa switch
         {
-            // Ca ngày: 07:31 -> 19:30
+            // Ca ngày: 07:31 -> 19:31 (loại trừ)
             1 => (
                 ngay.Date.AddHours(7).AddMinutes(31),
-                ngay.Date.AddHours(19).AddMinutes(30)
+                ngay.Date.AddHours(19).AddMinutes(31)
             ),
 
-            // Ca đêm: 19:31 -> 07:30 hôm sau
+            // Ca đêm: 19:31 -> 07:31 hôm sau (loại trừ)
             2 => (
                 ngay.Date.AddHours(19).AddMinutes(31),
-                ngay.Date.AddDays(1).AddHours(7).AddMinutes(30)
+                ngay.Date.AddDays(1).AddHours(7).AddMinutes(31)
             ),
 
             _ => throw new ArgumentOutOfRangeException(nameof(idCa), $"Ca không hợp lệ: {idCa}")
