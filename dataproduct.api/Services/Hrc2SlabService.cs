@@ -320,7 +320,7 @@ namespace dataproduct.api.Services
             }
 
             rowsHtml.Append("<tr class=\"total-row\">");
-            rowsHtml.Append("<td colspan=\"5\" style=\"text-align:center\"><strong>Tổng</strong></td>");
+            rowsHtml.Append("<td colspan=\"5\" style=\"text-align:center\"><strong>Tổng cộng: </strong></td>");
             TdTotal2(r => r.NguoiLoai1So,   r => r.NguoiLoai1Kl);
             TdTotal2(r => r.NguoiLoai2So,   r => r.NguoiLoai2Kl);
             TdTotal2(r => r.NguoiLoai2TpSo, r => r.NguoiLoai2TpKl);
@@ -341,6 +341,7 @@ namespace dataproduct.api.Services
             var userMap = signerIds.Count > 0
                 ? await _masterCtx.Tbl_TaiKhoan
                     .Include(t => t.ViTri)
+                    .Include(t => t.PhongBan)
                     .Where(t => signerIds.Contains(t.ID_TaiKhoan))
                     .ToDictionaryAsync(t => t.ID_TaiKhoan)
                 : new Dictionary<int, TaiKhoan>();
@@ -348,6 +349,11 @@ namespace dataproduct.api.Services
             var (ducSigImg, ducSigTen) = await BuildSigPartsAsync(ducUserId, userMap);
             var (khoSigImg, khoSigTen) = await BuildSigPartsAsync(khoUserId, userMap);
             var (qlclSigImg, qlclSigTen) = await BuildSigPartsAsync(qlclUserId, userMap);
+
+            var thanhPhanHtml = string.Concat(
+                BuildThanhPhanLine(1, qlclUserId, userMap),
+                BuildThanhPhanLine(2, ducUserId, userMap),
+                BuildThanhPhanLine(3, khoUserId, userMap));
 
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC2_BBXNSL_PhoiTam.html");
             if (!File.Exists(templatePath))
@@ -360,9 +366,11 @@ namespace dataproduct.api.Services
                 .Replace("{{LogoUrl}}",       logoUrl)
                 .Replace("{{soPhieu}}", soPhieu)
                 .Replace("{{ngaySX}}", ngaySX)
+                .Replace("{{mayduc}}", phieu?.MayDuc.HasValue == true ? $"Máy {phieu.MayDuc}" : "")
                 .Replace("{{ca}}", ca)
                 .Replace("{{kip}}", kip)
                 .Replace("{{TABLE_BODY}}", rowsHtml.ToString())
+                .Replace("{{ThanhPhanHtml}}", thanhPhanHtml)
                 .Replace("{{DucKyImgHtml}}", ducSigImg)
                 .Replace("{{DucKyTenHtml}}", ducSigTen)
                 .Replace("{{KhoKyImgHtml}}", khoSigImg)
@@ -451,7 +459,8 @@ namespace dataproduct.api.Services
                             caVal = caProp.GetInt32();
                         else if (caProp.ValueKind == JsonValueKind.String && int.TryParse(caProp.GetString(), out var cv))
                             caVal = cv;
-                        ca = caVal == 1 ? "Ca ngày" : caVal == 2 ? "Ca đêm" : "";
+                        // Ca ngày = 1, Ca đêm = 2 — giữ nguyên số để ghép "Kíp: {ca}{kip}" (vd "1A")
+                        ca = caVal > 0 ? caVal.ToString() : "";
                     }
 
                     if (root.TryGetProperty("kip", out var kipProp) && kipProp.ValueKind != JsonValueKind.Null)
@@ -502,6 +511,26 @@ namespace dataproduct.api.Services
             return (ducUserId, khoUserId, qlclUserId);
         }
 
+        // Dòng "Thành phần" trong biên bản PDF — cùng nguồn dữ liệu với chữ ký (Duc/Kho/Qlcl),
+        // format text theo kiểu BBGN_ThepLong.html: "N. Nhãn: Ông/Bà: Tên   Chức vụ: ..."
+        // Dòng "Thành phần" trong biên bản PDF — cùng nguồn dữ liệu với chữ ký (Duc/Kho/Qlcl),
+        // format: "N. Ông/Bà: Tên   Chức vụ: ...   BP: ..."
+        private static string BuildThanhPhanLine(int idx, int? userId, Dictionary<int, TaiKhoan> userMap)
+        {
+            var u = userId != null && userMap.TryGetValue(userId.Value, out var uu) ? uu : null;
+            if (u == null)
+                return $"<div class=\"info-row\">{idx}. Ông/Bà: -</div>";
+
+            var ten = System.Net.WebUtility.HtmlEncode(u.HoVaTen ?? "");
+            var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
+            var bp = System.Net.WebUtility.HtmlEncode(u.PhongBan?.TenNgan ?? "");
+
+            var body = $"Ông/Bà: <strong>{ten}</strong>";
+            if (!string.IsNullOrEmpty(chucVu)) body += $"&nbsp;&nbsp;&nbsp;&nbsp;Chức vụ: {chucVu}";
+            if (!string.IsNullOrEmpty(bp)) body += $"&nbsp;&nbsp;&nbsp;&nbsp;BP: {bp}";
+            return $"<div class=\"info-row\">{idx}. {body}</div>";
+        }
+
         private async Task<(string ImgHtml, string TenHtml)> BuildSigPartsAsync(int? userId, Dictionary<int, TaiKhoan> userMap)
         {
             if (userId == null || !userMap.TryGetValue(userId.Value, out var u))
@@ -509,11 +538,7 @@ namespace dataproduct.api.Services
 
             var imgTag = await FormatChuKyImgAsync(u.ChuKy);
             var name = System.Net.WebUtility.HtmlEncode(u.HoVaTen ?? "");
-            var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
-            var tenHtml = !string.IsNullOrEmpty(chucVu)
-                ? $"{name}<div style=\"font-weight:normal;font-size:9pt;color:#555;\">{chucVu}</div>"
-                : name;
-            return (imgTag, tenHtml);
+            return (imgTag, name);
         }
 
         private async Task<string> FormatChuKyImgAsync(string? chuKy)
