@@ -335,11 +335,12 @@ namespace dataproduct.api.Controllers
                     throw new NotSupportedException(
                         $"Chưa có template Excel cho '{templateName}'. Đặt file tại: wwwroot/templates/{templateName}.xlsx");
 
-                var (headersBOF, headersLFRH, rows) =
+                var (headersBOF, headersLF, headersRH, rows) =
                     await _excelService.GetExportDataAsync(ngayPhieu, caPhieu, bieuMau, scopePhieu, idPhieu);
 
                 bool isBof = bieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase);
-                var headers = isBof ? headersBOF : headersLFRH;
+                bool isRh = bieuMau.Equals("RH", StringComparison.OrdinalIgnoreCase);
+                var headers = isBof ? headersBOF : (isRh ? headersRH : headersLF);
 
                 var dateStr = ngayPhieu.ToString("ddMMyyyy");
                 var fileName = $"{templateName}_Ca{caPhieu}_{dateStr}.xlsx";
@@ -440,12 +441,14 @@ namespace dataproduct.api.Controllers
                             item.MaBmFull, ngay, ca, item.Scope);
                         var kip = phieu?.Kip ?? "";
 
-                        var (headersBOF, headersLFRH, rows) =
+                        var (headersBOF, headersLF, headersRH, rows) =
                             await _excelService.GetExportDataAsync(ngay, ca, item.BieuMauShort, item.Scope, phieu?.Idphieu);
 
                         var headers = item.BieuMauShort.Equals("BOF", StringComparison.OrdinalIgnoreCase)
                             ? headersBOF
-                            : headersLFRH;
+                            : item.BieuMauShort.Equals("RH", StringComparison.OrdinalIgnoreCase)
+                                ? headersRH
+                                : headersLF;
 
                         await _excelService.RenderBodyFromDbAsync(
                             ws,

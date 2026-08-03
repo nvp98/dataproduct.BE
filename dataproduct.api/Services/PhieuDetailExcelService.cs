@@ -73,46 +73,38 @@ namespace dataproduct.api.Services
         /// Lấy dữ liệu từ DLNM_HRC2 + PhuLieu_HRC2 để export Excel thống kê.
         /// Params: ngay (DateOnly), ca, bieuMau, scope — tương tự SearchThongKeApiAsync nhưng không phân trang.
         /// </summary>
-        public async Task<(List<PhuLieuHeaderTable> HeadersBOF, List<PhuLieuHeaderTable> HeadersLFRH, List<HRC2ThongKeRow> Rows)> GetExportDataAsync(
+        public async Task<(List<PhuLieuHeaderTable> HeadersBOF, List<PhuLieuHeaderTable> HeadersLF, List<PhuLieuHeaderTable> HeadersRH, List<HRC2ThongKeRow> Rows)> GetExportDataAsync(
             DateOnly ngay, int ca, string bieuMau, int scope, Guid? idPhieu = null)
         {
-            // 1. Lấy tất cả header Excel trong 1 query, split thành 2 list trong memory
-            var allExcelHeaders = await _context.Header_Keys
-                .Where(h => h.IsUsed_Excel == true)
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LFRH })
-                .ToListAsync();
-
-            var headersBOF = allExcelHeaders
-                .Where(h => h.LoaiExcel == 1 || h.LoaiExcel == 3)
-                .OrderBy(h => h.ThuTu_Excel_BOF ?? int.MaxValue)
-                .ThenBy(h => h.Id)
-                .Select(h => new PhuLieuHeaderTable
-                {
-                    IDHeaderKey = h.Id,
-                    TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
-                })
-                .ToList();
-
-            var headersLFRH = allExcelHeaders
-                .Where(h => h.LoaiExcel == 2 || h.LoaiExcel == 3)
-                .OrderBy(h => h.ThuTu_Excel_LFRH ?? int.MaxValue)
-                .ThenBy(h => h.Id)
-                .Select(h => new PhuLieuHeaderTable
-                {
-                    IDHeaderKey = h.Id,
-                    TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
-                })
-                .ToList();
+            // 1. Lấy header Excel theo config Header_Key hiện tại (live) — dùng cho phiếu chưa Chốt,
+            // hoặc làm fallback khi phiếu Chốt không có snapshot (xem PHẦN dưới).
+            var (headersBOF, headersLF, headersRH) = await GetLiveExcelHeadersAsync();
 
             // Chọn header list phù hợp với bieuMau hiện tại để build data rows
             var loaiBmKey = bieuMau.Trim().ToUpperInvariant();
             bool isBofExcel = loaiBmKey.Contains("BOF");
-            var headers = isBofExcel ? headersBOF : headersLFRH;
+            bool isRhExcel = loaiBmKey.Contains("RH");
 
-            if (!headersBOF.Any() && !headersLFRH.Any())
-                return (headersBOF, headersLFRH, new List<HRC2ThongKeRow>());
+            // Phiếu đã Chốt: dùng snapshot TOÀN BỘ danh sách cột theo config Excel đã chụp lại
+            // ĐÚNG lúc phiếu chuyển sang Chốt (PhieuService.CaptureExcelHeaderSnapshotIfApplicableAsync,
+            // lưu vào DataJson["excelHeaderSnapshotAtChot"]) — không phải config hiện tại, và không
+            // phải chỉ những phụ liệu có dữ liệu thật trong JSON (khác hẳn table1DynamicColumns).
+            // Phiếu Chốt từ TRƯỚC KHI có cơ chế này (chưa có field snapshot) → fallback về config
+            // live như hành vi gốc (chấp nhận được, vì dữ liệu lịch sử "config lúc chốt" không tồn tại).
+            // Giá trị từng ô (KLPhuGia) và các cột số cố định (O2, N2, KLGangLongCCT...) luôn tính từ
+            // PhuLieu_HRC2/DLNM_HRC2 live như code hiện tại bên dưới — không nằm trong snapshot này.
+            var chotSnapshotHeaders = await TryGetChotSnapshotHeadersAsync(idPhieu, bieuMau);
+            if (chotSnapshotHeaders != null)
+            {
+                if (isBofExcel) headersBOF = chotSnapshotHeaders;
+                else if (isRhExcel) headersRH = chotSnapshotHeaders;
+                else headersLF = chotSnapshotHeaders;
+            }
+
+            var headers = isBofExcel ? headersBOF : (isRhExcel ? headersRH : headersLF);
+
+            if (!headersBOF.Any() && !headersLF.Any() && !headersRH.Any())
+                return (headersBOF, headersLF, headersRH, new List<HRC2ThongKeRow>());
 
             var usedHeaderKeyIds = headers.Select(x => x.IDHeaderKey).ToHashSet();
 
@@ -149,7 +141,7 @@ namespace dataproduct.api.Services
                 .ToListAsync();
 
             if (!items.Any())
-                return (headersBOF, headersLFRH, new List<HRC2ThongKeRow>());
+                return (headersBOF, headersLF, headersRH, new List<HRC2ThongKeRow>());
 
             // Lấy DataJson overrides từ phiếu (nếu có idPhieu) để ưu tiên giá trị user đã sửa tay.
             // DataJson là nguồn sự thật cho manual overrides trên UI.
@@ -400,7 +392,127 @@ namespace dataproduct.api.Services
                 })
                 .ToList();
 
-            return (headersBOF, headersLFRH, rows);
+            return (headersBOF, headersLF, headersRH, rows);
+        }
+
+        /// <summary>
+        /// Tên field lưu snapshot header Excel trong BmPhieu.DataJson — dùng chung giữa
+        /// PhieuService (lúc chốt, ghi snapshot) và PhieuDetailExcelService (lúc export, đọc lại).
+        /// </summary>
+        public const string ExcelHeaderSnapshotJsonKey = "excelHeaderSnapshotAtChot";
+
+        /// <summary>
+        /// Danh sách cột Excel theo config Header_Key HIỆN TẠI (live), tách theo BOF/LF/RH.
+        /// LoaiExcel là bitmask: BOF=1, LF=2, RH=4 (1 header có thể thuộc nhiều biểu mẫu cùng lúc).
+        /// Dùng cho cả export (headers phiếu chưa Chốt/fallback) lẫn chụp snapshot lúc Chốt phiếu
+        /// (PhieuService.CaptureExcelHeaderSnapshotIfApplicableAsync) — 1 nguồn logic duy nhất,
+        /// tránh lệch nhau giữa 2 chỗ dùng.
+        /// </summary>
+        public async Task<(List<PhuLieuHeaderTable> HeadersBOF, List<PhuLieuHeaderTable> HeadersLF, List<PhuLieuHeaderTable> HeadersRH)> GetLiveExcelHeadersAsync()
+        {
+            var allExcelHeaders = await _context.Header_Keys
+                .Where(h => h.IsUsed_Excel == true)
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LF, h.ThuTu_Excel_RH })
+                .ToListAsync();
+
+            var headersBOF = allExcelHeaders
+                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 1) != 0)
+                .OrderBy(h => h.ThuTu_Excel_BOF ?? int.MaxValue)
+                .ThenBy(h => h.Id)
+                .Select(h => new PhuLieuHeaderTable
+                {
+                    IDHeaderKey = h.Id,
+                    TenPhuLieu = h.TenHienThi,
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                })
+                .ToList();
+
+            var headersLF = allExcelHeaders
+                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 2) != 0)
+                .OrderBy(h => h.ThuTu_Excel_LF ?? int.MaxValue)
+                .ThenBy(h => h.Id)
+                .Select(h => new PhuLieuHeaderTable
+                {
+                    IDHeaderKey = h.Id,
+                    TenPhuLieu = h.TenHienThi,
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                })
+                .ToList();
+
+            var headersRH = allExcelHeaders
+                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 4) != 0)
+                .OrderBy(h => h.ThuTu_Excel_RH ?? int.MaxValue)
+                .ThenBy(h => h.Id)
+                .Select(h => new PhuLieuHeaderTable
+                {
+                    IDHeaderKey = h.Id,
+                    TenPhuLieu = h.TenHienThi,
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                })
+                .ToList();
+
+            return (headersBOF, headersLF, headersRH);
+        }
+
+        /// <summary>
+        /// Phiếu đã Chốt (TinhTrang=5): trả về danh sách cột phụ liệu (thứ tự + tên) đã CHỤP LẠI
+        /// TOÀN BỘ config Excel (Header_Key.IsUsed_Excel/LoaiExcel/ThuTu_Excel_*) ĐÚNG lúc phiếu
+        /// chuyển sang Chốt (xem PhieuService.CaptureExcelHeaderSnapshotIfApplicableAsync — lưu
+        /// vào DataJson[ExcelHeaderSnapshotJsonKey]). KHÔNG dùng table1DynamicColumns vì đó chỉ là
+        /// phụ liệu THỰC SỰ CÓ DỮ LIỆU trong mẻ (tập con), không phải toàn bộ danh sách theo config
+        /// — vd config có 10 loại nhưng mẻ chỉ dùng 4 loại thì table1DynamicColumns chỉ có 4.
+        /// Trả về null nếu phiếu chưa Chốt / không có idPhieu / parse lỗi / phiếu Chốt từ TRƯỚC KHI
+        /// có cơ chế này (chưa từng lưu field snapshot) → caller fallback về headers config live
+        /// (hành vi gốc trước khi có toàn bộ cơ chế snapshot này).
+        /// </summary>
+        private async Task<List<PhuLieuHeaderTable>?> TryGetChotSnapshotHeadersAsync(Guid? idPhieu, string bieuMau)
+        {
+            if (!idPhieu.HasValue) return null;
+
+            var phieu = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(p => p.Idphieu == idPhieu.Value)
+                .Select(p => new { p.TinhTrang, p.DataJson })
+                .FirstOrDefaultAsync();
+
+            if (phieu == null || phieu.TinhTrang != 5 || string.IsNullOrWhiteSpace(phieu.DataJson))
+                return null;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(phieu.DataJson);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty(ExcelHeaderSnapshotJsonKey, out var snapArr) ||
+                    snapArr.ValueKind != JsonValueKind.Array)
+                    return null; // Phiếu Chốt từ trước khi có cơ chế snapshot → fallback config live
+
+                var headers = new List<PhuLieuHeaderTable>();
+                foreach (var col in snapArr.EnumerateArray())
+                {
+                    if (!col.TryGetProperty("headerKeyId", out var hkProp) ||
+                        hkProp.ValueKind != JsonValueKind.Number)
+                        continue;
+
+                    var label = col.TryGetProperty("label", out var lblProp) &&
+                                 lblProp.ValueKind == JsonValueKind.String
+                        ? lblProp.GetString() ?? ""
+                        : "";
+
+                    headers.Add(new PhuLieuHeaderTable
+                    {
+                        IDHeaderKey = hkProp.GetInt32(),
+                        TenPhuLieu = label
+                    });
+                }
+
+                return headers.Count > 0 ? headers : null;
+            }
+            catch
+            {
+                // DataJson parse lỗi → trả về null, caller fallback về live headers, không chặn export
+                return null;
+            }
         }
 
         /// <summary>
@@ -1536,7 +1648,7 @@ namespace dataproduct.api.Services
             DateOnly ngay, int ca, string bieuMau, int scope, Guid idPhieu,
             string gioBatDau = "", string gioKetThuc = "")
         {
-            var (headersBOF, headersLFRH, rows) = await GetExportDataAsync(ngay, ca, bieuMau, scope, idPhieu);
+            var (headersBOF, headersLF, headersRH, rows) = await GetExportDataAsync(ngay, ca, bieuMau, scope, idPhieu);
             var imageSignsDto = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
 
             // Footer HRC2_BB_NauLuyen có 2 vị trí ký:
@@ -1566,7 +1678,8 @@ namespace dataproduct.api.Services
             }
 
             bool isBof = bieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase);
-            var headers = isBof ? headersBOF : headersLFRH;
+            bool isRh = bieuMau.Equals("RH", StringComparison.OrdinalIgnoreCase);
+            var headers = isBof ? headersBOF : (isRh ? headersRH : headersLF);
             // Phân bổ đã được gộp vào TotalKLPhuGia — không render cột riêng
             var phanBoHeaders = new List<PhuLieuHeaderTable>();
 

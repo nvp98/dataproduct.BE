@@ -104,11 +104,13 @@ namespace dataproduct.api.Repositories
                 ThuTu = null,
                 TyTrong = h.TyTrong.HasValue ? (decimal?)h.TyTrong.Value : null,
                 ThuTu_TK_BOF = h.ThuTu_TK_BOF,
-                ThuTu_TK_LFRH = h.ThuTu_TK_LFRH,
+                ThuTu_TK_LF = h.ThuTu_TK_LF,
+                ThuTu_TK_RH = h.ThuTu_TK_RH,
                 IsUsed_Excel = h.IsUsed_Excel,
                 LoaiExcel = h.LoaiExcel,
                 ThuTu_Excel_BOF = h.ThuTu_Excel_BOF,
-                ThuTu_Excel_LFRH = h.ThuTu_Excel_LFRH,
+                ThuTu_Excel_LF = h.ThuTu_Excel_LF,
+                ThuTu_Excel_RH = h.ThuTu_Excel_RH,
                 MaVatTuChiPhi = h.MaVatTuChiPhi,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
@@ -139,9 +141,11 @@ namespace dataproduct.api.Repositories
             IQueryable<Header_Key> query = column switch
             {
                 ThuTuColumn.TK_BOF     => _context.Header_Keys.Where(x => x.ThuTu_TK_BOF == value),
-                ThuTuColumn.TK_LFRH    => _context.Header_Keys.Where(x => x.ThuTu_TK_LFRH == value),
+                ThuTuColumn.TK_LF      => _context.Header_Keys.Where(x => x.ThuTu_TK_LF == value),
+                ThuTuColumn.TK_RH      => _context.Header_Keys.Where(x => x.ThuTu_TK_RH == value),
                 ThuTuColumn.Excel_BOF  => _context.Header_Keys.Where(x => x.ThuTu_Excel_BOF == value),
-                ThuTuColumn.Excel_LFRH => _context.Header_Keys.Where(x => x.ThuTu_Excel_LFRH == value),
+                ThuTuColumn.Excel_LF   => _context.Header_Keys.Where(x => x.ThuTu_Excel_LF == value),
+                ThuTuColumn.Excel_RH   => _context.Header_Keys.Where(x => x.ThuTu_Excel_RH == value),
                 _ => throw new ArgumentOutOfRangeException(nameof(column))
             };
 
@@ -199,11 +203,13 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = pl != null ? pl.TenPhuLieu : null,
                     LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
                     ThuTu_TK_BOF = hk != null ? hk.ThuTu_TK_BOF : null,
-                    ThuTu_TK_LFRH = hk != null ? hk.ThuTu_TK_LFRH : null,
+                    ThuTu_TK_LF = hk != null ? hk.ThuTu_TK_LF : null,
+                    ThuTu_TK_RH = hk != null ? hk.ThuTu_TK_RH : null,
                     IsUsed_Excel = hk != null ? hk.IsUsed_Excel : null,
                     LoaiExcel = hk != null ? hk.LoaiExcel : null,
                     ThuTu_Excel_BOF = hk != null ? hk.ThuTu_Excel_BOF : null,
-                    ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null,
+                    ThuTu_Excel_LF = hk != null ? hk.ThuTu_Excel_LF : null,
+                    ThuTu_Excel_RH = hk != null ? hk.ThuTu_Excel_RH : null,
                     ID_NhomKey = hk != null ? hk.ID_NhomKey : null,
                     MaVatTuChiPhi = hk != null ? hk.MaVatTuChiPhi : null
                 };
@@ -232,11 +238,13 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = null,
                     LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
                     ThuTu_TK_BOF = hk.ThuTu_TK_BOF,
-                    ThuTu_TK_LFRH = hk.ThuTu_TK_LFRH,
+                    ThuTu_TK_LF = hk.ThuTu_TK_LF,
+                    ThuTu_TK_RH = hk.ThuTu_TK_RH,
                     IsUsed_Excel = hk.IsUsed_Excel,
                     LoaiExcel = hk.LoaiExcel,
                     ThuTu_Excel_BOF = hk.ThuTu_Excel_BOF,
-                    ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH,
+                    ThuTu_Excel_LF = hk.ThuTu_Excel_LF,
+                    ThuTu_Excel_RH = hk.ThuTu_Excel_RH,
                     ID_NhomKey = hk.ID_NhomKey,
                     MaVatTuChiPhi = hk.MaVatTuChiPhi
                 };
@@ -265,11 +273,13 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = pl.TenPhuLieu,
                     LoaiThongKe = null,
                     ThuTu_TK_BOF = null,
-                    ThuTu_TK_LFRH = null,
+                    ThuTu_TK_LF = null,
+                    ThuTu_TK_RH = null,
                     IsUsed_Excel = null,
                     LoaiExcel = null,
                     ThuTu_Excel_BOF = null,
-                    ThuTu_Excel_LFRH = null,
+                    ThuTu_Excel_LF = null,
+                    ThuTu_Excel_RH = null,
                     ID_NhomKey = null,
                     MaVatTuChiPhi = null
                 };
@@ -385,15 +395,21 @@ namespace dataproduct.api.Repositories
                 "thutu_tk_bof" => descending
                     ? query.OrderBy(x => x.ThuTu_TK_BOF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_BOF)
                     : query.OrderBy(x => x.ThuTu_TK_BOF == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_BOF),
-                "thutu_tk_lfrh" => descending
-                    ? query.OrderBy(x => x.ThuTu_TK_LFRH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_LFRH)
-                    : query.OrderBy(x => x.ThuTu_TK_LFRH == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_LFRH),
+                "thutu_tk_lf" => descending
+                    ? query.OrderBy(x => x.ThuTu_TK_LF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_LF)
+                    : query.OrderBy(x => x.ThuTu_TK_LF == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_LF),
+                "thutu_tk_rh" => descending
+                    ? query.OrderBy(x => x.ThuTu_TK_RH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_RH)
+                    : query.OrderBy(x => x.ThuTu_TK_RH == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_RH),
                 "thutu_excel_bof" => descending
                     ? query.OrderBy(x => x.ThuTu_Excel_BOF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_BOF)
                     : query.OrderBy(x => x.ThuTu_Excel_BOF == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_BOF),
-                "thutu_excel_lfrh" => descending
-                    ? query.OrderBy(x => x.ThuTu_Excel_LFRH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_LFRH)
-                    : query.OrderBy(x => x.ThuTu_Excel_LFRH == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_LFRH),
+                "thutu_excel_lf" => descending
+                    ? query.OrderBy(x => x.ThuTu_Excel_LF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_LF)
+                    : query.OrderBy(x => x.ThuTu_Excel_LF == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_LF),
+                "thutu_excel_rh" => descending
+                    ? query.OrderBy(x => x.ThuTu_Excel_RH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_RH)
+                    : query.OrderBy(x => x.ThuTu_Excel_RH == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_RH),
                 // Mặc định: phụ liệu/header key mới trước (NgayTao DESC), giữ nguyên hành vi cũ
                 _ => query.OrderByDescending(x => x.NgayTao)
             };
