@@ -13,10 +13,12 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo)
+        public async Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo, int? idLoCao)
         {
             return await _context.LG_PB_NhomPhanBo
-                .Where(x => !x.IsDelete && (loaiPhanBo == null || x.LoaiPhanBo == loaiPhanBo))
+                .Where(x => !x.IsDelete
+                    && (loaiPhanBo == null || x.LoaiPhanBo == loaiPhanBo)
+                    && (idLoCao == null || x.IDLoCao == idLoCao))
                 .OrderBy(x => x.LoaiPhanBo)
                 .ThenBy(x => x.ThuTu)
                 .AsNoTracking()
@@ -43,6 +45,7 @@ namespace dataproduct.api.Repositories
             existing.PhuongThucPhanBo = entity.PhuongThucPhanBo;
             existing.MaVatTu = entity.MaVatTu;
             existing.ThuTu = entity.ThuTu;
+            existing.IDLoCao = entity.IDLoCao;
 
             await _context.SaveChangesAsync();
             return existing;
@@ -124,7 +127,7 @@ namespace dataproduct.api.Repositories
             byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao)
         {
             var nhoms = await _context.LG_PB_NhomPhanBo
-                .Where(x => !x.IsDelete && x.LoaiPhanBo == loaiPhanBo)
+                .Where(x => !x.IsDelete && x.LoaiPhanBo == loaiPhanBo && x.IDLoCao == idLoCao)
                 .OrderBy(x => x.ThuTu)
                 .AsNoTracking()
                 .ToListAsync();
@@ -169,6 +172,7 @@ namespace dataproduct.api.Repositories
                     on tv.IDNhomPhanBo equals nhom.ID
                 where !tv.IsDelete
                    && nhom.LoaiPhanBo == loaiPhanBo
+                   && nhom.IDLoCao == idLoCao
                    && tv.IDLoCao == idLoCao
                    && (
                             tv.Ngay < ngay

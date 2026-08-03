@@ -417,7 +417,7 @@ namespace dataproduct.api.Repositories
 
     public interface INhomPhanBoRepository
     {
-        Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo);
+        Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo, int? idLoCao);
         Task<LG_PB_NhomPhanBo?> GetByIdAsync(int id);
         Task<LG_PB_NhomPhanBo> AddAsync(LG_PB_NhomPhanBo entity);
         Task<LG_PB_NhomPhanBo?> UpdateAsync(int id, LG_PB_NhomPhanBo entity);

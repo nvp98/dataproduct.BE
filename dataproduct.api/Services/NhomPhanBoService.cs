@@ -20,15 +20,16 @@ namespace dataproduct.api.Services
             _ketQuaRepo = ketQuaRepo;
         }
 
-        public async Task<List<NhomPhanBoDto>> GetListAsync(byte? loaiPhanBo)
+        public async Task<List<NhomPhanBoDto>> GetListAsync(byte? loaiPhanBo, int? idLoCao)
         {
-            var list = await _repo.GetListAsync(loaiPhanBo);
+            var list = await _repo.GetListAsync(loaiPhanBo, idLoCao);
             return list.Select(MapNhom).ToList();
         }
 
         public async Task<NhomPhanBoDto> CreateAsync(CreateNhomPhanBoDto dto)
         {
             ValidateLoaiPhanBo(dto.LoaiPhanBo);
+            ValidateIdLoCao(dto.IdLoCao);
 
             var entity = new LG_PB_NhomPhanBo
             {
@@ -36,7 +37,8 @@ namespace dataproduct.api.Services
                 LoaiPhanBo = dto.LoaiPhanBo,
                 PhuongThucPhanBo = dto.PhuongThucPhanBo,
                 MaVatTu = dto.MaVatTu,
-                ThuTu = dto.ThuTu
+                ThuTu = dto.ThuTu,
+                IDLoCao = dto.IdLoCao
             };
             var created = await _repo.AddAsync(entity);
             return MapNhom(created);
@@ -50,9 +52,17 @@ namespace dataproduct.api.Services
                     "Không tạo nhóm riêng cho Than cốc <10mm — nhóm này dùng chung cấu hình với CVH (chọn Loại phân bổ = CVH).");
         }
 
+        // Mỗi nhóm chỉ áp dụng cho ĐÚNG 1 lò cao — nhóm dùng chung nhiều lò phải tạo nhiều dòng riêng (cùng tên khác ID)
+        private static void ValidateIdLoCao(int idLoCao)
+        {
+            if (idLoCao <= 0)
+                throw new InvalidOperationException("Phải chọn lò cao áp dụng cho nhóm.");
+        }
+
         public async Task<NhomPhanBoDto> UpdateAsync(int id, UpdateNhomPhanBoDto dto)
         {
             ValidateLoaiPhanBo(dto.LoaiPhanBo);
+            ValidateIdLoCao(dto.IdLoCao);
 
             var entity = new LG_PB_NhomPhanBo
             {
@@ -60,7 +70,8 @@ namespace dataproduct.api.Services
                 LoaiPhanBo = dto.LoaiPhanBo,
                 PhuongThucPhanBo = dto.PhuongThucPhanBo,
                 MaVatTu = dto.MaVatTu,
-                ThuTu = dto.ThuTu
+                ThuTu = dto.ThuTu,
+                IDLoCao = dto.IdLoCao
             };
             var updated = await _repo.UpdateAsync(id, entity);
             if (updated == null) throw new InvalidOperationException("Không tìm thấy nhóm phân bổ.");
@@ -253,7 +264,8 @@ namespace dataproduct.api.Services
             LoaiPhanBo = x.LoaiPhanBo,
             PhuongThucPhanBo = x.PhuongThucPhanBo,
             MaVatTu = x.MaVatTu,
-            ThuTu = x.ThuTu
+            ThuTu = x.ThuTu,
+            IdLoCao = x.IDLoCao ?? 0 // 0 = chưa gán lò cao (dữ liệu cũ trước khi có cột này) — cần vào sửa gán lại
         };
     }
 }

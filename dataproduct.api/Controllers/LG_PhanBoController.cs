@@ -95,9 +95,9 @@ namespace dataproduct.api.Controllers
         // ─── Nhóm phân bổ (api/LG_PhanBo/nhom) ───────────────────────────────
 
         [HttpGet("nhom/get-list")]
-        public async Task<IActionResult> GetNhomList([FromQuery] byte? loaiPhanBo)
+        public async Task<IActionResult> GetNhomList([FromQuery] byte? loaiPhanBo, [FromQuery] int? idLoCao)
         {
-            try { return Ok(await _nhomPhanBoService.GetListAsync(loaiPhanBo)); }
+            try { return Ok(await _nhomPhanBoService.GetListAsync(loaiPhanBo, idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
