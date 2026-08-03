@@ -10,6 +10,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public byte PhuongThucPhanBo { get; set; }
         public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
+        public int IdLoCao { get; set; }
     }
 
     public class CreateNhomPhanBoDto
@@ -19,6 +20,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public byte PhuongThucPhanBo { get; set; }
         public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
+        public int IdLoCao { get; set; }
     }
 
     public class UpdateNhomPhanBoDto
@@ -28,6 +30,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public byte PhuongThucPhanBo { get; set; }
         public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
+        public int IdLoCao { get; set; }
     }
 
     public class NvlNhomPhanBoDto

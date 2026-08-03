@@ -12,5 +12,6 @@ namespace dataproduct.api.Models
         public string? MaVatTu { get; set; }
         public int? ThuTu { get; set; }
         public bool IsDelete { get; set; }
+        public int? IDLoCao { get; set; }
     }
 }
