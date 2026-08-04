@@ -896,6 +896,26 @@ namespace dataproduct.api.Business
             phieu.IsDelete = 0;
             phieu.IsClone = false;
             // phieu.NgayTao = DateTime.Now;
+            // nếu MaBm = CTD_BienBan_SanLuong thì check ở BK_KCS_BBXNSanLuong reset IDPhieu = null và sau đó call đến store sp_Sync_BK_KCS_BBXN_SANLUONG truyền ngày sx vào
+            if (phieu.MaBm == "CTD_BienBan_SanLuong")
+            {
+                var relatedRecords = await _context.BkKcsBbxnSanLuongs
+                                            .Where(x => x.IDPhieu == phieu.Idphieu)
+                                            .ToListAsync();
+
+                if (relatedRecords.Any())
+                {
+                    foreach (var item in relatedRecords)
+                    {
+                        item.IDPhieu = null;
+                    }
+
+                    await _context.SaveChangesAsync();
+                    // Gọi store procedure để đồng bộ dữ liệu
+                    await _context.Database.ExecuteSqlRawAsync("EXEC sp_Sync_BK_KCS_BBXN_SANLUONG @FromDate = {0} @ToDate = {1}", phieu.NgaySX, phieu.NgaySX);
+                }
+
+            }
 
             await _repo.UpdateAsync(phieu);
 
