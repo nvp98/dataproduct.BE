@@ -476,6 +476,7 @@ namespace dataproduct.api.Repositories
         Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
         Task<List<LG_PB_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
         Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan);
+        Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo);
         Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
 
         // Gán/sửa Mã công đoạn chi phí (DQ1/DQ2) cho toàn bộ dòng NHÁP (TrangThai=0) của 1 NVL trong ngày —

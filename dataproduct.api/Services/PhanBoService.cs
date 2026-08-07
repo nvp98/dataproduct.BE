@@ -421,6 +421,16 @@ namespace dataproduct.api.Services
             }
         }
 
+        // ─── Hủy chốt (mở khóa lại toàn bộ 3 loại phân bổ của 1 ngày để sửa/tính lại) ───
+
+        public async Task HuyChotPhanBoAsync(DateTime ngay, int idNguoiThucHien)
+        {
+            ngay = ngay.Date;
+
+            foreach (var loai in TatCaLoaiPhanBo)
+                await _ketQuaRepo.HuyChotAsync(ngay, loai);
+        }
+
         private async Task ValidateTruocKhiChotAsync(DateTime ngay, byte loaiPhanBo)
         {
             var rows = await _ketQuaRepo.GetByNgayAsync(ngay, loaiPhanBo, null);

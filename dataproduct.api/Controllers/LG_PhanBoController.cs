@@ -69,6 +69,18 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        [HttpPost("huy-chot")]
+        public async Task<IActionResult> HuyChot([FromBody] ChotPhanBoRequestDto dto)
+        {
+            try
+            {
+                await _phanBoService.HuyChotPhanBoAsync(dto.Ngay, dto.IdNguoiXacNhan);
+                return Ok(new { message = "Đã hủy chốt phân bổ." });
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpGet("bao-cao")]
         public async Task<IActionResult> BaoCao(
             [FromQuery] DateTime tuNgay,
