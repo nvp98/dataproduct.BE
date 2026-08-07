@@ -71,6 +71,23 @@ namespace dataproduct.api.Repositories
             return rows.Count;
         }
 
+        public async Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo)
+        {
+            var rows = await _context.LG_PB_KetQuaPhanBo
+                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.TrangThai == 1)
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                row.TrangThai = 0;
+                row.IDNguoiXacNhan = null;
+                row.NgayXacNhan = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return rows.Count;
+        }
+
         public async Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo)
         {
             return await _context.LG_PB_KetQuaPhanBo

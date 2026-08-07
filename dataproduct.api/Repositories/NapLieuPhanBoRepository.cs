@@ -27,7 +27,7 @@ namespace dataproduct.api.Repositories
                     Ca = (byte?)g.Key.IDCa,
                     IdLoCao = idLoCao,
                     IdNvl = g.Key.IDNVL,
-                    KhoiLuongNapLieu = g.Sum(x => x.GiaTri ?? 0)
+                    KhoiLuongNapLieu = g.Sum(x =>(x.ManualGiaTri? (x.GiaTri ?? 0m): (x.GiaTri_Goc ?? x.GiaTri ?? 0m))* (100m - (x.DoAm ?? 0m))/ 100m)
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -44,7 +44,7 @@ namespace dataproduct.api.Repositories
                     Ngay = ngay.Date,
                     Ca = (byte?)g.Key.IDCa,
                     IdLoCao = g.Key.IDLoCao ?? 0,
-                    KhoiLuongNhanVe = g.Sum(x =>( x.GiaTri ?? 0m) * (100m-(x.DoAm ?? 0m)) /100m)
+                    KhoiLuongNhanVe = g.Sum(x => (x.ManualGiaTri ? (x.GiaTri ?? 0m) : (x.GiaTri_Goc ?? x.GiaTri ?? 0m)) * (100m - (x.DoAm ?? 0m)) / 100m)
                 })
                 .AsNoTracking()
                 .ToListAsync();
