@@ -22,8 +22,7 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.TenPhuLieu.Contains(searchKey));
 
             return await query
-                .OrderBy(x => x.ThuTu ?? int.MaxValue)
-                .ThenBy(x => x.ID)
+                .OrderBy(x => x.ID)
                 .ToListAsync();
         }
 

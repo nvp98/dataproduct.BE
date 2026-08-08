@@ -68,6 +68,7 @@ namespace dataproduct.api.Repositories
                             existingDetail.TongThucTe = detailDto.TongThucTe;
                             existingDetail.IDSilo = detailDto.IDSilo;
                             existingDetail.LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe;
+                            existingDetail.ThuTu = detailDto.ThuTu;
 
                             _context.STD_XUAT_NHAP_TON_HRC1s.Update(existingDetail);
                         }
@@ -94,6 +95,7 @@ namespace dataproduct.api.Repositories
                                 TongThucTe = detailDto.TongThucTe,
                                 IDSilo = detailDto.IDSilo,
                                 LuongSuDungKiemKe = detailDto.LuongSuDungKiemKe,
+                                ThuTu = detailDto.ThuTu,
                             };
 
                             await _context.STD_XUAT_NHAP_TON_HRC1s.AddAsync(newDetail);
@@ -200,7 +202,7 @@ namespace dataproduct.api.Repositories
             var ngaySxOnly = DateOnly.FromDateTime(ngaySx);
 
             List<int> allPhuLieuIds = new();
-            Dictionary<int, List<(int PhuLieuID, string? TenNguyenLieu, decimal? TyTrong, int? IDSilo)>> sourceByScope = new();
+            Dictionary<int, List<(int PhuLieuID, string? TenNguyenLieu, decimal? TyTrong, int? IDSilo, int? ThuTu)>> sourceByScope = new();
             Dictionary<int, (decimal? TyLeBOF, decimal? TyLeLF)> prevTotalTyLeLookup = new();
 
             // -------------------------------------------------------
@@ -217,9 +219,13 @@ namespace dataproduct.api.Repositories
 
             if (prevPhieu == default)
             {
-                // Không có phiếu trước đó → dùng danh sách HRC1_PhuLieuNM mặc định (IsUsedNXT = true)
+                // Không có phiếu trước đó → dùng danh sách HRC1_PhuLieuNM mặc định (IsUsedNXT = true),
+                // theo ThuTu_Excel_BOF khai báo trong danh mục (cột ThuTu đơn cũ đã bỏ; nhánh này áp dụng
+                // chung cho cả 10 tổ hợp BOF/LF nên không tách riêng theo BieuMau ở bước init này).
                 var defaults = await _context.Hrc1PhuLieuNms
                     .Where(x => x.IsUsedNXT == true)
+                    .OrderBy(x => x.ThuTu_Excel_BOF ?? int.MaxValue)
+                    .ThenBy(x => x.ID)
                     .Select(x => new { x.ID, x.TenPhuLieu })
                     .ToListAsync();
 
@@ -227,7 +233,7 @@ namespace dataproduct.api.Repositories
                     throw new Exception("Không có Phụ liệu mặc định nào (IsUsedNXT = true) trong HRC1_PhuLieuNM");
 
                 var defaultItems = defaults
-                    .Select(x => (x.ID, (string?)x.TenPhuLieu, (decimal?)null, (int?)null))
+                    .Select((x, idx) => (x.ID, (string?)x.TenPhuLieu, (decimal?)null, (int?)null, (int?)idx))
                     .ToList();
 
                 foreach (var tohop in Enum.GetValues<ToHopSTDNXT_HRC1>())
@@ -248,6 +254,7 @@ namespace dataproduct.api.Repositories
                         x.TyTrong,
                         x.Scope,
                         x.IDSilo,
+                        x.ThuTu,
                     })
                     .ToListAsync();
 
@@ -261,15 +268,17 @@ namespace dataproduct.api.Repositories
                 if (!prevRecords.Any())
                     throw new Exception($"Phiếu ca trước không có dữ liệu phụ liệu (IdPhieu: {prevPhieu})");
 
-                // Group theo Scope → dedup theo PhuLieuID trong mỗi Scope
+                // Group theo Scope → dedup theo PhuLieuID trong mỗi Scope, giữ nguyên thứ tự
+                // hiển thị (ThuTu) mà người dùng đã sắp xếp ở ca trước
                 sourceByScope = prevRecords
                     .GroupBy(x => x.Scope)
                     .ToDictionary(
                         g => g.Key,
                         g => g
+                            .OrderBy(x => x.ThuTu ?? int.MaxValue)
                             .GroupBy(x => x.PhuLieuID)
                             .Select(hg => hg.First())
-                            .Select(x => (x.PhuLieuID, x.TenNguyenLieu, x.TyTrong, x.IDSilo))
+                            .Select((x, idx) => (x.PhuLieuID, x.TenNguyenLieu, x.TyTrong, x.IDSilo, (int?)idx))
                             .ToList()
                     );
 
@@ -321,7 +330,8 @@ namespace dataproduct.api.Repositories
                         TenNguyenLieu = item.TenNguyenLieu,
                         TyTrong = item.TyTrong,
                         IDSilo = item.IDSilo,
-                        ViTri = 1
+                        ViTri = 1,
+                        ThuTu = item.ThuTu
                     });
                 }
             }
@@ -423,7 +433,12 @@ namespace dataproduct.api.Repositories
             {
                 throw new Exception("Phiếu không tồn tại");
             }
-            var details = await _context.STD_XUAT_NHAP_TON_HRC1s.Where(x => x.Id_Phieu == phieuId).ToListAsync();
+            var details = await _context.STD_XUAT_NHAP_TON_HRC1s
+                .Where(x => x.Id_Phieu == phieuId)
+                .OrderBy(x => x.Scope)
+                .ThenBy(x => x.ThuTu ?? int.MaxValue)
+                .ThenBy(x => x.Id)
+                .ToListAsync();
             var summary = await _context.STD_NXT_TOTAL_HRC1s.Where(x => x.Id_Phieu == phieuId).ToListAsync();
 
             var siloIds = details

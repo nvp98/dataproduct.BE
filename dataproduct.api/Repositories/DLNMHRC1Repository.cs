@@ -81,6 +81,12 @@ namespace dataproduct.api.Repositories
                             phuLieuNmMap.TryGetValue(r.PhuLieuID.Value, out var nm);
                             var tenPhuLieu = r.TenPhuLieu ?? nm?.TenPhuLieu;
 
+                            // Thứ tự cột phụ liệu trên form Tạo/Chi tiết theo đúng biểu mẫu của mẻ (BOF/LF) —
+                            // xem Models/Hrc1PhuLieuNm.cs. Cột ThuTu đơn cũ đã bỏ.
+                            var thuTuExcel = string.Equals(b.BieuMau, "LF", StringComparison.OrdinalIgnoreCase)
+                                ? nm?.ThuTu_Excel_LF
+                                : nm?.ThuTu_Excel_BOF;
+
                             model.phuLieus.Add(new HeaderKeyGroupedByReportNoModel
                             {
                                 ID_PhuLieu = r.PhuLieuID.Value,
@@ -89,7 +95,7 @@ namespace dataproduct.api.Repositories
                                 KLPhuGiaTotal = (double?)r.KLPhuGia,
                                 IsManual = r.IsManual,
                                 KLPhuGia_Manual = (double?)r.KLPhuGia_Manual,
-                                ThuTu = nm?.ThuTu,
+                                ThuTu = thuTuExcel,
                             });
 
                             // KLPhanBo: 1 cột duy nhất trên cùng dòng (không phải record riêng như HRC2)
@@ -125,12 +131,13 @@ namespace dataproduct.api.Repositories
         }
 
         // =========================================================
-        // Thống kê tiêu hao BOF (search / sum) — dùng cho ThongKeTieuHaoBOF.tsx
+        // Thống kê tiêu hao BOF/LF (search / sum) — dùng cho ThongKeTieuHaoHRC1.tsx
         // =========================================================
 
         private IQueryable<Hrc1TieuHao> BuildThongKeQuery(SearchThongKeHrc1 dto)
         {
-            var query = _context.Hrc1TieuHaos.Where(x => x.BieuMau == "BOF").AsQueryable();
+            var bieuMau = string.IsNullOrWhiteSpace(dto.BieuMau) ? "BOF" : dto.BieuMau;
+            var query = _context.Hrc1TieuHaos.Where(x => x.BieuMau == bieuMau).AsQueryable();
 
             if (dto.TuNgay.HasValue)
                 query = query.Where(x => x.NgaySanXuat >= DateOnly.FromDateTime(dto.TuNgay.Value));
@@ -150,14 +157,20 @@ namespace dataproduct.api.Repositories
             return query;
         }
 
-        private static double ComputeEffectiveTotal(Hrc1PhuLieu p)
+        // Trả null nếu phụ liệu này thực sự không có số liệu nào (kể cả trường hợp "xóa manual về ban
+        // đầu" — IsManual=true nhưng KLPhuGia_Manual=null, xem DLNMHRC1Service.SaveHRC1ManualDataAsync)
+        // — để Thống kê/Export hiển thị ô trống thay vì "0" gây hiểu nhầm là đã đo được giá trị 0.
+        private static double? ComputeEffectiveTotal(Hrc1PhuLieu p)
         {
-            var effective = p.IsManual ? (double)(p.KLPhuGia_Manual ?? 0) : (double)(p.KLPhuGia ?? 0);
-            return effective + (double)(p.KLPhanBo ?? 0);
+            double? effective = p.IsManual ? (double?)p.KLPhuGia_Manual : (double?)p.KLPhuGia;
+            if (!effective.HasValue && !p.KLPhanBo.HasValue) return null;
+            return (effective ?? 0) + (double)(p.KLPhanBo ?? 0);
         }
 
         public async Task<SearchThongKeHrc1ApiResponse> SearchThongKeApiAsync(SearchThongKeHrc1 dto)
         {
+            var bieuMau = string.IsNullOrWhiteSpace(dto.BieuMau) ? "BOF" : dto.BieuMau;
+
             var query = BuildThongKeQuery(dto)
                 .OrderByDescending(x => x.NgaySanXuat).ThenBy(x => x.Ca).ThenBy(x => x.Scope).ThenBy(x => x.MeThoi);
 
@@ -167,10 +180,15 @@ namespace dataproduct.api.Repositories
             var pageSize = dto.PageSize is > 0 ? dto.PageSize.Value : 20;
             var pageItems = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
-            var headerTables = await _context.Hrc1PhuLieuNms
-                .Where(x => x.DangSuDung)
-                .OrderBy(x => x.ThuTu ?? int.MaxValue).ThenBy(x => x.ID)
-                .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu, ThuTu = x.ThuTu })
+            // Thứ tự cột phụ liệu trên bảng Thống kê tách riêng theo BOF/LF (ThuTu_TK_BOF/ThuTu_TK_LF)
+            // vì 2 biểu mẫu dùng bộ phụ liệu khác nhau — xem Models/Hrc1PhuLieuNm.cs.
+            var headerQueryBase = _context.Hrc1PhuLieuNms.Where(x => x.DangSuDung);
+            var headerQuery = bieuMau == "LF"
+                ? headerQueryBase.OrderBy(x => x.ThuTu_TK_LF ?? int.MaxValue).ThenBy(x => x.ID)
+                : headerQueryBase.OrderBy(x => x.ThuTu_TK_BOF ?? int.MaxValue).ThenBy(x => x.ID);
+
+            var headerTables = await headerQuery
+                .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
                 .ToListAsync();
 
             var meIds = pageItems.Select(x => x.ID).ToList();

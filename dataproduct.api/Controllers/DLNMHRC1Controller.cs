@@ -31,6 +31,13 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        [HttpPost("search-me-thoi")]
+        public async Task<IActionResult> SearchMeThoi([FromBody] HRC1_SearchMeThoiRequest request)
+        {
+            var result = await _service.SearchMeThoiAsync(request);
+            return Ok(result);
+        }
+
         [HttpPost("chuyen-me-thoi")]
         public async Task<IActionResult> ChuyenMeThoi([FromBody] ChuyenMeThoiRequest request)
         {
@@ -162,7 +169,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var file = await _service.ExportExcelDetailAsync(ngay, ca, scope, idPhieu);
+                var file = await _service.ExportExcelDetailAsync(ngay, ca, scope, idPhieu, string.IsNullOrWhiteSpace(bieuMau) ? "BOF" : bieuMau);
                 return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex)
@@ -179,12 +186,31 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var file = await _service.ExportPdfDetailAsync(ngay, ca, scope, idPhieu);
+                var file = await _service.ExportPdfDetailAsync(ngay, ca, scope, idPhieu, string.IsNullOrWhiteSpace(bieuMau) ? "BOF" : bieuMau);
                 return File(file.Content, file.ContentType, file.FileName);
             }
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("refresh-gang-metrics")]
+        public async Task<IActionResult> RefreshGangMetrics([FromBody] RefreshGangMetricsRequest request)
+        {
+            try
+            {
+                if (request?.PhieuIds == null || request.PhieuIds.Count == 0)
+                    return BadRequest("Danh sách phiếu không được để trống.");
+                if (request.PhieuIds.Count > 10)
+                    return BadRequest("Tối đa 10 phiếu mỗi lần làm mới.");
+
+                var result = await _service.RefreshGangMetricsByPhieuIdsAsync(request.PhieuIds);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
     }

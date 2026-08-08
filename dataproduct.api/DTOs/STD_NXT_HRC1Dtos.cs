@@ -33,6 +33,8 @@ namespace dataproduct.api.DTOs
         public decimal? TongThucTe { get; set; }
         public int? IDSilo { get; set; }
         public decimal? LuongSuDungKiemKe { get; set; }
+        /// <summary>Thứ tự hiển thị dòng trong bảng (theo Scope), do người dùng sắp xếp trên UI.</summary>
+        public int? ThuTu { get; set; }
     }
 
     public class NXTSummaryDto_HRC1

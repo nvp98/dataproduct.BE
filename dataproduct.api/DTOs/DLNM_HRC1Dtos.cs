@@ -53,17 +53,29 @@ namespace dataproduct.api.DTOs
         public List<int>? PhuLieuIds { get; set; }
     }
 
-    /// <summary>Bộ lọc thống kê tiêu hao HRC1 (BOF) — không có LoaiBM như HRC2 vì HRC1 hiện chỉ có BOF.</summary>
+    /// <summary>Bộ lọc thống kê tiêu hao HRC1 (BOF/LF, dùng chung bảng Hrc1TieuHao — xem
+    /// .claude/hrc1_tieuhaoBOF.md). BieuMau mặc định "BOF" nếu không truyền, để tương thích ngược
+    /// với các lời gọi cũ trước khi có tab LF trên ThongKeTieuHaoHRC1.tsx.</summary>
     public class SearchThongKeHrc1
     {
         public DateTime? TuNgay { get; set; }
         public DateTime? DenNgay { get; set; }
         public int? Ca { get; set; }
+        public string? BieuMau { get; set; }
         public int? Scope { get; set; }
         public string? SearchText { get; set; }
         public bool? IsTrungMeThoi { get; set; }
         public bool? IsDelete { get; set; }
         public int? Page { get; set; } = 1;
         public int? PageSize { get; set; } = 20;
+    }
+
+    /// <summary>Request cho autocomplete meThoi khi thêm dòng tay ở phiếu Tiêu hao BOF/LF (POST
+    /// /api/DLNMHRC1/search-me-thoi). IdLoThoi = đúng Lò thổi đang chọn trên phiếu (BOF: chính là
+    /// Scope 1-5). Null → fallback tìm trên toàn bộ lò thổi nhà máy 1 (xem DLNMHRC1Service.SearchMeThoiAsync).</summary>
+    public class HRC1_SearchMeThoiRequest
+    {
+        public string? SearchStr { get; set; }
+        public int? IdLoThoi { get; set; }
     }
 }

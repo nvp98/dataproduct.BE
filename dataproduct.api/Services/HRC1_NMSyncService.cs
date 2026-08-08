@@ -42,9 +42,12 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Bổ sung KLGangLongCCT (usp_Sum_KL_GangLong_By_MeThoi_CCT) cho các mẻ NM trong đúng slot
+        /// Bổ sung KLGangLongCCT (usp_Sum_KL_GangLong_By_MeThoi_CCT) cho mọi mẻ trong đúng slot
         /// Ngày+Ca+Lò+BieuMau — mirror HRC2_NMSyncService.EnsureGangLongMetricsAsync. Luôn ghi đè để
         /// phản ánh thay đổi từ phía gang. Chỉ áp dụng BOF (LF chưa có nguồn NM nào để bổ sung metric này).
+        /// KHÔNG lọc IsNM: SP chỉ tra cứu theo MeThoi (không phụ thuộc dòng đến từ NM hay thêm tay) —
+        /// lọc IsNM==true trước đây khiến mẻ thêm tay (IsNM=false) không bao giờ có KLGangLongCCT dù
+        /// MeThoi của nó vẫn tồn tại và tra được ở DB GangLong.
         /// </summary>
         private async Task EnsureGangLongMetricsAsync(SyncFromNM_HRC1_Request request)
         {
@@ -55,7 +58,6 @@ namespace dataproduct.api.Services
 
             var rows = await _context.Hrc1TieuHaos
                 .Where(x =>
-                    x.IsNM == true &&
                     !x.IsDeleted &&
                     x.NgaySanXuat == ngay &&
                     x.Ca == request.Ca &&
@@ -86,8 +88,9 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Bổ sung KLThepPheGang (usp_Get_KLThepPhe_By_MeThoi) cho các mẻ NM trong đúng slot — mirror
+        /// Bổ sung KLThepPheGang (usp_Get_KLThepPhe_By_MeThoi) cho mọi mẻ trong đúng slot — mirror
         /// HRC2_NMSyncService.EnsureThepPheGangAsync. Luôn ghi đè. Chỉ áp dụng BOF.
+        /// KHÔNG lọc IsNM — cùng lý do với EnsureGangLongMetricsAsync ở trên.
         /// </summary>
         private async Task EnsureThepPheGangAsync(SyncFromNM_HRC1_Request request)
         {
@@ -98,7 +101,6 @@ namespace dataproduct.api.Services
 
             var rows = await _context.Hrc1TieuHaos
                 .Where(x =>
-                    x.IsNM == true &&
                     !x.IsDeleted &&
                     x.NgaySanXuat == ngay &&
                     x.Ca == request.Ca &&
@@ -160,6 +162,39 @@ namespace dataproduct.api.Services
 
             await _context.SaveChangesAsync();
             return validRows.Count;
+        }
+
+        /// <summary>
+        /// Làm mới KLThepLong (LF) cho danh sách rows đã tải sẵn từ HRC1_MeThep.KlThepLong — mirror
+        /// RefreshGangMetricsForRowsAsync ở trên nhưng nguồn dữ liệu là HRC1_MeThep (không phải DB
+        /// GangLong) vì LF chưa có nguồn NM để bổ sung gang metrics. Luôn ghi đè (kể cả IsEdited) để
+        /// phản ánh thay đổi mới nhất từ phía giao nhận thép lỏng, giống hành vi "luôn ghi đè" của
+        /// RefreshGangMetricsForRowsAsync.
+        /// </summary>
+        public async Task<int> RefreshThepLongForRowsAsync(List<Hrc1TieuHao> rows)
+        {
+            var validRows = rows.Where(x => !string.IsNullOrWhiteSpace(x.MeThoi)).ToList();
+            if (validRows.Count == 0) return 0;
+
+            var allMeThoi = validRows
+                .Select(x => x.MeThoi!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var meThepByMaMe = await _context.HRC1_MeTheps
+                .Where(m => m.MaMe != null && allMeThoi.Contains(m.MaMe))
+                .ToDictionaryAsync(m => m.MaMe!, StringComparer.OrdinalIgnoreCase);
+
+            int updated = 0;
+            foreach (var row in validRows)
+            {
+                if (!meThepByMaMe.TryGetValue(row.MeThoi!, out var me)) continue;
+                row.KLThepLong = me.KlThepLong;
+                updated++;
+            }
+
+            await _context.SaveChangesAsync();
+            return updated;
         }
 
         /// <summary>

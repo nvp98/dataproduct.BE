@@ -6,7 +6,11 @@ namespace dataproduct.api.Services
     public class Hrc1PhuLieuNmUpsertDto
     {
         public string TenPhuLieu { get; set; } = null!;
-        public int? ThuTu { get; set; }
+        public int? ThuTu_TK_BOF { get; set; }
+        public int? ThuTu_TK_LF { get; set; }
+        public int? ThuTu_Excel_BOF { get; set; }
+        public int? ThuTu_Excel_LF { get; set; }
+        public string? MaVatTuChiPhi { get; set; }
     }
 
     public class Hrc1PhuLieuNmService
@@ -32,7 +36,11 @@ namespace dataproduct.api.Services
             var entity = new Hrc1PhuLieuNm
             {
                 TenPhuLieu = dto.TenPhuLieu,
-                ThuTu = dto.ThuTu,
+                ThuTu_TK_BOF = dto.ThuTu_TK_BOF,
+                ThuTu_TK_LF = dto.ThuTu_TK_LF,
+                ThuTu_Excel_BOF = dto.ThuTu_Excel_BOF,
+                ThuTu_Excel_LF = dto.ThuTu_Excel_LF,
+                MaVatTuChiPhi = string.IsNullOrWhiteSpace(dto.MaVatTuChiPhi) ? null : dto.MaVatTuChiPhi.Trim(),
                 // Phụ liệu thêm qua trang quản lý luôn là thêm tay, không gắn với cột view nguồn (TenPhuLieuNM),
                 // và không đánh dấu IsNM — chỉ SP_Sync_HRC1_PhuLieu mới ghi nhận là dữ liệu tự động.
                 TenPhuLieuNM = null,
@@ -53,7 +61,11 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("Tên phụ liệu đã tồn tại.");
 
             existing.TenPhuLieu = dto.TenPhuLieu;
-            existing.ThuTu = dto.ThuTu;
+            existing.ThuTu_TK_BOF = dto.ThuTu_TK_BOF;
+            existing.ThuTu_TK_LF = dto.ThuTu_TK_LF;
+            existing.ThuTu_Excel_BOF = dto.ThuTu_Excel_BOF;
+            existing.ThuTu_Excel_LF = dto.ThuTu_Excel_LF;
+            existing.MaVatTuChiPhi = string.IsNullOrWhiteSpace(dto.MaVatTuChiPhi) ? null : dto.MaVatTuChiPhi.Trim();
             await _repo.UpdateAsync(existing);
             return true;
         }

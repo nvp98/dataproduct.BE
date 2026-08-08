@@ -44,7 +44,7 @@ namespace dataproduct.api.ResponseModels
     }
 
     // =========================================================
-    // Thống kê tiêu hao BOF (NM.HRC1/ThongKe/ThongKeTieuHaoBOF.tsx)
+    // Thống kê tiêu hao BOF/LF (NM.HRC1/ThongKe/ThongKeTieuHaoHRC1.tsx)
     // Riêng biệt với Hrc1GroupedByMeThoiModel vì "tổng dùng cho báo cáo" (TotalKLPhuGia = hiệu lực + phân bổ)
     // chỉ áp dụng cho thống kê — không đụng field KLPhuGia/KLPhanBo dùng cho luồng tạo/xem phiếu.
     // =========================================================
@@ -74,7 +74,6 @@ namespace dataproduct.api.ResponseModels
     {
         public int PhuLieuID { get; set; }
         public string? TenPhuLieu { get; set; }
-        public int? ThuTu { get; set; }
     }
 
     public class SearchThongKeHrc1ApiResponse

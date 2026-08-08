@@ -56,6 +56,9 @@ public class STD_XUAT_NHAP_TON_HRC1
     public Guid Id_Phieu { get; set; }
     public int? IDSilo { get; set; }
 
+    /// <summary>Thứ tự hiển thị dòng trong bảng (theo Scope), do người dùng sắp xếp trên UI.</summary>
+    public int? ThuTu { get; set; }
+
     [Column(TypeName = "decimal(18,3)")]
     public decimal? LuongSuDungKiemKe { get; set; }
 }

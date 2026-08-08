@@ -490,7 +490,11 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<Hrc1TieuHao>(entity =>
         {
-            entity.ToTable("HRC1_TieuHao");
+            entity.ToTable("HRC1_TieuHao", tb =>
+            {
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_SoftDelete");
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_GangLong");
+            });
             entity.HasKey(e => e.ID);
             entity.Property(e => e.ID).HasColumnName("ID");
             entity.Property(e => e.IDNM).HasColumnName("IDNM");
@@ -529,7 +533,7 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<Hrc1PhuLieu>(entity =>
         {
-            entity.ToTable("HRC1_PhuLieu");
+            entity.ToTable("HRC1_PhuLieu", tb => tb.HasTrigger("trg_HRC1_PhuLieu_ChiPhi"));
             entity.HasKey(e => e.ID);
             entity.Property(e => e.ID).HasColumnName("ID");
             entity.Property(e => e.MeID).HasColumnName("MeID");
@@ -561,7 +565,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.DangSuDung).HasColumnName("DangSuDung");
             entity.Property(e => e.IsNM).HasColumnName("IsNM");
             entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
-            entity.Property(e => e.ThuTu).HasColumnName("ThuTu");
+            entity.Property(e => e.MaVatTuChiPhi).HasColumnName("MaVatTuChiPhi");
             entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
             entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
         });
@@ -808,7 +812,7 @@ public partial class ProductFormContext : DbContext
         // --- HRC1 ---
         modelBuilder.Entity<HRC1_MeThep>(entity =>
         {
-            entity.ToTable("HRC1_MeThep");
+            entity.ToTable("HRC1_MeThep", tb => tb.HasTrigger("trg_HRC1_MeThep_ChiPhi"));
             entity.Property(e => e.MaMe).HasMaxLength(30);
             entity.Property(e => e.ThungSo).HasMaxLength(20);
             entity.Property(e => e.ThoiGian).HasMaxLength(5);

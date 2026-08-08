@@ -1,6 +1,7 @@
 using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.Export;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 using dataproduct.api.ResponseModels;
 using ClosedXML.Excel;
@@ -24,11 +25,13 @@ namespace dataproduct.api.Services
         private readonly HRC1_NMSyncService _syncService;
         private readonly SyncPhanLoaiService _syncPhanLoaiService;
         private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
         // Dùng cho export Excel/PDF chi tiết phiếu (gộp từ Hrc1PhieuDetailExcelService cũ — tránh sinh
         // thêm file, xem vùng "EXPORT EXCEL/PDF CHI TIẾT PHIẾU" ở cuối class).
         private readonly IConverter _pdfConverter;
         private readonly IWebHostEnvironment _env;
         private readonly PheDuyetService _pheDuyetService;
+        private readonly HRC2_NMSyncService _hrc2NMSyncService;
 
         private const int HeaderParentRow = 6;
         private const int HeaderChildRow = 7;
@@ -66,18 +69,44 @@ namespace dataproduct.api.Services
             HRC1_NMSyncService syncService,
             SyncPhanLoaiService syncPhanLoaiService,
             ProductFormContext context,
+            ProductDataMasterDbContext masterContext,
             PheDuyetService pheDuyetService,
             IConverter pdfConverter,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            HRC2_NMSyncService hrc2NMSyncService)
         {
             _repo = repo;
             _stdNxtRepo = stdNxtRepo;
             _syncService = syncService;
             _syncPhanLoaiService = syncPhanLoaiService;
             _context = context;
+            _masterContext = masterContext;
             _pheDuyetService = pheDuyetService;
             _pdfConverter = pdfConverter;
             _env = env;
+            _hrc2NMSyncService = hrc2NMSyncService;
+        }
+
+        /// <summary>
+        /// Autocomplete meThoi khi thêm dòng tay ở phiếu Tiêu hao BOF/LF — mirror
+        /// BBGN_ThepLongService.SearchMeThoi, đọc thẳng Tbl_MeThoi bên DB Master. Có IdLoThoi (đúng
+        /// Lò thổi/Scope đang chọn trên phiếu) → chỉ tìm đúng lò đó. Không có → fallback toàn bộ lò
+        /// thổi nhà máy 1 ({1,2,3,4,5}, giống nhánh nhaMay==1 mặc định của BBGN).
+        /// </summary>
+        public async Task<List<string>> SearchMeThoiAsync(HRC1_SearchMeThoiRequest request)
+        {
+            var query = request?.IdLoThoi is int idLoThoi
+                ? _masterContext.Tbl_MeThoi.Where(x => x.Is_Delete != true && x.ID_LoThoi == idLoThoi)
+                : _masterContext.Tbl_MeThoi.Where(x => x.Is_Delete != true && new[] { 1, 2, 3, 4, 5 }.Contains(x.ID_LoThoi));
+
+            if (!string.IsNullOrWhiteSpace(request?.SearchStr))
+                query = query.Where(x => x.MaMeThoi.Contains(request.SearchStr.Trim()));
+
+            return await query
+                .OrderByDescending(x => x.ID)
+                .Select(x => x.MaMeThoi)
+                .Take(50)
+                .ToListAsync();
         }
 
         public async Task<List<Hrc1GroupedByMeThoiModel>> FilterGroupedAsync(SyncFromNM_HRC1_Request request)
@@ -155,8 +184,9 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// "Làm mới" trên trang Sổ Xuất-Nhập-Tồn HRC1. Chỉ BOF có sync tự động từ NM (lò 1-5, lò 5 chưa
-        /// có view nguồn nhưng gọi vẫn an toàn — SP_HRC1_BOF_Sync_Full tự bỏ qua nếu không có dữ liệu).
+        /// "Làm mới" trên trang Sổ Xuất-Nhập-Tồn HRC1. Chỉ BOF có sync tự động từ NM (lò 1-5, view nguồn
+        /// vw_BOF5 đã có đủ mẻ/MeThoi, có thể chưa đủ hết các cột phụ liệu — SP_HRC1_BOF_Sync_Full xử lý
+        /// bình thường, không throw).
         /// LF không có SP sync (hoàn toàn nhập tay qua phiếu HRC1_BB_TieuHao_LF) nên không cần trigger gì
         /// thêm — chỉ đọc thẳng HRC1_TieuHao/HRC1_PhuLieu đã có sẵn. Mirror
         /// DLNMHRC2Service.FilterSTD_NXTAsync.
@@ -814,7 +844,7 @@ namespace dataproduct.api.Services
         }
 
         // =========================================================
-        // Thống kê tiêu hao BOF — ThongKeTieuHaoBOF.tsx
+        // Thống kê tiêu hao BOF/LF — ThongKeTieuHaoHRC1.tsx
         // =========================================================
 
         public Task<SearchThongKeHrc1ApiResponse> SearchThongKeAsync(SearchThongKeHrc1 dto)
@@ -831,19 +861,51 @@ namespace dataproduct.api.Services
             => _repo.ChuyenMeThoiAsync(request);
 
         /// <summary>
-        /// Xuất Excel thống kê tiêu hao BOF theo mẫu HRC1_PKH_BOF.xlsx — mirror y hệt layout
-        /// DLNMHRC2Service.ExportThongKeExcelAsync (nhánh BOF), chỉ đổi field/khóa phụ liệu cho đúng model HRC1
-        /// (PhuLieuID thay IDHeaderKey, KLGang thay KLGangLongCCT vì HRC1 KLGangLongCCT hiện luôn NULL).
+        /// Xuất Excel thống kê tiêu hao BOF/LF — dispatch theo dto.BieuMau. BOF dùng mẫu
+        /// HRC1_PKH_BOF.xlsx, mirror y hệt layout DLNMHRC2Service.ExportThongKeExcelAsync (nhánh BOF),
+        /// chỉ đổi field/khóa phụ liệu cho đúng model HRC1 (PhuLieuID thay IDHeaderKey, KLGang thay
+        /// KLGangLongCCT vì HRC1 KLGangLongCCT hiện luôn NULL). LF dùng mẫu HRC1_PKH_LF.xlsx (xem
+        /// BuildLfExportFile) — mẫu này CHƯA có file thật trong wwwroot/templates, cần bổ sung trước khi
+        /// nút Excel ở tab LF của ThongKeTieuHaoHRC1.tsx dùng được (sẽ báo lỗi "không tìm thấy file mẫu"
+        /// cho tới khi đó).
         /// </summary>
         public async Task<ExportFileResult> ExportThongKeExcelAsync(SearchThongKeHrc1 dto)
         {
             dto.Page = 1;
             dto.PageSize = int.MaxValue;
+            var bieuMau = string.IsNullOrWhiteSpace(dto.BieuMau) ? "BOF" : dto.BieuMau;
 
             var result = await SearchThongKeAsync(dto);
             if (result.Data.Count == 0)
                 throw new InvalidOperationException("Không có dữ liệu phù hợp với điều kiện lọc để xuất Excel.");
 
+            // Thứ tự cột phụ liệu khi xuất Excel (ThuTu_Excel_BOF/ThuTu_Excel_LF) có thể khác thứ tự
+            // hiển thị trên bảng Thống kê (ThuTu_TK_BOF/ThuTu_TK_LF) — sắp lại đúng theo mẫu Excel
+            // trước khi build file, xem Models/Hrc1PhuLieuNm.cs.
+            if (result.PhuLieuHeaderTables.Count > 0)
+            {
+                var phuLieuIds = result.PhuLieuHeaderTables.Select(h => h.PhuLieuID).ToList();
+                var excelOrderMap = bieuMau == "LF"
+                    ? await _context.Hrc1PhuLieuNms
+                        .Where(x => phuLieuIds.Contains(x.ID))
+                        .ToDictionaryAsync(x => x.ID, x => x.ThuTu_Excel_LF)
+                    : await _context.Hrc1PhuLieuNms
+                        .Where(x => phuLieuIds.Contains(x.ID))
+                        .ToDictionaryAsync(x => x.ID, x => x.ThuTu_Excel_BOF);
+
+                result.PhuLieuHeaderTables = result.PhuLieuHeaderTables
+                    .OrderBy(h => excelOrderMap.TryGetValue(h.PhuLieuID, out var order) ? (order ?? int.MaxValue) : int.MaxValue)
+                    .ThenBy(h => h.PhuLieuID)
+                    .ToList();
+            }
+
+            return bieuMau == "LF"
+                ? BuildLfExportFile(dto.Scope, result)
+                : BuildBofExportFile(dto.Scope, result);
+        }
+
+        private static ExportFileResult BuildBofExportFile(int? scope, SearchThongKeHrc1ApiResponse result)
+        {
             var headers = result.PhuLieuHeaderTables;
 
             var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates", "HRC1_PKH_BOF.xlsx");
@@ -854,7 +916,6 @@ namespace dataproduct.api.Services
             using var workbook = new XLWorkbook(fs);
             var ws = workbook.Worksheet(1);
 
-            var scope = dto.Scope;
             var title = $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}".Trim();
 
             ws.Range(4, 1, 4, 27).Merge();
@@ -1020,6 +1081,176 @@ namespace dataproduct.api.Services
             {
                 Content = stream.ToArray(),
                 FileName = $"ThongKe_HRC1_BOF_{DateTime.Now:yyyyMMdd_HHmm}.xlsx",
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            };
+        }
+
+        /// <summary>
+        /// Xuất Excel thống kê tiêu hao LF theo mẫu HRC1_PKH_LF.xlsx — mirror layout của
+        /// BuildBofExportFile nhưng đổi đúng cột theo dữ liệu thật của LF (xem HRC1_BB_TieuHao_LF.json):
+        /// không có Gang lỏng/Thép phế (BOF) mà chỉ có 1 cột "Khối lượng thép lỏng", không có Oxy/Nitơ mà
+        /// chỉ có Argon, và không có khái niệm "KL thép phế trong thùng gang". File mẫu HRC1_PKH_LF.xlsx
+        /// hiện CHƯA tồn tại trong wwwroot/templates — cần được bổ sung thủ công trước khi dùng được.
+        /// </summary>
+        private static ExportFileResult BuildLfExportFile(int? scope, SearchThongKeHrc1ApiResponse result)
+        {
+            var headers = result.PhuLieuHeaderTables;
+
+            var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates", "HRC1_PKH_LF.xlsx");
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
+
+            using var fs = new FileStream(templatePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var workbook = new XLWorkbook(fs);
+            var ws = workbook.Worksheet(1);
+
+            var title = $"BIÊN BẢN TIÊU HAO NẤU LUYỆN TINH LUYỆN LF {scope}".Trim();
+
+            ws.Range(4, 1, 4, 27).Merge();
+            ws.Cell(4, 1).Value = title;
+            ws.Cell(4, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(4, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(4, 1).Style.Font.Bold = true;
+            ws.Cell(4, 1).Style.Font.FontSize = 16;
+
+            // ===== HEADER PHỤ LIỆU ĐỘNG + CÁC CỘT CỐ ĐỊNH =====
+            // Cột cố định LF chỉ có 7 (không có cột Thép phế riêng như BOF): STT, Ngày SX, Ca, Kíp,
+            // Mẻ nấu, Mác thép, Khối lượng thép lỏng — nên headerStartCol lùi 1 so với BOF (8 thay vì 9).
+            const int headerRow = 7;
+            const int headerStartCol = 8;
+
+            if (headers.Count > 0)
+            {
+                int headerEndCol = headerStartCol + headers.Count - 1;
+                var phuGiaRange = ws.Range(6, headerStartCol, 6, headerEndCol);
+                phuGiaRange.Merge();
+                phuGiaRange.Value = "Chất hợp kim hóa / Phụ gia khử oxy (Kg)";
+                phuGiaRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                phuGiaRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                phuGiaRange.Style.Alignment.WrapText = true;
+                phuGiaRange.Style.Font.Bold = true;
+            }
+
+            int headerCol = headerStartCol;
+            foreach (var h in headers)
+            {
+                ws.Cell(headerRow, headerCol).Value = h.TenPhuLieu;
+                headerCol++;
+            }
+
+            int extraStartCol = headerStartCol + headers.Count;
+            int fuelCol = extraStartCol;
+
+            var fuelHeader = ws.Range(6, fuelCol, 7, fuelCol);
+            fuelHeader.Merge();
+            fuelHeader.Value = "Argon (m³)";
+            fuelHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            fuelHeader.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            fuelHeader.Style.Alignment.WrapText = true;
+            fuelHeader.Style.Font.Bold = true;
+
+            int noteCol = fuelCol + 1;
+            var noteHeader = ws.Range(6, noteCol, 7, noteCol);
+            noteHeader.Merge();
+            noteHeader.Value = "Ghi chú";
+            noteHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            noteHeader.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            noteHeader.Style.Alignment.WrapText = true;
+            noteHeader.Style.Font.Bold = true;
+
+            const int startRow = 8;
+            int currentRow = startRow;
+
+            foreach (var row in result.Data)
+            {
+                var d = row.Data;
+                if (d == null) continue;
+
+                ws.Cell(currentRow, 1).Value = currentRow - startRow + 1;
+                ws.Cell(currentRow, 2).Value = d.NgaySanXuat.HasValue ? d.NgaySanXuat.Value.ToString("dd/MM/yyyy") : "";
+                ws.Cell(currentRow, 3).Value = d.Ca == 1 ? "Ca ngày" : d.Ca == 2 ? "Ca đêm" : "";
+                ws.Cell(currentRow, 4).Value = "";
+                ws.Cell(currentRow, 5).Value = d.MeThoi;
+                ws.Cell(currentRow, 6).Value = d.MacThep;
+                ws.Cell(currentRow, 7).Value = (double?)d.KLThepLong;
+
+                var valueByPhuLieuId = row.Values
+                    .Where(v => v.TotalKLPhuGia.HasValue)
+                    .ToDictionary(v => v.PhuLieuID, v => v.TotalKLPhuGia!.Value);
+
+                int colIndex = headerStartCol;
+                foreach (var h in headers)
+                {
+                    if (valueByPhuLieuId.TryGetValue(h.PhuLieuID, out var value) && value != 0)
+                        ws.Cell(currentRow, colIndex).Value = value;
+                    colIndex++;
+                }
+
+                if (d.AR.HasValue) ws.Cell(currentRow, fuelCol).Value = d.AR.Value;
+
+                ws.Row(currentRow).Height = 18;
+                currentRow++;
+            }
+
+            // ===== DÒNG TỔNG =====
+            currentRow += 1;
+            int totalRow = currentRow;
+
+            ws.Range(totalRow, 1, totalRow, 6).Merge();
+            ws.Cell(totalRow, 1).Value = "Tổng";
+            ws.Cell(totalRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(totalRow, 1).Style.Font.Bold = true;
+
+            int lastDataRow = currentRow - 1;
+            ws.Range(startRow, 1, lastDataRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            ws.Cell(totalRow, 7).FormulaA1 = $"SUM(G{startRow}:G{lastDataRow})";
+
+            int col = headerStartCol;
+            foreach (var h in headers)
+            {
+                var colLetter = ws.Cell(1, col).Address.ColumnLetter;
+                ws.Cell(totalRow, col).FormulaA1 = $"SUM({colLetter}{startRow}:{colLetter}{lastDataRow})";
+                col++;
+            }
+
+            currentRow += 2;
+            int lastFooterRow = currentRow;
+
+            var lastUsedColumn = ws.LastColumnUsed();
+            int lastColumn = lastUsedColumn != null ? lastUsedColumn.ColumnNumber() : 30;
+
+            var headerBorderRange = ws.Range(6, 1, 7, lastColumn);
+            headerBorderRange.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+            headerBorderRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+            headerBorderRange.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+            headerBorderRange.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+            headerBorderRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            headerBorderRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            headerBorderRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            headerBorderRange.Style.Alignment.WrapText = true;
+
+            var dataRange = ws.Range(startRow, 1, totalRow, lastColumn);
+            dataRange.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+            dataRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+            dataRange.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+            dataRange.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+            dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+            var footerRange = ws.Range(currentRow, 1, lastFooterRow, lastColumn);
+            footerRange.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+            footerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+            footerRange.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+            footerRange.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+            footerRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+
+            return new ExportFileResult
+            {
+                Content = stream.ToArray(),
+                FileName = $"ThongKe_HRC1_LF_{DateTime.Now:yyyyMMdd_HHmm}.xlsx",
                 ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             };
         }
@@ -1326,24 +1557,59 @@ namespace dataproduct.api.Services
         }
 
         // -------------------------------------------------------
+        // Entry point cho plugin exporter (IPhieuExcelExporter/IPhieuPdfExporter, xem
+        // Services/Exporters/HRC1TieuHaoExcelExporter.cs, HRC1TieuHaoPdfExporter.cs) — chỉ cần idPhieu,
+        // tự suy ra BOF/LF từ MaBm của phiếu (HRC1_BB_TieuHao_BOF / HRC1_BB_TieuHao_LF) và Ngày/Ca/Lò từ
+        // chính phiếu, không cần query string như api/DLNMHRC1/export-*-detail cũ.
+        // -------------------------------------------------------
+        private static string ResolveBieuMauFromMaBm(string? maBm) =>
+            !string.IsNullOrWhiteSpace(maBm) && maBm.EndsWith("_LF", StringComparison.OrdinalIgnoreCase)
+                ? "LF"
+                : "BOF";
+
+        public async Task<ExportFileResult> ExportTieuHaoExcelAsync(Guid phieuId)
+        {
+            var phieu = await GetBmPhieuByIdOrThrowAsync(phieuId);
+            if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
+                throw new InvalidOperationException("Phiếu thiếu Ngày SX/Ca để xuất Excel.");
+            var bieuMau = ResolveBieuMauFromMaBm(phieu.MaBm);
+            return await ExportExcelDetailAsync(phieu.NgaySX.Value, phieu.Ca.Value, phieu.Scope ?? 0, phieuId, bieuMau);
+        }
+
+        public async Task<ExportFileResult> ExportTieuHaoPdfAsync(Guid phieuId)
+        {
+            var phieu = await GetBmPhieuByIdOrThrowAsync(phieuId);
+            if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
+                throw new InvalidOperationException("Phiếu thiếu Ngày SX/Ca để xuất PDF.");
+            var bieuMau = ResolveBieuMauFromMaBm(phieu.MaBm);
+            return await ExportPdfDetailAsync(phieu.NgaySX.Value, phieu.Ca.Value, phieu.Scope ?? 0, phieuId, bieuMau);
+        }
+
+        // -------------------------------------------------------
         // Export data query — mirror DLNMHRC1Repository.SearchThongKeApiAsync nhưng lọc đúng
         // 1 tổ hợp Ngày+Ca+Lò (không phân trang, không filter IsDelete/IsTrungMeThoi).
         // -------------------------------------------------------
         private async Task<(List<Hrc1PhuLieuHeaderTable> Headers, List<Hrc1ThongKeRow> Rows)> GetExportDataAsync(
-            DateOnly ngay, int ca, int scope)
+            DateOnly ngay, int ca, int scope, string bieuMau = "BOF")
         {
             var items = await _context.Hrc1TieuHaos
                 .Where(x => !x.IsDeleted && x.NgaySanXuat == ngay && x.Ca == (byte)ca
-                         && x.BieuMau == "BOF" && x.Scope == scope)
+                         && x.BieuMau == bieuMau && x.Scope == scope)
                 .OrderBy(x => x.MeThoi)
                 .AsNoTracking()
                 .ToListAsync();
 
-            var headers = await _context.Hrc1PhuLieuNms
-                .Where(x => x.DangSuDung)
-                .OrderBy(x => x.ThuTu ?? int.MaxValue).ThenBy(x => x.ID)
-                .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu, ThuTu = x.ThuTu })
-                .ToListAsync();
+            // Thứ tự cột phụ liệu: BOF sắp theo ThuTu_Excel_BOF, LF sắp theo ThuTu_Excel_LF — cột ThuTu
+            // đơn cũ đã bỏ (xem Hrc1PhuLieuNm.cs).
+            bool isLF = bieuMau == "LF";
+            var headersQuery = _context.Hrc1PhuLieuNms.Where(x => x.DangSuDung);
+            var headers = isLF
+                ? await headersQuery.OrderBy(x => x.ThuTu_Excel_LF ?? int.MaxValue).ThenBy(x => x.ID)
+                    .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
+                    .ToListAsync()
+                : await headersQuery.OrderBy(x => x.ThuTu_Excel_BOF ?? int.MaxValue).ThenBy(x => x.ID)
+                    .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
+                    .ToListAsync();
 
             var meIds = items.Select(x => x.ID).ToList();
             var plByMeId = meIds.Count > 0
@@ -1375,10 +1641,14 @@ namespace dataproduct.api.Services
             return (headers, rows);
         }
 
-        private static double ComputeEffectiveTotal(Hrc1PhuLieu p)
+        // Trả null nếu phụ liệu này thực sự không có số liệu nào (kể cả trường hợp "xóa manual về ban
+        // đầu" — IsManual=true nhưng KLPhuGia_Manual=null) — để Export hiển thị ô trống thay vì "0"
+        // gây hiểu nhầm là đã đo được giá trị 0 (xem DLNMHRC1Repository.ComputeEffectiveTotal — bản gốc).
+        private static double? ComputeEffectiveTotal(Hrc1PhuLieu p)
         {
-            var effective = p.IsManual ? (double)(p.KLPhuGia_Manual ?? 0) : (double)(p.KLPhuGia ?? 0);
-            return effective + (double)(p.KLPhanBo ?? 0);
+            double? effective = p.IsManual ? (double?)p.KLPhuGia_Manual : (double?)p.KLPhuGia;
+            if (!effective.HasValue && !p.KLPhanBo.HasValue) return null;
+            return (effective ?? 0) + (double)(p.KLPhanBo ?? 0);
         }
 
         private static Hrc1TieuHao_ResponseModel MapData(Hrc1TieuHao b) => new Hrc1TieuHao_ResponseModel
@@ -1409,7 +1679,7 @@ namespace dataproduct.api.Services
 
         // ---- EXCEL ----
 
-        public async Task<ExportFileResult> ExportExcelDetailAsync(DateOnly ngay, int ca, int scope, Guid idPhieu)
+        public async Task<ExportFileResult> ExportExcelDetailAsync(DateOnly ngay, int ca, int scope, Guid idPhieu, string bieuMau = "BOF")
         {
             var phieu = await GetBmPhieuByIdOrThrowAsync(idPhieu);
             if (!phieu.NgaySX.HasValue || !phieu.Ca.HasValue)
@@ -1420,13 +1690,16 @@ namespace dataproduct.api.Services
             var kipPhieu = phieu.Kip ?? "";
             var scopePhieu = phieu.Scope ?? scope;
 
-            const string templateName = "HRC1_BB_NauLuyen_BOF";
-            var templatePath = Path.Combine(_env.WebRootPath, "templates", $"{templateName}.xlsx");
+            // Dùng chung 1 file letterhead (logo + khung company) cho cả BOF/LF — nội dung ISO code (dòng
+            // 1-3) được ghi đè theo bieuMau trong UpdateHeaderRowMerges, phần lưới dữ liệu (từ dòng 4) hoàn
+            // toàn generate bằng code nên không cần file mẫu riêng cho LF.
+            const string templateFileName = "HRC1_BB_NauLuyen_BOF";
+            var templatePath = Path.Combine(_env.WebRootPath, "templates", $"{templateFileName}.xlsx");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
 
-            var (headers, rows) = await GetExportDataAsync(ngayPhieu, caPhieu, scopePhieu);
-            var fileName = $"{templateName}_Ca{caPhieu}_{ngayPhieu:ddMMyyyy}.xlsx";
+            var (headers, rows) = await GetExportDataAsync(ngayPhieu, caPhieu, scopePhieu, bieuMau);
+            var fileName = $"HRC1_BB_NauLuyen_{bieuMau}_Ca{caPhieu}_{ngayPhieu:ddMMyyyy}.xlsx";
 
             // ClosedXML lỗi khi save workbook có drawing (logo) trực tiếp ra MemoryStream → save qua file tạm.
             var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.xlsx");
@@ -1435,7 +1708,7 @@ namespace dataproduct.api.Services
                 using (var workbook = new XLWorkbook(templatePath))
                 {
                     var ws = workbook.Worksheets.First();
-                    await RenderBodyFromDbAsync(ws, headers, rows, scopePhieu, ngayPhieu: ngayPhieu, caPhieu: caPhieu, kip: kipPhieu, idPhieu: idPhieu);
+                    await RenderBodyFromDbAsync(ws, headers, rows, scopePhieu, ngayPhieu: ngayPhieu, caPhieu: caPhieu, kip: kipPhieu, idPhieu: idPhieu, bieuMau: bieuMau);
                     workbook.SaveAs(tempPath);
                 }
 
@@ -1463,16 +1736,19 @@ namespace dataproduct.api.Services
 
         private async Task RenderBodyFromDbAsync(IXLWorksheet ws,
             List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows,
-            int? scope, DateOnly? ngayPhieu, int? caPhieu, string kip, Guid? idPhieu)
+            int? scope, DateOnly? ngayPhieu, int? caPhieu, string kip, Guid? idPhieu, string bieuMau = "BOF")
         {
-            int lastCol = ComputeLastCol(headers.Count);
+            int lastCol = ComputeLastCol(headers.Count, bieuMau);
             ws.Column(2).Width = 25;
             ws.Column(3).Width = 25;
             ws.Column(lastCol).Width = 25;
 
             ClearRowsFrom(ws, 4);
-            UpdateHeaderRowMerges(ws, lastCol);
-            RenderInfoRows(ws, rows, lastCol, scope, ngayPhieu, caPhieu, kip);
+            string isoText = bieuMau == "LF"
+                ? "BM.14/QT.05.15\nNgày hiệu lực: 10/01/2025\nLần sửa đổi: 00"
+                : "BM.08/QT.05.15\nNgày hiệu lực: 10/01/2025\nLần sửa đổi: 00";
+            UpdateHeaderRowMerges(ws, lastCol, isoText);
+            RenderInfoRows(ws, rows, lastCol, scope, ngayPhieu, caPhieu, kip, bieuMau);
 
             int dataStartRow = DataStartRow;
             int dataEndRow = dataStartRow + rows.Count - 1;
@@ -1486,9 +1762,9 @@ namespace dataproduct.api.Services
                 nguoiLapName = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0)?.HoVaTen;
             }
 
-            RenderColumnHeaders(ws, headers);
-            RenderDataRows(ws, headers, rows, dataStartRow);
-            RenderTotalRow(ws, totalRow, headers, rows);
+            RenderColumnHeaders(ws, headers, bieuMau);
+            RenderDataRows(ws, headers, rows, dataStartRow, bieuMau);
+            RenderTotalRow(ws, totalRow, headers, rows, bieuMau);
             int tableLastRow = RenderFooter(ws, totalRow + 2, lastCol);
             RenderSignatureRow(ws, tableLastRow + 1, lastCol, truongKipName, nguoiLapName);
 
@@ -1496,12 +1772,18 @@ namespace dataproduct.api.Services
         }
 
         // -------------------------------------------------------
-        // Column position helpers — BOF: STT|MeThoi|MacThep|KLGangLong|KLThepPhe (5 cột) rồi phụ liệu từ col 6,
-        // sau phụ liệu: Oxy|Nito|Ghi chú (3 cột).
+        // Column position helpers.
+        // BOF: STT|MeThoi|MacThep|KLGangLong|KLThepPhe (5 cột cố định) rồi phụ liệu, sau phụ liệu:
+        // Oxy|Nito|Argon|QueLayMau|QueDoNhiet|Ghi chú (6 cột).
+        // LF: STT|MeThoi|MacThep|KLThepLong (4 cột cố định) rồi phụ liệu, sau phụ liệu:
+        // Argon|QueLayMau|QueDoNhiet|Ghi chú (4 cột, LF không có Oxy/Nito).
         // -------------------------------------------------------
-        private const int PhuLieuStartCol = 6;
+        private static int FixedColsCount(string bieuMau) => bieuMau == "LF" ? 4 : 5;
+        private static int TailColsCount(string bieuMau) => bieuMau == "LF" ? 4 : 6;
+        private static int PhuLieuStartCol(string bieuMau) => FixedColsCount(bieuMau) + 1;
 
-        private static int ComputeLastCol(int dynamicCount) => (PhuLieuStartCol - 1) + dynamicCount + 3;
+        private static int ComputeLastCol(int dynamicCount, string bieuMau) =>
+            FixedColsCount(bieuMau) + dynamicCount + TailColsCount(bieuMau);
 
         private static void ClearRowsFrom(IXLWorksheet ws, int startRow)
         {
@@ -1515,10 +1797,8 @@ namespace dataproduct.api.Services
                 ws.Row(r).Clear(XLClearOptions.Contents);
         }
 
-        private static void UpdateHeaderRowMerges(IXLWorksheet ws, int lastCol)
+        private static void UpdateHeaderRowMerges(IXLWorksheet ws, int lastCol, string isoText)
         {
-            var info = ws.Cell(1, 1).Value;
-
             var headerMerges = ws.MergedRanges
                 .Where(m => m.RangeAddress.FirstAddress.RowNumber >= 1 && m.RangeAddress.LastAddress.RowNumber <= 3)
                 .ToList();
@@ -1526,21 +1806,23 @@ namespace dataproduct.api.Services
 
             ws.Range(1, 1, 3, lastCol).Merge();
             var cell = ws.Cell(1, 1);
-            cell.Value = info;
+            cell.Value = isoText;
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
             cell.Style.Alignment.WrapText = true;
         }
 
         private static void RenderInfoRows(IXLWorksheet ws, List<Hrc1ThongKeRow> rows, int lastCol,
-            int? scope, DateOnly? ngayPhieu, int? caPhieu, string kip)
+            int? scope, DateOnly? ngayPhieu, int? caPhieu, string kip, string bieuMau)
         {
             var d = rows.FirstOrDefault()?.Data;
             var caValue = caPhieu ?? d?.Ca ?? 0;
             var rawDate = d?.NgaySanXuat;
             string ngayStr = ngayPhieu.HasValue ? ngayPhieu.Value.ToString("dd/MM/yyyy") : (rawDate?.ToString("dd/MM/yyyy") ?? "");
 
-            string tenBm = $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}";
+            string tenBm = bieuMau == "LF"
+                ? $"BIÊN BẢN TIÊU HAO NẤU LUYỆN TINH LUYỆN LF {scope}"
+                : $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}";
 
             ws.Range(4, 1, 4, lastCol).Merge();
             var c4 = ws.Cell(4, 1);
@@ -1574,33 +1856,59 @@ namespace dataproduct.api.Services
             c5.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
         }
 
-        private static void RenderColumnHeaders(IXLWorksheet ws, List<Hrc1PhuLieuHeaderTable> headers)
+        private static void RenderColumnHeaders(IXLWorksheet ws, List<Hrc1PhuLieuHeaderTable> headers, string bieuMau)
         {
-            const int s = PhuLieuStartCol;
+            bool isLF = bieuMau == "LF";
+            int s = PhuLieuStartCol(bieuMau);
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, isLF ? "Mẻ nấu" : "Mẻ thổi");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL gang lỏng\n(tấn)");
-            MergeVertCell(ws, 5, "KL thép phế\n(tấn)");
+            if (isLF)
+            {
+                MergeVertCell(ws, 4, "KL thép lỏng\n(tấn)");
+            }
+            else
+            {
+                MergeVertCell(ws, 4, "KL gang lỏng\n(tấn)");
+                MergeVertCell(ws, 5, "KL thép phế\n(tấn)");
+            }
 
             if (headers.Count > 0)
             {
-                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Phụ gia công nghệ (Kg)");
+                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1,
+                    isLF ? "Chất hợp kim hóa / Phụ gia khử oxy (Kg)" : "Phụ gia công nghệ (Kg)");
                 for (int i = 0; i < headers.Count; i++)
                     HeaderCell(ws, HeaderChildRow, s + i, headers[i].TenPhuLieu ?? "");
             }
 
             int a = s + headers.Count;
-            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Nhiên liệu");
-            HeaderCell(ws, HeaderChildRow, a, "Oxy");
-            HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
-            MergeVertCell(ws, a + 2, "Ghi chú");
+            if (isLF)
+            {
+                MergeVertCell(ws, a, "Argon\n(m3)");
+                a += 1;
+            }
+            else
+            {
+                MergeHorizCell(ws, HeaderParentRow, a, a + 2, "Khí (nhập tay)");
+                HeaderCell(ws, HeaderChildRow, a, "Oxy");
+                HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
+                HeaderCell(ws, HeaderChildRow, a + 2, "Argon");
+                a += 3;
+            }
+
+            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Que");
+            HeaderCell(ws, HeaderChildRow, a, "Que lấy mẫu");
+            HeaderCell(ws, HeaderChildRow, a + 1, "Que đo nhiệt");
+            a += 2;
+
+            MergeVertCell(ws, a, "Ghi chú");
         }
 
-        private static void RenderDataRows(IXLWorksheet ws, List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows, int dataStartRow)
+        private static void RenderDataRows(IXLWorksheet ws, List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows, int dataStartRow, string bieuMau)
         {
-            const int s = PhuLieuStartCol;
+            bool isLF = bieuMau == "LF";
+            int s = PhuLieuStartCol(bieuMau);
             int r = dataStartRow;
             int n = 1;
 
@@ -1612,32 +1920,57 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 1).Value = n++;
                 ws.Cell(r, 2).Value = d.MeThoi ?? "";
                 ws.Cell(r, 3).Value = d.MacThep ?? "";
-                ws.Cell(r, 4).Value = Num((double?)d.KLGang);
-                ws.Cell(r, 5).Value = Num((double?)((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0)));
+                if (isLF)
+                {
+                    ws.Cell(r, 4).Value = Num((double?)d.KLThepLong);
+                }
+                else
+                {
+                    ws.Cell(r, 4).Value = Num((double?)d.KLGang);
+                    ws.Cell(r, 5).Value = Num((double?)((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0)));
+                }
 
                 for (int i = 0; i < headers.Count; i++)
                     ws.Cell(r, s + i).Value = vm.TryGetValue(headers[i].PhuLieuID, out var kl) ? Num(kl) : Blank.Value;
 
                 int a = s + headers.Count;
-                ws.Cell(r, a++).Value = Num(d.O2);
-                ws.Cell(r, a++).Value = Num(d.N2);
+                if (isLF)
+                {
+                    ws.Cell(r, a++).Value = Num(d.AR);
+                }
+                else
+                {
+                    ws.Cell(r, a++).Value = Num(d.O2);
+                    ws.Cell(r, a++).Value = Num(d.N2);
+                    ws.Cell(r, a++).Value = Num(d.AR);
+                }
+                ws.Cell(r, a++).Value = d.QueLayMau.HasValue ? (XLCellValue)d.QueLayMau.Value : Blank.Value;
+                ws.Cell(r, a++).Value = d.QueDoNhiet.HasValue ? (XLCellValue)d.QueDoNhiet.Value : Blank.Value;
                 ws.Cell(r, a).Value = d.GhiChu ?? "";
 
                 r++;
             }
         }
 
-        private static void RenderTotalRow(IXLWorksheet ws, int r, List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows)
+        private static void RenderTotalRow(IXLWorksheet ws, int r, List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows, string bieuMau)
         {
-            const int s = PhuLieuStartCol;
+            bool isLF = bieuMau == "LF";
+            int s = PhuLieuStartCol(bieuMau);
 
             ws.Range(r, 1, r, 3).Merge();
             ws.Cell(r, 1).Value = "Tổng cộng";
             ws.Cell(r, 1).Style.Font.Bold = true;
             ws.Cell(r, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-            ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => (double?)x.Data?.KLGang ?? 0);
-            ws.Cell(r, 5).Value = (XLCellValue)rows.Sum(x => (double?)((x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0)) ?? 0);
+            if (isLF)
+            {
+                ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => (double?)x.Data?.KLThepLong ?? 0);
+            }
+            else
+            {
+                ws.Cell(r, 4).Value = (XLCellValue)rows.Sum(x => (double?)x.Data?.KLGang ?? 0);
+                ws.Cell(r, 5).Value = (XLCellValue)rows.Sum(x => (double?)((x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0)) ?? 0);
+            }
 
             for (int i = 0; i < headers.Count; i++)
             {
@@ -1646,8 +1979,18 @@ namespace dataproduct.api.Services
             }
 
             int a = s + headers.Count;
-            ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.O2 ?? 0);
-            ws.Cell(r, a).Value = (XLCellValue)rows.Sum(x => x.Data?.N2 ?? 0);
+            if (isLF)
+            {
+                ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.AR ?? 0);
+            }
+            else
+            {
+                ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.O2 ?? 0);
+                ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.N2 ?? 0);
+                ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.AR ?? 0);
+            }
+            ws.Cell(r, a++).Value = (XLCellValue)rows.Sum(x => x.Data?.QueLayMau ?? 0);
+            ws.Cell(r, a).Value = (XLCellValue)rows.Sum(x => x.Data?.QueDoNhiet ?? 0);
             // Ghi chú — bỏ qua
         }
 
@@ -1782,9 +2125,9 @@ namespace dataproduct.api.Services
 
         // ---- PDF ----
 
-        public async Task<ExportFileResult> ExportPdfDetailAsync(DateOnly ngay, int ca, int scope, Guid idPhieu)
+        public async Task<ExportFileResult> ExportPdfDetailAsync(DateOnly ngay, int ca, int scope, Guid idPhieu, string bieuMau = "BOF")
         {
-            var (headers, rows) = await GetExportDataAsync(ngay, ca, scope);
+            var (headers, rows) = await GetExportDataAsync(ngay, ca, scope, bieuMau);
 
             var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
             var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
@@ -1794,7 +2137,7 @@ namespace dataproduct.api.Services
             string? truongKipName = truongKip?.HoVaTen;
             string? nguoiLapName = nguoiLap?.HoVaTen;
 
-            var html = await BuildPdfHtmlAsync(ngay, ca, scope, headers, rows, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName);
+            var html = await BuildPdfHtmlAsync(ngay, ca, scope, headers, rows, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName, bieuMau);
 
             var doc = new HtmlToPdfDocument
             {
@@ -1813,7 +2156,7 @@ namespace dataproduct.api.Services
             return new ExportFileResult
             {
                 Content = _pdfConverter.Convert(doc),
-                FileName = $"HRC1_BB_NauLuyen_BOF_Ca{ca}_{ngay:ddMMyyyy}.pdf",
+                FileName = $"HRC1_BB_NauLuyen_{bieuMau}_Ca{ca}_{ngay:ddMMyyyy}.pdf",
                 ContentType = "application/pdf",
             };
         }
@@ -1822,11 +2165,14 @@ namespace dataproduct.api.Services
             DateOnly ngay, int ca, int scope,
             List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows,
             string chuKyTruongKipHtml, string chuKyNguoiLapHtml,
-            string? truongKipName, string? nguoiLapName)
+            string? truongKipName, string? nguoiLapName, string bieuMau)
         {
+            bool isLF = bieuMau == "LF";
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
-            string tenBm = $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}";
+            string tenBm = isLF
+                ? $"BIÊN BẢN TIÊU HAO NẤU LUYỆN TINH LUYỆN LF {scope}"
+                : $"BIÊN BẢN TIÊU HAO NẤU LUYỆN LÒ THỔI {scope}";
 
             string ngayStr = ngay.ToString("dd/MM/yyyy");
             string gioBatDau, gioKetThuc, ngayKetThuc = ngayStr;
@@ -1843,13 +2189,16 @@ namespace dataproduct.api.Services
             }
             string infoKip = $"Kíp {ca}: Từ {gioBatDau} ngày {ngayStr} đến {gioKetThuc} ngày {ngayKetThuc}";
 
-            // Trước tiên dùng nguyên mã ISO đang copy từ HRC2 (BM.08/QT.05.15) — đổi lại khi có mã HRC1 riêng.
-            string bmCode = "BM.08/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00";
+            // Mã ISO riêng theo biểu mẫu — mirror isoInfo.code trong BM_config/HRC1_BB_TieuHao_BOF.json
+            // (BM.08/QT.05.15) và HRC1_BB_TieuHao_LF.json (BM.14/QT.05.15).
+            string bmCode = isLF
+                ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00"
+                : "BM.08/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00";
 
-            string thead = PdfThead(headers);
-            string tbody = PdfTbody(headers, rows);
-            int lastCol = ComputeLastCol(headers.Count);
-            string footer = PdfFooterHtml(lastCol, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName);
+            string thead = PdfThead(headers, bieuMau);
+            string tbody = PdfTbody(headers, rows, bieuMau);
+            int lastCol = ComputeLastCol(headers.Count, bieuMau);
+            // string footer = PdfFooterHtml(lastCol, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName);
 
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BB_NauLuyen.html");
             var html = await File.ReadAllTextAsync(templatePath);
@@ -1860,36 +2209,56 @@ namespace dataproduct.api.Services
                 .Replace("{{TenBieuMau}}", tenBm)
                 .Replace("{{InfoKip}}", infoKip)
                 .Replace("{{TheadRows}}", thead)
-                .Replace("{{TbodyRows}}", tbody)
-                .Replace("{{FooterHtml}}", footer);
+                .Replace("{{TbodyRows}}", tbody);
+                // .Replace("{{FooterHtml}}", footer);
         }
 
-        private static string PdfThead(List<Hrc1PhuLieuHeaderTable> h)
+        private static string PdfThead(List<Hrc1PhuLieuHeaderTable> h, string bieuMau)
         {
+            bool isLF = bieuMau == "LF";
             var r1 = new StringBuilder();
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append($"<th rowspan=\"2\">{(isLF ? "Mẻ nấu" : "Mẻ thổi")}</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL gang lỏng<br/>(tấn)</th>");
-            r1.Append("<th rowspan=\"2\">KL thép phế<br/>(tấn)</th>");
+            if (isLF)
+            {
+                r1.Append("<th rowspan=\"2\">KL thép lỏng<br/>(tấn)</th>");
+            }
+            else
+            {
+                r1.Append("<th rowspan=\"2\">KL gang lỏng<br/>(tấn)</th>");
+                r1.Append("<th rowspan=\"2\">KL thép phế<br/>(tấn)</th>");
+            }
 
             if (h.Count > 0)
             {
-                r1.Append($"<th colspan=\"{h.Count}\">Phụ gia công nghệ (Kg)</th>");
+                r1.Append($"<th colspan=\"{h.Count}\">{(isLF ? "Chất hợp kim hóa / Phụ gia khử oxy (Kg)" : "Phụ gia công nghệ (Kg)")}</th>");
                 foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
             }
 
-            r1.Append("<th colspan=\"2\">Nhiên liệu</th>");
-            r2.Append("<th>Oxy</th><th>Nito</th>");
+            if (isLF)
+            {
+                r1.Append("<th rowspan=\"2\">Argon<br/>(m3)</th>");
+            }
+            else
+            {
+                r1.Append("<th colspan=\"3\">Khí (nhập tay)</th>");
+                r2.Append("<th>Oxy</th><th>Nito</th><th>Argon</th>");
+            }
+
+            r1.Append("<th colspan=\"2\">Que</th>");
+            r2.Append("<th>Que lấy mẫu</th><th>Que đo nhiệt</th>");
+
             r1.Append("<th rowspan=\"2\">Ghi chú</th>");
 
             return $"<thead><tr>{r1}</tr><tr>{r2}</tr></thead>";
         }
 
-        private static string PdfTbody(List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows)
+        private static string PdfTbody(List<Hrc1PhuLieuHeaderTable> headers, List<Hrc1ThongKeRow> rows, string bieuMau)
         {
+            bool isLF = bieuMau == "LF";
             var sb = new StringBuilder("<tbody>");
             int stt = 1;
             foreach (var row in rows)
@@ -1898,23 +2267,56 @@ namespace dataproduct.api.Services
                 var vm = row.Values.ToDictionary(v => v.PhuLieuID, v => v.TotalKLPhuGia);
                 sb.Append("<tr>");
                 sb.Append($"<td>{stt++}</td><td>{d.MeThoi ?? ""}</td><td>{d.MacThep ?? ""}</td>");
-                sb.Append($"<td>{PFmt((double?)d.KLGang)}</td><td>{PFmt((double?)((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0)))}</td>");
+                if (isLF)
+                {
+                    sb.Append($"<td>{PFmt((double?)d.KLThepLong)}</td>");
+                }
+                else
+                {
+                    sb.Append($"<td>{PFmt((double?)d.KLGang)}</td><td>{PFmt((double?)((d.KLThepPhe ?? 0) + (d.KLThepPheGang ?? 0)))}</td>");
+                }
                 foreach (var hx in headers)
                     sb.Append($"<td>{PFmt(vm.TryGetValue(hx.PhuLieuID, out var kl) ? kl : null)}</td>");
-                sb.Append($"<td>{PFmt(d.O2)}</td><td>{PFmt(d.N2)}</td>");
+                if (isLF)
+                {
+                    sb.Append($"<td>{PFmt(d.AR)}</td>");
+                }
+                else
+                {
+                    sb.Append($"<td>{PFmt(d.O2)}</td><td>{PFmt(d.N2)}</td><td>{PFmt(d.AR)}</td>");
+                }
+                sb.Append($"<td>{(d.QueLayMau.HasValue ? d.QueLayMau.Value.ToString() : "")}</td>");
+                sb.Append($"<td>{(d.QueDoNhiet.HasValue ? d.QueDoNhiet.Value.ToString() : "")}</td>");
                 sb.Append($"<td class=\"td-left\">{d.GhiChu ?? ""}</td>");
                 sb.Append("</tr>");
             }
             sb.Append("<tr class=\"total-row\"><td colspan=\"3\">Tổng cộng</td>");
-            sb.Append($"<td>{PFmt(rows.Sum(x => (double?)x.Data?.KLGang ?? 0))}</td>");
-            sb.Append($"<td>{PFmt(rows.Sum(x => (double?)((x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0)) ?? 0))}</td>");
+            if (isLF)
+            {
+                sb.Append($"<td>{PFmt(rows.Sum(x => (double?)x.Data?.KLThepLong ?? 0))}</td>");
+            }
+            else
+            {
+                sb.Append($"<td>{PFmt(rows.Sum(x => (double?)x.Data?.KLGang ?? 0))}</td>");
+                sb.Append($"<td>{PFmt(rows.Sum(x => (double?)((x.Data?.KLThepPhe ?? 0) + (x.Data?.KLThepPheGang ?? 0)) ?? 0))}</td>");
+            }
             foreach (var hx in headers)
             {
                 var plId = hx.PhuLieuID;
                 sb.Append($"<td>{PFmt(rows.Sum(x => x.Values.FirstOrDefault(v => v.PhuLieuID == plId)?.TotalKLPhuGia ?? 0))}</td>");
             }
-            sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2 ?? 0))}</td>");
-            sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2 ?? 0))}</td>");
+            if (isLF)
+            {
+                sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR ?? 0))}</td>");
+            }
+            else
+            {
+                sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.O2 ?? 0))}</td>");
+                sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.N2 ?? 0))}</td>");
+                sb.Append($"<td>{PFmt(rows.Sum(x => x.Data?.AR ?? 0))}</td>");
+            }
+            sb.Append($"<td>{rows.Sum(x => x.Data?.QueLayMau ?? 0)}</td>");
+            sb.Append($"<td>{rows.Sum(x => x.Data?.QueDoNhiet ?? 0)}</td>");
             sb.Append("<td></td>");
             sb.Append("</tr></tbody>");
             return sb.ToString();
@@ -1955,5 +2357,85 @@ namespace dataproduct.api.Services
         }
 
         private static string PFmt(double? v) => v.HasValue ? v.Value.ToString("0.##") : "";
+
+        public async Task<RefreshGangMetricsResult> RefreshGangMetricsByPhieuIdsAsync(List<Guid> phieuIds)
+        {
+            // Chỉ lấy phiếu BOF/LF, lấy distinct slot theo từng loại biểu mẫu — không quan tâm
+            // TinhTrang của phiếu (làm mới bất kể trạng thái).
+            var slots = await _context.BmPhieus
+                .Where(p => phieuIds.Contains(p.Idphieu) &&
+                            (p.MaBm == "HRC1_BB_TieuHao_BOF" || p.MaBm == "HRC1_BB_TieuHao_LF"))
+                .Select(p => new { p.MaBm, p.NgaySX, p.Ca, p.Scope })
+                .Distinct()
+                .ToListAsync();
+
+            int skippedPhieu = phieuIds.Count - slots.Count;
+
+            if (slots.Count == 0)
+                return new RefreshGangMetricsResult
+                {
+                    UpdatedRows = 0,
+                    SkippedPhieu = skippedPhieu,
+                    Message = "Không có phiếu HRC1_BB_TieuHao_BOF/LF nào trong danh sách."
+                };
+
+            // BOF: KLGangLongCCT + KLThepPheGang từ DB GangLong (theo MeThoi).
+            var bofRowsById = new Dictionary<long, Hrc1TieuHao>();
+            foreach (var slot in slots.Where(s => s.MaBm == "HRC1_BB_TieuHao_BOF"))
+            {
+                if (slot.NgaySX == null || slot.Ca == null || slot.Scope == null) continue;
+                var slotRows = await _context.Hrc1TieuHaos
+                    .Where(x =>
+                        x.IsNM == true &&
+                        x.IsDeleted != true &&
+                        x.NgaySanXuat == slot.NgaySX &&
+                        x.Ca == slot.Ca.Value &&
+                        x.Scope == slot.Scope.Value &&
+                        x.BieuMau == "BOF" &&
+                        x.MeThoi != null)
+                    .ToListAsync();
+                foreach (var r in slotRows)
+                    bofRowsById[r.ID] = r;
+            }
+
+            // LF: KLThepLong từ HRC1_MeThep (giao nhận thép lỏng).
+            var lfRowsById = new Dictionary<long, Hrc1TieuHao>();
+            foreach (var slot in slots.Where(s => s.MaBm == "HRC1_BB_TieuHao_LF"))
+            {
+                if (slot.NgaySX == null || slot.Ca == null || slot.Scope == null) continue;
+                var slotRows = await _context.Hrc1TieuHaos
+                    .Where(x =>
+                        x.IsDeleted != true &&
+                        x.NgaySanXuat == slot.NgaySX &&
+                        x.Ca == slot.Ca.Value &&
+                        x.Scope == slot.Scope.Value &&
+                        x.BieuMau == "LF" &&
+                        x.MeThoi != null)
+                    .ToListAsync();
+                foreach (var r in slotRows)
+                    lfRowsById[r.ID] = r;
+            }
+
+            if (bofRowsById.Count == 0 && lfRowsById.Count == 0)
+                return new RefreshGangMetricsResult
+                {
+                    UpdatedRows = 0,
+                    SkippedPhieu = skippedPhieu,
+                    Message = "Không tìm thấy dữ liệu mẻ nào."
+                };
+
+            int updated = 0;
+            if (bofRowsById.Count > 0)
+                updated += await _syncService.RefreshGangMetricsForRowsAsync(bofRowsById.Values.ToList());
+            if (lfRowsById.Count > 0)
+                updated += await _syncService.RefreshThepLongForRowsAsync(lfRowsById.Values.ToList());
+
+            return new RefreshGangMetricsResult
+            {
+                UpdatedRows = updated,
+                SkippedPhieu = skippedPhieu,
+                Message = $"Đã làm mới {updated} mẻ từ {slots.Count} slot ({phieuIds.Count} phiếu)."
+            };
+        }
     }
 }
