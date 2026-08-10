@@ -922,7 +922,7 @@ namespace dataproduct.api.Services
                 var ngay = slot.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
                 var slotRows = await _context.DLNM_HRC2s
                     .Where(x =>
-                        x.IsNM == true &&
+                        // x.IsNM == true &&
                         x.IsDelete != true &&
                         x.Ngay == ngay &&
                         x.Ca == slot.Ca.Value &&

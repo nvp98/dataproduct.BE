@@ -117,6 +117,15 @@ namespace dataproduct.api.Services
             var rowIndex = startRow;
             var stt = 1;
 
+            void SetTrangThaiCell(int r, int c, int trangThai)
+            {
+                var cell = ws.Cell(r, c);
+                cell.Value = trangThai == 1 ? "Đã xác nhận" : "Chưa xác nhận";
+                cell.Style.Fill.BackgroundColor = trangThai == 1
+                    ? XLColor.FromHtml("#C6EFCE")
+                    : XLColor.FromHtml("#D9D9D9");
+            }
+
             foreach (var tt in trangThais)
             {
                 var slab = tt.Slab;
@@ -130,19 +139,23 @@ namespace dataproduct.api.Services
                 ws.Cell(rowIndex, 1).Value = stt;
                 ws.Cell(rowIndex, 2).Value = slab.ShiftName ?? "";
                 ws.Cell(rowIndex, 3).Value = slab.IdSlab ?? "";
-                ws.Cell(rowIndex, 4).Value = slab.MeThep ?? "";
-                ws.Cell(rowIndex, 5).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
-                ws.Cell(rowIndex, 6).Value = kt;
-                ws.Cell(rowIndex, 7).Value = slab.MacThep ?? "";
-                ws.Cell(rowIndex, 8).Value = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
-                ws.Cell(rowIndex, 9).Value = slab.ChatLuong ?? "";
+                ws.Cell(rowIndex, 4).Value = slab.OrderId ?? "";
+                ws.Cell(rowIndex, 5).Value = slab.MeThep ?? "";
+                ws.Cell(rowIndex, 6).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
+                ws.Cell(rowIndex, 7).Value = kt;
+                ws.Cell(rowIndex, 8).Value = slab.MacThep ?? "";
+                ws.Cell(rowIndex, 9).Value = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
+                ws.Cell(rowIndex, 10).Value = slab.ChatLuong ?? "";
+                SetTrangThaiCell(rowIndex, 11, tt.TrangThaiDuc);
+                SetTrangThaiCell(rowIndex, 12, tt.TrangThaiKho);
+                SetTrangThaiCell(rowIndex, 13, tt.TrangThaiPKH);
 
                 rowIndex++;
                 stt++;
             }
 
             if (rowIndex > startRow)
-                SetThinBorders(ws, startRow, rowIndex - 1, 9);
+                SetThinBorders(ws, startRow, rowIndex - 1, 13);
 
             using var ms = new MemoryStream();
             workbook.SaveAs(ms);
@@ -183,6 +196,18 @@ namespace dataproduct.api.Services
             var rowIndex = startRow;
             var stt = 1;
 
+            void SetSo(int r, int c, int v)
+            {
+                if (v > 0) ws.Cell(r, c).Value = v;
+                else ws.Cell(r, c).Clear(XLClearOptions.Contents);
+            }
+
+            void SetKl(int r, int c, decimal v)
+            {
+                if (v > 0) ws.Cell(r, c).Value = (double)v;
+                else ws.Cell(r, c).Clear(XLClearOptions.Contents);
+            }
+
             foreach (var row in pivotRows)
             {
                 if (rowIndex > startRow)
@@ -193,28 +218,17 @@ namespace dataproduct.api.Services
                 ws.Cell(rowIndex, 3).Value = row.MacThep;
                 ws.Cell(rowIndex, 4).Value = row.MeThep;
                 ws.Cell(rowIndex, 5).Value = row.KichThuoc;
-                ws.Cell(rowIndex, 6).Value = row.NguoiLoai1So;
-                ws.Cell(rowIndex, 7).Value = (double)row.NguoiLoai1Kl;
-                ws.Cell(rowIndex, 8).Value = row.NguoiLoai2So;
-                ws.Cell(rowIndex, 9).Value = (double)row.NguoiLoai2Kl;
-                ws.Cell(rowIndex, 10).Value = row.NguoiLoai2TpSo;
-                ws.Cell(rowIndex, 11).Value = (double)row.NguoiLoai2TpKl;
-                ws.Cell(rowIndex, 12).Value = row.NguoiLoai3So;
-                ws.Cell(rowIndex, 13).Value = (double)row.NguoiLoai3Kl;
-                ws.Cell(rowIndex, 14).Value = row.NguoiLoai3TpSo;
-                ws.Cell(rowIndex, 15).Value = (double)row.NguoiLoai3TpKl;
-                ws.Cell(rowIndex, 16).Value = row.NguoiNganDaiSo;
-                ws.Cell(rowIndex, 17).Value = (double)row.NguoiNganDaiKl;
-                ws.Cell(rowIndex, 18).Value = row.NongLoai1So;
-                ws.Cell(rowIndex, 19).Value = (double)row.NongLoai1Kl;
-                ws.Cell(rowIndex, 20).Value = row.NongLoai2So;
-                ws.Cell(rowIndex, 21).Value = (double)row.NongLoai2Kl;
-                ws.Cell(rowIndex, 22).Value = row.NongLoai2TpSo;
-                ws.Cell(rowIndex, 23).Value = (double)row.NongLoai2TpKl;
-                ws.Cell(rowIndex, 24).Value = row.NongLoai3TpSo;
-                ws.Cell(rowIndex, 25).Value = (double)row.NongLoai3TpKl;
-                ws.Cell(rowIndex, 26).Value = row.TongSoPhoi;
-                ws.Cell(rowIndex, 27).Value = (double)row.TongKhoiLuong;
+                SetSo(rowIndex, 6,  row.NguoiLoai1So);   SetKl(rowIndex, 7,  row.NguoiLoai1Kl);
+                SetSo(rowIndex, 8,  row.NguoiLoai2So);   SetKl(rowIndex, 9,  row.NguoiLoai2Kl);
+                SetSo(rowIndex, 10, row.NguoiLoai2TpSo); SetKl(rowIndex, 11, row.NguoiLoai2TpKl);
+                SetSo(rowIndex, 12, row.NguoiLoai3So);   SetKl(rowIndex, 13, row.NguoiLoai3Kl);
+                SetSo(rowIndex, 14, row.NguoiLoai3TpSo); SetKl(rowIndex, 15, row.NguoiLoai3TpKl);
+                SetSo(rowIndex, 16, row.NguoiNganDaiSo); SetKl(rowIndex, 17, row.NguoiNganDaiKl);
+                SetSo(rowIndex, 18, row.NongLoai1So);    SetKl(rowIndex, 19, row.NongLoai1Kl);
+                SetSo(rowIndex, 20, row.NongLoai2So);    SetKl(rowIndex, 21, row.NongLoai2Kl);
+                SetSo(rowIndex, 22, row.NongLoai2TpSo);  SetKl(rowIndex, 23, row.NongLoai2TpKl);
+                SetSo(rowIndex, 24, row.NongLoai3TpSo);  SetKl(rowIndex, 25, row.NongLoai3TpKl);
+                SetSo(rowIndex, 26, row.TongSoPhoi);     SetKl(rowIndex, 27, row.TongKhoiLuong);
 
                 rowIndex++;
                 stt++;
@@ -228,28 +242,17 @@ namespace dataproduct.api.Services
 
                 ws.Cell(rowIndex, 1).Value = "Tổng";
                 for (int c = 2; c <= 5; c++) ws.Cell(rowIndex, c).Value = "";
-                ws.Cell(rowIndex, 6).Value = pivotRows.Sum(r => r.NguoiLoai1So);
-                ws.Cell(rowIndex, 7).Value = (double)pivotRows.Sum(r => r.NguoiLoai1Kl);
-                ws.Cell(rowIndex, 8).Value = pivotRows.Sum(r => r.NguoiLoai2So);
-                ws.Cell(rowIndex, 9).Value = (double)pivotRows.Sum(r => r.NguoiLoai2Kl);
-                ws.Cell(rowIndex, 10).Value = pivotRows.Sum(r => r.NguoiLoai2TpSo);
-                ws.Cell(rowIndex, 11).Value = (double)pivotRows.Sum(r => r.NguoiLoai2TpKl);
-                ws.Cell(rowIndex, 12).Value = pivotRows.Sum(r => r.NguoiLoai3So);
-                ws.Cell(rowIndex, 13).Value = (double)pivotRows.Sum(r => r.NguoiLoai3Kl);
-                ws.Cell(rowIndex, 14).Value = pivotRows.Sum(r => r.NguoiLoai3TpSo);
-                ws.Cell(rowIndex, 15).Value = (double)pivotRows.Sum(r => r.NguoiLoai3TpKl);
-                ws.Cell(rowIndex, 16).Value = pivotRows.Sum(r => r.NguoiNganDaiSo);
-                ws.Cell(rowIndex, 17).Value = (double)pivotRows.Sum(r => r.NguoiNganDaiKl);
-                ws.Cell(rowIndex, 18).Value = pivotRows.Sum(r => r.NongLoai1So);
-                ws.Cell(rowIndex, 19).Value = (double)pivotRows.Sum(r => r.NongLoai1Kl);
-                ws.Cell(rowIndex, 20).Value = pivotRows.Sum(r => r.NongLoai2So);
-                ws.Cell(rowIndex, 21).Value = (double)pivotRows.Sum(r => r.NongLoai2Kl);
-                ws.Cell(rowIndex, 22).Value = pivotRows.Sum(r => r.NongLoai2TpSo);
-                ws.Cell(rowIndex, 23).Value = (double)pivotRows.Sum(r => r.NongLoai2TpKl);
-                ws.Cell(rowIndex, 24).Value = pivotRows.Sum(r => r.NongLoai3TpSo);
-                ws.Cell(rowIndex, 25).Value = (double)pivotRows.Sum(r => r.NongLoai3TpKl);
-                ws.Cell(rowIndex, 26).Value = pivotRows.Sum(r => r.TongSoPhoi);
-                ws.Cell(rowIndex, 27).Value = (double)pivotRows.Sum(r => r.TongKhoiLuong);
+                SetSo(rowIndex, 6,  pivotRows.Sum(r => r.NguoiLoai1So));   SetKl(rowIndex, 7,  pivotRows.Sum(r => r.NguoiLoai1Kl));
+                SetSo(rowIndex, 8,  pivotRows.Sum(r => r.NguoiLoai2So));   SetKl(rowIndex, 9,  pivotRows.Sum(r => r.NguoiLoai2Kl));
+                SetSo(rowIndex, 10, pivotRows.Sum(r => r.NguoiLoai2TpSo)); SetKl(rowIndex, 11, pivotRows.Sum(r => r.NguoiLoai2TpKl));
+                SetSo(rowIndex, 12, pivotRows.Sum(r => r.NguoiLoai3So));   SetKl(rowIndex, 13, pivotRows.Sum(r => r.NguoiLoai3Kl));
+                SetSo(rowIndex, 14, pivotRows.Sum(r => r.NguoiLoai3TpSo)); SetKl(rowIndex, 15, pivotRows.Sum(r => r.NguoiLoai3TpKl));
+                SetSo(rowIndex, 16, pivotRows.Sum(r => r.NguoiNganDaiSo)); SetKl(rowIndex, 17, pivotRows.Sum(r => r.NguoiNganDaiKl));
+                SetSo(rowIndex, 18, pivotRows.Sum(r => r.NongLoai1So));    SetKl(rowIndex, 19, pivotRows.Sum(r => r.NongLoai1Kl));
+                SetSo(rowIndex, 20, pivotRows.Sum(r => r.NongLoai2So));    SetKl(rowIndex, 21, pivotRows.Sum(r => r.NongLoai2Kl));
+                SetSo(rowIndex, 22, pivotRows.Sum(r => r.NongLoai2TpSo));  SetKl(rowIndex, 23, pivotRows.Sum(r => r.NongLoai2TpKl));
+                SetSo(rowIndex, 24, pivotRows.Sum(r => r.NongLoai3TpSo));  SetKl(rowIndex, 25, pivotRows.Sum(r => r.NongLoai3TpKl));
+                SetSo(rowIndex, 26, pivotRows.Sum(r => r.TongSoPhoi));     SetKl(rowIndex, 27, pivotRows.Sum(r => r.TongKhoiLuong));
             }
 
             var lastRow = pivotRows.Count > 0 ? rowIndex : rowIndex - 1;
@@ -282,11 +285,11 @@ namespace dataproduct.api.Services
             var rowsHtml = new StringBuilder();
 
             static string N0(int v, System.Globalization.CultureInfo c) => v > 0 ? v.ToString("N0", c) : "";
-            static string N3(decimal v, System.Globalization.CultureInfo c) => v > 0 ? v.ToString("N3", c) : "";
+            static string NKl(decimal v, System.Globalization.CultureInfo c) => v > 0 ? v.ToString("N0", c) : "";
 
             void Td2(int so, decimal kl)
             {
-                rowsHtml.Append($"<td class=\"num\">{N0(so, vi)}</td><td class=\"num\">{N3(kl, vi)}</td>");
+                rowsHtml.Append($"<td class=\"num\">{N0(so, vi)}</td><td class=\"num\">{NKl(kl, vi)}</td>");
             }
 
             var stt = 1;
@@ -309,14 +312,14 @@ namespace dataproduct.api.Services
                 Td2(r.NongLoai2TpSo,  r.NongLoai2TpKl);
                 Td2(r.NongLoai3TpSo,  r.NongLoai3TpKl);
                 rowsHtml.Append($"<td class=\"num\"><strong>{N0(r.TongSoPhoi, vi)}</strong></td>");
-                rowsHtml.Append($"<td class=\"num\"><strong>{N3(r.TongKhoiLuong, vi)}</strong></td>");
+                rowsHtml.Append($"<td class=\"num\"><strong>{NKl(r.TongKhoiLuong, vi)}</strong></td>");
                 rowsHtml.Append("</tr>");
             }
 
             // Total row
             void TdTotal2(Func<TongHopPivotRow, int> soFn, Func<TongHopPivotRow, decimal> klFn)
             {
-                rowsHtml.Append($"<td class=\"num\">{N0(pivotRows.Sum(soFn), vi)}</td><td class=\"num\">{N3(pivotRows.Sum(klFn), vi)}</td>");
+                rowsHtml.Append($"<td class=\"num\">{N0(pivotRows.Sum(soFn), vi)}</td><td class=\"num\">{NKl(pivotRows.Sum(klFn), vi)}</td>");
             }
 
             rowsHtml.Append("<tr class=\"total-row\">");
@@ -332,7 +335,7 @@ namespace dataproduct.api.Services
             TdTotal2(r => r.NongLoai2TpSo,  r => r.NongLoai2TpKl);
             TdTotal2(r => r.NongLoai3TpSo,  r => r.NongLoai3TpKl);
             rowsHtml.Append($"<td class=\"num\"><strong>{N0(pivotRows.Sum(r => r.TongSoPhoi), vi)}</strong></td>");
-            rowsHtml.Append($"<td class=\"num\"><strong>{N3(pivotRows.Sum(r => r.TongKhoiLuong), vi)}</strong></td>");
+            rowsHtml.Append($"<td class=\"num\"><strong>{NKl(pivotRows.Sum(r => r.TongKhoiLuong), vi)}</strong></td>");
             rowsHtml.Append("</tr>");
 
             var (ducUserId, khoUserId, qlclUserId) = await GetPhieuSignersAsync(idPhieu);
@@ -519,16 +522,18 @@ namespace dataproduct.api.Services
         {
             var u = userId != null && userMap.TryGetValue(userId.Value, out var uu) ? uu : null;
             if (u == null)
-                return $"<div class=\"info-row\">{idx}. Ông/Bà: -</div>";
+                return $"<div class=\"info-row\"><span class=\"info-idx\">{idx}.</span><span class=\"info-field info-name\">Ông/Bà: -</span></div>";
 
             var ten = System.Net.WebUtility.HtmlEncode(u.HoVaTen ?? "");
             var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
             var bp = System.Net.WebUtility.HtmlEncode(u.PhongBan?.TenNgan ?? "");
 
-            var body = $"Ông/Bà: <strong>{ten}</strong>";
-            if (!string.IsNullOrEmpty(chucVu)) body += $"&nbsp;&nbsp;&nbsp;&nbsp;Chức vụ: {chucVu}";
-            if (!string.IsNullOrEmpty(bp)) body += $"&nbsp;&nbsp;&nbsp;&nbsp;BP: {bp}";
-            return $"<div class=\"info-row\">{idx}. {body}</div>";
+            return $"<div class=\"info-row\">" +
+                   $"<span class=\"info-idx\">{idx}.</span>" +
+                   $"<span class=\"info-field info-name\">Ông/Bà: <strong>{ten}</strong></span>" +
+                   $"<span class=\"info-field info-chucvu\">Chức vụ: {chucVu}</span>" +
+                   $"<span class=\"info-field info-bp\">BP: {bp}</span>" +
+                   $"</div>";
         }
 
         private async Task<(string ImgHtml, string TenHtml)> BuildSigPartsAsync(int? userId, Dictionary<int, TaiKhoan> userMap)
@@ -604,6 +609,8 @@ namespace dataproduct.api.Services
             public HashSet<string> _shiftNames = new();
         }
 
+        private static string FmtKichThuoc(decimal v) => Math.Round(v, 0, MidpointRounding.AwayFromZero).ToString("0");
+
         private static List<TongHopPivotRow> BuildPivotRows(List<BkHrc2SlabTrangThai> trangThais)
         {
             var map = new Dictionary<string, TongHopPivotRow>();
@@ -612,7 +619,7 @@ namespace dataproduct.api.Services
             {
                 var slab = tt.Slab;
                 var kt = (slab.ChieuDay != null && slab.ChieuRong != null && slab.ChieuDai != null)
-                    ? $"{slab.ChieuDay}x{slab.ChieuRong}x{slab.ChieuDai}"
+                    ? $"{FmtKichThuoc(slab.ChieuDay.Value)}x{FmtKichThuoc(slab.ChieuRong.Value)}x{FmtKichThuoc(slab.ChieuDai.Value)}"
                     : "";
                 var key = $"{slab.MeThep ?? ""}|{slab.MacThep ?? ""}|{kt}";
 

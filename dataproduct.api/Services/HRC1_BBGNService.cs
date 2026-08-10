@@ -788,6 +788,8 @@ namespace dataproduct.api.Services
             if (req.MeIds.Count == 0) return;
 
             var meTheps = await _repo.GetMeThepsByIdsAsync(req.MeIds);
+            if (meTheps.Any(m => m.IsChot == true))
+                throw new InvalidOperationException("Mẻ đã được chốt, phải bỏ chốt trước khi bỏ xác nhận.");
             var now = DateTime.Now;
 
             foreach (var me in meTheps)

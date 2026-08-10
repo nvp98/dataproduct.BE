@@ -45,12 +45,14 @@ namespace dataproduct.api.ResponseModels
         public decimal? TyTrong { get; set; }
         // ThongKe ordering
         public int? ThuTu_TK_BOF { get; set; }
-        public int? ThuTu_TK_LFRH { get; set; }
+        public int? ThuTu_TK_LF { get; set; }
+        public int? ThuTu_TK_RH { get; set; }
         // Excel export
         public bool? IsUsed_Excel { get; set; }
         public byte? LoaiExcel { get; set; }
         public int? ThuTu_Excel_BOF { get; set; }
-        public int? ThuTu_Excel_LFRH { get; set; }
+        public int? ThuTu_Excel_LF { get; set; }
+        public int? ThuTu_Excel_RH { get; set; }
         public string? MaVatTuChiPhi { get; set; }
         public List<HeaderMapping_ResponseModel> HeaderMappings { get; set; } = new List<HeaderMapping_ResponseModel>();
     }
@@ -83,12 +85,14 @@ namespace dataproduct.api.ResponseModels
         public byte? LoaiThongKe { get; set; }
         // ThongKe ordering
         public int? ThuTu_TK_BOF { get; set; }
-        public int? ThuTu_TK_LFRH { get; set; }
+        public int? ThuTu_TK_LF { get; set; }
+        public int? ThuTu_TK_RH { get; set; }
         // Excel export
         public bool? IsUsed_Excel { get; set; }
         public byte? LoaiExcel { get; set; }
         public int? ThuTu_Excel_BOF { get; set; }
-        public int? ThuTu_Excel_LFRH { get; set; }
+        public int? ThuTu_Excel_LF { get; set; }
+        public int? ThuTu_Excel_RH { get; set; }
         public int? ID_NhomKey { get; set; }
         public string? TenNhom { get; set; }
         public string? MaVatTuChiPhi { get; set; }
