@@ -15,12 +15,26 @@ namespace dataproduct.api.Services
         private readonly IBMPheDuyetRepository _repo;
         private readonly ProductDataMasterDbContext _contextMaster;
         private readonly IPhieuRepository _phieuRepo;
+        private readonly DLNMHRC1Service _dlnmHrc1Service;
 
-        public BmPheDuyetService(IBMPheDuyetRepository repo, ProductDataMasterDbContext Mastercontext, IPhieuRepository phieuRepo)
+        // Danh sách BM được phép revert dữ liệu dùng chung khi reject clone — xem DLNMHRC1Service.RevertHRC1ToSnapshotAsync.
+        // Trước mắt chỉ HRC1 Tiêu hao BOF/LF (nơi đã xác nhận rõ pipeline lưu ghi thẳng vào bảng dùng chung).
+        private static readonly HashSet<string> RevertOnRejectMaBms = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "HRC1_BB_TieuHao_BOF",
+            "HRC1_BB_TieuHao_LF",
+        };
+
+        public BmPheDuyetService(
+            IBMPheDuyetRepository repo,
+            ProductDataMasterDbContext Mastercontext,
+            IPhieuRepository phieuRepo,
+            DLNMHRC1Service dlnmHrc1Service)
         {
             _repo = repo;
             _contextMaster = Mastercontext;
             _phieuRepo = phieuRepo;
+            _dlnmHrc1Service = dlnmHrc1Service;
         }
 
         public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID,int? isCheckDuyet)
@@ -149,6 +163,20 @@ namespace dataproduct.api.Services
                     {
                         phieuCha.IsLock = 0;
                         await _phieuRepo.UpdateAsync(phieuCha);
+
+                        // Riêng HRC1 Tiêu hao BOF/LF: pipeline lưu ghi dữ liệu chi tiết (table1...) thẳng
+                        // vào bảng sản xuất dùng chung theo Id dòng gốc — không tách riêng theo phiếu.
+                        // Khi phiếu clone được sửa + Lưu (kể cả thêm/xóa dòng, thêm cột phụ liệu), dữ liệu
+                        // dùng chung đó đã bị ghi đè/thêm/xóa theo bản clone. Xóa clone không tự revert lại
+                        // — phải đồng bộ lại TOÀN BỘ (full sync, không chỉ upsert) bảng dùng chung theo đúng
+                        // DataJson của phiếu cha (chưa từng bị đổi khi tạo/sửa clone) trước khi phiếu cha
+                        // hiển thị lại — xem DLNMHRC1Service.RevertHRC1ToSnapshotAsync.
+                        // Chỉ xử lý cho 2 BM này — các BM khác chưa được rà soát an toàn để revert theo
+                        // cách này nên tạm thời không đụng vào.
+                        if (RevertOnRejectMaBms.Contains(phieuCha.MaBm ?? string.Empty))
+                        {
+                            await _dlnmHrc1Service.RevertHRC1ToSnapshotAsync(phieuCha);
+                        }
                     }
                     await _repo.DeleteByPhieuIdAsync(phieuId);
                     await _phieuRepo.DeleteAsync(phieuId);

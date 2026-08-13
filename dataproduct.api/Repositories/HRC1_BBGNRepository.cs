@@ -161,6 +161,7 @@ namespace dataproduct.api.Repositories
                     MacThep = me.MacThepBKMIS,
                     KLThepLong = me.KlThepLong,
                     NgaySanXuat = ngaySanXuat,
+                    ThoiGianLF = me.ThoiGian,
                     Ca = (byte?)ca,
                     IsNM = false,
                     IsEdited = false,
@@ -173,6 +174,7 @@ namespace dataproduct.api.Repositories
                 existing.MacThep = me.MacThepBKMIS ?? existing.MacThep;
                 existing.KLThepLong = me.KlThepLong ?? existing.KLThepLong;
                 existing.NgaySanXuat = ngaySanXuat;
+                existing.ThoiGianLF = me.ThoiGian ?? existing.ThoiGianLF;
                 existing.Ca = (byte?)ca;
                 existing.NgayCapNhat = DateTime.Now;
             }

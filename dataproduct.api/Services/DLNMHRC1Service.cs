@@ -816,21 +816,21 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Xóa vĩnh viễn 1 mẻ thêm tay (IsNM = false) — dòng do người dùng tự thêm qua nút "+ Thêm dòng", không có
-        /// nguồn NM để đối chiếu nên không cần giữ lại. Chỉ chấp nhận xóa cứng cho dòng IsNM = false; nếu ai đó
-        /// gọi nhầm lên 1 dòng IsNM = true thì từ chối để tránh mất dữ liệu NM vĩnh viễn (phải dùng DeleteRowNMAsync).
-        /// Xóa kèm toàn bộ phụ liệu liên quan (HRC1_PhuLieu.MeID).
+        /// Xóa mềm 1 mẻ thêm tay (IsNM = false) — dòng do người dùng tự thêm qua nút "+ Thêm dòng". Chỉ chấp
+        /// nhận xóa cho dòng IsNM = false; nếu ai đó gọi nhầm lên 1 dòng IsNM = true thì từ chối để tránh mất
+        /// dữ liệu NM (phải dùng DeleteRowNMAsync). Trước đây xóa CỨNG (kèm xóa hẳn Hrc1PhuLieu liên quan) —
+        /// đổi sang xóa mềm (mirror DeleteRowNMAsync, không đụng Hrc1PhuLieu — ẩn theo transitively qua MeID)
+        /// để RevertHRC1ToSnapshotAsync có thể khôi phục lại dòng này khi Reject 1 phiếu clone đã xóa nhầm/
+        /// không còn cần dòng này trong lúc sửa (xem BmPheDuyetService.UpdateTinhTrangAsync nhánh Reject).
         /// </summary>
         public async Task<bool> DeleteManualRowAsync(int id)
         {
-            var existing = await _context.Hrc1TieuHaos.FirstOrDefaultAsync(x => x.ID == id);
+            var existing = await _context.Hrc1TieuHaos.FirstOrDefaultAsync(x => x.ID == id && !x.IsDeleted);
             if (existing == null || existing.IsNM) return false;
 
-            var relatedPhuLieus = await _context.Hrc1PhuLieus.Where(x => x.MeID == id).ToListAsync();
-            if (relatedPhuLieus.Count > 0)
-                _context.Hrc1PhuLieus.RemoveRange(relatedPhuLieus);
-
-            _context.Hrc1TieuHaos.Remove(existing);
+            existing.IsDeleted = true;
+            existing.NgayXoa = DateTime.Now;
+            _context.Hrc1TieuHaos.Update(existing);
             await _context.SaveChangesAsync();
 
             if (!string.IsNullOrEmpty(existing.MeThoi))
@@ -1539,8 +1539,197 @@ namespace dataproduct.api.Services
         }
 
         // =========================================================
+        // REVERT ON REJECT (phiếu clone HRC1 Tiêu hao BOF/LF) — xem BmPheDuyetService.UpdateTinhTrangAsync
+        // nhánh Reject. Toàn bộ vùng này là code RIÊNG cho revert, KHÔNG sửa SaveHRC1ManualDataAsync/
+        // SaveHRC1LFManualDataAsync/BuildModelToInsert/BuildLFModelToInsert (2 cặp hàm đó dùng CHUNG cho
+        // luồng Lưu bình thường qua HRC1ManualFromPhieuFormJsonInitializer/HRC1LFManualFromPhieuFormJsonInitializer)
+        // — chỉ GỌI LẠI chúng sau khi tự khôi phục dòng cần thiết ở bước riêng bên dưới, để không đổi hành
+        // vi Lưu bình thường của 2 biểu mẫu này.
+        // =========================================================
+
+        /// <summary>
+        /// Đồng bộ TOÀN BỘ (full sync) bảng Hrc1TieuHao/Hrc1PhuLieu dùng chung về đúng snapshot DataJson
+        /// của phiếu — dùng khi Reject 1 phiếu clone: phiếu clone có thể đã Thêm/Xóa dòng hoặc thêm cột
+        /// phụ liệu trong lúc sửa (ghi thẳng vào bảng dùng chung theo Ngày/Ca/Lò, không tách riêng theo
+        /// phiếu) — chỉ upsert theo Id có trong DataJson (như Lưu bình thường) không đảo ngược được các
+        /// thay đổi thêm/xóa đó. Các bước:
+        /// 1. Khôi phục (IsDeleted=false) dòng bị xóa mềm trong lúc sửa clone mà phiếu cha vẫn tham chiếu.
+        /// 2. Upsert lại giá trị theo đúng snapshot (gọi nguyên SaveHRC1ManualDataAsync/LF, không đổi).
+        /// 3. Xóa mềm dòng "thêm tay" clone tự thêm mà phiếu cha không biết tới.
+        /// 4. Xóa các dòng Hrc1PhuLieu (cột phụ liệu) clone tự thêm mà phiếu cha không có.
+        /// KHÔNG thể khôi phục dòng thêm tay đã bị XÓA CỨNG trước khi DeleteManualRowAsync đổi sang xóa mềm.
+        /// </summary>
+        public async Task RevertHRC1ToSnapshotAsync(BmPhieu phieuGoc)
+        {
+            if (string.IsNullOrWhiteSpace(phieuGoc.DataJson)) return;
+
+            bool isLF = string.Equals(phieuGoc.MaBm, "HRC1_BB_TieuHao_LF", StringComparison.OrdinalIgnoreCase);
+            string bieuMau = isLF ? "LF" : "BOF";
+
+            using var doc = JsonDocument.Parse(phieuGoc.DataJson);
+            var formData = doc.RootElement;
+
+            if (!TryGetHRC1ScopeInfo(formData, out var ngaySX, out var ca, out var scope)) return;
+
+            if (isLF)
+            {
+                var models = await BuildLFModelToInsert(formData);
+                if (models.Count == 0) return;
+
+                await ReviveDeletedRevertRowsAsync(models);
+                await SaveHRC1LFManualDataAsync(models);
+                await RemoveExtraManualRowsAsync(ngaySX, ca, scope, "LF", models);
+                await RemoveExtraLFPhuLieuAsync(models);
+            }
+            else
+            {
+                var (models, manualColHeaderKeyIds) = await BuildModelToInsert(formData);
+                if (models.Count == 0) return;
+
+                await ReviveDeletedRevertRowsAsync(models);
+                await SaveHRC1ManualDataAsync(models, manualColHeaderKeyIds);
+                await RemoveExtraManualRowsAsync(ngaySX, ca, scope, "BOF", models);
+                await RemoveExtraAdjustPhuLieuAsync(models);
+            }
+        }
+
+        private static bool TryGetHRC1ScopeInfo(JsonElement formData, out DateOnly ngaySX, out int ca, out int scope)
+        {
+            ngaySX = default;
+            ca = 0;
+            scope = 0;
+
+            if (!formData.TryGetProperty("scope", out var scopeProp) || scopeProp.ValueKind != JsonValueKind.Number)
+                return false;
+            if (!formData.TryGetProperty("ca", out var caProp) || caProp.ValueKind != JsonValueKind.Number)
+                return false;
+            var ngaySXstr = formData.TryGetProperty("NgaySX", out var nsxProp) ? nsxProp.GetString() : null;
+            if (string.IsNullOrEmpty(ngaySXstr))
+                return false;
+
+            scope = scopeProp.GetInt32();
+            ca = caProp.GetInt32();
+            ngaySX = DateOnly.Parse(ngaySXstr);
+            return true;
+        }
+
+        /// <summary>
+        /// Khôi phục (IsDeleted=false) các dòng Hrc1TieuHao bị xóa mềm trong lúc sửa phiếu clone mà
+        /// snapshot phiếu cha vẫn tham chiếu đích danh theo Id — làm TRƯỚC khi gọi SaveHRC1ManualDataAsync/
+        /// LF (không đổi) để 2 hàm đó tìm thấy đúng dòng qua filter !IsDeleted như luồng Lưu bình thường.
+        /// </summary>
+        private async Task ReviveDeletedRevertRowsAsync(List<Hrc1InsertModel> models)
+        {
+            var ids = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).ToList();
+            if (ids.Count == 0) return;
+
+            var deletedRows = await _context.Hrc1TieuHaos
+                .Where(x => ids.Contains(x.ID) && x.IsDeleted)
+                .ToListAsync();
+            if (deletedRows.Count == 0) return;
+
+            foreach (var row in deletedRows)
+            {
+                row.IsDeleted = false;
+                row.NgayXoa = null;
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Xóa mềm dòng "thêm tay" (IsNM=false) thuộc đúng Ngày/Ca/Lò/BieuMau nhưng KHÔNG có trong
+        /// snapshot phiếu cha — dòng do clone tự thêm trong lúc sửa mà phiếu cha không biết tới. CHỈ áp
+        /// dụng cho IsNM=false: không đụng dòng IsNM=true (nguồn NM) để tránh xóa nhầm mẻ sản xuất thật
+        /// phát sinh sau khi phiếu cha được lưu — không liên quan gì tới việc sửa phiếu clone.
+        /// </summary>
+        private async Task RemoveExtraManualRowsAsync(DateOnly ngaySX, int ca, int scope, string bieuMau, List<Hrc1InsertModel> models)
+        {
+            var keepIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).ToHashSet();
+
+            var extras = await _context.Hrc1TieuHaos
+                .Where(x => !x.IsDeleted && !x.IsNM && x.NgaySanXuat == ngaySX && x.Ca == (byte)ca
+                         && x.Scope == scope && x.BieuMau == bieuMau && !keepIds.Contains(x.ID))
+                .ToListAsync();
+            if (extras.Count == 0) return;
+
+            foreach (var row in extras)
+            {
+                row.IsDeleted = true;
+                row.NgayXoa = DateTime.Now;
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// BOF: xóa Hrc1PhuLieu "thêm cột điều chỉnh" (IsAddManual=true, có PhuLieuID) mà clone tự thêm
+        /// trong lúc sửa, không có trong snapshot phiếu cha. CHỈ xóa loại IsAddManual — không đụng phụ
+        /// liệu baseline (IsAddManual=false, đến từ SP_Sync_HRC1_PhuLieu) vì baseline hợp lệ có thể = 0
+        /// nên không phải lúc nào cũng xuất hiện trong models (BuildPhuLieus bỏ qua baseline = 0 khi build
+        /// từ snapshot) — xóa theo baseline sẽ xóa nhầm dữ liệu sync hợp lệ. Bỏ qua IsPhanBo (dòng phân bổ
+        /// chênh lệch của module HRC1_STD_NXT, không liên quan tới việc sửa phiếu clone).
+        /// </summary>
+        private async Task RemoveExtraAdjustPhuLieuAsync(List<Hrc1InsertModel> models)
+        {
+            var meIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).Distinct().ToList();
+            if (meIds.Count == 0) return;
+
+            var keepPairs = new HashSet<(int MeId, int PhuLieuId)>();
+            foreach (var model in models)
+            {
+                if (!model.Id.HasValue || model.Id <= 0) continue;
+                foreach (var pl in model.PhuLieus)
+                {
+                    if (pl.PhuLieuID.HasValue && pl.IsAddManual == true)
+                        keepPairs.Add((model.Id.Value, pl.PhuLieuID.Value));
+                }
+            }
+
+            var extras = await _context.Hrc1PhuLieus
+                .Where(x => meIds.Contains(x.MeID) && !x.IsDeleted && !x.IsPhanBo && x.IsAddManual && x.PhuLieuID.HasValue)
+                .ToListAsync();
+            var toRemove = extras.Where(x => !keepPairs.Contains((x.MeID, x.PhuLieuID!.Value))).ToList();
+            if (toRemove.Count == 0) return;
+
+            _context.Hrc1PhuLieus.RemoveRange(toRemove);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// LF: mọi phụ liệu của 1 mẻ đều nhập tay như nhau (không có baseline auto-sync như BOF, xem vùng
+        /// "LF manual save pipeline" phía trên), nên so khớp ĐẦY ĐỦ theo đúng bộ PhuLieuID mà snapshot
+        /// phiếu cha liệt kê cho từng dòng — phụ liệu nào clone tự thêm mà phiếu cha không có thì xóa. Bỏ
+        /// qua IsPhanBo (dòng phân bổ chênh lệch của module HRC1_STD_NXT).
+        /// </summary>
+        private async Task RemoveExtraLFPhuLieuAsync(List<Hrc1InsertModel> models)
+        {
+            var meIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).Distinct().ToList();
+            if (meIds.Count == 0) return;
+
+            var keepPairs = new HashSet<(int MeId, int PhuLieuId)>();
+            foreach (var model in models)
+            {
+                if (!model.Id.HasValue || model.Id <= 0) continue;
+                foreach (var pl in model.PhuLieus)
+                {
+                    if (pl.PhuLieuID.HasValue)
+                        keepPairs.Add((model.Id.Value, pl.PhuLieuID.Value));
+                }
+            }
+
+            var extras = await _context.Hrc1PhuLieus
+                .Where(x => meIds.Contains(x.MeID) && !x.IsDeleted && !x.IsPhanBo && x.PhuLieuID.HasValue)
+                .ToListAsync();
+            var toRemove = extras.Where(x => !keepPairs.Contains((x.MeID, x.PhuLieuID!.Value))).ToList();
+            if (toRemove.Count == 0) return;
+
+            _context.Hrc1PhuLieus.RemoveRange(toRemove);
+            await _context.SaveChangesAsync();
+        }
+
+        // =========================================================
         // EXPORT EXCEL/PDF CHI TIẾT PHIẾU (gộp từ Hrc1PhieuDetailExcelService cũ)
-        // Xuất Excel/PDF cho 1 phiếu tiêu hao BOF cụ thể (mẫu HRC1_BB_NauLuyen_BOF.xlsx / HRC1_BB_NauLuyen.html) —
+        // Xuất Excel/PDF cho 1 phiếu tiêu hao BOF/LF cụ thể (mẫu Excel HRC1_BB_NauLuyen_BOF.xlsx /
+        // HRC1_BB_NauLuyen_LF.xlsx theo bieuMau; PDF dùng chung HRC1_BB_NauLuyen.html) —
         // mirror y hệt PhieuDetailExcelService (HRC2), chỉ giữ nhánh BOF (HRC1 chưa có LF/RH) và đổi field/khóa phụ liệu
         // cho đúng model HRC1: PhuLieuID thay IDHeaderKey, KLGang thay KLGangLongCCT (KLGangLongCCT của HRC1 luôn NULL).
         // Không cần bước "DataJson overrides" như HRC2 — HRC1_PhuLieu.IsManual/KLPhuGia_Manual đã là nguồn sự thật bền
@@ -1590,7 +1779,7 @@ namespace dataproduct.api.Services
         // 1 tổ hợp Ngày+Ca+Lò (không phân trang, không filter IsDelete/IsTrungMeThoi).
         // -------------------------------------------------------
         private async Task<(List<Hrc1PhuLieuHeaderTable> Headers, List<Hrc1ThongKeRow> Rows)> GetExportDataAsync(
-            DateOnly ngay, int ca, int scope, string bieuMau = "BOF")
+            DateOnly ngay, int ca, int scope, Guid idPhieu, string bieuMau = "BOF")
         {
             var items = await _context.Hrc1TieuHaos
                 .Where(x => !x.IsDeleted && x.NgaySanXuat == ngay && x.Ca == (byte)ca
@@ -1599,17 +1788,25 @@ namespace dataproduct.api.Services
                 .AsNoTracking()
                 .ToListAsync();
 
-            // Thứ tự cột phụ liệu: BOF sắp theo ThuTu_Excel_BOF, LF sắp theo ThuTu_Excel_LF — cột ThuTu
-            // đơn cũ đã bỏ (xem Hrc1PhuLieuNm.cs).
             bool isLF = bieuMau == "LF";
-            var headersQuery = _context.Hrc1PhuLieuNms.Where(x => x.DangSuDung);
-            var headers = isLF
-                ? await headersQuery.OrderBy(x => x.ThuTu_Excel_LF ?? int.MaxValue).ThenBy(x => x.ID)
-                    .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
-                    .ToListAsync()
-                : await headersQuery.OrderBy(x => x.ThuTu_Excel_BOF ?? int.MaxValue).ThenBy(x => x.ID)
-                    .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
-                    .ToListAsync();
+
+            // Ưu tiên đúng bộ + thứ tự phụ liệu đã lưu trong jsonData của CHÍNH phiếu này tại thời điểm
+            // lưu (snapshot table1DynamicColumns.BOF_PhuGia/LF_PhuGia, xem TaoTieuHaoLoThoi.tsx/
+            // TaoTieuHaoTinhLuyenLF.tsx) thay vì danh mục HRC1_PhuLieuNM hiện tại — nếu không, phiếu cũ
+            // export ra sẽ mất cột (phụ liệu bị tắt DangSuDung) hoặc lệch thứ tự khi danh mục đổi sau
+            // ngày lưu. Chỉ fallback về danh mục hiện tại cho phiếu cũ lưu trước khi có snapshot này.
+            var headers = await TryGetSnapshotHeadersAsync(idPhieu, isLF);
+            if (headers == null)
+            {
+                var headersQuery = _context.Hrc1PhuLieuNms.Where(x => x.DangSuDung);
+                headers = isLF
+                    ? await headersQuery.OrderBy(x => x.ThuTu_Excel_LF ?? int.MaxValue).ThenBy(x => x.ID)
+                        .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
+                        .ToListAsync()
+                    : await headersQuery.OrderBy(x => x.ThuTu_Excel_BOF ?? int.MaxValue).ThenBy(x => x.ID)
+                        .Select(x => new Hrc1PhuLieuHeaderTable { PhuLieuID = x.ID, TenPhuLieu = x.TenPhuLieu })
+                        .ToListAsync();
+            }
 
             var meIds = items.Select(x => x.ID).ToList();
             var plByMeId = meIds.Count > 0
@@ -1639,6 +1836,46 @@ namespace dataproduct.api.Services
             }).ToList();
 
             return (headers, rows);
+        }
+
+        // Đọc snapshot cột phụ liệu chuẩn (BOF_PhuGia/LF_PhuGia) đã lưu trong DataJson của phiếu tại
+        // thời điểm Lưu (xem TaoTieuHaoLoThoi.tsx/TaoTieuHaoTinhLuyenLF.tsx getFormData → dynamicColumnMap).
+        // Thứ tự phần tử trong mảng JSON CHÍNH LÀ thứ tự cột đã đóng băng — không cần đọc lại ThuTu_Excel.
+        // Trả null nếu phiếu chưa có snapshot (dữ liệu cũ lưu trước khi có cơ chế này) để caller fallback
+        // về danh mục hiện tại.
+        private async Task<List<Hrc1PhuLieuHeaderTable>?> TryGetSnapshotHeadersAsync(Guid idPhieu, bool isLF)
+        {
+            var dataJson = await _context.BmPhieus
+                .Where(x => x.Idphieu == idPhieu)
+                .Select(x => x.DataJson)
+                .FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(dataJson)) return null;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(dataJson);
+                if (!doc.RootElement.TryGetProperty("table1DynamicColumns", out var dynamicRoot)) return null;
+
+                var groupName = isLF ? "LF_PhuGia" : "BOF_PhuGia";
+                if (!dynamicRoot.TryGetProperty(groupName, out var group) || group.ValueKind != JsonValueKind.Array)
+                    return null;
+
+                var result = new List<Hrc1PhuLieuHeaderTable>();
+                foreach (var col in group.EnumerateArray())
+                {
+                    if (!col.TryGetProperty("headerKeyId", out var idProp) || idProp.ValueKind != JsonValueKind.Number)
+                        continue;
+                    var label = col.TryGetProperty("label", out var labelProp) && labelProp.ValueKind == JsonValueKind.String
+                        ? labelProp.GetString()
+                        : null;
+                    result.Add(new Hrc1PhuLieuHeaderTable { PhuLieuID = idProp.GetInt32(), TenPhuLieu = label });
+                }
+                return result.Count > 0 ? result : null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
         }
 
         // Trả null nếu phụ liệu này thực sự không có số liệu nào (kể cả trường hợp "xóa manual về ban
@@ -1690,15 +1927,15 @@ namespace dataproduct.api.Services
             var kipPhieu = phieu.Kip ?? "";
             var scopePhieu = phieu.Scope ?? scope;
 
-            // Dùng chung 1 file letterhead (logo + khung company) cho cả BOF/LF — nội dung ISO code (dòng
-            // 1-3) được ghi đè theo bieuMau trong UpdateHeaderRowMerges, phần lưới dữ liệu (từ dòng 4) hoàn
-            // toàn generate bằng code nên không cần file mẫu riêng cho LF.
-            const string templateFileName = "HRC1_BB_NauLuyen_BOF";
+            // BOF và LF dùng 2 file letterhead riêng (thông tin biểu mẫu khác nhau) — nội dung ISO code
+            // (dòng 1-3) vẫn được ghi đè theo bieuMau trong UpdateHeaderRowMerges để đảm bảo đúng dù file
+            // mẫu có sẵn đúng sẵn hay không; phần lưới dữ liệu (từ dòng 4) hoàn toàn generate bằng code.
+            var templateFileName = bieuMau == "LF" ? "HRC1_BB_NauLuyen_LF" : "HRC1_BB_NauLuyen_BOF";
             var templatePath = Path.Combine(_env.WebRootPath, "templates", $"{templateFileName}.xlsx");
             if (!File.Exists(templatePath))
                 throw new FileNotFoundException($"Không tìm thấy file mẫu Excel: {templatePath}");
 
-            var (headers, rows) = await GetExportDataAsync(ngayPhieu, caPhieu, scopePhieu, bieuMau);
+            var (headers, rows) = await GetExportDataAsync(ngayPhieu, caPhieu, scopePhieu, idPhieu, bieuMau);
             var fileName = $"HRC1_BB_NauLuyen_{bieuMau}_Ca{caPhieu}_{ngayPhieu:ddMMyyyy}.xlsx";
 
             // ClosedXML lỗi khi save workbook có drawing (logo) trực tiếp ra MemoryStream → save qua file tạm.
@@ -2127,7 +2364,7 @@ namespace dataproduct.api.Services
 
         public async Task<ExportFileResult> ExportPdfDetailAsync(DateOnly ngay, int ca, int scope, Guid idPhieu, string bieuMau = "BOF")
         {
-            var (headers, rows) = await GetExportDataAsync(ngay, ca, scope, bieuMau);
+            var (headers, rows) = await GetExportDataAsync(ngay, ca, scope, idPhieu, bieuMau);
 
             var pheDuyets = await _pheDuyetService.GetPheDuyetPhieuAsync(idPhieu);
             var truongKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);

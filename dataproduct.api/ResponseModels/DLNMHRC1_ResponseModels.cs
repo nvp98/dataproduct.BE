@@ -28,6 +28,7 @@ namespace dataproduct.api.ResponseModels
         public byte? Ca { get; set; }
         public DateTime? ThoiDiemBatDau { get; set; }
         public DateTime? ThoiDiemKetThuc { get; set; }
+        public string? ThoiGianLF { get; set;}
     }
 
     /// <summary>

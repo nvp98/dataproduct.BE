@@ -161,7 +161,7 @@ namespace dataproduct.api.Controllers
             }
         }
 
-        /// <summary>Xuất biên bản 1 phiếu (mẫu HRC1_BB_NauLuyen_BOF.xlsx). Ngày/Ca/Lò lấy theo phiếu nếu phiếu có sẵn.</summary>
+        /// <summary>Xuất biên bản 1 phiếu (mẫu HRC1_BB_NauLuyen_BOF.xlsx / HRC1_BB_NauLuyen_LF.xlsx theo bieuMau). Ngày/Ca/Lò lấy theo phiếu nếu phiếu có sẵn.</summary>
         [HttpGet("export-excel-detail")]
         public async Task<IActionResult> ExportExcelDetail(
             [FromQuery] DateOnly ngay, [FromQuery] int ca, [FromQuery] int scope,

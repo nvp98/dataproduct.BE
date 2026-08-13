@@ -37,4 +37,6 @@ public partial class Hrc1TieuHao
     public int? NguoiTao { get; set; }
     public DateTime? NgayCapNhat { get; set; }
     public int? NguoiCapNhat { get; set; }
+    public string? ThoiGianLF {get;set;}
 }
+    

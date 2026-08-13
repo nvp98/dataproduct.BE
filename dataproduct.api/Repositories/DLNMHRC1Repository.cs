@@ -277,6 +277,7 @@ namespace dataproduct.api.Repositories
             Ca = b.Ca,
             ThoiDiemBatDau = b.ThoiDiemBatDau,
             ThoiDiemKetThuc = b.ThoiDiemKetThuc,
+            ThoiGianLF = b.ThoiGianLF,
         };
 
         // =========================================================
