@@ -83,6 +83,10 @@ namespace dataproduct.api.ResponseModels
         public int IDHeaderKey { get; set; }
         public string TenPhuLieu { get; set; }
         public byte LoaiThongKe { get; set; }
+
+        /// <summary>Header_Key.LoaiPhieu ("KL"/"PG"/null) — dùng để gộp cột theo nhóm khi render
+        /// export (vd LF/RH có 2 nhóm phụ liệu riêng: Chất hợp kim hóa/Phụ gia và chất khử oxy).</summary>
+        public string? LoaiPhieu { get; set; }
     }
 
     public class SearchThongKeApiResponse

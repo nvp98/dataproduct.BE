@@ -24,6 +24,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _config;
         private readonly ProductDataMasterDbContext _masterCtx;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public HRC1_BBGNService(
             IHRC1_BBGNRepository repo,
@@ -33,7 +34,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration config,
             ProductDataMasterDbContext masterCtx,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _bbgnSvc = bbgnSvc;
@@ -43,6 +45,7 @@ namespace dataproduct.api.Services
             _config = config;
             _masterCtx = masterCtx;
             _httpClientFactory = httpClientFactory;
+            _bmConfig = bmConfig;
         }
 
         // -------------------------------------------------------
@@ -2146,8 +2149,8 @@ namespace dataproduct.api.Services
             var ngay = phieu.NgaySX.Value;
 
             string tuGio, denGio, tuNgay, denNgay;
-            if (ca == 1) { tuGio = "08:00"; denGio = "20:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = tuNgay; }
-            else { tuGio = "20:00"; denGio = "08:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
+            if (ca == 1) { tuGio = "08"; denGio = "20"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = tuNgay; }
+            else { tuGio = "20"; denGio = "08"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
 
             var phieuData = await GetPhieuAsync(phieuId);
             var rows = phieuData.DanhSachMe
@@ -2212,7 +2215,7 @@ namespace dataproduct.api.Services
                     var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
                     var info = $"Ông/bà: <strong>{name}</strong>";
                     if (!string.IsNullOrEmpty(chucVu))
-                        info += $" - Chức vụ: <strong>{chucVu}</strong>";
+                        info += $"&nbsp;&nbsp;&nbsp;&nbsp;Chức vụ: <strong>{chucVu}</strong>";
                     lines.Add(info);
                 }
                 return string.Join("<br/>", lines);
@@ -2246,10 +2249,11 @@ namespace dataproduct.api.Services
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BBGN_ThepLong.html");
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var html = await File.ReadAllTextAsync(templatePath);
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("HRC1_BBGN_ThepLong");
 
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
-                .Replace("{{BmCode}}", "BM.16/QT.05.10<br/>Ngày hiệu lực: 01/09/2023")
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{Kip}}", kip)
                 .Replace("{{TuGio}}", tuGio)
                 .Replace("{{TuNgay}}", tuNgay)

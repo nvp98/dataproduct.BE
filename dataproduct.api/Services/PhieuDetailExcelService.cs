@@ -21,14 +21,16 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
         private readonly PheDuyetService _pheDuyetService;
+        private readonly BmConfigService _bmConfig;
 
-        public PhieuDetailExcelService(ProductFormContext context, PheDuyetService pheDuyetService, IConverter pdfConverter, IConfiguration configuration, IWebHostEnvironment env)
+        public PhieuDetailExcelService(ProductFormContext context, PheDuyetService pheDuyetService, IConverter pdfConverter, IConfiguration configuration, IWebHostEnvironment env, BmConfigService bmConfig)
         {
             _context       = context;
             _pdfConverter  = pdfConverter;
             _configuration = configuration;
             _env           = env;
             _pheDuyetService = pheDuyetService;
+            _bmConfig      = bmConfig;
         }
 
         public async Task<BmPhieu> GetBmPhieuByIdOrThrowAsync(Guid idPhieu)
@@ -100,6 +102,14 @@ namespace dataproduct.api.Services
                 else if (isRhExcel) headersRH = chotSnapshotHeaders;
                 else headersLF = chotSnapshotHeaders;
             }
+
+            // LF có 2 nhóm phụ liệu riêng (Chất hợp kim hóa=KL, Phụ gia và chất khử oxy=PG) render
+            // thành 2 khối cột liền nhau trong PDF/Excel (PdfThead_LF/RenderColumnHeaders_LF) — cần
+            // đảm bảo thứ tự cột ở đây đã gộp liền khối theo nhóm (áp dụng cho cả header live lẫn
+            // snapshot đã chốt), nếu không colspan merge theo nhóm sẽ sai khi ThuTu_Excel_LF xen kẽ.
+            headersLF = headersLF
+                .OrderBy(h => h.LoaiPhieu == "KL" ? 0 : h.LoaiPhieu == "PG" ? 1 : 2)
+                .ToList();
 
             var headers = isBofExcel ? headersBOF : (isRhExcel ? headersRH : headersLF);
 
@@ -412,7 +422,7 @@ namespace dataproduct.api.Services
         {
             var allExcelHeaders = await _context.Header_Keys
                 .Where(h => h.IsUsed_Excel == true)
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LF, h.ThuTu_Excel_RH })
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LF, h.ThuTu_Excel_RH, h.LoaiPhieu })
                 .ToListAsync();
 
             var headersBOF = allExcelHeaders
@@ -423,7 +433,8 @@ namespace dataproduct.api.Services
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
@@ -435,7 +446,8 @@ namespace dataproduct.api.Services
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
@@ -447,7 +459,8 @@ namespace dataproduct.api.Services
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
@@ -499,10 +512,18 @@ namespace dataproduct.api.Services
                         ? lblProp.GetString() ?? ""
                         : "";
 
+                    // loaiPhieu: chỉ có ở snapshot chụp SAU khi có cơ chế gộp nhóm cột KL/PG cho LF/RH;
+                    // snapshot cũ hơn không có field này → null → cột rơi vào nhóm "khác" khi render.
+                    var loaiPhieu = col.TryGetProperty("loaiPhieu", out var lpProp) &&
+                                 lpProp.ValueKind == JsonValueKind.String
+                        ? lpProp.GetString()
+                        : null;
+
                     headers.Add(new PhuLieuHeaderTable
                     {
                         IDHeaderKey = hkProp.GetInt32(),
-                        TenPhuLieu = label
+                        TenPhuLieu = label,
+                        LoaiPhieu = loaiPhieu
                     });
                 }
 
@@ -1132,10 +1153,11 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("BOF"); // 6
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL gang lỏng\n(tấn)");
-            MergeVertCell(ws, 5, "KL thép phế\n(tấn)");
+            MergeHorizCell(ws, HeaderParentRow, 4, 5, "Nguyên liệu đầu vào (tấn)");
+            HeaderCell(ws, HeaderChildRow, 4, "Gang lỏng");
+            HeaderCell(ws, HeaderChildRow, 5, "Thép phế");
 
             if (headers.Count > 0)
             {
@@ -1145,7 +1167,7 @@ namespace dataproduct.api.Services
             }
 
             int a = s + headers.Count;
-            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Nhiên liệu");
+            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Nhiên liệu (m³)");
             HeaderCell(ws, HeaderChildRow, a,     "Oxy");
             HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
             MergeVertCell(ws, a + 2, "Ghi chú");
@@ -1160,15 +1182,34 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("LF"); // 5
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL thép lỏng\n(tấn)");
+            MergeVertCell(ws, 4, "Khối lượng thép lỏng (tấn)\n(Tính cả thùng thép)");
 
             if (headers.Count > 0)
             {
-                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Phụ gia công nghệ (Kg)");
-                for (int i = 0; i < headers.Count; i++)
-                    HeaderCell(ws, HeaderChildRow, s + i, headers[i].TenPhuLieu);
+                var (klList, pgList, otherList) = SplitByLoaiPhieuGroup(headers);
+                int col = s;
+                if (klList.Count > 0)
+                {
+                    MergeHorizCell(ws, HeaderParentRow, col, col + klList.Count - 1, "Chất hợp kim hóa");
+                    for (int i = 0; i < klList.Count; i++)
+                        HeaderCell(ws, HeaderChildRow, col + i, klList[i].TenPhuLieu);
+                    col += klList.Count;
+                }
+                if (pgList.Count > 0)
+                {
+                    MergeHorizCell(ws, HeaderParentRow, col, col + pgList.Count - 1, "Phụ gia & chất khử oxy");
+                    for (int i = 0; i < pgList.Count; i++)
+                        HeaderCell(ws, HeaderChildRow, col + i, pgList[i].TenPhuLieu);
+                    col += pgList.Count;
+                }
+                if (otherList.Count > 0)
+                {
+                    MergeHorizCell(ws, HeaderParentRow, col, col + otherList.Count - 1, "Phụ gia công nghệ (Kg)");
+                    for (int i = 0; i < otherList.Count; i++)
+                        HeaderCell(ws, HeaderChildRow, col + i, otherList[i].TenPhuLieu);
+                }
             }
 
             int a = s + headers.Count;
@@ -1188,24 +1229,24 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("RH"); // 5
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL thép lỏng\n(tấn)");
+            MergeVertCell(ws, 4, "Khối lượng thép lỏng (tấn)\n(Tính cả thùng thép)");
 
             if (headers.Count > 0)
             {
-                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Phụ gia công nghệ (Kg)");
+                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Chất hợp kim hóa");
                 for (int i = 0; i < headers.Count; i++)
                     HeaderCell(ws, HeaderChildRow, s + i, headers[i].TenPhuLieu);
             }
 
             int a = s + headers.Count;
-            MergeHorizCell(ws, HeaderParentRow, a, a + 2, "Khí");
+            MergeHorizCell(ws, HeaderParentRow, a, a + 2, "Khí (m³)");
             HeaderCell(ws, HeaderChildRow, a,     "Argon");
             HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
             HeaderCell(ws, HeaderChildRow, a + 2, "Oxi");
-            MergeVertCell(ws, a + 3, "Que lấy mẫu");
-            MergeVertCell(ws, a + 4, "Que đo nhiệt");
+            MergeVertCell(ws, a + 3, "Que lấy mẫu (cái)");
+            MergeVertCell(ws, a + 4, "Que đo nhiệt (cái)");
             MergeVertCell(ws, a + 5, "Ghi chú");
 
             RenderPhanBoHeaders(ws, a + 6, phanBoHeaders);
@@ -1779,9 +1820,10 @@ namespace dataproduct.api.Services
 
             string infoKip = $"Kíp {caStr}: Từ {gioBatDauLocal} ngày {ngayStr} đến {gioKetThucLocal} ngày {ngayKetThuc}";
 
-            string bmCode = key.Contains("BOF") ? "BM.08/QT.05.15 <br /> Ngày hiệu lực: 05/07/2025 <br /> Lần sửa đổi: 01"
-                          : key.Contains("LF")  ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 02"
-                          :                       "BM.16/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 03";
+            string bmConfigKey = key.Contains("BOF") ? "HRC2_BB_NauLuyen_BOF"
+                               : key.Contains("LF")  ? "HRC2_BB_NauLuyen_LF"
+                               :                       "HRC2_BB_NauLuyen_RH";
+            string bmCode = await _bmConfig.GetBmCodeHtmlAsync(bmConfigKey);
 
             string thead = key.Contains("BOF") ? PdfThead_BOF(headers, phanBoHeaders)
                          : key.Contains("LF")  ? PdfThead_LF(headers, phanBoHeaders)
@@ -1830,10 +1872,10 @@ namespace dataproduct.api.Services
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL gang lỏng<br/>(tấn)</th>");
-            r1.Append("<th rowspan=\"2\">KL thép phế<br/>(tấn)</th>");
+            r1.Append("<th colspan=\"2\">Nguyên liệu đầu vào (tấn)</th>");
+            r2.Append("<th>Gang lỏng</th><th>Thép phế</th>");
 
             if (h.Count > 0)
             {
@@ -1841,8 +1883,8 @@ namespace dataproduct.api.Services
                 foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
             }
 
-            r1.Append("<th colspan=\"2\">Nhiên liệu</th>");
-            r2.Append("<th>Oxy</th><th>Nito</th>");
+            r1.Append("<th colspan=\"2\">Nhiên liệu (m³)</th>");
+            r2.Append("<th>Oxy</th><th>Nitơ</th>");
             r1.Append("<th rowspan=\"2\">Ghi chú</th>");
 
             if (pb.Count > 0)
@@ -1854,20 +1896,46 @@ namespace dataproduct.api.Services
             return $"<thead><tr>{r1}</tr><tr>{r2}</tr></thead>";
         }
 
+        /// <summary>Gộp danh sách cột phụ liệu thành 3 khối liền nhau theo Header_Key.LoaiPhieu:
+        /// KL (Chất hợp kim hóa) → PG (Phụ gia và chất khử oxy) → còn lại (chưa gắn nhóm).
+        /// Dùng cho LF/RH — thứ tự tương đối trong từng khối giữ nguyên theo ThuTu_Excel_*.</summary>
+        private static (List<PhuLieuHeaderTable> Kl, List<PhuLieuHeaderTable> Pg, List<PhuLieuHeaderTable> Others) SplitByLoaiPhieuGroup(
+            List<PhuLieuHeaderTable> headers)
+        {
+            var kl     = headers.Where(h => h.LoaiPhieu == "KL").ToList();
+            var pg     = headers.Where(h => h.LoaiPhieu == "PG").ToList();
+            var others = headers.Where(h => h.LoaiPhieu != "KL" && h.LoaiPhieu != "PG").ToList();
+            return (kl, pg, others);
+        }
+
         private static string PdfThead_LF(List<PhuLieuHeaderTable> h, List<PhuLieuHeaderTable> pb)
         {
             var r1 = new StringBuilder();
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL thép lỏng<br/>(tấn)</th>");
+            r1.Append("<th rowspan=\"2\">Khối lượng thép lỏng (tấn)(Tính cả thùng thép)</th>");
 
             if (h.Count > 0)
             {
-                r1.Append($"<th colspan=\"{h.Count}\">Phụ gia công nghệ (Kg)</th>");
-                foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                var (klList, pgList, otherList) = SplitByLoaiPhieuGroup(h);
+                if (klList.Count > 0)
+                {
+                    r1.Append($"<th colspan=\"{klList.Count}\">Chất hợp kim hóa</th>");
+                    foreach (var x in klList) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                }
+                if (pgList.Count > 0)
+                {
+                    r1.Append($"<th colspan=\"{pgList.Count}\">Phụ gia và chất khử oxy</th>");
+                    foreach (var x in pgList) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                }
+                if (otherList.Count > 0)
+                {
+                    r1.Append($"<th colspan=\"{otherList.Count}\">Phụ gia công nghệ (Kg)</th>");
+                    foreach (var x in otherList) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                }
             }
 
             r1.Append("<th>Khí</th>");
@@ -1891,13 +1959,13 @@ namespace dataproduct.api.Services
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL thép lỏng<br/>(tấn)</th>");
-
+            r1.Append("<th rowspan=\"2\">Khối lượng thép lỏng (tấn)(Tính cả thùng thép)</th>");
+    
             if (h.Count > 0)
             {
-                r1.Append($"<th colspan=\"{h.Count}\">Phụ gia công nghệ (Kg)</th>");
+                r1.Append($"<th colspan=\"{h.Count}\">Chất hợp kim hóa </th>");
                 foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
             }
 

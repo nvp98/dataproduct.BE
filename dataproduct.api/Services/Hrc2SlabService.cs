@@ -22,6 +22,7 @@ namespace dataproduct.api.Services
         private readonly IConverter _pdfConverter;
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public Hrc2SlabService(
             IHrc2SlabRepository repo,
@@ -30,7 +31,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConverter pdfConverter,
             IConfiguration config,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _context = context;
@@ -39,6 +41,7 @@ namespace dataproduct.api.Services
             _pdfConverter = pdfConverter;
             _config = config;
             _httpClientFactory = httpClientFactory;
+            _bmConfig = bmConfig;
         }
 
         public Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req)
@@ -54,8 +57,14 @@ namespace dataproduct.api.Services
         public Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu)
             => _repo.GetRuotPhieuAsync(idPhieu);
 
-        public Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu)
-            => _repo.GetSlabsByPhieuAsync(idPhieu);
+        public Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu, int? currentUserId = null)
+            => _repo.GetSlabsByPhieuAsync(idPhieu, currentUserId);
+
+        public Task CheckAsync(Hrc2SlabCheckRequest req)
+            => _repo.CheckAsync(req.IdSlabs, req.NguoiThucHien);
+
+        public Task UnCheckAsync(Hrc2SlabCheckRequest req)
+            => _repo.UnCheckAsync(req.IdSlabs, req.NguoiThucHien);
 
         public Task XacNhanAsync(Hrc2XacNhanRequest req)
             => _repo.XacNhanAsync(req.IdSlabs, req.LoaiXacNhan, req.NguoiThucHien);
@@ -99,12 +108,25 @@ namespace dataproduct.api.Services
 
         // ── Chi tiết Excel (BBGN phôi tấm HRC2) ─────────────────────────────
 
-        public async Task<ExportFileResult> ExportChiTietExcelAsync(Guid idPhieu)
+        public async Task<ExportFileResult> ExportChiTietExcelAsync(Guid idPhieu, int? currentUserId = null)
         {
             var phieu = await GetPhieuAsync(idPhieu);
             var (soPhieu, ngaySX, _, _) = ExtractPhieuInfo(phieu);
 
             var trangThais = await GetTrangThaisAsync(idPhieu);
+
+            // "Đã check" chỉ tính riêng cho user hiện tại — độc lập với workflow xác nhận ở trên.
+            HashSet<int> checkedSlabIds = [];
+            if (currentUserId.HasValue && trangThais.Count > 0)
+            {
+                var slabIds = trangThais.Select(t => t.IdSlab).ToList();
+                checkedSlabIds = (await _context.BkHrc2Slab_UserChecks
+                    .AsNoTracking()
+                    .Where(c => c.IdUser == currentUserId.Value && slabIds.Contains(c.IdSlab))
+                    .Select(c => c.IdSlab)
+                    .ToListAsync())
+                    .ToHashSet();
+            }
 
             var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC2_BBSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
@@ -114,6 +136,7 @@ namespace dataproduct.api.Services
             var ws = workbook.Worksheet(1);
 
             const int startRow = 6;
+            const int checkCol = 14;
             var rowIndex = startRow;
             var stt = 1;
 
@@ -125,6 +148,21 @@ namespace dataproduct.api.Services
                     ? XLColor.FromHtml("#C6EFCE")
                     : XLColor.FromHtml("#D9D9D9");
             }
+
+            void SetCheckCell(int r, int c, bool daCheck)
+            {
+                var cell = ws.Cell(r, c);
+                cell.Value = daCheck ? "Đã check" : "";
+                if (daCheck)
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
+            }
+
+            // Header cột mới — copy style từ header "TT PKH" (cột 13) để đồng bộ giao diện với template có sẵn.
+            var headerRow = startRow - 1;
+            var checkHeaderCell = ws.Cell(headerRow, checkCol);
+            checkHeaderCell.Value = "Đã check";
+            checkHeaderCell.Style = ws.Cell(headerRow, 13).Style;
+            ws.Column(checkCol).Width = 14;
 
             foreach (var tt in trangThais)
             {
@@ -149,13 +187,14 @@ namespace dataproduct.api.Services
                 SetTrangThaiCell(rowIndex, 11, tt.TrangThaiDuc);
                 SetTrangThaiCell(rowIndex, 12, tt.TrangThaiKho);
                 SetTrangThaiCell(rowIndex, 13, tt.TrangThaiPKH);
+                SetCheckCell(rowIndex, checkCol, checkedSlabIds.Contains(tt.IdSlab));
 
                 rowIndex++;
                 stt++;
             }
 
             if (rowIndex > startRow)
-                SetThinBorders(ws, startRow, rowIndex - 1, 13);
+                SetThinBorders(ws, startRow, rowIndex - 1, checkCol);
 
             using var ms = new MemoryStream();
             workbook.SaveAs(ms);
@@ -364,9 +403,11 @@ namespace dataproduct.api.Services
 
             var html = await File.ReadAllTextAsync(templatePath);
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("HRC2_BBSL_PhoiTam");
 
             html = html
                 .Replace("{{LogoUrl}}",       logoUrl)
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{soPhieu}}", soPhieu)
                 .Replace("{{ngaySX}}", ngaySX)
                 .Replace("{{mayduc}}", phieu?.MayDuc.HasValue == true ? $"Máy {phieu.MayDuc}" : "")

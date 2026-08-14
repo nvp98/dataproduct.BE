@@ -66,9 +66,9 @@ namespace dataproduct.api.Controllers
 
         /// <summary>Danh sách slab cá nhân thuộc phiếu (đã chuyển KCS)</summary>
         [HttpGet("slabs-by-phieu/{idPhieu:guid}")]
-        public async Task<IActionResult> GetSlabsByPhieu(Guid idPhieu)
+        public async Task<IActionResult> GetSlabsByPhieu(Guid idPhieu, [FromQuery] int? currentUserId = null)
         {
-            var data = await _svc.GetSlabsByPhieuAsync(idPhieu);
+            var data = await _svc.GetSlabsByPhieuAsync(idPhieu, currentUserId);
             return Ok(data);
         }
 
@@ -140,6 +140,38 @@ namespace dataproduct.api.Controllers
             });
         }
 
+        // ── Đánh dấu "đã check" (độc lập theo user, không thuộc workflow xác nhận) ──
+
+        [HttpPost("check")]
+        public async Task<IActionResult> Check([FromBody] Hrc2SlabCheckRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            await _svc.CheckAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã đánh dấu check {request.IdSlabs.Count} slab.",
+                AffectedRows = request.IdSlabs.Count
+            });
+        }
+
+        [HttpPost("un-check")]
+        public async Task<IActionResult> UnCheck([FromBody] Hrc2SlabCheckRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            await _svc.UnCheckAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã bỏ check {request.IdSlabs.Count} slab.",
+                AffectedRows = request.IdSlabs.Count
+            });
+        }
+
         // ── PKH Workflow ─────────────────────────────────────────────────────
 
         [HttpPost("chot-phieu")]
@@ -196,11 +228,12 @@ namespace dataproduct.api.Controllers
         // ── Export ────────────────────────────────────────────────────────────
 
         [HttpGet("export/excel")]
-        public async Task<IActionResult> ExportExcel([FromQuery] Guid idPhieu, [FromQuery] string tab = "chitiet")
+        public async Task<IActionResult> ExportExcel(
+            [FromQuery] Guid idPhieu, [FromQuery] string tab = "chitiet", [FromQuery] int? currentUserId = null)
         {
             var result = tab == "tonghop"
                 ? await _svc.ExportTongHopExcelAsync(idPhieu)
-                : await _svc.ExportChiTietExcelAsync(idPhieu);
+                : await _svc.ExportChiTietExcelAsync(idPhieu, currentUserId);
             return File(result.Content, result.ContentType, result.FileName);
         }
 

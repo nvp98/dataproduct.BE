@@ -20,7 +20,7 @@ namespace dataproduct.api.Services.PhieuEnrichers;
 /// Hrc1SlabRepository.ChotPhieuAsync: slab "tự nhiên" (khớp NgaySX + Ca, chưa bị chuyển ca)
 /// cộng với slab "được chuyển ca" vào đúng phiếu này (IsChuyenCa + IdPhieuBBSL).
 /// </summary>
-public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher
+public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher, IPhieuTinhTrangFilterEnricher
 {
     private readonly ProductFormContext _context;
     public string MaBm => "HRC1_BBSL_PhoiTam";
@@ -63,5 +63,84 @@ public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher
             + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1 || !t.TrangThaiC4);
 
         item.TinhTrang = chuaXacNhan == 0 ? 12 : 11;
+    }
+
+    /// <summary>Bản batch của EnrichAsync ở trên, dùng để lọc TinhTrang trước khi phân trang.</summary>
+    public async Task<List<Guid>> FilterByTinhTrangAsync(List<BmPhieu> candidates, int tinhTrang)
+    {
+        if (tinhTrang == 5)
+            return candidates.Where(p => p.TinhTrang == 5).Select(p => p.Idphieu).ToList();
+
+        if (tinhTrang != 11 && tinhTrang != 12)
+            return [];
+
+        var openCandidates = candidates.Where(p => p.TinhTrang != 5).ToList();
+        if (openCandidates.Count == 0) return [];
+
+        var ngaySXSet = openCandidates.Where(p => p.NgaySX.HasValue).Select(p => p.NgaySX!.Value).Distinct().ToList();
+        var idphieuSet = openCandidates.Select(p => p.Idphieu).ToList();
+
+        var naturalSlabs = ngaySXSet.Count > 0
+            ? await _context.Hrc1Slabs
+                .AsNoTracking()
+                .Where(s => s.NgaySX.HasValue && ngaySXSet.Contains(s.NgaySX.Value))
+                .Select(s => new { s.Id, s.NgaySX, s.CaSX })
+                .ToListAsync()
+            : [];
+
+        var naturalSlabIds = naturalSlabs.Select(s => s.Id).ToList();
+
+        var chuyenCaIds = naturalSlabIds.Count > 0
+            ? (await _context.Hrc1SlabTrangThais
+                .AsNoTracking()
+                .Where(t => naturalSlabIds.Contains(t.IdSlab) && t.IsChuyenCa)
+                .Select(t => t.IdSlab)
+                .ToListAsync()).ToHashSet()
+            : [];
+
+        var naturalTTMap = naturalSlabIds.Count > 0
+            ? await _context.Hrc1SlabTrangThais
+                .AsNoTracking()
+                .Where(t => naturalSlabIds.Contains(t.IdSlab))
+                .ToDictionaryAsync(t => t.IdSlab)
+            : new Dictionary<int, Hrc1SlabTrangThai>();
+
+        var transferredAll = await _context.Hrc1SlabTrangThais
+            .AsNoTracking()
+            .Where(t => t.IsChuyenCa && t.IdPhieuBBSL != null && idphieuSet.Contains(t.IdPhieuBBSL.Value))
+            .ToListAsync();
+        var transferredByPhieu = transferredAll
+            .GroupBy(t => t.IdPhieuBBSL!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new List<Guid>();
+        foreach (var p in openCandidates)
+        {
+            var caStr = p.Ca?.ToString();
+            var naturalIds = naturalSlabs
+                .Where(s => s.NgaySX == p.NgaySX && s.CaSX == caStr && !chuyenCaIds.Contains(s.Id))
+                .Select(s => s.Id)
+                .ToList();
+
+            transferredByPhieu.TryGetValue(p.Idphieu, out var transferredRecords);
+            transferredRecords ??= [];
+
+            bool hoanThanh;
+            if (naturalIds.Count == 0 && transferredRecords.Count == 0)
+            {
+                hoanThanh = false;
+            }
+            else
+            {
+                var chuaXacNhan = naturalIds.Count(id =>
+                        !naturalTTMap.TryGetValue(id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1 || !tt.TrangThaiC4)
+                    + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1 || !t.TrangThaiC4);
+                hoanThanh = chuaXacNhan == 0;
+            }
+
+            if ((tinhTrang == 12) == hoanThanh)
+                result.Add(p.Idphieu);
+        }
+        return result;
     }
 }

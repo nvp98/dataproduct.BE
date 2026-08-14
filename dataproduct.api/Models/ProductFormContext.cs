@@ -79,6 +79,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
     public virtual DbSet<BkHrc2SlabTrangThai> BkHrc2SlabTrangThais { get; set; }
     public virtual DbSet<BkSyncHrc2SlabControl> BkSyncHrc2SlabControls { get; set; }
+    public virtual DbSet<BkHrc2Slab_UserCheck> BkHrc2Slab_UserChecks { get; set; }
 
     // HRC1
     public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
@@ -858,6 +859,14 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.BatDauLuc).HasColumnType("datetime");
             entity.Property(e => e.KetThucLuc).HasColumnType("datetime");
+        });
+
+        // Marker "đã check" độc lập theo user — không FK, chỉ liên kết theo quy ước tên cột.
+        modelBuilder.Entity<BkHrc2Slab_UserCheck>(entity =>
+        {
+            entity.ToTable("BK_HRC2_Slab_UserCheck");
+            entity.HasKey(e => new { e.IdUser, e.IdSlab });
+            entity.Property(e => e.NgayCheck).HasColumnType("datetime2(0)").HasDefaultValueSql("SYSDATETIME()");
         });
 
         // --- HRC1 Slab ---

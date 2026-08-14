@@ -69,6 +69,22 @@ namespace dataproduct.api.Repositories
             if (DateOnly.TryParse(req.DenNgay, out var denNgay))
                 query = query.Where(s => s.NgaySXTheoCa < denNgay.AddDays(1));
 
+            // Date filter via NgayXuLy (BM_Phieu.NgaySX, join qua BkHrc2SlabTrangThai.IdPhieuBBSL)
+            var tuNgayXLOk = DateOnly.TryParse(req.TuNgayXL, out var tuNgayXL);
+            var denNgayXLOk = DateOnly.TryParse(req.DenNgayXL, out var denNgayXL);
+            if (tuNgayXLOk || denNgayXLOk)
+            {
+                var phieuXLQuery = _context.BmPhieus.AsNoTracking().Where(p => p.MaBm == MaBm);
+                if (tuNgayXLOk)
+                    phieuXLQuery = phieuXLQuery.Where(p => p.NgaySX >= tuNgayXL);
+                if (denNgayXLOk)
+                    phieuXLQuery = phieuXLQuery.Where(p => p.NgaySX < denNgayXL.AddDays(1));
+                var phieuIdsXL = phieuXLQuery.Select(p => p.Idphieu);
+
+                query = query.Where(s => _context.BkHrc2SlabTrangThais.Any(t =>
+                    t.IdSlab == s.Id && t.IdPhieuBBSL != null && phieuIdsXL.Contains(t.IdPhieuBBSL.Value)));
+            }
+
             // Workflow filter
             if (req.TrangThaiKCS.HasValue)
                 query = req.TrangThaiKCS == 0
@@ -236,7 +252,7 @@ namespace dataproduct.api.Repositories
 
         // ── Chi tiết slab trong phiếu ─────────────────────────────────────────
 
-        public async Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu)
+        public async Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu, int? currentUserId = null)
         {
             var phieu = await _context.BmPhieus.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == MaBm)
@@ -259,15 +275,52 @@ namespace dataproduct.api.Repositories
             var ttMap = ttList.ToDictionary(t => t.IdSlab);
             var userNames = await GetUserNamesAsync(ttList);
 
+            // "Đã check" chỉ tính riêng cho user hiện tại — không ảnh hưởng user khác.
+            HashSet<int> checkedSlabIds = currentUserId.HasValue
+                ? (await _context.BkHrc2Slab_UserChecks
+                    .AsNoTracking()
+                    .Where(c => c.IdUser == currentUserId.Value && slabIds.Contains(c.IdSlab))
+                    .Select(c => c.IdSlab)
+                    .ToListAsync())
+                    .ToHashSet()
+                : [];
+
             return slabs
                 .OrderBy(s => s.ShiftName)
                 .ThenBy(s => s.IdSlab)
                 .Select(s =>
                 {
                     ttMap.TryGetValue(s.Id, out var tt);
-                    return MapToItem(s, tt, phieu, userNames);
+                    return MapToItem(s, tt, phieu, userNames, checkedSlabIds.Contains(s.Id));
                 })
                 .ToList();
+        }
+
+        // ── Đánh dấu "đã check" theo user (độc lập, không thuộc workflow xác nhận) ──
+
+        public async Task CheckAsync(List<int> idSlabs, int idUser)
+        {
+            var existing = await _context.BkHrc2Slab_UserChecks
+                .Where(c => c.IdUser == idUser && idSlabs.Contains(c.IdSlab))
+                .Select(c => c.IdSlab)
+                .ToListAsync();
+
+            var toInsert = idSlabs.Except(existing);
+            var now = DateTime.Now;
+            foreach (var id in toInsert)
+                _context.BkHrc2Slab_UserChecks.Add(new BkHrc2Slab_UserCheck { IdUser = idUser, IdSlab = id, NgayCheck = now });
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UnCheckAsync(List<int> idSlabs, int idUser)
+        {
+            var records = await _context.BkHrc2Slab_UserChecks
+                .Where(c => c.IdUser == idUser && idSlabs.Contains(c.IdSlab))
+                .ToListAsync();
+
+            _context.BkHrc2Slab_UserChecks.RemoveRange(records);
+            await _context.SaveChangesAsync();
         }
 
         // ── Workflow: Xác nhận ────────────────────────────────────────────────
@@ -538,7 +591,8 @@ namespace dataproduct.api.Repositories
         }
 
         private static Hrc2SlabItem MapToItem(
-            BkHrc2Slab s, BkHrc2SlabTrangThai? tt, BmPhieu? phieu, Dictionary<int, string?> userNames)
+            BkHrc2Slab s, BkHrc2SlabTrangThai? tt, BmPhieu? phieu, Dictionary<int, string?> userNames,
+            bool daCheck = false)
         {
             string? ResolveName(int? userId) =>
                 userId.HasValue && userNames.TryGetValue(userId.Value, out var name) ? name : null;
@@ -592,6 +646,7 @@ namespace dataproduct.api.Repositories
                 NguoiXacNhanDuc    = ResolveName(tt?.NguoiXacNhanDuc),
                 NguoiXacNhanKho    = ResolveName(tt?.NguoiXacNhanKho),
                 NguoiXacNhanPKH    = ResolveName(tt?.NguoiChotPKH),
+                DaCheck            = daCheck,
             };
         }
     }
