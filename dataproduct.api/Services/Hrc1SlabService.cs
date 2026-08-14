@@ -23,6 +23,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _sqlConnStr;
+        private readonly BmConfigService _bmConfig;
 
         public Hrc1SlabService(
             IHrc1SlabRepository repo,
@@ -31,7 +32,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConverter pdfConverter,
             IConfiguration config,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _context = context;
@@ -42,6 +44,7 @@ namespace dataproduct.api.Services
             _httpClientFactory = httpClientFactory;
             _sqlConnStr = config.GetConnectionString("DbConnectionString")
                 ?? throw new InvalidOperationException("DbConnectionString is not configured.");
+            _bmConfig = bmConfig;
         }
 
         // ── Sync / Search / Workflow ─────────────────────────────────────────
@@ -363,8 +366,10 @@ namespace dataproduct.api.Services
                 throw new FileNotFoundException($"Không tìm thấy template HTML: {templatePath}");
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var html = await File.ReadAllTextAsync(templatePath);
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("HRC1_BBSL_PhoiTam");
             html = html
                 .Replace("{{LogoUrl}}",       logoUrl)
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{soPhieu}}", soPhieu)
                 .Replace("{{ngaySX}}", ngaySX)
                 .Replace("{{ca}}", ca)

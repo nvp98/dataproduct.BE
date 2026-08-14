@@ -613,7 +613,7 @@ namespace dataproduct.api.Business
                 var headers = bieuMau == "BOF" ? headersBOF : (bieuMau == "RH" ? headersRH : headersLF);
 
                 var snapshot = headers
-                    .Select(h => new { headerKeyId = h.IDHeaderKey, label = h.TenPhuLieu })
+                    .Select(h => new { headerKeyId = h.IDHeaderKey, label = h.TenPhuLieu, loaiPhieu = h.LoaiPhieu })
                     .ToList();
 
                 var root = string.IsNullOrWhiteSpace(phieu.DataJson)

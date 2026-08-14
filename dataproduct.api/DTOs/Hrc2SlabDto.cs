@@ -4,6 +4,8 @@ namespace dataproduct.api.DTOs
     {
         public string? TuNgay { get; set; }
         public string? DenNgay { get; set; }
+        public string? TuNgayXL { get; set; }
+        public string? DenNgayXL { get; set; }
         public string? CaSanXuat { get; set; }
         public string? Kip { get; set; }
         public int? MayDuc { get; set; }
@@ -73,6 +75,8 @@ namespace dataproduct.api.DTOs
         public string? NguoiXacNhanDuc { get; set; }
         public string? NguoiXacNhanKho { get; set; }
         public string? NguoiXacNhanPKH { get; set; }
+        // Đánh dấu "đã check" của RIÊNG user đang đăng nhập (BkHrc2Slab_UserCheck) — độc lập với workflow xác nhận.
+        public bool DaCheck { get; set; }
     }
 
     public class Hrc2SlabTongHopItem
@@ -121,6 +125,12 @@ namespace dataproduct.api.DTOs
     {
         public List<int> IdSlabs { get; set; } = [];
         public Guid IdPhieu { get; set; }
+        public int NguoiThucHien { get; set; }
+    }
+
+    public class Hrc2SlabCheckRequest
+    {
+        public List<int> IdSlabs { get; set; } = [];
         public int NguoiThucHien { get; set; }
     }
 
