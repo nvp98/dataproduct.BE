@@ -112,6 +112,13 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_PB_NVL_NhomPhanBo> LG_PB_NVL_NhomPhanBo { get; set; }
     public virtual DbSet<LG_PB_Map_Xuong_LoCao> LG_PB_Map_Xuong_LoCao { get; set; }
     public virtual DbSet<LG_PB_BienBanNhanQHLCCVH> LG_PB_BienBanNhanQHLCCVH { get; set; }
+
+    // NM.TKVV — Biên bản xác nhận sản lượng
+    public virtual DbSet<TKVV_NguyenVatLieu> TKVV_NguyenVatLieu { get; set; }
+    public virtual DbSet<TKVV_SanLuongMapping> TKVV_SanLuongMapping { get; set; }
+    public virtual DbSet<TKVV_SanLuongDuLieu> TKVV_SanLuongDuLieu { get; set; }
+    public virtual DbSet<TKVV_SanLuongChiTiet> TKVV_SanLuongChiTiet { get; set; }
+    public virtual DbSet<EMS_MappingTag> EMS_MappingTag { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
     public virtual DbSet<LG_PB_KetQuaPhanBo> LG_PB_KetQuaPhanBo { get; set; }
@@ -775,6 +782,30 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<LG_PB_BienBanNhanQHLCCVH>(entity =>
         {
             entity.Property(e => e.KhoiLuongNhanVe).HasPrecision(18, 3);
+        });
+
+        modelBuilder.Entity<TKVV_SanLuongMapping>(entity =>
+        {
+            entity.ToTable("TKVV_SanLuongMapping");
+        });
+        modelBuilder.Entity<TKVV_SanLuongDuLieu>(entity =>
+        {
+            entity.ToTable("TKVV_SanLuongDuLieu");
+            entity.Property(e => e.Value).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<TKVV_SanLuongChiTiet>(entity =>
+        {
+            entity.ToTable("TKVV_SanLuongChiTiet");
+            entity.Property(e => e.Loai1).HasPrecision(18, 3);
+            entity.Property(e => e.Loai2).HasPrecision(18, 3);
+            entity.Property(e => e.Loai3).HasPrecision(18, 3);
+            entity.Property(e => e.PhePham).HasPrecision(18, 3);
+        });
+        // Không ToTable(): type này chỉ dùng qua FromSqlRaw (EXEC dbo.EMS_GetMappingTag),
+        // không có bảng/view vật lý nào trong PRODUCT_FORM để ánh xạ.
+        modelBuilder.Entity<EMS_MappingTag>(entity =>
+        {
+            entity.HasNoKey();
         });
         modelBuilder.Entity<LG_PB_TyLePhanBo>(entity =>
         {
