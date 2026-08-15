@@ -438,9 +438,15 @@ namespace dataproduct.api.Services
                 })
                 .ToList();
 
+            // LF: chỉ render cột phụ liệu nào có ĐỦ CẢ 2 — ThuTu_Excel_LF (để xác định thứ tự) VÀ
+            // LoaiPhieu = "KL"/"PG" (để xác định thuộc nhóm nào) — thiếu 1 trong 2 thì không hiện
+            // (tránh vỡ khớp cột giữa header nhóm KL/PG và dữ liệu thân bảng ở PdfThead_LF/
+            // RenderColumnHeaders_LF, vốn chỉ render đúng 2 nhóm này, không còn nhóm dự phòng).
             var headersLF = allExcelHeaders
-                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 2) != 0)
-                .OrderBy(h => h.ThuTu_Excel_LF ?? int.MaxValue)
+                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 2) != 0
+                         && h.ThuTu_Excel_LF.HasValue
+                         && (h.LoaiPhieu == "KL" || h.LoaiPhieu == "PG"))
+                .OrderBy(h => h.ThuTu_Excel_LF!.Value)
                 .ThenBy(h => h.Id)
                 .Select(h => new PhuLieuHeaderTable
                 {
@@ -752,21 +758,21 @@ namespace dataproduct.api.Services
                     RenderDataRows_BOF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_BOF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, BofFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_LF":
                     RenderColumnHeaders_LF(ws, headers, phanBoHeaders);
                     RenderDataRows_LF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_LF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_RH":
                     RenderColumnHeaders_RH(ws, headers, phanBoHeaders);
                     RenderDataRows_RH(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_RH(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 default:
                     tableLastRow = totalRow;
@@ -1188,7 +1194,7 @@ namespace dataproduct.api.Services
 
             if (headers.Count > 0)
             {
-                var (klList, pgList, otherList) = SplitByLoaiPhieuGroup(headers);
+                var (klList, pgList) = SplitByLoaiPhieuGroup(headers);
                 int col = s;
                 if (klList.Count > 0)
                 {
@@ -1202,13 +1208,6 @@ namespace dataproduct.api.Services
                     MergeHorizCell(ws, HeaderParentRow, col, col + pgList.Count - 1, "Phụ gia & chất khử oxy");
                     for (int i = 0; i < pgList.Count; i++)
                         HeaderCell(ws, HeaderChildRow, col + i, pgList[i].TenPhuLieu);
-                    col += pgList.Count;
-                }
-                if (otherList.Count > 0)
-                {
-                    MergeHorizCell(ws, HeaderParentRow, col, col + otherList.Count - 1, "Phụ gia công nghệ (Kg)");
-                    for (int i = 0; i < otherList.Count; i++)
-                        HeaderCell(ws, HeaderChildRow, col + i, otherList[i].TenPhuLieu);
                 }
             }
 
@@ -1620,18 +1619,18 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Render dòng chữ ký ở ngoài khối footer bảng (không nằm trong range apply border chung).
         /// </summary>
-        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config,
+        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config, string key,
             string? truongKipName = null, string? nguoiLapName = null)
         {
             int N = lastCol;
             int g3s = N - 3; // Tồn cuối kíp: start
             int g3e = N;     // Tồn cuối kíp: end
             int leftEnd = g3s - 1;
-
+            string leftLabel = key.Contains("BOF") ? config.LabelTruongKip : "Trưởng/Phó kíp";
             if (leftEnd >= 1)
             {
                 ws.Range(signRow, 1, signRow, leftEnd).Merge();
-                ws.Cell(signRow, 1).Value = config.LabelTruongKip;
+                ws.Cell(signRow, 1).Value = leftLabel;
                 ws.Cell(signRow, 1).Style.Font.Bold = true;
                 ws.Cell(signRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 ws.Cell(signRow, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
@@ -1846,6 +1845,7 @@ namespace dataproduct.api.Services
                     chuKyTruongKipHtml,
                     chuKyNguoiLapHtml,
                     footerData,
+                    key,
                     truongKipName,
                     nguoiLapName)
                 : "";
@@ -1896,16 +1896,16 @@ namespace dataproduct.api.Services
             return $"<thead><tr>{r1}</tr><tr>{r2}</tr></thead>";
         }
 
-        /// <summary>Gộp danh sách cột phụ liệu thành 3 khối liền nhau theo Header_Key.LoaiPhieu:
-        /// KL (Chất hợp kim hóa) → PG (Phụ gia và chất khử oxy) → còn lại (chưa gắn nhóm).
-        /// Dùng cho LF/RH — thứ tự tương đối trong từng khối giữ nguyên theo ThuTu_Excel_*.</summary>
-        private static (List<PhuLieuHeaderTable> Kl, List<PhuLieuHeaderTable> Pg, List<PhuLieuHeaderTable> Others) SplitByLoaiPhieuGroup(
+        /// <summary>Gộp danh sách cột phụ liệu thành 2 khối liền nhau theo Header_Key.LoaiPhieu:
+        /// KL (Chất hợp kim hóa) → PG (Phụ gia và chất khử oxy). LF/RH luôn gán đủ KL/PG cho mọi
+        /// phụ liệu (không có giá trị khác/NULL trong thực tế) nên không cần bucket dự phòng.
+        /// Thứ tự tương đối trong từng khối giữ nguyên theo ThuTu_Excel_*.</summary>
+        private static (List<PhuLieuHeaderTable> Kl, List<PhuLieuHeaderTable> Pg) SplitByLoaiPhieuGroup(
             List<PhuLieuHeaderTable> headers)
         {
-            var kl     = headers.Where(h => h.LoaiPhieu == "KL").ToList();
-            var pg     = headers.Where(h => h.LoaiPhieu == "PG").ToList();
-            var others = headers.Where(h => h.LoaiPhieu != "KL" && h.LoaiPhieu != "PG").ToList();
-            return (kl, pg, others);
+            var kl = headers.Where(h => h.LoaiPhieu == "KL").ToList();
+            var pg = headers.Where(h => h.LoaiPhieu == "PG").ToList();
+            return (kl, pg);
         }
 
         private static string PdfThead_LF(List<PhuLieuHeaderTable> h, List<PhuLieuHeaderTable> pb)
@@ -1920,7 +1920,7 @@ namespace dataproduct.api.Services
 
             if (h.Count > 0)
             {
-                var (klList, pgList, otherList) = SplitByLoaiPhieuGroup(h);
+                var (klList, pgList) = SplitByLoaiPhieuGroup(h);
                 if (klList.Count > 0)
                 {
                     r1.Append($"<th colspan=\"{klList.Count}\">Chất hợp kim hóa</th>");
@@ -1930,11 +1930,6 @@ namespace dataproduct.api.Services
                 {
                     r1.Append($"<th colspan=\"{pgList.Count}\">Phụ gia và chất khử oxy</th>");
                     foreach (var x in pgList) r2.Append($"<th>{x.TenPhuLieu}</th>");
-                }
-                if (otherList.Count > 0)
-                {
-                    r1.Append($"<th colspan=\"{otherList.Count}\">Phụ gia công nghệ (Kg)</th>");
-                    foreach (var x in otherList) r2.Append($"<th>{x.TenPhuLieu}</th>");
                 }
             }
 
@@ -1962,7 +1957,7 @@ namespace dataproduct.api.Services
             r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
             r1.Append("<th rowspan=\"2\">Khối lượng thép lỏng (tấn)(Tính cả thùng thép)</th>");
-    
+
             if (h.Count > 0)
             {
                 r1.Append($"<th colspan=\"{h.Count}\">Chất hợp kim hóa </th>");
@@ -2101,6 +2096,7 @@ namespace dataproduct.api.Services
             string chuKyTruongKipHtml,
             string chuKyNguoiLapHtml,
             List<STD_XUAT_NHAP_TON_HRC2>? footerData = null,
+            string key = "",
             string? truongKipName = null,
             string? nguoiLapName = null)
         {
@@ -2148,14 +2144,14 @@ namespace dataproduct.api.Services
 
             // Close footer table: sign row render tách riêng để không chịu border ngoài (outer medium) của footer.
             sb.Append("</table>");
-
+            string labelTPChuKy = key.Contains("BOF") ? config.LabelTruongKip : "Trưởng/Phó kíp";
             // Sign row (outside footer table)
             int truongKipSpan = siloSpan + g1Span + g2Span; // col 1 → N-4
             sb.Append($"<table style=\"width:100%;margin-top:20px; border:none; border-collapse:collapse;\">");
             sb.Append("<tr>");
             sb.Append(
                 $"<td colspan=\"{truongKipSpan}\" style=\"text-align:center;font-weight:bold;border:none;vertical-align:middle;\">"
-                + $"<div style=\"text-align:center;font-weight:bold;\">{config.LabelTruongKip}</div>"
+                + $"<div style=\"text-align:center;font-weight:bold;\">{labelTPChuKy}</div>"
                 + $"{(string.IsNullOrWhiteSpace(chuKyTruongKipHtml) ? "" : chuKyTruongKipHtml)}"
                 + $"{(string.IsNullOrWhiteSpace(truongKipName) ? "" : $"<div style=\"text-align:center;\">{truongKipName}</div>")}"
                 + $"</td>");
