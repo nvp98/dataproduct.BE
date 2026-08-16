@@ -11,6 +11,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
+        public string? Scope { get; set; }
+        public string? TenScope { get; set; }
     }
 
     public class CreateTKVVNguyenVatLieuDto
@@ -20,6 +22,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? DonViTinh { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
+        public string? Scope { get; set; }
+        public string? TenScope { get; set; }
     }
 
     public class UpdateTKVVNguyenVatLieuDto
@@ -30,49 +34,40 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
+        public string? Scope { get; set; }
+        public string? TenScope { get; set; }
     }
 
-    // ─── Mapping Tag PLC (TagIDEMS) -> Scope + Ca ───────────────────────────────
-    // 1 Tag = 1 BM/xưởng/ca (báo TỔNG khối lượng cả ca) — ca ngày và ca đêm dùng 2
-    // Tag khác nhau nên bắt buộc khai báo Ca. Không gắn với 1 sản phẩm cụ thể —
-    // KTV/KCS tự chọn sản phẩm và tự chia Loại 1/2/3/Phế phẩm khi nhập biên bản.
+    // ─── Mapping NVL ↔ Tag EMS + Ca (bảng TKVV_NVL_TagMapping) ─────────────────
+    // 1 bản ghi = 1 NVL dùng TagIDEMS nào ở Ca nào. Scope không lưu ở mapping —
+    // kế thừa từ TKVV_NguyenVatLieu.Scope qua NguyenVatLieuID.
 
     public class TKVVMappingDto
     {
-        public long Id { get; set; }
-        public string TagID { get; set; } = string.Empty;
-        public string MaKey { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public int? ThuTu { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
+        public int Id { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string? TenNVL { get; set; }
+        public string? ScopeNVL { get; set; }
+        public string TagIDEMS { get; set; } = string.Empty;
+        public int Ca { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
-        public DateTime NgayTao { get; set; }
+        public DateTime NgayCapNhat { get; set; }
     }
 
     public class CreateTKVVMappingDto
     {
-        public string TagID { get; set; } = string.Empty;
-        public string MaKey { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public int? ThuTu { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string TagIDEMS { get; set; } = string.Empty;
+        public int Ca { get; set; }
         public string? GhiChu { get; set; }
     }
 
     public class UpdateTKVVMappingDto
     {
-        public string TagID { get; set; } = string.Empty;
-        public string MaKey { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public int? ThuTu { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string TagIDEMS { get; set; } = string.Empty;
+        public int Ca { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
     }
@@ -88,6 +83,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int Id { get; set; }
         public string Xuong { get; set; } = string.Empty;
         public string? Loai { get; set; }
+        public string? MaCan { get; set; }
         public string? TenCan { get; set; }
         public string TagIDEMS { get; set; } = string.Empty;
         public string TagName { get; set; } = string.Empty;

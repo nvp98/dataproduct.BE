@@ -2,18 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace dataproduct.api.Models
 {
-    // Mapping Tag PLC (TagIDEMS) -> Scope (xưởng) + Ca. 1 Tag = 1 BM/xưởng/ca (báo
-    // TỔNG khối lượng cả ca) — ca ngày và ca đêm dùng 2 Tag khác nhau nên bắt buộc
-    // khai báo Ca. Không gắn với 1 sản phẩm cụ thể — KTV/KCS tự chọn sản phẩm VÀ tự
-    // chia Loại 1/2/3/Phế phẩm khi nhập biên bản.
+    // Mapping Tag PLC -> Scope + Ca + PhanLoai dùng cho tích lũy sản lượng PLC.
+    // Bảng này cấu hình cách gán dữ liệu từ TKVV_SanLuongDuLieu vào đúng xưởng/ca/loại.
+    // Khác với TKVV_NVL_TagMapping — bảng đó quản lý NVL ↔ TagIDEMS cho admin UI.
     public class TKVV_SanLuongMapping
     {
         [Key]
         public long ID { get; set; }
         public string TagID { get; set; } = string.Empty;
-        public string MaKey { get; set; } = string.Empty;
+        public string? MaKey { get; set; }
         public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
+        public string? PhanLoai { get; set; }
         public int? ThuTu { get; set; }
         public DateOnly? TuNgay { get; set; }
         public DateOnly? DenNgay { get; set; }
@@ -21,5 +20,6 @@ namespace dataproduct.api.Models
         public string? GhiChu { get; set; }
         public DateTime NgayTao { get; set; }
         public int? NguoiTaoID { get; set; }
+        public byte Ca { get; set; }
     }
 }

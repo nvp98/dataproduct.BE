@@ -16,8 +16,8 @@ namespace dataproduct.api.Services
 
         // ─── Danh mục NVL ────────────────────────────────────────────────────
 
-        public Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM)
-            => _repo.GetNvlListAsync(maBM);
+        public Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope)
+            => _repo.GetNvlListAsync(maBM, scope);
 
         public async Task<TKVVNguyenVatLieuDto?> GetNvlByIdAsync(int id)
         {
@@ -35,6 +35,8 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 GhiChu = dto.GhiChu,
                 TrangThai = true,
+                Scope = dto.Scope,
+                TenScope = dto.TenScope,
             };
             var result = await _repo.AddNvlAsync(entity);
             return MapNvl(result);
@@ -50,6 +52,8 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 TrangThai = dto.TrangThai,
                 GhiChu = dto.GhiChu,
+                Scope = dto.Scope,
+                TenScope = dto.TenScope,
             };
             var result = await _repo.UpdateNvlAsync(id, entity);
             return result == null ? null : MapNvl(result);
@@ -66,16 +70,17 @@ namespace dataproduct.api.Services
             ThuTu = e.ThuTu,
             TrangThai = e.TrangThai,
             GhiChu = e.GhiChu,
+            Scope = e.Scope,
+            TenScope = e.TenScope,
         };
 
-        // ─── Mapping (Tag PLC -> Scope, không gắn sản phẩm/Loại) ────────────────
-        // 1 Tag = 1 BM/xưởng, báo TỔNG khối lượng cả ca — KTV/KCS tự chọn sản
-        // phẩm và tự chia Loại 1/2/3/Phế phẩm khi nhập biên bản.
+        // ─── Mapping NVL ↔ Tag EMS + Ca ─────────────────────────────────────────
+        // Scope kế thừa từ NVL — không lưu lại ở bảng mapping.
 
-        public Task<List<TKVVMappingDto>> GetMappingListAsync(string? scope, string? tagID, int? ca)
-            => _repo.GetMappingListAsync(scope, tagID, ca);
+        public Task<List<TKVVMappingDto>> GetMappingListAsync()
+            => _repo.GetMappingListAsync();
 
-        public async Task<TKVVMappingDto?> GetMappingByIdAsync(long id)
+        public async Task<TKVVMappingDto?> GetMappingByIdAsync(int id)
         {
             var e = await _repo.GetMappingByIdAsync(id);
             return e == null ? null : MapMapping(e);
@@ -83,15 +88,11 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVMappingDto> AddMappingAsync(CreateTKVVMappingDto dto)
         {
-            var entity = new TKVV_SanLuongMapping
+            var entity = new TKVV_NVL_TagMapping
             {
-                TagID = dto.TagID,
-                MaKey = dto.MaKey,
-                Scope = dto.Scope,
+                NguyenVatLieuID = dto.NguyenVatLieuID,
+                TagIDEMS = dto.TagIDEMS,
                 Ca = dto.Ca,
-                ThuTu = dto.ThuTu,
-                TuNgay = dto.TuNgay,
-                DenNgay = dto.DenNgay,
                 GhiChu = dto.GhiChu,
                 TrangThai = true,
             };
@@ -99,17 +100,13 @@ namespace dataproduct.api.Services
             return MapMapping(result);
         }
 
-        public async Task<TKVVMappingDto?> UpdateMappingAsync(long id, UpdateTKVVMappingDto dto)
+        public async Task<TKVVMappingDto?> UpdateMappingAsync(int id, UpdateTKVVMappingDto dto)
         {
-            var entity = new TKVV_SanLuongMapping
+            var entity = new TKVV_NVL_TagMapping
             {
-                TagID = dto.TagID,
-                MaKey = dto.MaKey,
-                Scope = dto.Scope,
+                NguyenVatLieuID = dto.NguyenVatLieuID,
+                TagIDEMS = dto.TagIDEMS,
                 Ca = dto.Ca,
-                ThuTu = dto.ThuTu,
-                TuNgay = dto.TuNgay,
-                DenNgay = dto.DenNgay,
                 TrangThai = dto.TrangThai,
                 GhiChu = dto.GhiChu,
             };
@@ -117,21 +114,17 @@ namespace dataproduct.api.Services
             return result == null ? null : MapMapping(result);
         }
 
-        public Task<bool> DeleteMappingAsync(long id) => _repo.DeleteMappingAsync(id);
+        public Task<bool> DeleteMappingAsync(int id) => _repo.DeleteMappingAsync(id);
 
-        private static TKVVMappingDto MapMapping(TKVV_SanLuongMapping e) => new()
+        private static TKVVMappingDto MapMapping(TKVV_NVL_TagMapping e) => new()
         {
             Id = e.ID,
-            TagID = e.TagID,
-            MaKey = e.MaKey,
-            Scope = e.Scope,
+            NguyenVatLieuID = e.NguyenVatLieuID,
+            TagIDEMS = e.TagIDEMS,
             Ca = e.Ca,
-            ThuTu = e.ThuTu,
-            TuNgay = e.TuNgay,
-            DenNgay = e.DenNgay,
             TrangThai = e.TrangThai,
             GhiChu = e.GhiChu,
-            NgayTao = e.NgayTao,
+            NgayCapNhat = e.NgayCapNhat,
         };
 
         // ─── Danh sách Tag PLC từ EMS để chọn khi tạo Mapping ──────────────────
@@ -149,6 +142,7 @@ namespace dataproduct.api.Services
                     Id = x.ID,
                     Xuong = x.Xuong?.Trim() ?? string.Empty,
                     Loai = x.Loai?.Trim(),
+                    MaCan = x.MaCan?.Trim(),
                     TenCan = x.TenCan?.Trim(),
                     TagIDEMS = x.TagIDEMS!.Value.ToString(),
                     TagName = x.TagName?.Trim() ?? string.Empty,

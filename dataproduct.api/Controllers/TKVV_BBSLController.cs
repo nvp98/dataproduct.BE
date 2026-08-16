@@ -18,9 +18,9 @@ namespace dataproduct.api.Controllers
         // ─── Danh mục NVL ────────────────────────────────────────────────────
 
         [HttpGet("get-nvl")]
-        public async Task<IActionResult> GetNvlList([FromQuery] string? maBM)
+        public async Task<IActionResult> GetNvlList([FromQuery] string? maBM, [FromQuery] string? scope)
         {
-            try { return Ok(await _service.GetNvlListAsync(maBM)); }
+            try { return Ok(await _service.GetNvlListAsync(maBM, scope)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
@@ -71,15 +71,14 @@ namespace dataproduct.api.Controllers
         // ─── Mapping ─────────────────────────────────────────────────────────
 
         [HttpGet("get-mapping")]
-        public async Task<IActionResult> GetMappingList(
-            [FromQuery] string? scope, [FromQuery] string? tagID, [FromQuery] int? ca)
+        public async Task<IActionResult> GetMappingList()
         {
-            try { return Ok(await _service.GetMappingListAsync(scope, tagID, ca)); }
+            try { return Ok(await _service.GetMappingListAsync()); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
         [HttpGet("get-mapping/{id}")]
-        public async Task<IActionResult> GetMappingById(long id)
+        public async Task<IActionResult> GetMappingById(int id)
         {
             try
             {
@@ -101,7 +100,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpPut("update-mapping/{id}")]
-        public async Task<IActionResult> UpdateMapping(long id, [FromBody] UpdateTKVVMappingDto dto)
+        public async Task<IActionResult> UpdateMapping(int id, [FromBody] UpdateTKVVMappingDto dto)
         {
             try
             {
@@ -112,7 +111,7 @@ namespace dataproduct.api.Controllers
         }
 
         [HttpDelete("delete-mapping/{id}")]
-        public async Task<IActionResult> DeleteMapping(long id)
+        public async Task<IActionResult> DeleteMapping(int id)
         {
             try
             {
@@ -129,7 +128,7 @@ namespace dataproduct.api.Controllers
         public async Task<IActionResult> GetEmsTagList([FromQuery] string? xuong, [FromQuery] string? tagName)
         {
             try { return Ok(await _service.GetEmsTagListAsync(xuong, tagName)); }
-            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message, detail = ex.InnerException?.Message }); }
         }
 
         // ─── Dữ liệu sản lượng ────────────────────────────────────────────────

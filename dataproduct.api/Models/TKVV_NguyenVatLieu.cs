@@ -13,5 +13,7 @@ namespace dataproduct.api.Models
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; } = true;
         public string? GhiChu { get; set; }
+        public string? Scope { get; set; }
+        public string? TenScope { get; set; }
     }
 }

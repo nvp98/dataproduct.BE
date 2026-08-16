@@ -6,18 +6,18 @@ namespace dataproduct.api.Repositories
     public interface ITKVV_BBSLRepository
     {
         // Danh mục NVL (sản phẩm theo biểu mẫu)
-        Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM);
+        Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope);
         Task<TKVV_NguyenVatLieu?> GetNvlByIdAsync(int id);
         Task<TKVV_NguyenVatLieu> AddNvlAsync(TKVV_NguyenVatLieu entity);
         Task<TKVV_NguyenVatLieu?> UpdateNvlAsync(int id, TKVV_NguyenVatLieu entity);
         Task<bool> DeleteNvlAsync(int id);
 
-        // Mapping Tag PLC -> Scope + Ca
-        Task<List<TKVVMappingDto>> GetMappingListAsync(string? scope, string? tagID, int? ca);
-        Task<TKVV_SanLuongMapping?> GetMappingByIdAsync(long id);
-        Task<TKVV_SanLuongMapping> AddMappingAsync(TKVV_SanLuongMapping entity);
-        Task<TKVV_SanLuongMapping?> UpdateMappingAsync(long id, TKVV_SanLuongMapping entity);
-        Task<bool> DeleteMappingAsync(long id);
+        // Mapping NVL ↔ Tag EMS + Ca (TKVV_NVL_TagMapping)
+        Task<List<TKVVMappingDto>> GetMappingListAsync();
+        Task<TKVV_NVL_TagMapping?> GetMappingByIdAsync(int id);
+        Task<TKVV_NVL_TagMapping> AddMappingAsync(TKVV_NVL_TagMapping entity);
+        Task<TKVV_NVL_TagMapping?> UpdateMappingAsync(int id, TKVV_NVL_TagMapping entity);
+        Task<bool> DeleteMappingAsync(int id);
 
         // Danh sách Tag PLC từ EMS (dbo.EMS_GetMappingTag) để chọn khi tạo Mapping
         Task<List<EMS_MappingTag>> GetEmsTagListAsync(string? xuong, string? tagName);

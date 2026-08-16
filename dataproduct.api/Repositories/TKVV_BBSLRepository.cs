@@ -30,10 +30,11 @@ namespace dataproduct.api.Repositories
 
         // ─── Danh mục NVL ────────────────────────────────────────────────────
 
-        public async Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM)
+        public async Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope)
         {
             return await _context.TKVV_NguyenVatLieu
-                .Where(x => maBM == null || x.MaBM == maBM)
+                .Where(x => (maBM == null || x.MaBM == maBM)
+                         && (scope == null || x.Scope == scope))
                 .OrderBy(x => x.ThuTu)
                 .Select(x => new TKVVNguyenVatLieuDto
                 {
@@ -44,6 +45,8 @@ namespace dataproduct.api.Repositories
                     ThuTu = x.ThuTu,
                     TrangThai = x.TrangThai,
                     GhiChu = x.GhiChu,
+                    Scope = x.Scope,
+                    TenScope = x.TenScope,
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -70,6 +73,8 @@ namespace dataproduct.api.Repositories
             existing.ThuTu = entity.ThuTu;
             existing.TrangThai = entity.TrangThai;
             existing.GhiChu = entity.GhiChu;
+            existing.Scope = entity.Scope;
+            existing.TenScope = entity.TenScope;
 
             await _context.SaveChangesAsync();
             return existing;
@@ -84,85 +89,121 @@ namespace dataproduct.api.Repositories
             return true;
         }
 
-        // ─── Mapping ─────────────────────────────────────────────────────────
+        // ─── Mapping NVL ↔ Tag EMS + Ca ──────────────────────────────────────
 
-        public async Task<List<TKVVMappingDto>> GetMappingListAsync(string? scope, string? tagID, int? ca)
+        public async Task<List<TKVVMappingDto>> GetMappingListAsync()
         {
             return await (
-                from m in _context.TKVV_SanLuongMapping
-                where (scope == null || m.Scope == scope)
-                   && (tagID == null || m.TagID == tagID)
-                   && (ca == null || m.Ca == (byte)ca)
-                orderby m.Scope, m.Ca, m.ThuTu
+                from m in _context.TKVV_NVL_TagMapping
+                join n in _context.TKVV_NguyenVatLieu on m.NguyenVatLieuID equals n.ID
+                orderby n.Scope, m.Ca, n.ThuTu
                 select new TKVVMappingDto
                 {
                     Id = m.ID,
-                    TagID = m.TagID,
-                    MaKey = m.MaKey,
-                    Scope = m.Scope,
+                    NguyenVatLieuID = m.NguyenVatLieuID,
+                    TenNVL = n.TenNVL,
+                    ScopeNVL = n.Scope,
+                    TagIDEMS = m.TagIDEMS,
                     Ca = m.Ca,
-                    ThuTu = m.ThuTu,
-                    TuNgay = m.TuNgay,
-                    DenNgay = m.DenNgay,
                     TrangThai = m.TrangThai,
                     GhiChu = m.GhiChu,
-                    NgayTao = m.NgayTao,
+                    NgayCapNhat = m.NgayCapNhat,
                 }
             ).AsNoTracking().ToListAsync();
         }
 
-        public async Task<TKVV_SanLuongMapping?> GetMappingByIdAsync(long id)
-            => await _context.TKVV_SanLuongMapping.FindAsync(id);
+        public async Task<TKVV_NVL_TagMapping?> GetMappingByIdAsync(int id)
+            => await _context.TKVV_NVL_TagMapping.FindAsync(id);
 
-        public async Task<TKVV_SanLuongMapping> AddMappingAsync(TKVV_SanLuongMapping entity)
+        public async Task<TKVV_NVL_TagMapping> AddMappingAsync(TKVV_NVL_TagMapping entity)
         {
-            entity.NgayTao = DateTime.Now;
-            await _context.TKVV_SanLuongMapping.AddAsync(entity);
+            entity.NgayCapNhat = DateTime.Now;
+            await _context.TKVV_NVL_TagMapping.AddAsync(entity);
             await _context.SaveChangesAsync();
             return entity;
         }
 
-        public async Task<TKVV_SanLuongMapping?> UpdateMappingAsync(long id, TKVV_SanLuongMapping entity)
+        public async Task<TKVV_NVL_TagMapping?> UpdateMappingAsync(int id, TKVV_NVL_TagMapping entity)
         {
-            var existing = await _context.TKVV_SanLuongMapping.FindAsync(id);
+            var existing = await _context.TKVV_NVL_TagMapping.FindAsync(id);
             if (existing == null) return null;
 
-            existing.TagID = entity.TagID;
-            existing.MaKey = entity.MaKey;
-            existing.Scope = entity.Scope;
+            existing.NguyenVatLieuID = entity.NguyenVatLieuID;
+            existing.TagIDEMS = entity.TagIDEMS;
             existing.Ca = entity.Ca;
-            existing.ThuTu = entity.ThuTu;
-            existing.TuNgay = entity.TuNgay;
-            existing.DenNgay = entity.DenNgay;
-            existing.TrangThai = entity.TrangThai;
             existing.GhiChu = entity.GhiChu;
+            existing.TrangThai = entity.TrangThai;
+            existing.NgayCapNhat = DateTime.Now;
 
             await _context.SaveChangesAsync();
             return existing;
         }
 
-        public async Task<bool> DeleteMappingAsync(long id)
+        public async Task<bool> DeleteMappingAsync(int id)
         {
-            var existing = await _context.TKVV_SanLuongMapping.FindAsync(id);
+            var existing = await _context.TKVV_NVL_TagMapping.FindAsync(id);
             if (existing == null) return false;
             existing.TrangThai = false;
+            existing.NgayCapNhat = DateTime.Now;
             await _context.SaveChangesAsync();
             return true;
         }
 
         // ─── Danh sách Tag PLC từ EMS (dbo.EMS_GetMappingTag) ───────────────────
-        // Đọc EMS_MAPPING_TAG qua linked server SQL_OT.DATA_SANXUAT — chỉ để hiển
-        // thị cho admin chọn khi tạo Mapping, không lưu lại ở PRODUCT_FORM.
+        // Đọc EMS_MAPPING_TAG qua linked server — chỉ để hiển thị cho admin chọn
+        // khi tạo Mapping, không lưu lại ở PRODUCT_FORM.
+        // Dùng raw ADO.NET thay vì FromSqlRaw vì linked server SP không composable
+        // và type cột TagIDEMS có thể không khớp với long? khi EF Core map.
         public async Task<List<EMS_MappingTag>> GetEmsTagListAsync(string? xuong, string? tagName)
         {
-            return await _context.EMS_MappingTag
-                .FromSqlRaw(
-                    "EXEC dbo.EMS_GetMappingTag @Xuong, @TagIDEMS, @TagName",
-                    new SqlParameter("@Xuong", (object?)xuong ?? DBNull.Value),
-                    new SqlParameter("@TagIDEMS", DBNull.Value),
-                    new SqlParameter("@TagName", (object?)tagName ?? DBNull.Value)
-                )
-                .ToListAsync();
+            var result = new List<EMS_MappingTag>();
+
+            var conn = _context.Database.GetDbConnection();
+            var wasOpen = conn.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "dbo.EMS_GetMappingTag";
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.CommandTimeout = 30;
+
+                var pXuong = new SqlParameter("@Xuong", (object?)xuong ?? DBNull.Value);
+                var pTagID = new SqlParameter("@TagIDEMS", DBNull.Value);
+                var pTagName = new SqlParameter("@TagName", (object?)tagName ?? DBNull.Value);
+                cmd.Parameters.Add(pXuong);
+                cmd.Parameters.Add(pTagID);
+                cmd.Parameters.Add(pTagName);
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new EMS_MappingTag
+                    {
+                        ID           = reader["ID"] == DBNull.Value ? 0 : Convert.ToInt32(reader["ID"]),
+                        Xuong        = reader["Xuong"] == DBNull.Value ? null : reader["Xuong"].ToString(),
+                        Loai         = reader["Loai"] == DBNull.Value ? null : reader["Loai"].ToString(),
+                        TenNVL       = reader["TenNVL"] == DBNull.Value ? null : reader["TenNVL"].ToString(),
+                        TenCan       = reader["TenCan"] == DBNull.Value ? null : reader["TenCan"].ToString(),
+                        MaCan        = reader["MaCan"] == DBNull.Value ? null : reader["MaCan"].ToString(),
+                        AddressPLC   = reader["AddressPLC"] == DBNull.Value ? null : reader["AddressPLC"].ToString(),
+                        IPPLC        = reader["IPPLC"] == DBNull.Value ? null : reader["IPPLC"].ToString(),
+                        LoaiDuLieu   = reader["LoaiDuLieu"] == DBNull.Value ? null : reader["LoaiDuLieu"].ToString(),
+                        TagIDEMS     = reader["TagIDEMS"] == DBNull.Value ? null : Convert.ToInt64(reader["TagIDEMS"]),
+                        TagName      = reader["TagName"] == DBNull.Value ? null : reader["TagName"].ToString(),
+                        GhiChu       = reader["GhiChu"] == DBNull.Value ? null : reader["GhiChu"].ToString(),
+                        NgayCapNhat  = reader["NgayCapNhat"] == DBNull.Value ? DateTime.MinValue : Convert.ToDateTime(reader["NgayCapNhat"]),
+                        IsDelete     = reader["IsDelete"] == DBNull.Value ? false : Convert.ToBoolean(reader["IsDelete"]),
+                    });
+                }
+            }
+            finally
+            {
+                if (!wasOpen) await conn.CloseAsync();
+            }
+
+            return result;
         }
 
         // ─── Dữ liệu PLC thô ─────────────────────────────────────────────────

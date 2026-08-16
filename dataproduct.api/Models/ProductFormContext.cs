@@ -116,6 +116,7 @@ public partial class ProductFormContext : DbContext
     // NM.TKVV — Biên bản xác nhận sản lượng
     public virtual DbSet<TKVV_NguyenVatLieu> TKVV_NguyenVatLieu { get; set; }
     public virtual DbSet<TKVV_SanLuongMapping> TKVV_SanLuongMapping { get; set; }
+    public virtual DbSet<TKVV_NVL_TagMapping> TKVV_NVL_TagMapping { get; set; }
     public virtual DbSet<TKVV_SanLuongDuLieu> TKVV_SanLuongDuLieu { get; set; }
     public virtual DbSet<TKVV_SanLuongChiTiet> TKVV_SanLuongChiTiet { get; set; }
     public virtual DbSet<EMS_MappingTag> EMS_MappingTag { get; set; }
@@ -787,6 +788,10 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<TKVV_SanLuongMapping>(entity =>
         {
             entity.ToTable("TKVV_SanLuongMapping");
+        });
+        modelBuilder.Entity<TKVV_NVL_TagMapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_TagMapping");
         });
         modelBuilder.Entity<TKVV_SanLuongDuLieu>(entity =>
         {
