@@ -572,7 +572,10 @@ namespace dataproduct.api.Repositories
                 });
             }
 
-            response.IncompleteCount = response.Items.Count(x => x.TinhTrang.HasValue && x.TinhTrang.Value != 2);
+            // Đếm cả tab "Chưa có phiếu" (TinhTrang null, không match được phiếu nào) là chưa hoàn thành —
+            // trước đây dùng x.TinhTrang.HasValue && ... nên tab chưa tạo phiếu bị bỏ qua khỏi
+            // IncompleteCount, khiến CanPhanBo tính true dù còn nhiều lò/TL chưa có phiếu Hoàn thành.
+            response.IncompleteCount = response.Items.Count(x => x.TinhTrang != 2);
             response.CanPhanBo = response.IncompleteCount == 0;
             return response;
         }

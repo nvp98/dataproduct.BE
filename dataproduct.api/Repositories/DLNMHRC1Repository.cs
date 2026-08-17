@@ -87,26 +87,34 @@ namespace dataproduct.api.Repositories
                                 ? nm?.ThuTu_Excel_LF
                                 : nm?.ThuTu_Excel_BOF;
 
-                            model.phuLieus.Add(new HeaderKeyGroupedByReportNoModel
-                            {
-                                ID_PhuLieu = r.PhuLieuID.Value,
-                                TenPhuLieu = tenPhuLieu,
-                                KLPhuGia = (double?)r.KLPhuGia,
-                                KLPhuGiaTotal = (double?)r.KLPhuGia,
-                                IsManual = r.IsManual,
-                                KLPhuGia_Manual = (double?)r.KLPhuGia_Manual,
-                                ThuTu = thuTuExcel,
-                            });
-
-                            // KLPhanBo: 1 cột duy nhất trên cùng dòng (không phải record riêng như HRC2)
-                            if (r.KLPhanBo.HasValue)
+                            // Record phân bổ chênh lệch (IsPhanBo=true, ghi bởi STD_XNT_HRC1Repository.PhanBoAsync)
+                            // dùng CHUNG PhuLieuID với record đo thật (IsPhanBo=false) nhưng KHÁC dòng — phải tách
+                            // riêng ra model.phanBoPhulieus (giống HRC2), KHÔNG được gộp chung vào model.phuLieus
+                            // kẻo FE ghi đè giá trị đo thật bằng giá trị phân bổ khi 2 record trùng PhuLieuID.
+                            // TRƯỚC ĐÂY tách theo cột KLPhanBo (thiết kế "1 cột trên cùng dòng") nhưng PhanBoAsync
+                            // không bao giờ ghi cột đó (ghi KLPhuGia trên record IsPhanBo=true riêng) — khiến
+                            // phanBoPhulieus luôn rỗng còn phuLieus lẫn cả 2 loại record.
+                            if (r.IsPhanBo)
                             {
                                 model.phanBoPhulieus.Add(new HeaderKeyGroupedByReportNoModel
                                 {
                                     ID_PhuLieu = r.PhuLieuID.Value,
                                     TenPhuLieu = tenPhuLieu,
-                                    KLPhuGia = (double?)r.KLPhanBo,
-                                    KLPhuGiaTotal = (double?)r.KLPhanBo,
+                                    KLPhuGia = (double?)r.KLPhuGia,
+                                    KLPhuGiaTotal = (double?)r.KLPhuGia,
+                                });
+                            }
+                            else
+                            {
+                                model.phuLieus.Add(new HeaderKeyGroupedByReportNoModel
+                                {
+                                    ID_PhuLieu = r.PhuLieuID.Value,
+                                    TenPhuLieu = tenPhuLieu,
+                                    KLPhuGia = (double?)r.KLPhuGia,
+                                    KLPhuGiaTotal = (double?)r.KLPhuGia,
+                                    IsManual = r.IsManual,
+                                    KLPhuGia_Manual = (double?)r.KLPhuGia_Manual,
+                                    ThuTu = thuTuExcel,
                                 });
                             }
                         }
