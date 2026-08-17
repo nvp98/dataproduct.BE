@@ -62,7 +62,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                await _phanBoService.ChotPhanBoAsync(dto.Ngay, dto.IdNguoiXacNhan);
+                await _phanBoService.ChotPhanBoAsync(dto.Ngay, dto.Ca, dto.IdLoCao, dto.IdNguoiXacNhan);
                 return Ok(new { message = "Đã chốt phân bổ." });
             }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
@@ -74,7 +74,7 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                await _phanBoService.HuyChotPhanBoAsync(dto.Ngay, dto.IdNguoiXacNhan);
+                await _phanBoService.HuyChotPhanBoAsync(dto.Ngay, dto.Ca, dto.IdLoCao, dto.IdNguoiXacNhan);
                 return Ok(new { message = "Đã hủy chốt phân bổ." });
             }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
@@ -179,8 +179,9 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                var soLuong = await _tyLePhanBoService.CreateForNhomAsync(dto);
-                return Ok(new { message = $"Đã áp dụng % cho {soLuong} NVL trong nhóm." });
+                var (soCapNhat, soGiuNguyen) = await _tyLePhanBoService.CreateForNhomAsync(dto);
+                var ghiChuGiuNguyen = soGiuNguyen > 0 ? $" ({soGiuNguyen} NVL đang có % riêng được giữ nguyên)" : "";
+                return Ok(new { message = $"Đã áp dụng % cho {soCapNhat} NVL trong nhóm.{ghiChuGiuNguyen}" });
             }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
@@ -211,6 +212,15 @@ namespace dataproduct.api.Controllers
         {
             try { return Ok(await _tyLePhanBoService.CreateAsync(dto)); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // true nếu BẤT KỲ lò cao nào của (Ngày, Ca) đã chốt — vì tỷ lệ dùng chung cho mọi lò cao,
+        // dùng để FE khóa UI sửa % đúng theo phạm vi mà backend thực sự chặn (không phải riêng 1 lò cao)
+        [HttpGet("ty-le/is-ca-da-chot")]
+        public async Task<IActionResult> IsCaDaChot([FromQuery] DateTime ngay, [FromQuery] byte ca)
+        {
+            try { return Ok(await _tyLePhanBoService.IsCaDaChotAsync(ngay, ca)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
     }

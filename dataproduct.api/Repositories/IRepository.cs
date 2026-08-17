@@ -444,6 +444,10 @@ namespace dataproduct.api.Repositories
         // Tỷ lệ hiệu lực tại (ngay, ca) cho từng NVL: ưu tiên bản ghi đúng ca, fallback bản ghi Ca=NULL (áp dụng chung cả ngày)
         Task<Dictionary<int, decimal>> GetHieuLucMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte? ca);
 
+        // Bản ghi ĐÚNG (Ngay, Ca) — không fallback Ca=NULL — dùng để so sánh "NVL này đang giữ đúng % nhóm
+        // hay đã bị sửa riêng", vì cascade nhóm luôn ghi với Ca cụ thể (không dùng Ca=NULL)
+        Task<Dictionary<int, decimal>> GetExactMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte ca);
+
         // Ghi đè nếu đã có bản ghi cho đúng (IDNVL, Ngay, Ca) — cho phép sửa nhiều lần trước khi chốt
         Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity);
 
@@ -472,11 +476,17 @@ namespace dataproduct.api.Repositories
 
     public interface IKetQuaPhanBoRepository
     {
-        Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo);
+        // Chốt/kiểm tra chốt luôn theo ĐÚNG (Ngày, Ca, Lò cao, Loại phân bổ) — không ảnh hưởng ca/lò cao khác
+        Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao);
+        // LG_PB_TyLePhanBo không lưu Lò cao (tỷ lệ dùng chung cho NVL đó ở mọi lò cao) — kiểm tra chốt ở
+        // BẤT KỲ lò cao nào của (Ngày, Ca) này để tránh sửa tỷ lệ ảnh hưởng ngược lò cao đã chốt.
+        Task<bool> IsCaDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca);
+        // Tập (Ca, Lò cao) đã chốt của 1 (Ngày, Loại phân bổ) — dùng để bỏ qua khi tính lại cả ngày
+        Task<List<(byte Ca, int IdLoCao)>> GetChotSetAsync(DateTime ngay, byte loaiPhanBo);
         Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
         Task<List<LG_PB_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
-        Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan);
-        Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo);
+        Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao, int idNguoiXacNhan);
+        Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao);
         Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
 
         // Gán/sửa Mã công đoạn chi phí (DQ1/DQ2) cho toàn bộ dòng NHÁP (TrangThai=0) của 1 NVL trong ngày —
