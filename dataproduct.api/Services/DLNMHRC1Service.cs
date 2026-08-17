@@ -335,12 +335,20 @@ namespace dataproduct.api.Services
                 var queDoNhiet = TryGetInt(row, "queDoNhiet");
                 var ghiChu = row.TryGetProperty("ghiChu", out var gcProp) && gcProp.ValueKind == JsonValueKind.String
                     ? gcProp.GetString() : null;
+                // MacThep/KLThepPhe: FE cho sửa trên dòng NM (allowEditMacThepOnNMRow + không readonly ở
+                // config), phải đọc ra ở đây để SaveHRC1ManualDataAsync có giá trị mà lưu — thiếu 2 dòng
+                // này trước đây khiến mọi chỉnh sửa MacThep/KLThepPhe trên dòng NM bị âm thầm rớt mất.
+                var macThep = row.TryGetProperty("macThep", out var mtNM) && mtNM.ValueKind == JsonValueKind.String
+                    ? mtNM.GetString() : null;
+                var klThepPhe = TryGetDecimal(row, "klThepPhe");
 
                 if (isNMRow)
                 {
-                    // Mẻ từ NM: chỉ các trường nhập tay (khí + que + ghi chú) được phép sửa qua form.
+                    // Mẻ từ NM: chỉ các trường nhập tay (khí + que + ghi chú + mác thép + thép phế) được
+                    // phép sửa qua form — các trường NM khác (MeThoi, KLGang, ngày giờ...) không đụng.
                     if (!phuLieus.Any() && o2 == null && n2 == null && ar == null
-                        && queLayMau == null && queDoNhiet == null && ghiChu == null)
+                        && queLayMau == null && queDoNhiet == null && ghiChu == null
+                        && macThep == null && klThepPhe == null)
                         continue;
 
                     result.Add(new Hrc1InsertModel
@@ -350,6 +358,8 @@ namespace dataproduct.api.Services
                         Ca = (byte)ca,
                         Scope = scope,
                         MeThoi = meThoi!,
+                        MacThep = macThep,
+                        KLThepPhe = klThepPhe,
                         O2 = o2,
                         N2 = n2,
                         AR = ar,
@@ -495,8 +505,16 @@ namespace dataproduct.api.Services
                     klPhuGiaManual = currentNumeric;
                 }
 
-                // Chỉ skip khi không phải manual — record manual có thể cần dọn dẹp record cũ trong DB
-                if (!isManual && (klPhuGia == null || klPhuGia == 0) && (klPhuGiaManual == null || klPhuGiaManual == 0))
+                // Chỉ skip khi không phải manual VÀ không phải cột "Thêm cột điều chỉnh" — record manual
+                // có thể cần dọn dẹp record cũ trong DB. Cột isAddManualColumn PHẢI luôn được giữ lại dù
+                // isManual tính ra false: cột này không có baseline NM nào để "pass-through" (không giống
+                // 13 phụ liệu cố định), nên khi user xóa trắng giá trị, __orig phía FE (CustomTableHRC
+                // applyAndEmitCellChange) là null và giá trị hiện tại cũng rỗng → so sánh chuỗi "" === ""
+                // khiến FE tính isManualCell=false và sanitizeRowsBeforeSubmit xóa luôn __orig/__IsManual
+                // trước khi gửi lên. Nếu vẫn skip ở đây thì record cũ (KLPhuGia_Manual còn giá trị cũ)
+                // không bao giờ được chạm tới để dọn — đúng bug "khối lượng phụ liệu vẫn dính dữ liệu cũ".
+                if (!isManual && !isAddManualColumn
+                    && (klPhuGia == null || klPhuGia == 0) && (klPhuGiaManual == null || klPhuGiaManual == 0))
                     continue;
 
                 result.Add(new Hrc1_PhuLieuInsertModel
@@ -595,15 +613,61 @@ namespace dataproduct.api.Services
                     ? existingRows.FirstOrDefault(x => x.ID == model.Id.Value)
                     : null;
 
-                // IsNM=true: chỉ cho phép sửa các field nhập tay, không đụng field NM khác
+                // IsNM=true: chỉ cho phép sửa các field nhập tay (kể cả MacThep/KLThepPhe — FE cho sửa
+                // 2 field này trên dòng NM qua allowEditMacThepOnNMRow/không readonly, không đụng field
+                // NM khác như MeThoi/KLGang...). IsEdited chỉ bật khi giá trị THỰC SỰ đổi so với bản ghi
+                // hiện có — payload Lưu luôn gửi nguyên bảng (mọi mẻ đang hiển thị), không riêng dòng
+                // vừa sửa, nên so sánh trước khi gán để tránh mọi dòng NM bị đánh dấu "đã sửa" chỉ vì
+                // nằm trong lần lưu.
                 if (existing != null && existing.IsNM)
                 {
-                    if (model.O2.HasValue) existing.O2 = model.O2;
-                    if (model.N2.HasValue) existing.N2 = model.N2;
-                    if (model.AR.HasValue) existing.AR = model.AR;
-                    if (model.QueLayMau.HasValue) existing.QueLayMau = model.QueLayMau;
-                    if (model.QueDoNhiet.HasValue) existing.QueDoNhiet = model.QueDoNhiet;
-                    if (model.GhiChu != null) existing.GhiChu = model.GhiChu;
+                    bool fieldsChanged = false;
+
+                    // MacThep/KLThepPhe: mirror KLPhuGia/KLPhuGia_Manual của Hrc1PhuLieu — chụp lại
+                    // giá trị NM gốc vào *Orig lần đầu bị sửa (để FE dựng macThep__orig/klThepPhe__orig
+                    // giống hệt cột phụ liệu, highlight sống sót qua reload), kèm cờ *IsManual riêng —
+                    // KHÔNG suy luận "đã sửa" từ Orig != null, vì Orig tự nó có thể null hợp lệ (giá
+                    // trị NM gốc lúc sửa vốn null, vd MacThep chưa sync được lần đầu). Nếu sửa quay lại
+                    // đúng giá trị gốc thì xóa cả Orig lẫn IsManual (không còn gì khác biệt để tô vàng).
+                    if (model.MacThep != null && model.MacThep != existing.MacThep)
+                    {
+                        if (!existing.MacThepIsManual)
+                        {
+                            existing.MacThepOrig = existing.MacThep;
+                            existing.MacThepIsManual = true;
+                        }
+                        existing.MacThep = model.MacThep;
+                        fieldsChanged = true;
+                    }
+                    if (existing.MacThepIsManual && existing.MacThepOrig == existing.MacThep)
+                    {
+                        existing.MacThepOrig = null;
+                        existing.MacThepIsManual = false;
+                    }
+
+                    if (model.KLThepPhe.HasValue && model.KLThepPhe != existing.KLThepPhe)
+                    {
+                        if (!existing.KLThepPheIsManual)
+                        {
+                            existing.KLThepPheOrig = existing.KLThepPhe;
+                            existing.KLThepPheIsManual = true;
+                        }
+                        existing.KLThepPhe = model.KLThepPhe;
+                        fieldsChanged = true;
+                    }
+                    if (existing.KLThepPheIsManual && existing.KLThepPheOrig == existing.KLThepPhe)
+                    {
+                        existing.KLThepPheOrig = null;
+                        existing.KLThepPheIsManual = false;
+                    }
+
+                    if (model.O2.HasValue && model.O2 != existing.O2) { existing.O2 = model.O2; fieldsChanged = true; }
+                    if (model.N2.HasValue && model.N2 != existing.N2) { existing.N2 = model.N2; fieldsChanged = true; }
+                    if (model.AR.HasValue && model.AR != existing.AR) { existing.AR = model.AR; fieldsChanged = true; }
+                    if (model.QueLayMau.HasValue && model.QueLayMau != existing.QueLayMau) { existing.QueLayMau = model.QueLayMau; fieldsChanged = true; }
+                    if (model.QueDoNhiet.HasValue && model.QueDoNhiet != existing.QueDoNhiet) { existing.QueDoNhiet = model.QueDoNhiet; fieldsChanged = true; }
+                    if (model.GhiChu != null && model.GhiChu != existing.GhiChu) { existing.GhiChu = model.GhiChu; fieldsChanged = true; }
+                    if (fieldsChanged) existing.IsEdited = true;
                     existing.NgayCapNhat = DateTime.Now;
                     _context.Hrc1TieuHaos.Update(existing);
                     meMap[model.RowKey] = existing;
@@ -756,7 +820,12 @@ namespace dataproduct.api.Services
                         {
                             existingPl.IsManual = false;
                             existingPl.KLPhuGia_Manual = null;
-                            existingPl.IsAddManual = false;
+                            // KHÔNG hardcode false ở đây: 1 record IsAddManual=true (cột "Thêm cột điều
+                            // chỉnh") vẫn có thể đi vào nhánh này khi user xóa trắng giá trị (FE tính
+                            // isManual=false do __orig/__IsManual bị dọn — xem comment isAddManualColumn
+                            // ở BuildPhuLieus). Ghi đè cứng về false sẽ làm mất luôn danh tính "cột thêm
+                            // tay" của record dù chỉ đang bị xóa giá trị, không phải đổi loại cột.
+                            existingPl.IsAddManual = pl.IsAddManual ?? existingPl.IsAddManual;
                         }
                         if (pl.IsNM.HasValue)
                             existingPl.IsNM = pl.IsNM.Value;
@@ -1366,10 +1435,12 @@ namespace dataproduct.api.Services
                 if (!int.TryParse(dataIndex.Substring("phuLieu_".Length), out var phuLieuId)) continue;
                 if (!row.TryGetProperty(dataIndex, out var valProp)) continue;
 
-                // Chỉ loại NULL — giữ nguyên giá trị 0 (hợp lệ, khác nghĩa với "không nhập"), theo đúng
-                // quy ước đã áp dụng cho sync BOF (mục 3.6 tài liệu hrc1_tieuhaoBOF.md).
+                // value == null nghĩa là ô đã bị xóa trắng ở FE — VẪN phải add vào result (KLPhuGia =
+                // null) để SaveHRC1LFManualDataAsync (đoạn "Ô bị xóa trắng ở FE — dọn luôn record") thấy
+                // được và xóa record Hrc1PhuLieu cũ. Nếu continue ở đây, cột đó biến mất khỏi
+                // model.PhuLieus hoàn toàn → vòng lặp UPSERT không bao giờ chạm tới, record cũ bị bỏ sót
+                // và giữ nguyên giá trị cũ trong DB dù người dùng đã xóa trên FE.
                 var value = TryConvertNumeric(valProp);
-                if (!value.HasValue) continue;
 
                 string? label = col.TryGetProperty("label", out var lblProp) ? lblProp.GetString() : null;
 
@@ -1445,6 +1516,17 @@ namespace dataproduct.api.Services
                 }
                 else
                 {
+                    // IsEdited chỉ bật khi giá trị các field nhập tay (AR/QueLayMau/QueDoNhiet/GhiChu)
+                    // THỰC SỰ đổi so với bản ghi hiện có — payload Lưu luôn gửi nguyên bảng (mọi mẻ đang
+                    // hiển thị, kể cả dòng người dùng không đụng tới), không so sánh trước sẽ khiến mọi
+                    // dòng LF bị đánh dấu "đã sửa" chỉ vì nằm trong lần lưu.
+                    bool fieldsChanged =
+                        model.AR != existing.AR ||
+                        model.QueLayMau != existing.QueLayMau ||
+                        model.QueDoNhiet != existing.QueDoNhiet ||
+                        model.GhiChu != existing.GhiChu;
+                    if (fieldsChanged) existing.IsEdited = true;
+
                     existing.MeThoi = model.MeThoi;
                     existing.MacThep = model.MacThep;
                     existing.KLThepLong = model.KLThepLong;
@@ -1652,12 +1734,26 @@ namespace dataproduct.api.Services
                 .ToListAsync();
             if (extras.Count == 0) return;
 
+            var affectedMeThois = extras.Select(x => x.MeThoi).Where(x => !string.IsNullOrEmpty(x))
+                .Cast<string>().Distinct().ToList();
+
             foreach (var row in extras)
             {
                 row.IsDeleted = true;
                 row.NgayXoa = DateTime.Now;
             }
             await _context.SaveChangesAsync();
+
+            // Mẻ trùng (clone thêm tay) vừa bị xóa mềm ở trên có thể là 1 trong 2 mẻ khiến
+            // SP_HRC1_BOF_CapNhatTrangThaiTrung đánh IsTrungMeThoi=1 cho mẻ CÒN LẠI (SaveHRC1LFManualDataAsync/
+            // SaveHRC1ManualDataAsync gọi SP này TRƯỚC khi hàm này chạy, lúc đó dòng trùng vẫn còn active nên
+            // tính đúng là trùng). Không recalc lại ở đây thì mẻ gốc sẽ mãi kẹt IsTrungMeThoi=1 dù chỉ còn 1
+            // dòng active — phải gọi lại SP cho đúng MeThoi sau khi đã xóa mềm dòng thừa.
+            foreach (var mt in affectedMeThois)
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", bieuMau, mt);
+            }
         }
 
         /// <summary>

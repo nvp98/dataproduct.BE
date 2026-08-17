@@ -10,12 +10,17 @@ namespace dataproduct.api.ResponseModels
         public int? Scope { get; set; }
         public string? MeThoi { get; set; }
         public string? MacThep { get; set; }
+        public string? MacThepOrig { get; set; }
+        public bool MacThepIsManual { get; set; }
         public bool IsNM { get; set; }
+        public bool IsEdited { get; set; }
         public bool? IsChuyenCa { get; set; }
         public bool? IsTrungMeThoi { get; set; }
         public decimal? KLGang { get; set; }
         public decimal? KLGangLongCCT { get; set; }
         public decimal? KLThepPhe { get; set; }
+        public decimal? KLThepPheOrig { get; set; }
+        public bool KLThepPheIsManual { get; set; }
         public decimal? KLThepPheGang { get; set; }
         public decimal? KLThepLong { get; set; }
         public double? O2 { get; set; }

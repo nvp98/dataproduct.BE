@@ -504,6 +504,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Scope).HasColumnName("Scope");
             entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
             entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.MacThepOrig).HasColumnName("MacThepOrig");
+            entity.Property(e => e.MacThepIsManual).HasColumnName("MacThepIsManual");
             entity.Property(e => e.O2).HasColumnName("O2");
             entity.Property(e => e.N2).HasColumnName("N2");
             entity.Property(e => e.AR).HasColumnName("AR");
@@ -520,6 +522,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KLGang).HasColumnName("KLGang").HasPrecision(18, 3);
             entity.Property(e => e.KLGangLongCCT).HasColumnName("KLGangLongCCT").HasPrecision(18, 3);
             entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheOrig).HasColumnName("KLThepPheOrig").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheIsManual).HasColumnName("KLThepPheIsManual");
             entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang").HasPrecision(18, 3);
             entity.Property(e => e.KLThepLong).HasColumnName("KLThepLong").HasPrecision(18, 3);
             entity.Property(e => e.Ca).HasColumnName("Ca");

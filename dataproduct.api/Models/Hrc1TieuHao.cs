@@ -12,6 +12,13 @@ public partial class Hrc1TieuHao
     public int? Scope { get; set; }
     public string? MeThoi { get; set; }
     public string? MacThep { get; set; }
+    // Snapshot giá trị NM gốc của MacThep tại thời điểm sửa tay lần đầu — dùng để FE dựng
+    // macThep__orig, mirror KLPhuGia/KLPhuGia_Manual của Hrc1PhuLieu. Xem DLNMHRC1Service.SaveHRC1ManualDataAsync.
+    public string? MacThepOrig { get; set; }
+    // true nếu MacThep đã từng bị sửa tay trên dòng NM — KHÔNG suy luận từ MacThepOrig != null, vì
+    // MacThepOrig chính nó có thể null hợp lệ (giá trị NM gốc lúc sửa là null, vd MacThep chưa sync
+    // được lần đầu) mà vẫn cần biết đã sửa hay chưa.
+    public bool MacThepIsManual { get; set; }
     public double? O2 { get; set; }
     public double? N2 { get; set; }
     public double? AR { get; set; }
@@ -28,6 +35,10 @@ public partial class Hrc1TieuHao
     public decimal? KLGang { get; set; }
     public decimal? KLGangLongCCT { get; set; }
     public decimal? KLThepPhe { get; set; }
+    // Snapshot giá trị NM gốc của KLThepPhe tại thời điểm sửa tay lần đầu — xem MacThepOrig.
+    public decimal? KLThepPheOrig { get; set; }
+    // xem MacThepIsManual.
+    public bool KLThepPheIsManual { get; set; }
     public decimal? KLThepPheGang { get; set; }
     public decimal? KLThepLong { get; set; }
     public byte? Ca { get; set; }
