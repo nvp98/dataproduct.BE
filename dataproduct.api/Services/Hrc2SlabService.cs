@@ -168,7 +168,7 @@ namespace dataproduct.api.Services
             {
                 var slab = tt.Slab;
                 var kt = (slab.ChieuDay != null && slab.ChieuRong != null && slab.ChieuDai != null)
-                    ? $"{slab.ChieuDay}x{slab.ChieuRong}x{slab.ChieuDai}"
+                    ? $"{FmtKichThuoc(slab.ChieuDay.Value)}x{FmtKichThuoc(slab.ChieuRong.Value)}x{FmtKichThuoc(slab.ChieuDai.Value)}"
                     : "";
 
                 if (rowIndex > startRow)
