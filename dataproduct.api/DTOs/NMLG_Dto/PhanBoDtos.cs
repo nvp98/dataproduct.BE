@@ -42,6 +42,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public DateTime Ngay { get; set; }
         public byte Ca { get; set; }
         public int IdLoCao { get; set; }
+        // % riêng của NVL này tại (Ngày, Ca) — chỉ có giá trị với nhóm PP2 (Tỷ lệ nhập tay);
+        // null nếu NVL chưa được nhập % (kể cả khi đã "Áp dụng % cho cả nhóm" trước đó rồi xóa/thêm lại)
+        public decimal? TyLe { get; set; }
     }
 
     public class AddNvlNhomPhanBoDto
@@ -132,6 +135,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     public class ChotPhanBoRequestDto
     {
         public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int IdLoCao { get; set; }
         public int IdNguoiXacNhan { get; set; }
     }
 

@@ -776,14 +776,20 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<LG_PB_BienBanNhanQHLCCVH>(entity =>
         {
             entity.Property(e => e.KhoiLuongNhanVe).HasPrecision(18, 3);
+            // Bảng có trigger DB — EF Core mặc định dùng OUTPUT clause để lấy giá trị sinh tự động,
+            // nhưng SQL Server không cho phép OUTPUT trực tiếp trên bảng có trigger. Tắt để dùng
+            // câu SELECT bù thay vì OUTPUT, tránh lỗi "target table has database triggers".
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<LG_PB_TyLePhanBo>(entity =>
         {
             entity.Property(e => e.TyLe).HasPrecision(9, 6);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<LG_PB_TyLeNhom>(entity =>
         {
             entity.Property(e => e.TyLe).HasPrecision(9, 6);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<LG_PB_KetQuaPhanBo>(entity =>
         {
@@ -791,6 +797,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TyLePhanBo).HasPrecision(9, 6);
             entity.Property(e => e.KhoiLuongPhanBo).HasPrecision(18, 3);
             entity.Property(e => e.KhoiLuongChotCuoi).HasPrecision(18, 3);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<BkHrc2Slab>(entity =>
         {

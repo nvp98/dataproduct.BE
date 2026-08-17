@@ -12,10 +12,29 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo)
+        public async Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao)
         {
             return await _context.LG_PB_KetQuaPhanBo
-                .AnyAsync(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.TrangThai == 1);
+                .AnyAsync(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo
+                    && x.Ca == ca && x.IDLoCao == idLoCao && x.TrangThai == 1);
+        }
+
+        public async Task<bool> IsCaDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca)
+        {
+            return await _context.LG_PB_KetQuaPhanBo
+                .AnyAsync(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.Ca == ca && x.TrangThai == 1);
+        }
+
+        public async Task<List<(byte Ca, int IdLoCao)>> GetChotSetAsync(DateTime ngay, byte loaiPhanBo)
+        {
+            var rows = await _context.LG_PB_KetQuaPhanBo
+                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.TrangThai == 1 && x.Ca != null)
+                .Select(x => new { Ca = x.Ca!.Value, x.IDLoCao })
+                .Distinct()
+                .AsNoTracking()
+                .ToListAsync();
+
+            return rows.Select(x => (x.Ca, x.IDLoCao)).ToList();
         }
 
         public async Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities)
@@ -54,10 +73,11 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
         }
 
-        public async Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, int idNguoiXacNhan)
+        public async Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao, int idNguoiXacNhan)
         {
             var rows = await _context.LG_PB_KetQuaPhanBo
-                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.TrangThai == 0)
+                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo
+                    && x.Ca == ca && x.IDLoCao == idLoCao && x.TrangThai == 0)
                 .ToListAsync();
 
             foreach (var row in rows)
@@ -71,10 +91,11 @@ namespace dataproduct.api.Repositories
             return rows.Count;
         }
 
-        public async Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo)
+        public async Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao)
         {
             var rows = await _context.LG_PB_KetQuaPhanBo
-                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.TrangThai == 1)
+                .Where(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo
+                    && x.Ca == ca && x.IDLoCao == idLoCao && x.TrangThai == 1)
                 .ToListAsync();
 
             foreach (var row in rows)
