@@ -121,6 +121,25 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal TongTuDong { get; set; }
     }
 
+    // ─── Giá trị NVL tự động từ EMS (SP_TKVV_GetGiaTriNVL_Auto) ────────────────
+    // Gọi SP với (Ngay, Ca, Scope code, MaBM) — trả tổng GiaTri từ EMS_DATA_CAN
+    // theo mapping TKVV_NVL_TagMapping. Dùng để đổ dữ liệu vào bảng khi tạo phiếu.
+
+    public class TKVVGiaTriNVLAutoDto
+    {
+        public int NguyenVatLieuID { get; set; }
+        public string MaBM { get; set; } = string.Empty;
+        public string TenNVL { get; set; } = string.Empty;
+        public string? DonViTinh { get; set; }
+        public int? ThuTu { get; set; }
+        public string? Scope { get; set; }
+        public string? TenScope { get; set; }
+        public decimal GiaTri { get; set; }
+        public int SoLuongTag { get; set; }
+        public DateTime? ThoiGianTu { get; set; }
+        public DateTime? ThoiGianDen { get; set; }
+    }
+
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────
 
     public class TKVVChiTietDto
