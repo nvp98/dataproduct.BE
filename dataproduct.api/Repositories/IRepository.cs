@@ -525,14 +525,14 @@ namespace dataproduct.api.Repositories
     {
         Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req);
         Task<IEnumerable<Hrc2SlabTongHopItem>> GetTongHopAsync(string? tuNgay, string? denNgay, string? ca, string? kip);
-        Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
+        Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca, string? tuNgay = null, string? denNgay = null);
         Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
         Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu, int? currentUserId = null);
         Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
         Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
         Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
         Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
-        Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien);
+        Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien, DateTime? thoiDiemThaoTac = null);
         Task<int> ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
         Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc);
         Task CheckAsync(List<int> idSlabs, int idUser);

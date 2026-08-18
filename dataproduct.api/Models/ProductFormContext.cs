@@ -830,6 +830,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KhoiLuong).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.KhoiLuongTinhToan).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.ThoiDiemThaoTac).HasColumnType("datetime");
             entity.Property(e => e.IsChot).HasDefaultValue(false);
             entity.Property(e => e.MayDuc).HasColumnName("MayDuc");
             entity.Property(e => e.IsTrungIDSlab).HasColumnName("IsTrungIDSlab");
