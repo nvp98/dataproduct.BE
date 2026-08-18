@@ -143,6 +143,18 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        // KTV/KCS chỉnh tay GiaTriDieuChinh cho 1 dòng dữ liệu thô khi nghi ngờ PLC báo sai
+        [HttpPut("dulieu-tho/{id}/dieu-chinh")]
+        public async Task<IActionResult> UpdateGiaTriDieuChinh(long id, [FromBody] UpdateGiaTriDieuChinhRequestDto dto)
+        {
+            try
+            {
+                var ok = await _service.UpdateGiaTriDieuChinhAsync(id, dto.GiaTriDieuChinh);
+                return ok ? Ok(new { message = "Đã lưu giá trị điều chỉnh." }) : NotFound(new { message = $"Không tìm thấy dữ liệu ID={id}" });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         // Tổng tự động (PLC) theo Ngay/Ca/Scope — 1 Tag = 1 BM/xưởng nên chỉ có 1 số
         // tổng duy nhất (không tách theo sản phẩm), chỉ để đối chiếu, dùng chung cho
         // cả phiếu mới (chưa lưu) lẫn phiếu đã lưu (chỉ cần ngay/ca/scope từ form).
@@ -165,6 +177,74 @@ namespace dataproduct.api.Controllers
         public async Task<IActionResult> GetChiTietByPhieu(Guid idPhieu)
         {
             try { return Ok(await _service.GetChiTietByPhieuAsync(idPhieu)); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Đồng bộ dữ liệu cân/PLC thô (SP_TKVV_GetDuLieuCan_TuMapping) ───────
+
+        [HttpPost("sync-dulieu-ems")]
+        public async Task<IActionResult> SyncDuLieuTuEms([FromBody] SyncDuLieuTuEmsRequestDto dto)
+        {
+            try
+            {
+                var soDong = await _service.SyncDuLieuTuEmsAsync(dto.Ngay, dto.Ca, dto.Scope);
+                return Ok(new { message = $"Đã đồng bộ {soDong} dòng dữ liệu mới từ PLC.", soDongMoi = soDong });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp ────────────────────────
+
+        [HttpGet("get-sanluong-mapping")]
+        public async Task<IActionResult> GetSanLuongMappingList([FromQuery] string? scope)
+        {
+            try { return Ok(await _service.GetSanLuongMappingListAsync(scope)); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpGet("get-sanluong-mapping/{id}")]
+        public async Task<IActionResult> GetSanLuongMappingById(long id)
+        {
+            try
+            {
+                var r = await _service.GetSanLuongMappingByIdAsync(id);
+                return r == null ? NotFound(new { message = $"Không tìm thấy mapping ID={id}" }) : Ok(r);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("create-sanluong-mapping")]
+        public async Task<IActionResult> CreateSanLuongMapping([FromBody] CreateTKVVSanLuongMappingDto dto)
+        {
+            try
+            {
+                var r = await _service.AddSanLuongMappingAsync(dto);
+                return CreatedAtAction(nameof(GetSanLuongMappingById), new { id = r.Id }, r);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPut("update-sanluong-mapping/{id}")]
+        public async Task<IActionResult> UpdateSanLuongMapping(long id, [FromBody] UpdateTKVVSanLuongMappingDto dto)
+        {
+            try
+            {
+                var r = await _service.UpdateSanLuongMappingAsync(id, dto);
+                return r == null ? NotFound(new { message = $"Không tìm thấy mapping ID={id}" }) : Ok(r);
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpDelete("delete-sanluong-mapping/{id}")]
+        public async Task<IActionResult> DeleteSanLuongMapping(long id)
+        {
+            try
+            {
+                var ok = await _service.DeleteSanLuongMappingAsync(id);
+                return ok ? Ok(new { message = "Đã ngừng mapping." }) : NotFound(new { message = $"Không tìm thấy mapping ID={id}" });
+            }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
     }

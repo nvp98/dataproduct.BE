@@ -16,8 +16,8 @@ namespace dataproduct.api.Services.NMTKVV
         public Task<List<TKVVGiaTriNVLAutoDto>> GetGiaTriNVLAutoAsync(
             DateTime ngay, int ca, int scope, string maBM)
         {
-            //var scopeCode = TKVV_BCSL_ChiPhiRepository.ResolveScopeCode(scope);
-            return _repo.GetGiaTriNVLAutoAsync(ngay, ca, scope.ToString(), maBM);
+            var scopeCode = TKVV_BCSL_ChiPhiRepository.ResolveScopeCode(scope);
+            return _repo.GetGiaTriNVLAutoAsync(ngay, ca, scopeCode, maBM);
         }
     }
 }

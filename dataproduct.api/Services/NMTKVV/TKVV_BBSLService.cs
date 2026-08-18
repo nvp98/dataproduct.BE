@@ -27,6 +27,7 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto> AddNvlAsync(CreateTKVVNguyenVatLieuDto dto)
         {
+            var scopeCode = dto.Scope.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(dto.Scope.Value) : null;
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -35,8 +36,8 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 GhiChu = dto.GhiChu,
                 TrangThai = true,
-                Scope = dto.Scope,
-                TenScope = dto.TenScope,
+                Scope = scopeCode,
+                TenScope = dto.TenScope ?? scopeCode,
             };
             var result = await _repo.AddNvlAsync(entity);
             return MapNvl(result);
@@ -44,6 +45,7 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto?> UpdateNvlAsync(int id, UpdateTKVVNguyenVatLieuDto dto)
         {
+            var scopeCode = dto.Scope.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(dto.Scope.Value) : null;
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -52,8 +54,8 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 TrangThai = dto.TrangThai,
                 GhiChu = dto.GhiChu,
-                Scope = dto.Scope,
-                TenScope = dto.TenScope,
+                Scope = scopeCode,
+                TenScope = dto.TenScope ?? scopeCode,
             };
             var result = await _repo.UpdateNvlAsync(id, entity);
             return result == null ? null : MapNvl(result);
@@ -70,8 +72,8 @@ namespace dataproduct.api.Services
             ThuTu = e.ThuTu,
             TrangThai = e.TrangThai,
             GhiChu = e.GhiChu,
-            Scope = e.Scope,
-            TenScope = e.TenScope,
+            Scope = TKVV_BBSLRepository.ResolveScopeNumber(e.Scope),
+            TenScope = e.TenScope ?? e.Scope,
         };
 
         // ─── Mapping NVL ↔ Tag EMS + Ca ─────────────────────────────────────────
@@ -159,6 +161,9 @@ namespace dataproduct.api.Services
             string? scope, DateTime? ngayBatDau, DateTime? ngayKetThuc)
             => _repo.GetDataByFilterAsync(scope, ngayBatDau, ngayKetThuc);
 
+        public Task<bool> UpdateGiaTriDieuChinhAsync(long id, decimal? giaTriDieuChinh)
+            => _repo.UpdateGiaTriDieuChinhAsync(id, giaTriDieuChinh);
+
         // ─── Tổng tự động (PLC) theo Ngay/Ca/Scope toàn cục (1-6) ──────────────
         // 1 Tag = 1 BM/xưởng, chỉ có 1 số tổng duy nhất (không tách theo sản phẩm).
         // Chỉ để KTV/KCS đối chiếu — KHÔNG tự điền vào Loại 1/2/3/Phế phẩm vì PLC
@@ -166,6 +171,101 @@ namespace dataproduct.api.Services
 
         public Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay, int ca, int scope)
             => _repo.GetTongTuDongAsync(ngay, ca, scope);
+
+        // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp ─────────────────────────
+
+        public async Task<List<TKVVSanLuongMappingDto>> GetSanLuongMappingListAsync(string? scope)
+        {
+            var list = await _repo.GetSanLuongMappingListAsync(scope);
+            if (list.Count == 0) return list;
+
+            // Enrich TenCan từ danh mục Cân EMS (không có bảng local — chỉ gọi qua SP linked
+            // server) để hiển thị tên cân bên cạnh TagID cho dễ đọc, không bắt buộc khớp được.
+            try
+            {
+                var emsTags = await _repo.GetEmsTagListAsync(null, null);
+                var tenCanByTagId = emsTags
+                    .Where(t => t.TagIDEMS != null)
+                    .GroupBy(t => t.TagIDEMS!.Value.ToString())
+                    .ToDictionary(g => g.Key, g => g.First().TenCan);
+
+                foreach (var item in list)
+                    item.TenCan = tenCanByTagId.GetValueOrDefault(item.TagID);
+            }
+            catch
+            {
+                // Lỗi gọi linked server EMS không được chặn việc xem danh sách mapping đã lưu
+            }
+
+            return list;
+        }
+
+        public async Task<TKVVSanLuongMappingDto?> GetSanLuongMappingByIdAsync(long id)
+        {
+            var e = await _repo.GetSanLuongMappingByIdAsync(id);
+            return e == null ? null : MapSanLuongMapping(e);
+        }
+
+        public async Task<TKVVSanLuongMappingDto> AddSanLuongMappingAsync(CreateTKVVSanLuongMappingDto dto)
+        {
+            var entity = new TKVV_SanLuongMapping
+            {
+                TagID = dto.TagID,
+                Scope = dto.Scope,
+                Ca = dto.Ca,
+                Kip = dto.Kip,
+                TuNgay = dto.TuNgay,
+                DenNgay = dto.DenNgay,
+                GhiChu = dto.GhiChu,
+                NguoiTaoID = dto.NguoiTaoID,
+                TrangThai = true,
+            };
+            var result = await _repo.AddSanLuongMappingAsync(entity);
+            return MapSanLuongMapping(result);
+        }
+
+        public async Task<TKVVSanLuongMappingDto?> UpdateSanLuongMappingAsync(long id, UpdateTKVVSanLuongMappingDto dto)
+        {
+            var entity = new TKVV_SanLuongMapping
+            {
+                TagID = dto.TagID,
+                Scope = dto.Scope,
+                Ca = dto.Ca,
+                Kip = dto.Kip,
+                TuNgay = dto.TuNgay,
+                DenNgay = dto.DenNgay,
+                GhiChu = dto.GhiChu,
+                NguoiTaoID = dto.NguoiTaoID,
+                TrangThai = dto.TrangThai,
+            };
+            var result = await _repo.UpdateSanLuongMappingAsync(id, entity);
+            return result == null ? null : MapSanLuongMapping(result);
+        }
+
+        public Task<bool> DeleteSanLuongMappingAsync(long id) => _repo.DeleteSanLuongMappingAsync(id);
+
+        private static TKVVSanLuongMappingDto MapSanLuongMapping(TKVV_SanLuongMapping e) => new()
+        {
+            Id = e.ID,
+            TagID = e.TagID,
+            Scope = e.Scope,
+            Ca = e.Ca,
+            Kip = e.Kip,
+            TuNgay = e.TuNgay,
+            DenNgay = e.DenNgay,
+            TrangThai = e.TrangThai,
+            GhiChu = e.GhiChu,
+            NgayTao = e.NgayTao,
+            NguoiTaoID = e.NguoiTaoID,
+        };
+
+        // ─── Đồng bộ dữ liệu cân/PLC thô (SP_TKVV_GetDuLieuCan_TuMapping) ───────────
+
+        public Task<int> SyncDuLieuTuEmsAsync(DateTime ngay, byte ca, int scope)
+        {
+            var scopeCode = TKVV_BBSLRepository.ResolveScopeCode(scope);
+            return _repo.SyncDuLieuTuEmsAsync(ngay, ca, scopeCode);
+        }
 
         // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────
 

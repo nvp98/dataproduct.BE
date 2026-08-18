@@ -11,7 +11,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -22,7 +22,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? DonViTinh { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -34,7 +34,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -97,8 +97,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
     {
         public long Id { get; set; }
         public string TagID { get; set; } = string.Empty;
-        public string? MaKey { get; set; }
-        public decimal? Value { get; set; }
+        public decimal? GiaTriTuDong { get; set; }
+        public decimal? GiaTriDieuChinh { get; set; }
         public DateOnly Ngay { get; set; }
         public byte Ca { get; set; }
         public string Scope { get; set; } = string.Empty;
@@ -138,6 +138,59 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int SoLuongTag { get; set; }
         public DateTime? ThoiGianTu { get; set; }
         public DateTime? ThoiGianDen { get; set; }
+    }
+
+    // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp (bảng TKVV_SanLuongMapping) ─
+    // Dùng cho GetTongTuDongAsync (tổng PLC/ca để đối soát) — xác định Tag nào của
+    // cân (danh mục ở tab "Danh mục Cân") tính vào Xưởng nào, hiệu lực trong
+    // khoảng (TuNgay, DenNgay). Kíp chỉ để ghi chú/lọc hiển thị, KHÔNG được dùng để
+    // lọc khi tính tổng tự động hiện tại (GetTongTuDongAsync chỉ lọc theo Scope+Ca).
+
+    public class TKVVSanLuongMappingDto
+    {
+        public long Id { get; set; }
+        public string TagID { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public byte Ca { get; set; }
+        public string? Kip { get; set; }
+        public DateOnly? TuNgay { get; set; }
+        public DateOnly? DenNgay { get; set; }
+        public bool TrangThai { get; set; }
+        public string? GhiChu { get; set; }
+        public DateTime NgayTao { get; set; }
+        public int? NguoiTaoID { get; set; }
+        public string? TenCan { get; set; } // join từ danh mục Cân (EMS) theo TagID, chỉ để hiển thị
+    }
+
+    public class CreateTKVVSanLuongMappingDto
+    {
+        public string TagID { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public byte Ca { get; set; }
+        public string? Kip { get; set; }
+        public DateOnly? TuNgay { get; set; }
+        public DateOnly? DenNgay { get; set; }
+        public string? GhiChu { get; set; }
+        public int? NguoiTaoID { get; set; }
+    }
+
+    public class UpdateTKVVSanLuongMappingDto : CreateTKVVSanLuongMappingDto
+    {
+        public bool TrangThai { get; set; }
+    }
+
+    // ─── Đồng bộ dữ liệu cân/PLC thô (SP_TKVV_GetDuLieuCan_TuMapping) → TKVV_SanLuongDuLieu ─
+
+    public class SyncDuLieuTuEmsRequestDto
+    {
+        public DateTime Ngay { get; set; }
+        public byte Ca { get; set; }
+        public int Scope { get; set; }
+    }
+
+    public class UpdateGiaTriDieuChinhRequestDto
+    {
+        public decimal? GiaTriDieuChinh { get; set; }
     }
 
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────
