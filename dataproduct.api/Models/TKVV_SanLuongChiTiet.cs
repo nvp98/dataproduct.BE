@@ -8,7 +8,7 @@ namespace dataproduct.api.Models
         [Key]
         public long ID { get; set; }
         public Guid IDPhieu { get; set; }
-        public int? Scope { get; set; }
+        public string? Scope { get; set; }
         public DateOnly? Ngay { get; set; }
         public byte? Ca { get; set; }
         public int NguyenVatLieuID { get; set; }

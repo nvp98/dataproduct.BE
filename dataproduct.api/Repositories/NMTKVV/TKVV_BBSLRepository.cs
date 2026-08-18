@@ -429,11 +429,23 @@ namespace dataproduct.api.Repositories
 
         // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────
 
-        // Xóa + ghi mới trong cùng 1 transaction (giống ReplaceChiTietAsync của LGNL)
-        // để lỗi giữa chừng không làm mất trắng dữ liệu chi tiết của phiếu.
+        // Xóa + ghi mới trong cùng 1 transaction (giống ReplaceChiTietAsync của LGNL) để lỗi
+        // giữa chừng không làm mất trắng dữ liệu chi tiết của phiếu.
+        //
+        // BUG ĐÃ SỬA: PhieuService.CreateAsync gọi hook này (qua RunJsonInitializersAsync) từ
+        // BÊN TRONG transaction riêng của nó (using var tran = BeginTransactionAsync()). Nếu ở
+        // đây LUÔN tự mở thêm 1 transaction mới trên CÙNG _context, EF Core ném lỗi "transaction
+        // đã tồn tại" — bị catch (bên trên) nuốt mất, khiến chi tiết KHÔNG BAO GIỜ được lưu ở
+        // lần tạo phiếu ĐẦU TIÊN (chỉ lưu được khi sửa/lưu lại lần sau, vì UpdateAsync không có
+        // transaction bọc ngoài). Giờ chỉ tự mở transaction khi context CHƯA có transaction nào
+        // đang chạy — nếu đã có (gọi từ trong CreateAsync) thì dùng chung, để transaction ngoài
+        // cùng quyết định commit/rollback.
         public async Task ReplaceChiTietAsync(Guid idPhieu, List<TKVV_SanLuongChiTiet> entities)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            var ownsTransaction = _context.Database.CurrentTransaction == null;
+            var transaction = ownsTransaction
+                ? await _context.Database.BeginTransactionAsync()
+                : null;
             try
             {
                 await _context.TKVV_SanLuongChiTiet
@@ -446,12 +458,16 @@ namespace dataproduct.api.Repositories
                     await _context.SaveChangesAsync();
                 }
 
-                await transaction.CommitAsync();
+                if (transaction != null) await transaction.CommitAsync();
             }
             catch
             {
-                await transaction.RollbackAsync();
+                if (transaction != null) await transaction.RollbackAsync();
                 throw;
+            }
+            finally
+            {
+                if (transaction != null) await transaction.DisposeAsync();
             }
         }
 
@@ -467,7 +483,7 @@ namespace dataproduct.api.Repositories
                 {
                     Id = x.ID,
                     IdPhieu = x.IDPhieu,
-                    Scope = x.Scope,
+                    Scope = ResolveScopeNumber(x.Scope),
                     Ngay = x.Ngay,
                     Ca = x.Ca,
                     NguyenVatLieuID = x.NguyenVatLieuID,

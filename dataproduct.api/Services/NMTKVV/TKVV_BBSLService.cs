@@ -333,7 +333,7 @@ namespace dataproduct.api.Services
                     items.Add(new TKVV_SanLuongChiTiet
                     {
                         IDPhieu = phieu.Idphieu,
-                        Scope = scope.Value,
+                        Scope = TKVV_BBSLRepository.ResolveScopeCode(scope.Value),
                         Ngay = DateOnly.FromDateTime(ngay),
                         Ca = (byte)ca.Value,
                         NguyenVatLieuID = nguyenVatLieuID,
