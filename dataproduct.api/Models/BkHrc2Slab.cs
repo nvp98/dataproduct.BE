@@ -39,4 +39,5 @@ public class BkHrc2Slab
     public string? PhanLoai { get; set; }
 
     public BkHrc2SlabTrangThai? TrangThai { get; set; }
+    public DateTime? ThoiDiemThaoTac { get; set; }
 }

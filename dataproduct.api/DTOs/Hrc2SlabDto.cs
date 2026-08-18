@@ -70,6 +70,8 @@ namespace dataproduct.api.DTOs
         public int TrangThaiDuc { get; set; }
         public int TrangThaiKho { get; set; }
         public int TrangThaiPKH { get; set; }
+        // Thời điểm FE bắt được lúc người dùng xác nhận chuyển lên BBSL (khác NgayChuyenKCS — giờ server ghi nhận)
+        public DateTime? ThoiDiemThaoTac { get; set; }
         // Người xử lý từng bước (HoVaTen, resolve từ NguoiChuyenKCS/NguoiXacNhanDuc/NguoiXacNhanKho/NguoiChotPKH)
         public string? NguoiChuyenBBSL { get; set; }
         public string? NguoiXacNhanDuc { get; set; }
@@ -126,6 +128,8 @@ namespace dataproduct.api.DTOs
         public List<int> IdSlabs { get; set; } = [];
         public Guid IdPhieu { get; set; }
         public int NguoiThucHien { get; set; }
+        // Thời điểm FE bắt được lúc người dùng bấm xác nhận trong popup chọn phiếu (không phải giờ server nhận request)
+        public DateTime? ThoiDiemThaoTac { get; set; }
     }
 
     public class Hrc2SlabCheckRequest

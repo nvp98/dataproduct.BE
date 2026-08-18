@@ -51,8 +51,8 @@ namespace dataproduct.api.Services
             string? tuNgay, string? denNgay, string? ca, string? kip)
             => _repo.GetTongHopAsync(tuNgay, denNgay, ca, kip);
 
-        public Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca)
-            => _repo.GetPhieuBBSLAsync(kip, ca);
+        public Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca, string? tuNgay = null, string? denNgay = null)
+            => _repo.GetPhieuBBSLAsync(kip, ca, tuNgay, denNgay);
 
         public Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu)
             => _repo.GetRuotPhieuAsync(idPhieu);
@@ -79,7 +79,7 @@ namespace dataproduct.api.Services
             => _repo.HuyChotPhieuAsync(req.IdPhieu, req.NguoiThucHien);
 
         public async Task<int> ChuyenBbslAsync(Hrc2ChuyenBbslRequest req)
-            => await _repo.ChuyenBbslAsync(req.IdSlabs, req.IdPhieu, req.NguoiThucHien);
+            => await _repo.ChuyenBbslAsync(req.IdSlabs, req.IdPhieu, req.NguoiThucHien, req.ThoiDiemThaoTac);
 
         public async Task<int> ThuHoiAsync(Hrc2ChuyenBbslRequest req)
             => await _repo.ThuHoiAsync(req.IdSlabs, req.NguoiThucHien);
@@ -209,7 +209,10 @@ namespace dataproduct.api.Services
         }
 
         // ── Tổng hợp Excel (BBXNSL phôi tấm HRC2) ───────────────────────────
-        // Cột khớp JSON config HRC2_BBGN_PhoiTam.layout[0].columns (27 cột leaf):
+        // Layout ISO cố định của biểu mẫu BM.36/QT.05.15 (27 cột leaf), KHÔNG được đổi cấu trúc dù
+        // dữ liệu "Phôi nóng" hiện chưa có (LoaiPhoi trong DB hiện luôn là "Phôi nguội") — các cột
+        // nóng vẫn phải tồn tại và chỉ render trống/0 khi không có dữ liệu (SetSo/SetKl tự Clear khi
+        // v<=0), không được bỏ cột. Xem GetPivotKeys() để biết cách phân loại nguội/nóng × loại.
         // 1=STT, 2=shiftName, 3=macThep, 4=meThep, 5=kichThuoc,
         // 6-17=phôi nguội (loại I/II/IItp/III/IIItp/ngắndài × so/kl),
         // 18-25=phôi nóng (loại I/II/IItp/IIItp × so/kl),
@@ -479,7 +482,7 @@ namespace dataproduct.api.Services
         {
             var soPhieu = phieu?.SoPhieu ?? "";
             string ngaySX = "", ca = "", kip = "";
-
+            kip = phieu?.Kip ?? "";
             if (phieu?.DataJson != null)
             {
                 try
@@ -506,9 +509,7 @@ namespace dataproduct.api.Services
                         // Ca ngày = 1, Ca đêm = 2 — giữ nguyên số để ghép "Kíp: {ca}{kip}" (vd "1A")
                         ca = caVal > 0 ? caVal.ToString() : "";
                     }
-
-                    if (root.TryGetProperty("kip", out var kipProp) && kipProp.ValueKind != JsonValueKind.Null)
-                        kip = kipProp.GetString() ?? "";
+                    
                 }
                 catch { /* ignore parse errors */ }
             }
@@ -609,27 +610,38 @@ namespace dataproduct.api.Services
             catch { return ""; }
         }
 
-        // Dịch getColKeys() của FE sang C# — xác định cột pivot từ loaiPhoi + chatLuongTPHH
-        private static (string? SoKey, string? KlKey) GetPivotKeys(string? loaiPhoi, string? chatLuong)
+        // Xác định cột pivot (nguội/nóng × loại) cho biểu mẫu ISO cố định (BM.36/QT.05.15 — layout
+        // 10 nhóm, KHÔNG được đổi: nguội có 6 nhóm loại1/2/2TP/3/3TP/ngắn-dài, nóng chỉ có 4 nhóm
+        // loại1/2/2TP/3TP, không có "loại 3" hay "ngắn dài" riêng cho nóng).
+        // nguội/nóng lấy từ LoaiPhoi (field thô từ BKMIS, đáng tin cho việc này). Nhóm con (loại
+        // mấy) lấy từ PhanLoai (L1/L2/L2TP/L3/L3TP/ND/PP — field đã tính đúng, đồng bộ qua
+        // usp_SyncBK_HRC2_Slab) thay vì ChatLuongTPHH cũ (chỉ có text "Loại 1/2/3", không đủ chi
+        // tiết để tách L2TP/L3TP/ND). PP (phế phẩm) không có cột trong biểu mẫu ISO → không match,
+        // vẫn được cộng vào TongSoPhoi/TongKhoiLuong nhưng không lên cột phân loại nào.
+        private static (string? SoKey, string? KlKey) GetPivotKeys(string? loaiPhoi, string? phanLoai)
         {
             var lp = loaiPhoi ?? "";
-            var cl = chatLuong ?? "";
             var isNguoi = Regex.IsMatch(lp, "nguội|nguoi", RegexOptions.IgnoreCase);
             var isNong  = Regex.IsMatch(lp, "nóng|nong",   RegexOptions.IgnoreCase);
             if (!isNguoi && !isNong) return (null, null);
             var p = isNguoi ? "nguoi" : "nong";
-            string? mid = null;
-            if      (Regex.IsMatch(cl, @"iii.*th[àa]nh|3.*th[àa]nh", RegexOptions.IgnoreCase)) mid = "loai3tp";
-            else if (Regex.IsMatch(cl, @"\biii\b|\b3\b",              RegexOptions.IgnoreCase)) mid = isNguoi ? "loai3" : null;
-            else if (Regex.IsMatch(cl, @"ii.*th[àa]nh|2.*th[àa]nh",  RegexOptions.IgnoreCase)) mid = "loai2tp";
-            else if (Regex.IsMatch(cl, @"\bii\b|\b2\b",               RegexOptions.IgnoreCase)) mid = "loai2";
-            else if (Regex.IsMatch(cl, @"\bi\b|\b1\b",                RegexOptions.IgnoreCase)) mid = "loai1";
-            else if (isNguoi && Regex.IsMatch(cl, @"ng[aắ]n",         RegexOptions.IgnoreCase)) mid = "nganDai";
+
+            string? mid = phanLoai switch
+            {
+                "L1"   => "loai1",
+                "L2"   => "loai2",
+                "L2TP" => "loai2tp",
+                "L3"   => isNguoi ? "loai3" : null,   // nóng không có cột "Loại III" riêng
+                "L3TP" => "loai3tp",
+                "ND"   => isNguoi ? "nganDai" : null, // nóng không có cột "Ngắn dài"
+                _      => null,                       // PP hoặc PhanLoai chưa xác định
+            };
             if (mid == null) return (null, null);
             return ($"{p}_{mid}_so", $"{p}_{mid}_kl");
         }
 
-        // Pivot row — nhóm theo (meThep, macThep, kichThuoc), phân loại theo loaiPhoi + chatLuongTPHH
+        // Pivot row — nhóm theo (meThep, macThep, kichThuoc), phân loại theo nguội/nóng (LoaiPhoi) ×
+        // loại 1/2/2TP/3/3TP/ngắn dài (PhanLoai) — đúng layout ISO cố định của biểu mẫu.
         private class TongHopPivotRow
         {
             public string ShiftName = "";
@@ -679,7 +691,7 @@ namespace dataproduct.api.Services
                     row._shiftNames.Add(slab.ShiftName);
 
                 var kl = slab.KhoiLuong ?? 0;
-                var (soKey, _) = GetPivotKeys(slab.LoaiPhoi, slab.ChatLuongTPHH);
+                var (soKey, _) = GetPivotKeys(slab.LoaiPhoi, slab.PhanLoai);
 
                 switch (soKey)
                 {

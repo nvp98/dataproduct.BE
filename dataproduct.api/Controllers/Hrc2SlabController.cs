@@ -50,9 +50,11 @@ namespace dataproduct.api.Controllers
         [HttpGet("phieu-bbsl")]
         public async Task<IActionResult> GetPhieuBBSL(
             [FromQuery] string? kip,
-            [FromQuery] int? ca)
+            [FromQuery] int? ca,
+            [FromQuery] string? tuNgay,
+            [FromQuery] string? denNgay)
         {
-            var data = await _svc.GetPhieuBBSLAsync(kip, ca);
+            var data = await _svc.GetPhieuBBSLAsync(kip, ca, tuNgay, denNgay);
             return Ok(data);
         }
 

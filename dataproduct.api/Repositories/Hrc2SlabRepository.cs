@@ -149,7 +149,7 @@ namespace dataproduct.api.Repositories
 
         // ── Danh sách phiếu BBSL ─────────────────────────────────────────────
 
-        public async Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca)
+        public async Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca, string? tuNgay = null, string? denNgay = null)
         {
             var query = _context.BmPhieus.AsNoTracking()
                 .Where(p => p.MaBm == MaBm && p.TinhTrang != 5 && p.IsLock != 1
@@ -157,6 +157,11 @@ namespace dataproduct.api.Repositories
 
             if (!string.IsNullOrEmpty(kip)) query = query.Where(p => p.Kip == kip);
             if (ca.HasValue) query = query.Where(p => p.Ca == ca);
+
+            if (DateOnly.TryParse(tuNgay, out var tuNgayVal))
+                query = query.Where(p => p.NgaySX >= tuNgayVal);
+            if (DateOnly.TryParse(denNgay, out var denNgayVal))
+                query = query.Where(p => p.NgaySX <= denNgayVal);
 
             var phieus = await query.OrderByDescending(p => p.NgaySX).ToListAsync();
             if (phieus.Count == 0) return [];
@@ -473,7 +478,7 @@ namespace dataproduct.api.Repositories
 
         // ── Chuyển slab vào phiếu ────────────────────────────────────────────
 
-        public async Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien)
+        public async Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien, DateTime? thoiDiemThaoTac = null)
         {
             var phieu = await _context.BmPhieus
                 .FirstOrDefaultAsync(p => p.Idphieu == idPhieu && p.MaBm == MaBm)
@@ -486,7 +491,14 @@ namespace dataproduct.api.Repositories
                 .Where(t => idSlabs.Contains(t.IdSlab))
                 .ToDictionaryAsync(t => t.IdSlab);
 
+            var slabs = await _context.BkHrc2Slabs
+                .Where(s => idSlabs.Contains(s.Id))
+                .ToListAsync();
+
             var now = DateTime.Now;
+            // Ưu tiên thời điểm FE bắt được lúc người dùng bấm xác nhận trong popup — chỉ fallback về giờ
+            // server khi FE không gửi lên (vd gọi API trực tiếp, request cũ chưa cập nhật).
+            var thoiDiem = thoiDiemThaoTac ?? now;
             int affected = 0;
             foreach (var id in idSlabs)
             {
@@ -509,6 +521,11 @@ namespace dataproduct.api.Repositories
                     tt.NguoiChuyenKCS = nguoiThucHien;
                     tt.NgayChuyenKCS  = now;
                 }
+
+                var slab = slabs.FirstOrDefault(s => s.Id == id);
+                if (slab != null)
+                    slab.ThoiDiemThaoTac = thoiDiem;
+
                 affected++;
             }
 
@@ -530,6 +547,19 @@ namespace dataproduct.api.Repositories
                 t.TrangThaiKCS   = 0;
                 t.NguoiChuyenKCS = null;
                 t.NgayChuyenKCS  = null;
+            }
+
+            // Reset ThoiDiemThaoTac cùng lúc — theo đúng quy ước reset của mọi hành động "hủy" trong
+            // repo này (xem HuyXacNhanAsync): thu hồi = slab không còn gắn với lần chuyển BBSL nào,
+            // giữ lại mốc thời gian cũ sẽ gây hiểu lầm là slab vẫn còn dấu vết chuyển lên.
+            var recalledSlabIds = records.Select(t => t.IdSlab).ToList();
+            if (recalledSlabIds.Count > 0)
+            {
+                var slabs = await _context.BkHrc2Slabs
+                    .Where(s => recalledSlabIds.Contains(s.Id))
+                    .ToListAsync();
+                foreach (var slab in slabs)
+                    slab.ThoiDiemThaoTac = null;
             }
 
             await _context.SaveChangesAsync();
@@ -642,6 +672,7 @@ namespace dataproduct.api.Repositories
                 NgayXuLy           = phieu?.NgaySX?.ToString("yyyy-MM-dd"),
                 CaBBSL             = phieu?.Ca,
                 KipBBSL            = phieu?.Kip,
+                ThoiDiemThaoTac    = s.ThoiDiemThaoTac,
                 NguoiChuyenBBSL    = ResolveName(tt?.NguoiChuyenKCS),
                 NguoiXacNhanDuc    = ResolveName(tt?.NguoiXacNhanDuc),
                 NguoiXacNhanKho    = ResolveName(tt?.NguoiXacNhanKho),
