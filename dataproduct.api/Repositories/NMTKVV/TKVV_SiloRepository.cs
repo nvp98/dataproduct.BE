@@ -1,0 +1,216 @@
+using dataproduct.api.DTOs.NMTKVV_Dto;
+using dataproduct.api.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace dataproduct.api.Repositories.NMTKVV
+{
+    public class TKVV_SiloRepository : ITKVV_SiloRepository
+    {
+        private readonly ProductFormContext _context;
+
+        public TKVV_SiloRepository(ProductFormContext context)
+        {
+            _context = context;
+        }
+
+        // ─── TKVV_Silo ────────────────────────────────────────────────────────
+
+        public async Task<List<TKVVSiloDto>> GetSiloListAsync(string? scope)
+        {
+            return await _context.TKVV_Silo
+                .Where(x => scope == null || x.Scope == scope)
+                .OrderBy(x => x.Scope).ThenBy(x => x.MaSilo)
+                .Select(x => new TKVVSiloDto
+                {
+                    Id = x.ID,
+                    MaXuong = x.MaXuong,
+                    Scope = x.Scope,
+                    TenScope = x.TenScope,
+                    MaSilo = x.MaSilo,
+                    TenSilo = x.TenSilo,
+                    GhiChu = x.GhiChu,
+                    TrangThai = x.TrangThai,
+                    NgayCapNhat = x.NgayCapNhat,
+                })
+                .ToListAsync();
+        }
+
+        public async Task<TKVV_Silo?> GetSiloByIdAsync(int id)
+            => await _context.TKVV_Silo.FindAsync(id);
+
+        public async Task<TKVV_Silo> AddSiloAsync(TKVV_Silo entity)
+        {
+            entity.NgayCapNhat = DateTime.Now;
+            _context.TKVV_Silo.Add(entity);
+            await _context.SaveChangesAsync();
+            return entity;
+        }
+
+        public async Task<TKVV_Silo?> UpdateSiloAsync(int id, TKVV_Silo entity)
+        {
+            var existing = await _context.TKVV_Silo.FindAsync(id);
+            if (existing == null) return null;
+
+            existing.MaXuong = entity.MaXuong;
+            existing.Scope = entity.Scope;
+            existing.TenScope = entity.TenScope;
+            existing.MaSilo = entity.MaSilo;
+            existing.TenSilo = entity.TenSilo;
+            existing.GhiChu = entity.GhiChu;
+            existing.TrangThai = entity.TrangThai;
+            existing.NgayCapNhat = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteSiloAsync(int id)
+        {
+            var entity = await _context.TKVV_Silo.FindAsync(id);
+            if (entity == null) return false;
+            _context.TKVV_Silo.Remove(entity);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ─── TKVV_NVL_SiloMapping ─────────────────────────────────────────────
+
+        public async Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(int? nvlId, int? siloId)
+        {
+            var query = from m in _context.TKVV_NVL_SiloMapping
+                        join nvl in _context.TKVV_NguyenVatLieu on m.NguyenVatLieuID equals nvl.ID into nvlGroup
+                        from nvl in nvlGroup.DefaultIfEmpty()
+                        join silo in _context.TKVV_Silo on m.SiloID equals silo.ID into siloGroup
+                        from silo in siloGroup.DefaultIfEmpty()
+                        where (nvlId == null || m.NguyenVatLieuID == nvlId)
+                           && (siloId == null || m.SiloID == siloId)
+                        orderby m.NgaySX descending, m.Ca, m.NguyenVatLieuID
+                        select new TKVVNvlSiloMappingDto
+                        {
+                            Id = m.ID,
+                            NguyenVatLieuID = m.NguyenVatLieuID,
+                            TenNVL = nvl != null ? nvl.TenNVL : null,
+                            ScopeNVL = nvl != null ? nvl.Scope : null,
+                            SiloID = m.SiloID,
+                            TenSilo = silo != null ? silo.TenSilo : null,
+                            MaSilo = silo != null ? silo.MaSilo : null,
+                            Ca = m.Ca,
+                            NgaySX = m.NgaySX,
+                            GhiChu = m.GhiChu,
+                            TrangThai = m.TrangThai,
+                            NgayCapNhat = m.NgayCapNhat,
+                        };
+            return await query.ToListAsync();
+        }
+
+        public async Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id)
+            => await _context.TKVV_NVL_SiloMapping.FindAsync(id);
+
+        public async Task<TKVV_NVL_SiloMapping> AddNvlSiloMappingAsync(TKVV_NVL_SiloMapping entity)
+        {
+            entity.NgayCapNhat = DateTime.Now;
+            _context.TKVV_NVL_SiloMapping.Add(entity);
+            await _context.SaveChangesAsync();
+            return entity;
+        }
+
+        public async Task<TKVV_NVL_SiloMapping?> UpdateNvlSiloMappingAsync(int id, TKVV_NVL_SiloMapping entity)
+        {
+            var existing = await _context.TKVV_NVL_SiloMapping.FindAsync(id);
+            if (existing == null) return null;
+
+            existing.NguyenVatLieuID = entity.NguyenVatLieuID;
+            existing.SiloID = entity.SiloID;
+            existing.Ca = entity.Ca;
+            existing.NgaySX = entity.NgaySX;
+            existing.GhiChu = entity.GhiChu;
+            existing.TrangThai = entity.TrangThai;
+            existing.NgayCapNhat = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteNvlSiloMappingAsync(int id)
+        {
+            var entity = await _context.TKVV_NVL_SiloMapping.FindAsync(id);
+            if (entity == null) return false;
+            _context.TKVV_NVL_SiloMapping.Remove(entity);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ─── TKVV_Silo_TagMapping ──────────────────────────────────────────────
+
+        public async Task<List<TKVVSiloTagMappingDto>> GetSiloTagMappingListAsync(int? siloId, string? maBM)
+        {
+            var query = from m in _context.TKVV_Silo_TagMapping
+                        join silo in _context.TKVV_Silo on m.SiloID equals silo.ID into siloGroup
+                        from silo in siloGroup.DefaultIfEmpty()
+                        where (siloId == null || m.SiloID == siloId)
+                           && (maBM == null || m.MaBM == maBM)
+                        orderby m.SiloID, m.MaBM, m.LoaiDuLieu
+                        select new TKVVSiloTagMappingDto
+                        {
+                            Id = m.ID,
+                            SiloID = m.SiloID,
+                            TenSilo = silo != null ? silo.TenSilo : null,
+                            ScopeNVL = silo != null ? silo.Scope : null,
+                            MaBM = m.MaBM,
+                            LoaiDuLieu = m.LoaiDuLieu,
+                            TagIDEMS = m.TagIDEMS,
+                            TagName = m.TagName,
+                            TagIDEMS_Ngay = m.TagIDEMS_Ngay,
+                            TagName_Ngay = m.TagName_Ngay,
+                            TagIDEMS_Dem = m.TagIDEMS_Dem,
+                            TagName_Dem = m.TagName_Dem,
+                            GhiChu = m.GhiChu,
+                            TrangThai = m.TrangThai,
+                            NgayCapNhat = m.NgayCapNhat,
+                        };
+            return await query.ToListAsync();
+        }
+
+        public async Task<TKVV_Silo_TagMapping?> GetSiloTagMappingByIdAsync(int id)
+            => await _context.TKVV_Silo_TagMapping.FindAsync(id);
+
+        public async Task<TKVV_Silo_TagMapping> AddSiloTagMappingAsync(TKVV_Silo_TagMapping entity)
+        {
+            entity.NgayCapNhat = DateTime.Now;
+            _context.TKVV_Silo_TagMapping.Add(entity);
+            await _context.SaveChangesAsync();
+            return entity;
+        }
+
+        public async Task<TKVV_Silo_TagMapping?> UpdateSiloTagMappingAsync(int id, TKVV_Silo_TagMapping entity)
+        {
+            var existing = await _context.TKVV_Silo_TagMapping.FindAsync(id);
+            if (existing == null) return null;
+
+            existing.SiloID = entity.SiloID;
+            existing.MaBM = entity.MaBM;
+            existing.LoaiDuLieu = entity.LoaiDuLieu;
+            existing.TagIDEMS = entity.TagIDEMS;
+            existing.TagName = entity.TagName;
+            existing.TagIDEMS_Ngay = entity.TagIDEMS_Ngay;
+            existing.TagName_Ngay = entity.TagName_Ngay;
+            existing.TagIDEMS_Dem = entity.TagIDEMS_Dem;
+            existing.TagName_Dem = entity.TagName_Dem;
+            existing.GhiChu = entity.GhiChu;
+            existing.TrangThai = entity.TrangThai;
+            existing.NgayCapNhat = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+            return existing;
+        }
+
+        public async Task<bool> DeleteSiloTagMappingAsync(int id)
+        {
+            var entity = await _context.TKVV_Silo_TagMapping.FindAsync(id);
+            if (entity == null) return false;
+            _context.TKVV_Silo_TagMapping.Remove(entity);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+    }
+}
