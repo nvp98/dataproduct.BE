@@ -513,9 +513,12 @@ namespace dataproduct.api.Services
                 // khiến FE tính isManualCell=false và sanitizeRowsBeforeSubmit xóa luôn __orig/__IsManual
                 // trước khi gửi lên. Nếu vẫn skip ở đây thì record cũ (KLPhuGia_Manual còn giá trị cũ)
                 // không bao giờ được chạm tới để dọn — đúng bug "khối lượng phụ liệu vẫn dính dữ liệu cũ".
-                if (!isManual && !isAddManualColumn
-                    && (klPhuGia == null || klPhuGia == 0) && (klPhuGiaManual == null || klPhuGiaManual == 0))
-                    continue;
+                //if (!isManual && !isAddManualColumn
+                //    && (klPhuGia == null || klPhuGia == 0) && (klPhuGiaManual == null || klPhuGiaManual == 0))
+                //    continue;
+                //if (!isManual
+                //    && (klPhuGia == null || klPhuGia == 0)
+                //    && (klPhuGiaManual == null || klPhuGiaManual == 0)) continue;
 
                 result.Add(new Hrc1_PhuLieuInsertModel
                 {

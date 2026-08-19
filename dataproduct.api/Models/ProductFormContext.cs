@@ -533,6 +533,7 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
             entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
             entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+            entity.Property(e => e.IDPhieu).HasColumnName("IDPhieu");
         });
 
         modelBuilder.Entity<Hrc1PhuLieu>(entity =>
