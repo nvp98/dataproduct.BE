@@ -8,12 +8,13 @@ namespace dataproduct.api.Repositories.NMTKVV
         // Silo
         Task<List<TKVVSiloDto>> GetSiloListAsync(string? scope);
         Task<TKVV_Silo?> GetSiloByIdAsync(int id);
+        Task<TKVV_NguyenVatLieu?> GetNvlByIdAsync(int id);
         Task<TKVV_Silo> AddSiloAsync(TKVV_Silo entity);
         Task<TKVV_Silo?> UpdateSiloAsync(int id, TKVV_Silo entity);
         Task<bool> DeleteSiloAsync(int id);
 
         // NVL ↔ Silo Mapping
-        Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(int? nvlId, int? siloId);
+        Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId);
         Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id);
         Task<TKVV_NVL_SiloMapping> AddNvlSiloMappingAsync(TKVV_NVL_SiloMapping entity);
         Task<TKVV_NVL_SiloMapping?> UpdateNvlSiloMappingAsync(int id, TKVV_NVL_SiloMapping entity);

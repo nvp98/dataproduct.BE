@@ -73,7 +73,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep> MacTheps { get; set; }
     public virtual DbSet<MayDuc> MayDucs { get; set; }
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
-    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
+    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps { get; set; }
 
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
@@ -724,12 +724,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
         });
-         modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
-        {
-            entity.ToTable("NhomPhanLoaiMacThep");
-            entity.Property(e => e.Id).HasColumnName("Id");
-            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
-        });
+        modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
+       {
+           entity.ToTable("NhomPhanLoaiMacThep");
+           entity.Property(e => e.Id).HasColumnName("Id");
+           entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
+       });
 
         // --- HRC1 ---
         modelBuilder.Entity<HRC1_MeThep>(entity =>
@@ -810,7 +810,15 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.PhePham).HasPrecision(18, 3);
         });
         modelBuilder.Entity<TKVV_Silo>(entity => { entity.ToTable("TKVV_Silo"); });
-        modelBuilder.Entity<TKVV_NVL_SiloMapping>(entity => { entity.ToTable("TKVV_NVL_SiloMapping"); });
+        modelBuilder.Entity<TKVV_NVL_SiloMapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_SiloMapping");
+            entity.Property(e => e.MaBM).HasMaxLength(50);
+            entity.Property(e => e.Scope).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
+        });
         modelBuilder.Entity<TKVV_Silo_TagMapping>(entity => { entity.ToTable("TKVV_Silo_TagMapping"); });
         // Không ToTable(): type này chỉ dùng qua FromSqlRaw (EXEC dbo.EMS_GetMappingTag),
         // không có bảng/view vật lý nào trong PRODUCT_FORM để ánh xạ.

@@ -38,6 +38,9 @@ namespace dataproduct.api.Repositories.NMTKVV
         public async Task<TKVV_Silo?> GetSiloByIdAsync(int id)
             => await _context.TKVV_Silo.FindAsync(id);
 
+        public async Task<TKVV_NguyenVatLieu?> GetNvlByIdAsync(int id)
+            => await _context.TKVV_NguyenVatLieu.FindAsync(id);
+
         public async Task<TKVV_Silo> AddSiloAsync(TKVV_Silo entity)
         {
             entity.NgayCapNhat = DateTime.Now;
@@ -75,27 +78,32 @@ namespace dataproduct.api.Repositories.NMTKVV
 
         // ─── TKVV_NVL_SiloMapping ─────────────────────────────────────────────
 
-        public async Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(int? nvlId, int? siloId)
+        public async Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId)
         {
             var query = from m in _context.TKVV_NVL_SiloMapping
                         join nvl in _context.TKVV_NguyenVatLieu on m.NguyenVatLieuID equals nvl.ID into nvlGroup
                         from nvl in nvlGroup.DefaultIfEmpty()
                         join silo in _context.TKVV_Silo on m.SiloID equals silo.ID into siloGroup
                         from silo in siloGroup.DefaultIfEmpty()
-                        where (nvlId == null || m.NguyenVatLieuID == nvlId)
+                        where (string.IsNullOrWhiteSpace(maBM) || m.MaBM == maBM)
+                           && (string.IsNullOrWhiteSpace(scope) || m.Scope == scope)
+                           && (nvlId == null || m.NguyenVatLieuID == nvlId)
                            && (siloId == null || m.SiloID == siloId)
-                        orderby m.NgaySX descending, m.Ca, m.NguyenVatLieuID
+                        orderby m.NgaySX descending, m.Ca, m.ThuTu, m.NguyenVatLieuID
                         select new TKVVNvlSiloMappingDto
                         {
                             Id = m.ID,
+                            MaBM = m.MaBM,
                             NguyenVatLieuID = m.NguyenVatLieuID,
                             TenNVL = nvl != null ? nvl.TenNVL : null,
                             ScopeNVL = nvl != null ? nvl.Scope : null,
+                            Scope = m.Scope,
                             SiloID = m.SiloID,
                             TenSilo = silo != null ? silo.TenSilo : null,
                             MaSilo = silo != null ? silo.MaSilo : null,
                             Ca = m.Ca,
                             NgaySX = m.NgaySX,
+                            ThuTu = m.ThuTu,
                             GhiChu = m.GhiChu,
                             TrangThai = m.TrangThai,
                             NgayCapNhat = m.NgayCapNhat,
@@ -120,9 +128,12 @@ namespace dataproduct.api.Repositories.NMTKVV
             if (existing == null) return null;
 
             existing.NguyenVatLieuID = entity.NguyenVatLieuID;
+            existing.MaBM = entity.MaBM;
+            existing.Scope = entity.Scope;
             existing.SiloID = entity.SiloID;
             existing.Ca = entity.Ca;
             existing.NgaySX = entity.NgaySX;
+            existing.ThuTu = entity.ThuTu;
             existing.GhiChu = entity.GhiChu;
             existing.TrangThai = entity.TrangThai;
             existing.NgayCapNhat = DateTime.Now;

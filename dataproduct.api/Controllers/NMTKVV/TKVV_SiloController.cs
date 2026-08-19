@@ -58,9 +58,9 @@ namespace dataproduct.api.Controllers.NMTKVV
         // ─── NVL ↔ Silo Mapping ────────────────────────────────────────────────
 
         [HttpGet("nvl-silo-mapping")]
-        public async Task<IActionResult> GetNvlSiloMappingList([FromQuery] int? nvlId, [FromQuery] int? siloId)
+        public async Task<IActionResult> GetNvlSiloMappingList([FromQuery] string? maBM, [FromQuery] string? scope, [FromQuery] int? nvlId, [FromQuery] int? siloId)
         {
-            var result = await _service.GetNvlSiloMappingListAsync(nvlId, siloId);
+            var result = await _service.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId);
             return Ok(result);
         }
 
@@ -76,6 +76,7 @@ namespace dataproduct.api.Controllers.NMTKVV
         public async Task<IActionResult> AddNvlSiloMapping([FromBody] CreateTKVVNvlSiloMappingDto dto)
         {
             var result = await _service.AddNvlSiloMappingAsync(dto);
+            if (result == null) return BadRequest(new { message = "NVL hoặc Silo không hợp lệ, hoặc scope giữa NVL và Silo không khớp." });
             return Ok(result);
         }
 
@@ -83,7 +84,7 @@ namespace dataproduct.api.Controllers.NMTKVV
         public async Task<IActionResult> UpdateNvlSiloMapping(int id, [FromBody] UpdateTKVVNvlSiloMappingDto dto)
         {
             var result = await _service.UpdateNvlSiloMappingAsync(id, dto);
-            if (result == null) return NotFound();
+            if (result == null) return BadRequest(new { message = "NVL hoặc Silo không hợp lệ, hoặc scope giữa NVL và Silo không khớp." });
             return Ok(result);
         }
 

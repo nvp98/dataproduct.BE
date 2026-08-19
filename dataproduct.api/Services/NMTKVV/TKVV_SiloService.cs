@@ -21,6 +21,9 @@ namespace dataproduct.api.Services.NMTKVV
         public Task<TKVV_Silo?> GetSiloByIdAsync(int id)
             => _repo.GetSiloByIdAsync(id);
 
+        public Task<TKVV_NguyenVatLieu?> GetNvlByIdAsync(int id)
+            => _repo.GetNvlByIdAsync(id);
+
         public Task<TKVV_Silo> AddSiloAsync(CreateTKVVSiloDto dto)
         {
             var entity = new TKVV_Silo
@@ -56,38 +59,66 @@ namespace dataproduct.api.Services.NMTKVV
 
         // ─── NVL ↔ Silo Mapping ───────────────────────────────────────────────
 
-        public Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(int? nvlId, int? siloId)
-            => _repo.GetNvlSiloMappingListAsync(nvlId, siloId);
+        public Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId)
+            => _repo.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId);
 
         public Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id)
             => _repo.GetNvlSiloMappingByIdAsync(id);
 
-        public Task<TKVV_NVL_SiloMapping> AddNvlSiloMappingAsync(CreateTKVVNvlSiloMappingDto dto)
+        public async Task<TKVV_NVL_SiloMapping?> AddNvlSiloMappingAsync(CreateTKVVNvlSiloMappingDto dto)
         {
+            var nvl = await _repo.GetNvlByIdAsync(dto.NguyenVatLieuID);
+            if (nvl == null) return null;
+
+            if (dto.SiloID.HasValue)
+            {
+                var silo = await _repo.GetSiloByIdAsync(dto.SiloID.Value);
+                if (silo == null) return null;
+                // if (!string.IsNullOrWhiteSpace(nvl.Scope) && !string.IsNullOrWhiteSpace(silo.Scope) && !string.Equals(nvl.Scope, silo.Scope, StringComparison.OrdinalIgnoreCase))
+                //     return null;
+            }
+
             var entity = new TKVV_NVL_SiloMapping
             {
+                MaBM = string.IsNullOrWhiteSpace(dto.MaBM) ? nvl.MaBM : dto.MaBM,
                 NguyenVatLieuID = dto.NguyenVatLieuID,
+                Scope = string.IsNullOrWhiteSpace(dto.Scope) ? nvl.Scope : dto.Scope,
                 SiloID = dto.SiloID,
                 Ca = dto.Ca,
                 NgaySX = dto.NgaySX,
+                ThuTu = dto.ThuTu ?? nvl.ThuTu,
                 GhiChu = dto.GhiChu,
                 TrangThai = true,
             };
-            return _repo.AddNvlSiloMappingAsync(entity);
+            return await _repo.AddNvlSiloMappingAsync(entity);
         }
 
-        public Task<TKVV_NVL_SiloMapping?> UpdateNvlSiloMappingAsync(int id, UpdateTKVVNvlSiloMappingDto dto)
+        public async Task<TKVV_NVL_SiloMapping?> UpdateNvlSiloMappingAsync(int id, UpdateTKVVNvlSiloMappingDto dto)
         {
+            var nvl = await _repo.GetNvlByIdAsync(dto.NguyenVatLieuID);
+            if (nvl == null) return null;
+
+            if (dto.SiloID.HasValue)
+            {
+                var silo = await _repo.GetSiloByIdAsync(dto.SiloID.Value);
+                if (silo == null) return null;
+                // if (!string.IsNullOrWhiteSpace(nvl.Scope) && !string.IsNullOrWhiteSpace(silo.Scope) && !string.Equals(nvl.Scope, silo.Scope, StringComparison.OrdinalIgnoreCase))
+                //     return null;
+            }
+
             var entity = new TKVV_NVL_SiloMapping
             {
+                MaBM = string.IsNullOrWhiteSpace(dto.MaBM) ? nvl.MaBM : dto.MaBM,
                 NguyenVatLieuID = dto.NguyenVatLieuID,
+                Scope = string.IsNullOrWhiteSpace(dto.Scope) ? nvl.Scope : dto.Scope,
                 SiloID = dto.SiloID,
                 Ca = dto.Ca,
                 NgaySX = dto.NgaySX,
+                ThuTu = dto.ThuTu ?? nvl.ThuTu,
                 GhiChu = dto.GhiChu,
                 TrangThai = dto.TrangThai,
             };
-            return _repo.UpdateNvlSiloMappingAsync(id, entity);
+            return await _repo.UpdateNvlSiloMappingAsync(id, entity);
         }
 
         public Task<bool> DeleteNvlSiloMappingAsync(int id)

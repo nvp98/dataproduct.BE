@@ -35,14 +35,17 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
     public class TKVVNvlSiloMappingDto
     {
         public int Id { get; set; }
+        public string? MaBM { get; set; }
         public int NguyenVatLieuID { get; set; }
         public string? TenNVL { get; set; }
         public string? ScopeNVL { get; set; }
-        public int SiloID { get; set; }
+        public string? Scope { get; set; }
+        public int? SiloID { get; set; }
         public string? TenSilo { get; set; }
         public string? MaSilo { get; set; }
         public int Ca { get; set; }
         public DateOnly NgaySX { get; set; }
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
         public bool TrangThai { get; set; }
         public DateTime NgayCapNhat { get; set; }
@@ -50,10 +53,13 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
 
     public class CreateTKVVNvlSiloMappingDto
     {
+        public string? MaBM { get; set; }
         public int NguyenVatLieuID { get; set; }
-        public int SiloID { get; set; }
+        public string? Scope { get; set; }
+        public int? SiloID { get; set; }
         public int Ca { get; set; }
         public DateOnly NgaySX { get; set; }
+        public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
     }
 
