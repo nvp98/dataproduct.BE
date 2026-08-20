@@ -506,6 +506,7 @@ namespace dataproduct.api.Repositories
         Task<int> FillMacThepAsync();
         Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps);
         Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req);
+        Task<Hrc1SlabItem> CreateSlabAsync(Hrc1SlabCreateRequest req);
         Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu);
         Task SaveTongHopGhiChuAsync(Hrc1SaveTongHopGhiChuRequest req);
     }

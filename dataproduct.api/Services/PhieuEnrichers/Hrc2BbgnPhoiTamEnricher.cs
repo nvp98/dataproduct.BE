@@ -26,15 +26,24 @@ public class Hrc2BbgnPhoiTamEnricher : IPhieuSearchEnricher, IPhieuTinhTrangFilt
 
     public async Task EnrichAsync(SearchPhieuResponseModel item)
     {
-        if (item.TinhTrang == 5) return;
-
+        // Số lượng ID Slab đã xác nhận theo từng bộ phận (Đúc/Kho/PKH) trên tổng số ID Slab của
+        // phiếu — tính cho MỌI phiếu, kể cả đã chốt (TinhTrang == 5), vì UI danh sách phiếu cần
+        // hiển thị dù phiếu đã chốt hay chưa. FE tự suy ra 3 trạng thái hiển thị (Chưa XN / Đã XN
+        // một phần kèm số lượng / Đã XN hết) từ cặp (SoLuongXN*, SoLuongSlab).
         var records = await _context.BkHrc2SlabTrangThais
             .AsNoTracking()
             .Where(t => t.IdPhieuBBSL == item.Idphieu)
-            .Select(t => new { t.TrangThaiDuc, t.TrangThaiKho })
+            .Select(t => new { t.TrangThaiDuc, t.TrangThaiKho, t.TrangThaiPKH })
             .ToListAsync();
 
-        var hoanThanh = records.Count > 0 && records.All(t => t.TrangThaiDuc == 1 && t.TrangThaiKho == 1);
+        item.SoLuongSlab = records.Count;
+        item.SoLuongXNDuc = records.Count(t => t.TrangThaiDuc == 1);
+        item.SoLuongXNKho = records.Count(t => t.TrangThaiKho == 1);
+        item.SoLuongXNPKH = records.Count(t => t.TrangThaiPKH == 1);
+
+        if (item.TinhTrang == 5) return;
+
+        var hoanThanh = item.SoLuongSlab > 0 && item.SoLuongXNDuc == item.SoLuongSlab && item.SoLuongXNKho == item.SoLuongSlab;
         item.TinhTrang = hoanThanh ? 12 : 11;
     }
 

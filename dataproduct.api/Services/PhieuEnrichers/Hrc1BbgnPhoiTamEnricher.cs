@@ -29,8 +29,6 @@ public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher, IPhieuTinhTrangFilt
 
     public async Task EnrichAsync(SearchPhieuResponseModel item)
     {
-        if (item.TinhTrang == 5) return;
-
         var caStr = item.Ca?.ToString();
 
         var naturalIds = await _context.Hrc1Slabs
@@ -52,17 +50,32 @@ public class Hrc1BbgnPhoiTamEnricher : IPhieuSearchEnricher, IPhieuTinhTrangFilt
             .Where(t => t.IsChuyenCa && t.IdPhieuBBSL == item.Idphieu)
             .ToListAsync();
 
-        if (naturalIds.Count == 0 && transferredRecords.Count == 0)
+        // Số lượng ID Slab đã xác nhận theo từng bộ phận (Đúc/Cán/C4/PKH) trên tổng số ID Slab
+        // của phiếu — tính cho MỌI phiếu, kể cả đã chốt (TinhTrang == 5), vì UI danh sách phiếu
+        // cần hiển thị dù phiếu đã chốt hay chưa.
+        item.SoLuongSlab = naturalIds.Count + transferredRecords.Count;
+        item.SoLuongXNDuc = naturalIds.Count(id => naturalTTMap.TryGetValue(id, out var tt) && tt.TrangThaiDuc == 1)
+            + transferredRecords.Count(t => t.TrangThaiDuc == 1);
+        item.SoLuongXNCan = naturalIds.Count(id => naturalTTMap.TryGetValue(id, out var tt) && tt.TrangThaiCan == 1)
+            + transferredRecords.Count(t => t.TrangThaiCan == 1);
+        item.SoLuongXNC4 = naturalIds.Count(id => naturalTTMap.TryGetValue(id, out var tt) && tt.TrangThaiC4)
+            + transferredRecords.Count(t => t.TrangThaiC4);
+        item.SoLuongXNPKH = naturalIds.Count(id => naturalTTMap.TryGetValue(id, out var tt) && tt.TrangThaiPKH == 1)
+            + transferredRecords.Count(t => t.TrangThaiPKH == 1);
+
+        if (item.TinhTrang == 5) return;
+
+        if (item.SoLuongSlab == 0)
         {
             item.TinhTrang = 11;
             return;
         }
 
-        var chuaXacNhan = naturalIds.Count(id =>
-                !naturalTTMap.TryGetValue(id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1 || !tt.TrangThaiC4)
-            + transferredRecords.Count(t => t.TrangThaiDuc != 1 || t.TrangThaiCan != 1 || !t.TrangThaiC4);
+        var hoanThanh = item.SoLuongXNDuc == item.SoLuongSlab
+            && item.SoLuongXNCan == item.SoLuongSlab
+            && item.SoLuongXNC4 == item.SoLuongSlab;
 
-        item.TinhTrang = chuaXacNhan == 0 ? 12 : 11;
+        item.TinhTrang = hoanThanh ? 12 : 11;
     }
 
     /// <summary>Bản batch của EnrichAsync ở trên, dùng để lọc TinhTrang trước khi phân trang.</summary>
