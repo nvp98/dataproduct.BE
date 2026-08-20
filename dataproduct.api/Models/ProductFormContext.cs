@@ -796,7 +796,8 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<TKVV_SanLuongDuLieu>(entity =>
         {
             entity.ToTable("TKVV_SanLuongDuLieu");
-            entity.Property(e => e.Value).HasPrecision(18, 3);
+            entity.Property(e => e.GiaTriTuDong).HasPrecision(18, 3);
+            entity.Property(e => e.GiaTriDieuChinh).HasPrecision(18, 3);
         });
         modelBuilder.Entity<TKVV_SanLuongChiTiet>(entity =>
         {
