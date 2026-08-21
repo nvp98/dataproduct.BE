@@ -216,6 +216,22 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        // ── Sửa slab thủ công ──────────────────────────────────────────────
+
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> EditSlab(int id, [FromBody] Hrc1SlabEditRequest req)
+        {
+            try
+            {
+                await _svc.EditSlabAsync(id, req);
+                return Ok(new WorkflowResult { Success = true, Message = "Đã cập nhật slab.", AffectedRows = 1 });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         [HttpGet("tonghop-ghi-chu/{idPhieu:guid}")]

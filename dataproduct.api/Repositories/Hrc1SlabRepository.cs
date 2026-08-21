@@ -868,6 +868,40 @@ namespace dataproduct.api.Repositories
             return MapToItem(slab, null, phieu, ResolveMaVatTu(slab, null, mvt), mvt?.TenVatTu);
         }
 
+        // ── Sửa slab thủ công (tab "Chi tiết slab") ────────────────────────────
+        // Full-replace toàn bộ field nhập tay (mirror CreateSlabAsync) khi user bấm "Sửa" trên popup —
+        // khác UpdateSlabAsync ở trên (chỉ patch GhiChu/MaVatTu cho inline-edit, xem comment DTO).
+        public async Task EditSlabAsync(int id, Hrc1SlabEditRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.IDSlab))
+                throw new InvalidOperationException("ID Slab không được để trống.");
+
+            var slab = await _context.Hrc1Slabs.FindAsync(id)
+                ?? throw new InvalidOperationException($"Slab {id} không tồn tại.");
+
+            var tt = await _context.Hrc1SlabTrangThais.FirstOrDefaultAsync(t => t.IdSlab == id);
+            if (tt?.TrangThaiPKH == 1)
+                throw new InvalidOperationException("Slab thuộc phiếu đã chốt, không thể chỉnh sửa.");
+
+            var idSlab = req.IDSlab.Trim();
+            var trung = await _context.Hrc1Slabs.AnyAsync(s => s.IDSlab == idSlab && s.Id != id);
+            if (trung)
+                throw new InvalidOperationException($"ID Slab '{idSlab}' đã tồn tại.");
+
+            slab.IDSlab = idSlab;
+            slab.IDPiece = req.IDPiece;
+            slab.MaMe = req.MaMe;
+            slab.MacThep = req.MacThep;
+            slab.MayDuc = req.MayDuc;
+            slab.CutDate = req.CutDate;
+            slab.ChieuDay = req.ChieuDay;
+            slab.ChieuRong = req.ChieuRong;
+            slab.ChieuDai = req.ChieuDai;
+            slab.KhoiLuong = req.KhoiLuong;
+            slab.NgayCapNhat = DateTime.Now;
+            await _context.SaveChangesAsync();
+        }
+
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         public async Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)

@@ -134,6 +134,25 @@ namespace dataproduct.api.DTOs
         public decimal? KhoiLuong { get; set; }
     }
 
+    // ── Sửa slab thủ công (tab "Chi tiết slab") ──────────────────────────────
+    // Cùng bộ field với Hrc1SlabCreateRequest (popup "Sửa" tái dùng y hệt form "Thêm mới") — KHÔNG
+    // dùng chung Hrc1SlabUpdateRequest (chỉ GhiChu/MaVatTu, bán-patch cho inline-edit ghi chú): nếu
+    // gộp chung, các field không gửi trong request inline-edit sẽ bị deserialize về null rồi ghi đè
+    // mất dữ liệu thật (full-replace vs partial-patch là 2 semantics khác nhau, không thể dùng 1 DTO).
+    public class Hrc1SlabEditRequest
+    {
+        public string IDSlab { get; set; } = "";
+        public string? IDPiece { get; set; }
+        public string? MaMe { get; set; }
+        public string? MacThep { get; set; }
+        public string? MayDuc { get; set; }
+        public DateTime? CutDate { get; set; }
+        public decimal? ChieuDay { get; set; }
+        public decimal? ChieuRong { get; set; }
+        public decimal? ChieuDai { get; set; }
+        public decimal? KhoiLuong { get; set; }
+    }
+
     // ── Tổng hợp ghi chú ─────────────────────────────────────────────────────
 
     public class Hrc1TongHopGhiChuItem
