@@ -13,6 +13,11 @@ namespace dataproduct.api.Services.NMTKVV
             _repo = repo;
         }
 
+        // ─── NVL ──────────────────────────────────────────────────────────────
+
+        public Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope)
+            => _repo.GetNvlListAsync(maBM, scope);
+
         // ─── Silo ─────────────────────────────────────────────────────────────
 
         public Task<List<TKVVSiloDto>> GetSiloListAsync(string? scope)
@@ -59,8 +64,14 @@ namespace dataproduct.api.Services.NMTKVV
 
         // ─── NVL ↔ Silo Mapping ───────────────────────────────────────────────
 
-        public Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId)
-            => _repo.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId);
+        public Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId, DateOnly? ngaySX = null, int? ca = null)
+            => _repo.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId, ngaySX, ca);
+
+        public Task<List<TKVVNvlSiloMappingDto>> GetNearestMappingAsync(string? maBM, string scope, DateOnly beforeDate)
+            => _repo.GetNearestMappingAsync(maBM, scope, beforeDate);
+
+        public Task<int> BatchCreateNvlSiloMappingAsync(BatchCreateNvlSiloMappingDto dto)
+            => _repo.BatchCreateNvlSiloMappingAsync(dto);
 
         public Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id)
             => _repo.GetNvlSiloMappingByIdAsync(id);

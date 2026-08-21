@@ -140,6 +140,25 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public DateTime? ThoiGianDen { get; set; }
     }
 
+    // ─── Dữ liệu cân từ SP_TKVV_GetDuLieuCan — đổ bảng khi tạo phiếu BC SLCP ──
+    // Gọi với (Ngay, Ca, MaBM, LoaiDuLieu, Scope int) — trả từng dòng NVL/Silo.
+
+    public class TKVVDuLieuCanDto
+    {
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+        public string? MaBM { get; set; }
+        public string? Scope { get; set; }
+        public string? Xuong { get; set; }
+        public int? SiloID { get; set; }
+        public string? MaSilo { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string TenNVL { get; set; } = string.Empty;
+        public string? DonViTinh { get; set; }
+        public decimal GiaTri { get; set; }
+        public int SoLuongSilo { get; set; }
+    }
+
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────
 
     public class TKVVChiTietDto

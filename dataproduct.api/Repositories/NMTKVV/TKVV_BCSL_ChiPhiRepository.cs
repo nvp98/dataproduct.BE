@@ -71,5 +71,54 @@ namespace dataproduct.api.Repositories.NMTKVV
 
             return result;
         }
+
+        public async Task<List<TKVVDuLieuCanDto>> GetDuLieuCanAsync(
+            DateTime ngay, int ca, string maBM, string loaiDuLieu, int scope)
+        {
+            var result = new List<TKVVDuLieuCanDto>();
+
+            var conn = _context.Database.GetDbConnection();
+            var wasOpen = conn.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "dbo.SP_TKVV_GetDuLieuCan";
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.CommandTimeout = 30;
+                cmd.Parameters.Add(new SqlParameter("@Ngay", ngay.Date));
+                cmd.Parameters.Add(new SqlParameter("@Ca", ca));
+                cmd.Parameters.Add(new SqlParameter("@MaBM", maBM));
+                cmd.Parameters.Add(new SqlParameter("@LoaiDuLieu", loaiDuLieu));
+                cmd.Parameters.Add(new SqlParameter("@Scope", scope));
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new TKVVDuLieuCanDto
+                    {
+                        Ngay             = ngay.Date,
+                        Ca               = ca,
+                        MaBM             = maBM,
+                        Scope            = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
+                        Xuong            = reader["Xuong"] == DBNull.Value ? null : reader["Xuong"].ToString(),
+                        SiloID           = reader["SiloID"] == DBNull.Value ? null : Convert.ToInt32(reader["SiloID"]),
+                        MaSilo           = reader["MaSilo"] == DBNull.Value ? null : reader["MaSilo"].ToString(),
+                        NguyenVatLieuID  = reader["NguyenVatLieuID"] == DBNull.Value ? 0 : Convert.ToInt32(reader["NguyenVatLieuID"]),
+                        TenNVL           = reader["TenNVL"]?.ToString() ?? string.Empty,
+                        DonViTinh        = reader["DonViTinh"] == DBNull.Value ? null : reader["DonViTinh"].ToString(),
+                        GiaTri           = reader["GiaTri"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTri"]),
+                        SoLuongSilo      = reader["SoLuongSilo"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoLuongSilo"]),
+                    });
+                }
+            }
+            finally
+            {
+                if (!wasOpen) await conn.CloseAsync();
+            }
+
+            return result;
+        }
     }
 }

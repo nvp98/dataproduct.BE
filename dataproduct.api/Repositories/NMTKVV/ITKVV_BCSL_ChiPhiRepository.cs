@@ -7,5 +7,9 @@ namespace dataproduct.api.Repositories.NMTKVV
         // Giá trị NVL tự động từ EMS — gọi SP_TKVV_GetGiaTriNVL_Auto
         Task<List<TKVVGiaTriNVLAutoDto>> GetGiaTriNVLAutoAsync(
             DateTime ngay, int ca, string scopeCode, string maBM);
+
+        // Dữ liệu cân từ EMS — gọi SP_TKVV_GetDuLieuCan (theo Silo)
+        Task<List<TKVVDuLieuCanDto>> GetDuLieuCanAsync(
+            DateTime ngay, int ca, string maBM, string loaiDuLieu, int scope);
     }
 }

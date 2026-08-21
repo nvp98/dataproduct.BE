@@ -5,6 +5,9 @@ namespace dataproduct.api.Repositories.NMTKVV
 {
     public interface ITKVV_SiloRepository
     {
+        // NVL
+        Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope);
+
         // Silo
         Task<List<TKVVSiloDto>> GetSiloListAsync(string? scope);
         Task<TKVV_Silo?> GetSiloByIdAsync(int id);
@@ -14,7 +17,9 @@ namespace dataproduct.api.Repositories.NMTKVV
         Task<bool> DeleteSiloAsync(int id);
 
         // NVL ↔ Silo Mapping
-        Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId);
+        Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId, DateOnly? ngaySX = null, int? ca = null);
+        Task<List<TKVVNvlSiloMappingDto>> GetNearestMappingAsync(string? maBM, string scope, DateOnly beforeDate);
+        Task<int> BatchCreateNvlSiloMappingAsync(BatchCreateNvlSiloMappingDto dto);
         Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id);
         Task<TKVV_NVL_SiloMapping> AddNvlSiloMappingAsync(TKVV_NVL_SiloMapping entity);
         Task<TKVV_NVL_SiloMapping?> UpdateNvlSiloMappingAsync(int id, TKVV_NVL_SiloMapping entity);

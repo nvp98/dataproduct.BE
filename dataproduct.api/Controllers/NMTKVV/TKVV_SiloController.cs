@@ -58,10 +58,31 @@ namespace dataproduct.api.Controllers.NMTKVV
         // ─── NVL ↔ Silo Mapping ────────────────────────────────────────────────
 
         [HttpGet("nvl-silo-mapping")]
-        public async Task<IActionResult> GetNvlSiloMappingList([FromQuery] string? maBM, [FromQuery] string? scope, [FromQuery] int? nvlId, [FromQuery] int? siloId)
+        public async Task<IActionResult> GetNvlSiloMappingList([FromQuery] string? maBM, [FromQuery] string? scope, [FromQuery] int? nvlId, [FromQuery] int? siloId, [FromQuery] DateOnly? ngaySX, [FromQuery] int? ca)
         {
-            var result = await _service.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId);
+            var result = await _service.GetNvlSiloMappingListAsync(maBM, scope, nvlId, siloId, ngaySX, ca);
             return Ok(result);
+        }
+
+        [HttpGet("nvl-silo-mapping/nearest")]
+        public async Task<IActionResult> GetNearestMapping(
+            [FromQuery] string? maBM,
+            [FromQuery] string scope,
+            [FromQuery] DateOnly beforeDate)
+        {
+            if (string.IsNullOrWhiteSpace(scope))
+                return BadRequest(new { message = "Thiếu scope." });
+            var result = await _service.GetNearestMappingAsync(maBM, scope, beforeDate);
+            return Ok(result);
+        }
+
+        [HttpPost("nvl-silo-mapping/batch")]
+        public async Task<IActionResult> BatchCreateNvlSiloMapping([FromBody] BatchCreateNvlSiloMappingDto dto)
+        {
+            if (dto.Rows == null || dto.Rows.Count == 0)
+                return BadRequest(new { message = "Danh sách mapping trống." });
+            var count = await _service.BatchCreateNvlSiloMappingAsync(dto);
+            return Ok(new { count });
         }
 
         [HttpGet("nvl-silo-mapping/{id}")]

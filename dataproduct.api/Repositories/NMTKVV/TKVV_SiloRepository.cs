@@ -13,6 +13,31 @@ namespace dataproduct.api.Repositories.NMTKVV
             _context = context;
         }
 
+        // ─── TKVV_NguyenVatLieu ───────────────────────────────────────────────
+
+        public async Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope)
+        {
+            return await _context.TKVV_NguyenVatLieu
+                .Where(x => (string.IsNullOrWhiteSpace(maBM) || x.MaBM == maBM)
+                         && (string.IsNullOrWhiteSpace(scope) || x.Scope.Contains(scope))
+                         && x.TrangThai == true)
+                .OrderBy(x => x.ThuTu)
+                .Select(x => new TKVVNguyenVatLieuDto
+                {
+                    Id = x.ID,
+                    MaBM = x.MaBM,
+                    TenNVL = x.TenNVL,
+                    DonViTinh = x.DonViTinh,
+                    ThuTu = x.ThuTu,
+                    TrangThai = x.TrangThai,
+                    GhiChu = x.GhiChu,
+                    Scope = x.Scope,
+                    TenScope = x.TenScope,
+                })
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         // ─── TKVV_Silo ────────────────────────────────────────────────────────
 
         public async Task<List<TKVVSiloDto>> GetSiloListAsync(string? scope)
@@ -78,7 +103,7 @@ namespace dataproduct.api.Repositories.NMTKVV
 
         // ─── TKVV_NVL_SiloMapping ─────────────────────────────────────────────
 
-        public async Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId)
+        public async Task<List<TKVVNvlSiloMappingDto>> GetNvlSiloMappingListAsync(string? maBM, string? scope, int? nvlId, int? siloId, DateOnly? ngaySX = null, int? ca = null)
         {
             var query = from m in _context.TKVV_NVL_SiloMapping
                         join nvl in _context.TKVV_NguyenVatLieu on m.NguyenVatLieuID equals nvl.ID into nvlGroup
@@ -89,6 +114,9 @@ namespace dataproduct.api.Repositories.NMTKVV
                            && (string.IsNullOrWhiteSpace(scope) || m.Scope == scope)
                            && (nvlId == null || m.NguyenVatLieuID == nvlId)
                            && (siloId == null || m.SiloID == siloId)
+                           && (ngaySX == null || m.NgaySX == ngaySX)
+                           && (ca == null || m.Ca == ca)
+                           && m.TrangThai == true
                         orderby m.NgaySX descending, m.Ca, m.ThuTu, m.NguyenVatLieuID
                         select new TKVVNvlSiloMappingDto
                         {
@@ -109,6 +137,120 @@ namespace dataproduct.api.Repositories.NMTKVV
                             NgayCapNhat = m.NgayCapNhat,
                         };
             return await query.ToListAsync();
+        }
+
+        public async Task<List<TKVVNvlSiloMappingDto>> GetNearestMappingAsync(string? maBM, string scope, DateOnly beforeDate)
+        {
+            // Nếu đã có data cho beforeDate thì trả về luôn
+            var existsForDate = await _context.TKVV_NVL_SiloMapping
+                .AnyAsync(m => (string.IsNullOrWhiteSpace(maBM) || m.MaBM == maBM)
+                            && m.Scope == scope
+                            && m.NgaySX == beforeDate
+                            && m.TrangThai == true);
+
+            if (!existsForDate)
+            {
+                // Tìm ngày gần nhất trước beforeDate có data
+                var nearestNgaySX = await _context.TKVV_NVL_SiloMapping
+                    .Where(m => (string.IsNullOrWhiteSpace(maBM) || m.MaBM == maBM)
+                             && m.Scope == scope
+                             && m.NgaySX < beforeDate
+                             && m.TrangThai == true)
+                    .OrderByDescending(m => m.NgaySX)
+                    .Select(m => m.NgaySX)
+                    .FirstOrDefaultAsync();
+
+                if (nearestNgaySX == default) return new();
+
+                // Clone các record của ngày gần nhất sang beforeDate
+                var sourceRecords = await _context.TKVV_NVL_SiloMapping
+                    .Where(m => (string.IsNullOrWhiteSpace(maBM) || m.MaBM == maBM)
+                             && m.Scope == scope
+                             && m.NgaySX == nearestNgaySX
+                             && m.TrangThai == true)
+                    .ToListAsync();
+
+                var cloned = sourceRecords.Select(m => new TKVV_NVL_SiloMapping
+                {
+                    MaBM = m.MaBM,
+                    Scope = m.Scope,
+                    NgaySX = beforeDate,
+                    NguyenVatLieuID = m.NguyenVatLieuID,
+                    SiloID = m.SiloID,
+                    Ca = m.Ca,
+                    ThuTu = m.ThuTu,
+                    GhiChu = m.GhiChu,
+                    TrangThai = true,
+                    NgayCapNhat = DateTime.Now,
+                }).ToList();
+
+                _context.TKVV_NVL_SiloMapping.AddRange(cloned);
+                await _context.SaveChangesAsync();
+            }
+
+            return await (from m in _context.TKVV_NVL_SiloMapping
+                          join nvl in _context.TKVV_NguyenVatLieu on m.NguyenVatLieuID equals nvl.ID into nvlG
+                          from nvl in nvlG.DefaultIfEmpty()
+                          join silo in _context.TKVV_Silo on m.SiloID equals silo.ID into siloG
+                          from silo in siloG.DefaultIfEmpty()
+                          where (string.IsNullOrWhiteSpace(maBM) || m.MaBM == maBM)
+                             && m.Scope == scope
+                             && m.NgaySX == beforeDate
+                             && m.TrangThai == true
+                          orderby m.Ca, m.ThuTu, m.NguyenVatLieuID
+                          select new TKVVNvlSiloMappingDto
+                          {
+                              Id = m.ID,
+                              MaBM = m.MaBM,
+                              NguyenVatLieuID = m.NguyenVatLieuID,
+                              TenNVL = nvl != null ? nvl.TenNVL : null,
+                              ScopeNVL = nvl != null ? nvl.Scope : null,
+                              Scope = m.Scope,
+                              SiloID = m.SiloID,
+                              TenSilo = silo != null ? silo.TenSilo : null,
+                              MaSilo = silo != null ? silo.MaSilo : null,
+                              Ca = m.Ca,
+                              NgaySX = m.NgaySX,
+                              ThuTu = m.ThuTu,
+                              GhiChu = m.GhiChu,
+                              TrangThai = m.TrangThai,
+                              NgayCapNhat = m.NgayCapNhat,
+                          }).ToListAsync();
+        }
+
+        public async Task<int> BatchCreateNvlSiloMappingAsync(BatchCreateNvlSiloMappingDto dto)
+        {
+            // Kiểm tra nếu có id thì update và không có id thì insert
+
+            var entities = dto.Rows.Where(r => r.Id == null || r.Id == 0).Select((r, i) => new TKVV_NVL_SiloMapping
+            {
+                MaBM = dto.MaBM,
+                Scope = dto.Scope,
+                NgaySX = dto.NgaySX,
+                NguyenVatLieuID = r.NguyenVatLieuID,
+                SiloID = r.SiloID,
+                Ca = r.Ca,
+                ThuTu = r.ThuTu ?? (i + 1),
+                TrangThai = true,
+                NgayCapNhat = DateTime.Now,
+            }).ToList();
+            _context.TKVV_NVL_SiloMapping.AddRange(entities);
+            // update existing records
+            var updateEntities = dto.Rows.Where(r => r.Id != null && r.Id != 0).Select(r => new TKVV_NVL_SiloMapping
+            {
+                MaBM = dto.MaBM,
+                Scope = dto.Scope,
+                NgaySX = dto.NgaySX,
+                NguyenVatLieuID = r.NguyenVatLieuID,
+                SiloID = r.SiloID,
+                Ca = r.Ca,
+                ThuTu = r.ThuTu ?? 0,
+                TrangThai = true,
+                NgayCapNhat = DateTime.Now,
+            }).ToList();
+
+            await _context.SaveChangesAsync();
+            return entities.Count;
         }
 
         public async Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id)

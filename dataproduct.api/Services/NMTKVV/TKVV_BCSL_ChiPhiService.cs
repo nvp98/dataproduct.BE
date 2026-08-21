@@ -12,12 +12,12 @@ namespace dataproduct.api.Services.NMTKVV
             _repo = repo;
         }
 
-        // scope int 1-6 → map sang code "TK1"/"VV2"... trước khi gọi SP
         public Task<List<TKVVGiaTriNVLAutoDto>> GetGiaTriNVLAutoAsync(
             DateTime ngay, int ca, int scope, string maBM)
-        {
-            //var scopeCode = TKVV_BCSL_ChiPhiRepository.ResolveScopeCode(scope);
-            return _repo.GetGiaTriNVLAutoAsync(ngay, ca, scope.ToString(), maBM);
-        }
+            => _repo.GetGiaTriNVLAutoAsync(ngay, ca, scope.ToString(), maBM);
+
+        public Task<List<TKVVDuLieuCanDto>> GetDuLieuCanAsync(
+            DateTime ngay, int ca, string maBM, string loaiDuLieu, int scope)
+            => _repo.GetDuLieuCanAsync(ngay, ca, maBM, loaiDuLieu, scope);
     }
 }

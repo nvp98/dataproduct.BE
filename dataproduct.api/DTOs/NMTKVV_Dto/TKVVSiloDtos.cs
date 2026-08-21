@@ -68,6 +68,24 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public bool TrangThai { get; set; }
     }
 
+    public class BatchCreateNvlSiloMappingDto
+    {
+        public string MaBM { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public DateOnly NgaySX { get; set; }
+        public List<BatchNvlSiloMappingRowDto> Rows { get; set; } = new();
+    }
+
+    public class BatchNvlSiloMappingRowDto
+    {
+        public int? Id { get; set; } // optional, if provided then update, if null then insert
+        public string? MaBM { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public int? SiloID { get; set; }
+        public int Ca { get; set; }
+        public int? ThuTu { get; set; }
+    }
+
     // ─── TKVV_Silo_TagMapping ─────────────────────────────────────────────────
 
     public class TKVVSiloTagMappingDto
