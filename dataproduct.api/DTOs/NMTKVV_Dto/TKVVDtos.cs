@@ -140,57 +140,89 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public DateTime? ThoiGianDen { get; set; }
     }
 
-    // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp (bảng TKVV_SanLuongMapping) ─
-    // Dùng cho GetTongTuDongAsync (tổng PLC/ca để đối soát) — xác định Tag nào của
-    // cân (danh mục ở tab "Danh mục Cân") tính vào Xưởng nào, hiệu lực trong
-    // khoảng (TuNgay, DenNgay). Kíp chỉ để ghi chú/lọc hiển thị, KHÔNG được dùng để
-    // lọc khi tính tổng tự động hiện tại (GetTongTuDongAsync chỉ lọc theo Scope+Ca).
+    // ─── Dữ liệu cân từ SP_TKVV_GetDuLieuCan — đổ bảng khi tạo phiếu BC SLCP ──
+    // Gọi với (Ngay, Ca, MaBM, LoaiDuLieu, Scope int) — trả từng dòng NVL/Silo.
 
-    public class TKVVSanLuongMappingDto
-    {
-        public long Id { get; set; }
-        public string TagID { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public string? Kip { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public bool TrangThai { get; set; }
-        public string? GhiChu { get; set; }
-        public DateTime NgayTao { get; set; }
-        public int? NguoiTaoID { get; set; }
-        public string? TenCan { get; set; } // join từ danh mục Cân (EMS) theo TagID, chỉ để hiển thị
-    }
-
-    public class CreateTKVVSanLuongMappingDto
-    {
-        public string TagID { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public string? Kip { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public string? GhiChu { get; set; }
-        public int? NguoiTaoID { get; set; }
-    }
-
-    public class UpdateTKVVSanLuongMappingDto : CreateTKVVSanLuongMappingDto
-    {
-        public bool TrangThai { get; set; }
-    }
-
-    // ─── Đồng bộ dữ liệu cân/PLC thô (SP_TKVV_GetDuLieuCan_TuMapping) → TKVV_SanLuongDuLieu ─
-
-    public class SyncDuLieuTuEmsRequestDto
+    public class TKVVDuLieuCanDto
     {
         public DateTime Ngay { get; set; }
-        public byte Ca { get; set; }
-        public int Scope { get; set; }
+        public int Ca { get; set; }
+        public string? MaBM { get; set; }
+        public string? Scope { get; set; }
+        public string? Xuong { get; set; }
+        public int? SiloID { get; set; }
+        public string? MaSilo { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string TenNVL { get; set; } = string.Empty;
+        public string? DonViTinh { get; set; }
+        public decimal GiaTri { get; set; }
+        public int SoLuongSilo { get; set; }
     }
 
-    public class UpdateGiaTriDieuChinhRequestDto
+    // ─── TKVV_BaoCaoSanLuongChiPhi — bảng lưu dữ liệu cân + trạng thái điều chỉnh ─
+
+    public class TKVVBaoCaoSanLuongChiPhiDto
     {
-        public decimal? GiaTriDieuChinh { get; set; }
+        public long Id { get; set; }
+        public Guid? PhieuID { get; set; }
+        public DateOnly NgaySX { get; set; }
+        public int Ca { get; set; }
+        public string? Kip { get; set; }
+        public int? Scope { get; set; }          // INT — khớp cột Scope trong DB
+        public int? ThuTu { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string? TenNVL { get; set; }
+        public decimal? KLAm { get; set; }
+        public decimal? KLAmAuto { get; set; }
+        public decimal? DoAm { get; set; }
+        public decimal? QuyKho { get; set; }
+        public decimal? ThanhPhamL1 { get; set; }
+        public decimal? ThanhPhamL2 { get; set; }
+        public string? GhiChu { get; set; }
+        public bool IsAdjusted { get; set; }
+        public int? AdjustedBy { get; set; }
+        public DateTime? AdjustedDate { get; set; }
+    }
+
+    public class LoadDuLieuCanRequestDto
+    {
+        public DateOnly NgaySX { get; set; }
+        public string MaBM { get; set; } = string.Empty;
+        public string LoaiDuLieu { get; set; } = "SANLUONG";
+        public int Scope { get; set; }           // INT 1-6
+        public int? CreatedBy { get; set; }
+    }
+
+    public class LoadDuLieuCanResultDto
+    {
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table1 { get; set; } = new(); // Ca ngày
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table2 { get; set; } = new(); // Ca đêm
+    }
+
+    public class SaveBcSlRowDto
+    {
+        public long? Id { get; set; }
+        public DateOnly NgaySX { get; set; }
+        public int Ca { get; set; }
+        public int? Scope { get; set; }          // INT
+        public int NguyenVatLieuID { get; set; }
+        public string? Kip { get; set; }
+        public int? ThuTu { get; set; }
+        public decimal? KLAm { get; set; }
+        public decimal? KLAmAuto { get; set; }
+        public decimal? DoAm { get; set; }
+        public decimal? QuyKho { get; set; }
+        public decimal? ThanhPhamL1 { get; set; }
+        public decimal? ThanhPhamL2 { get; set; }
+        public string? GhiChu { get; set; }
+    }
+
+    public class SaveBcSlPhieuRequestDto
+    {
+        public string MaBM { get; set; } = string.Empty;
+        public Guid? PhieuID { get; set; }
+        public int CurrentUserId { get; set; }
+        public List<SaveBcSlRowDto> Rows { get; set; } = new();
     }
 
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────

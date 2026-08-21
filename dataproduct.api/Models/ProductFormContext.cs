@@ -73,7 +73,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep> MacTheps { get; set; }
     public virtual DbSet<MayDuc> MayDucs { get; set; }
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
-    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
+    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps { get; set; }
 
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
@@ -119,6 +119,10 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<TKVV_NVL_TagMapping> TKVV_NVL_TagMapping { get; set; }
     public virtual DbSet<TKVV_SanLuongDuLieu> TKVV_SanLuongDuLieu { get; set; }
     public virtual DbSet<TKVV_SanLuongChiTiet> TKVV_SanLuongChiTiet { get; set; }
+    public virtual DbSet<TKVV_Silo> TKVV_Silo { get; set; }
+    public virtual DbSet<TKVV_NVL_SiloMapping> TKVV_NVL_SiloMapping { get; set; }
+    public virtual DbSet<TKVV_Silo_TagMapping> TKVV_Silo_TagMapping { get; set; }
+    public virtual DbSet<TKVV_BaoCaoSanLuongChiPhi> TKVV_BaoCaoSanLuongChiPhi { get; set; }
     public virtual DbSet<EMS_MappingTag> EMS_MappingTag { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
@@ -721,12 +725,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
         });
-         modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
-        {
-            entity.ToTable("NhomPhanLoaiMacThep");
-            entity.Property(e => e.Id).HasColumnName("Id");
-            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
-        });
+        modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
+       {
+           entity.ToTable("NhomPhanLoaiMacThep");
+           entity.Property(e => e.Id).HasColumnName("Id");
+           entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
+       });
 
         // --- HRC1 ---
         modelBuilder.Entity<HRC1_MeThep>(entity =>
@@ -806,6 +810,33 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Loai2).HasPrecision(18, 3);
             entity.Property(e => e.Loai3).HasPrecision(18, 3);
             entity.Property(e => e.PhePham).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<TKVV_Silo>(entity => { entity.ToTable("TKVV_Silo"); });
+        modelBuilder.Entity<TKVV_NVL_SiloMapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_SiloMapping");
+            entity.Property(e => e.MaBM).HasMaxLength(50);
+            entity.Property(e => e.Scope).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
+        });
+        modelBuilder.Entity<TKVV_Silo_TagMapping>(entity => { entity.ToTable("TKVV_Silo_TagMapping"); });
+        modelBuilder.Entity<TKVV_BaoCaoSanLuongChiPhi>(entity =>
+        {
+            entity.ToTable("TKVV_BaoCaoSanLuongChiPhi");
+            entity.Property(e => e.Kip).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.KLAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.KLAmAuto).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.DoAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.QuyKho).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL1).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL2).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");
         });
         // Không ToTable(): type này chỉ dùng qua FromSqlRaw (EXEC dbo.EMS_GetMappingTag),
         // không có bảng/view vật lý nào trong PRODUCT_FORM để ánh xạ.
