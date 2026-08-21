@@ -697,11 +697,26 @@ namespace dataproduct.api.Services
             var ngay    = firstRow?.Ngay ?? DateTime.MinValue;
             var ca      = firstRow?.IdCa ?? 0;
             var scope   = firstRow?.IdLoCao ?? 0;
+            var kip = phieu.Kip?.Trim().ToUpper() ?? "";
 
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
-            var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca}";
+            //   var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca + kip}" ;
+            var caLabel = $"{ca}{kip}";
             var loCao       = scope > 0 ? scope.ToString() : "";
+
+            // Ca 1: 8h -> 20h cùng ngày; Ca 2: 20h -> 8h ngày hôm sau
+            var gioBatDau   = ca == 2 ? 20 : 8;
+            var gioKetThuc  = ca == 2 ? 8 : 20;
+            var ngayBatDauDisplay  = ngayDisplay;
+            var ngayKetThucDisplay = ngay != DateTime.MinValue
+                ? (ca == 2 ? ngay.AddDays(1) : ngay).ToString("dd/MM/yyyy")
+                : "";
+
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+
+            // Chỉ giữ NVL có ít nhất 1 dòng đã nhập giá trị trong phiếu này — loại bỏ NVL không dùng (toàn null)
+            var usedNvlIds = chiTiet.Where(x => x.GiaTri.HasValue).Select(x => x.IdNVL).ToHashSet();
+            nvlList = nvlList.Where(n => usedNvlIds.Contains(n.Id)).ToList();
 
             // Hàm lấy tên hiển thị NVL theo quyền: P.KH dùng TenNVL_TK (nếu đã xác nhận), còn lại dùng TenNVL_NM
             string NvlLabel(LGNLNvlDto n) =>
@@ -863,6 +878,10 @@ namespace dataproduct.api.Services
                 .Replace("{{LoCao}}", loCao)
                 .Replace("{{CaLabel}}", caLabel)
                 .Replace("{{NgaySX}}", ngayDisplay)
+                .Replace("{{GioBatDau}}", gioBatDau.ToString())
+                .Replace("{{NgayBatDau}}", ngayBatDauDisplay)
+                .Replace("{{GioKetThuc}}", gioKetThuc.ToString())
+                .Replace("{{NgayKetThuc}}", ngayKetThucDisplay)
                 .Replace("{{ColGroup}}", colGroup.ToString())
                 .Replace("{{TheadRow1}}", th1.ToString())
                 .Replace("{{TheadRow2}}", th2.ToString())
@@ -931,6 +950,10 @@ namespace dataproduct.api.Services
             var loCao = scope > 0 ? scope.ToString() : "";
 
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+
+            // Chỉ giữ NVL có ít nhất 1 dòng đã nhập giá trị trong phiếu này — loại bỏ NVL không dùng (toàn null)
+            var usedNvlIds = chiTiet.Where(x => x.GiaTri.HasValue).Select(x => x.IdNVL).ToHashSet();
+            nvlList = nvlList.Where(n => usedNvlIds.Contains(n.Id)).ToList();
 
             string NvlLabel(LGNLNvlDto n) => n.TenNVL_NM ?? "";
 
