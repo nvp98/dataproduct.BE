@@ -144,12 +144,34 @@ namespace dataproduct.api.Repositories
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Chọn dòng Hrc1TieuHao (LF) "đang hoạt động" theo MeThoi — kể từ khi clone "Đề nghị hiệu chỉnh"
+        /// nhân bản riêng dòng LF cho chính nó (DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync), có thể tồn
+        /// tại 2 dòng cùng MeThoi song song: 1 của phiếu cha (đã bị khóa IsLock=1) và 1 của clone (chưa
+        /// khóa). Đồng bộ từ BBGN_ThepLong (hàm này chạy ngoài luồng lưu phiếu) phải nhắm đúng dòng chưa bị
+        /// khóa — ưu tiên dòng có IDPhieu trỏ tới phiếu không khóa; dòng chưa gắn nhãn IDPhieu (dữ liệu cũ)
+        /// vẫn được coi là hợp lệ. Nếu vẫn còn nhiều hơn 1 (không nên xảy ra) lấy dòng tạo mới nhất.
+        /// </summary>
+        private async Task<Hrc1TieuHao?> GetActiveLfRowAsync(string meThoi)
+        {
+            var candidates = await (
+                from x in _ctx.Hrc1TieuHaos
+                join p in _ctx.BmPhieus on x.IDPhieu equals p.Idphieu into pj
+                from p in pj.DefaultIfEmpty()
+                where x.BieuMau == "LF" && x.MeThoi == meThoi && !x.IsDeleted
+                      && (x.IDPhieu == null || (p != null && p.IsLock != 1 && p.IsDelete != 1))
+                orderby x.NgayTao descending
+                select x
+            ).ToListAsync();
+
+            return candidates.FirstOrDefault();
+        }
+
         public async Task UpsertLfTieuHaoFromMeAsync(HRC1_MeThep me, int? scopeTL, DateOnly? ngaySanXuat, int? ca)
         {
             if (string.IsNullOrWhiteSpace(me.MaMe) || ngaySanXuat is null || ca is null) return;
 
-            var existing = await _ctx.Hrc1TieuHaos.FirstOrDefaultAsync(x =>
-                x.BieuMau == "LF" && x.MeThoi == me.MaMe && !x.IsDeleted);
+            var existing = await GetActiveLfRowAsync(me.MaMe);
 
             if (existing == null)
             {
@@ -194,17 +216,13 @@ namespace dataproduct.api.Repositories
 
             // Xóa vô điều kiện (kể cả đã sửa tay) — mẻ rời khỏi TL thì tiêu hao LF không còn ý nghĩa;
             // nếu TL nhận lại mẻ này sau đó, UpsertLfTieuHaoFromMeAsync sẽ tự tạo lại dòng mới.
-            var rows = await _ctx.Hrc1TieuHaos
-                .Where(x => x.BieuMau == "LF" && x.MeThoi == maMe && !x.IsDeleted)
-                .ToListAsync();
-            if (rows.Count == 0) return;
+            // CHỈ xóa đúng 1 dòng "đang hoạt động" (xem GetActiveLfRowAsync) — nếu có 1 clone "Đề nghị
+            // hiệu chỉnh" đang mở cùng MeThoi, dòng riêng của phiếu cha (đã khóa) phải được giữ nguyên để
+            // còn khôi phục lại nếu clone bị Reject.
+            var row = await GetActiveLfRowAsync(maMe);
+            if (row == null) return;
 
-            // foreach (var r in rows)
-            // {
-            //     r.IsDeleted = true;
-            //     r.NgayXoa = DateTime.Now;
-            // }
-            _ctx.Hrc1TieuHaos.RemoveRange(rows);
+            _ctx.Hrc1TieuHaos.Remove(row);
 
             await _ctx.SaveChangesAsync();
             await _ctx.Database.ExecuteSqlRawAsync(

@@ -26,6 +26,58 @@ namespace dataproduct.api.Repositories
         /// 1-5 = Lò thổi 1-5 (BOF), 6-10 = Tinh luyện 1-5 (LF).</summary>
         private static string ResolveBieuMauFromScope(int scope) => scope >= 1 && scope <= 5 ? "BOF" : "LF";
 
+        /// <summary>Port đúng công thức DLNMHRC1Repository.ComputeEffectiveTotal (api/DLNMHRC1/search-thongke)
+        /// sang decimal cho 1 dòng HRC1_PhuLieu.</summary>
+        private static decimal? ComputeEffectiveTotalHrc1(Hrc1PhuLieu p)
+        {
+            var effective = p.IsManual ? p.KLPhuGia_Manual : p.KLPhuGia;
+            if (!effective.HasValue && !p.KLPhanBo.HasValue) return null;
+            return (effective ?? 0) + (p.KLPhanBo ?? 0);
+        }
+
+        /// <summary>
+        /// Tính KLTK_BOF/KLTK_LF cho 1 PhuLieuID trong đúng Ngày/Ca — mirror công thức
+        /// DLNMHRC1Repository.GetThongKeSumAsync (api/DLNMHRC1/search-thongke): gộp TẤT CẢ Scope của từng
+        /// BieuMau (không lọc riêng 1 Scope), cộng cả dòng phân bổ (IsPhanBo=true, cùng PhuLieuID nên tự
+        /// khớp), loại dòng thuộc phiếu "Đề nghị hiệu chỉnh" cha đang khóa (BM_Phieu.IsLock=1) — mirror
+        /// BuildThongKeQuery. Trả về NULL cho vế nào không có dòng dữ liệu (khớp hành vi "không xuất hiện
+        /// trong kết quả" của search-thongke), khác 0.
+        /// </summary>
+        private async Task<(decimal? Bof, decimal? Lf)> ComputeKLTKAsync(DateOnly ngaySX, int ca, int phuLieuID)
+        {
+            var caByte = (byte)ca;
+            var meRows = await _context.Hrc1TieuHaos
+                .Where(x => x.NgaySanXuat == ngaySX && x.Ca == caByte && !x.IsDeleted)
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
+                .Select(x => new { x.ID, x.BieuMau })
+                .ToListAsync();
+
+            if (meRows.Count == 0) return (null, null);
+
+            var bieuMauByMeId = meRows.ToDictionary(x => x.ID, x => x.BieuMau);
+            var meIds = meRows.Select(x => x.ID).ToList();
+
+            var plRows = await _context.Hrc1PhuLieus
+                .Where(pl => pl.PhuLieuID == phuLieuID && !pl.IsDeleted && meIds.Contains(pl.MeID))
+                .ToListAsync();
+
+            decimal? bofTotal = null, lfTotal = null;
+            foreach (var pl in plRows)
+            {
+                var effective = ComputeEffectiveTotalHrc1(pl);
+                if (!effective.HasValue) continue;
+                if (!bieuMauByMeId.TryGetValue(pl.MeID, out var bieuMau) || bieuMau == null) continue;
+
+                if (string.Equals(bieuMau, "BOF", StringComparison.OrdinalIgnoreCase))
+                    bofTotal = (bofTotal ?? 0) + effective.Value;
+                else if (string.Equals(bieuMau, "LF", StringComparison.OrdinalIgnoreCase))
+                    lfTotal = (lfTotal ?? 0) + effective.Value;
+            }
+
+            return (bofTotal, lfTotal);
+        }
+
         public async Task<STD_NXT_HRC1_UpsertResponse> UpsertAsync(STD_NXT_HRC1_UpsertDto entity)
         {
             try
@@ -494,6 +546,8 @@ namespace dataproduct.api.Repositories
                     TyLeLF = x.TyLeLF,
                     KLPB_BOF = x.KLPB_BOF,
                     KLPB_LF = x.KLPB_LF,
+                    KLTK_BOF = x.KLTK_BOF,
+                    KLTK_LF = x.KLTK_LF,
                 }).ToList()
             };
         }
@@ -601,6 +655,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<bool> PhanBoAsync(STD_NXT_HRC1_PhanBoDto entity)
         {
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 await CheckPhieuChotAsync(entity.NgaySX, entity.Ca);
@@ -643,9 +698,13 @@ namespace dataproduct.api.Repositories
                 }
 
                 // ========== BƯỚC 2: Lấy tất cả mẻ trong HRC1_TieuHao theo ngày/ca ==========
+                // Loại dòng thuộc phiếu đã khóa (IsLock=1 — clone "Đề nghị hiệu chỉnh" đang mở), mirror
+                // DLNMHRC1Repository.GetAllAsync — tránh đếm đôi mẻ khi tính số mẻ để phân bổ chênh lệch.
                 var caByte = (byte)entity.Ca;
                 var meTrongCa = await _context.Hrc1TieuHaos
                     .Where(x => x.NgaySanXuat == ngaySXDate && x.Ca == caByte && x.IsDeleted == false)
+                    .Where(x => x.IDPhieu == null ||
+                        _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                     .ToListAsync();
 
                 if (!meTrongCa.Any())
@@ -816,6 +875,15 @@ namespace dataproduct.api.Repositories
                 totalRow.KLPB_BOF = klPerBofToPersist;
                 totalRow.KLPB_LF = klPerLFToPersist;
                 await _context.SaveChangesAsync();
+
+                // Tính KLTK_BOF/KLTK_LF SAU khi dòng phân bổ đã được lưu (BƯỚC 8/9 ở trên) — phải đọc lại DB
+                // sau SaveChangesAsync để công thức ComputeKLTKAsync gộp đúng cả phần phân bổ vừa ghi.
+                var (klTkBof, klTkLf) = await ComputeKLTKAsync(ngaySXDate, entity.Ca, entity.PhuLieuID);
+                totalRow.KLTK_BOF = klTkBof;
+                totalRow.KLTK_LF = klTkLf;
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
                 return true;
             }
             catch (Exception ex)
@@ -850,6 +918,7 @@ namespace dataproduct.api.Repositories
                 var ngaySXDate = DateOnly.FromDateTime(entity.NgaySX);
                 var caByte = (byte)entity.Ca;
 
+                // Loại dòng thuộc phiếu đã khóa (mirror GetAllAsync) để chỉ thu hồi đúng dòng đang hoạt động.
                 var phanBoRecords = await (
                     from pl in _context.Hrc1PhuLieus
                     join tieuHao in _context.Hrc1TieuHaos on pl.MeID equals tieuHao.ID
@@ -857,7 +926,9 @@ namespace dataproduct.api.Repositories
                           pl.IsPhanBo == true &&
                           tieuHao.NgaySanXuat == ngaySXDate &&
                           tieuHao.Ca == caByte &&
-                          tieuHao.IsDeleted == false
+                          tieuHao.IsDeleted == false &&
+                          (tieuHao.IDPhieu == null ||
+                              _context.BmPhieus.Any(p => p.Idphieu == tieuHao.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                     select pl
                 ).ToListAsync();
 
@@ -871,6 +942,9 @@ namespace dataproduct.api.Repositories
                 totalRow.TyLeLF = null;
                 totalRow.KLPB_BOF = null;
                 totalRow.KLPB_LF = null;
+                // Reset chờ bấm Phân bổ/Không phân bổ lại — không tính toán lại ở đây (theo yêu cầu người dùng).
+                totalRow.KLTK_BOF = null;
+                totalRow.KLTK_LF = null;
 
                 await _context.SaveChangesAsync();
                 return true;
@@ -898,11 +972,19 @@ namespace dataproduct.api.Repositories
                 }
                 if (totalRow.HasPhanBo == false)
                 {
+                    // Bấm lại lần 2 = hủy quyết định "Không phân bổ" — reset chờ quyết định lại, mirror
+                    // ThuHoiPhanBoAsync.
                     totalRow.HasPhanBo = null;
+                    totalRow.KLTK_BOF = null;
+                    totalRow.KLTK_LF = null;
                 }
                 else
                 {
                     totalRow.HasPhanBo = false;
+                    var (klTkBof, klTkLf) = await ComputeKLTKAsync(
+                        DateOnly.FromDateTime(entity.NgaySX), entity.Ca, entity.PhuLieuID);
+                    totalRow.KLTK_BOF = klTkBof;
+                    totalRow.KLTK_LF = klTkLf;
                 }
                 await _context.SaveChangesAsync();
                 return true;

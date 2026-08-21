@@ -27,7 +27,7 @@ namespace dataproduct.api.Services.Initializers
                 return new List<string>();
 
             using var doc = JsonDocument.Parse(phieu.DataJson);
-            await _dlnmHrc1Service.SaveHRC1ManualFromPhieuFormAsync(doc.RootElement);
+            await _dlnmHrc1Service.SaveHRC1ManualFromPhieuFormAsync(doc.RootElement, phieu.Idphieu);
             return new List<string>();
         }
     }

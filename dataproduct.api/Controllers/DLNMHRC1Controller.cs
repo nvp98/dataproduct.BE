@@ -73,6 +73,26 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        /// <summary>
+        /// Nhân bản dòng Hrc1TieuHao/Hrc1PhuLieu riêng cho phiếu clone "Đề nghị hiệu chỉnh" — gọi bởi
+        /// customPutApi từ TaoTieuHaoLoThoi.tsx (BOF) / TaoTieuHaoTinhLuyenLF.tsx (LF) ngay sau khi
+        /// PhieuApi.clone() thành công. Tự guard idempotent + no-op nếu không phải phiếu clone HRC1 Tiêu
+        /// Hao — an toàn khi bị gọi lại ở mỗi lần Lưu bình thường của phiếu clone.
+        /// </summary>
+        [HttpPost("clone-tieuhao/{idPhieu}")]
+        public async Task<IActionResult> CloneTieuHaoData(Guid idPhieu)
+        {
+            try
+            {
+                await _service.CloneTieuHaoDataIfNeededAsync(idPhieu);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
+
         /// <summary>Xóa vĩnh viễn 1 mẻ thêm tay (IsNM = false) — dùng cho dòng "+ Thêm dòng" trên UI.</summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)

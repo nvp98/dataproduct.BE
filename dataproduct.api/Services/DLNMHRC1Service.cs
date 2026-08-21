@@ -147,6 +147,10 @@ namespace dataproduct.api.Services
                 .Where(x => x.BieuMau == "LF" && !x.IsDeleted && !x.IsEdited
                          && x.NgaySanXuat == ngay && x.Ca == (byte)ca && x.Scope == scope
                          && x.MeThoi != null)
+                // Loại dòng thuộc phiếu đã khóa (clone "Đề nghị hiệu chỉnh" đang mở), mirror
+                // DLNMHRC1Repository.GetAllAsync — tránh sync nhầm cả dòng của phiếu cha lẫn bản sao clone.
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                 .ToListAsync();
             if (lfRows.Count == 0) return;
 
@@ -232,10 +236,10 @@ namespace dataproduct.api.Services
         // =========================================================
         // Lưu phụ liệu manual + manual_col từ formData phiếu (hook IPhieuJsonInitializer)
         // =========================================================
-        public async Task SaveHRC1ManualFromPhieuFormAsync(JsonElement formData)
+        public async Task SaveHRC1ManualFromPhieuFormAsync(JsonElement formData, Guid? idPhieu = null)
         {
             var (models, manualColHeaderKeyIds) = await BuildModelToInsert(formData);
-            await SaveHRC1ManualDataAsync(models, manualColHeaderKeyIds);
+            await SaveHRC1ManualDataAsync(models, manualColHeaderKeyIds, idPhieu);
         }
 
         private double? TryGetDouble(JsonElement row, string key)
@@ -585,7 +589,7 @@ namespace dataproduct.api.Services
             return null;
         }
 
-        public async Task SaveHRC1ManualDataAsync(List<Hrc1InsertModel> models, HashSet<int> manualColHeaderKeyIds)
+        public async Task SaveHRC1ManualDataAsync(List<Hrc1InsertModel> models, HashSet<int> manualColHeaderKeyIds, Guid? idPhieu = null)
         {
             if (models == null || !models.Any()) return;
 
@@ -671,6 +675,7 @@ namespace dataproduct.api.Services
                     if (model.QueDoNhiet.HasValue && model.QueDoNhiet != existing.QueDoNhiet) { existing.QueDoNhiet = model.QueDoNhiet; fieldsChanged = true; }
                     if (model.GhiChu != null && model.GhiChu != existing.GhiChu) { existing.GhiChu = model.GhiChu; fieldsChanged = true; }
                     if (fieldsChanged) existing.IsEdited = true;
+                    existing.IDPhieu ??= idPhieu;
                     existing.NgayCapNhat = DateTime.Now;
                     _context.Hrc1TieuHaos.Update(existing);
                     meMap[model.RowKey] = existing;
@@ -700,7 +705,8 @@ namespace dataproduct.api.Services
                         Ca = model.Ca,
                         IsNM = false,
                         IsEdited = false,
-                        NgayTao = DateTime.Now
+                        NgayTao = DateTime.Now,
+                        IDPhieu = idPhieu
                     };
                     await _context.Hrc1TieuHaos.AddAsync(entity);
                 }
@@ -718,6 +724,7 @@ namespace dataproduct.api.Services
                     existing.GhiChu = model.GhiChu;
                     existing.NgaySanXuat = model.NgaySanXuat;
                     existing.Ca = model.Ca;
+                    existing.IDPhieu ??= idPhieu;
                     existing.NgayCapNhat = DateTime.Now;
                     _context.Hrc1TieuHaos.Update(existing);
                     entity = existing;
@@ -891,9 +898,7 @@ namespace dataproduct.api.Services
         /// Xóa mềm 1 mẻ thêm tay (IsNM = false) — dòng do người dùng tự thêm qua nút "+ Thêm dòng". Chỉ chấp
         /// nhận xóa cho dòng IsNM = false; nếu ai đó gọi nhầm lên 1 dòng IsNM = true thì từ chối để tránh mất
         /// dữ liệu NM (phải dùng DeleteRowNMAsync). Trước đây xóa CỨNG (kèm xóa hẳn Hrc1PhuLieu liên quan) —
-        /// đổi sang xóa mềm (mirror DeleteRowNMAsync, không đụng Hrc1PhuLieu — ẩn theo transitively qua MeID)
-        /// để RevertHRC1ToSnapshotAsync có thể khôi phục lại dòng này khi Reject 1 phiếu clone đã xóa nhầm/
-        /// không còn cần dòng này trong lúc sửa (xem BmPheDuyetService.UpdateTinhTrangAsync nhánh Reject).
+        /// đổi sang xóa mềm (mirror DeleteRowNMAsync, không đụng Hrc1PhuLieu — ẩn theo transitively qua MeID).
         /// </summary>
         public async Task<bool> DeleteManualRowAsync(int id)
         {
@@ -1338,10 +1343,10 @@ namespace dataproduct.api.Services
         // auto-vs-manual, không đọc __orig/__IsManual từ FE.
         // =========================================================
 
-        public async Task SaveHRC1LFManualFromPhieuFormAsync(JsonElement formData)
+        public async Task SaveHRC1LFManualFromPhieuFormAsync(JsonElement formData, Guid? idPhieu = null)
         {
             var models = await BuildLFModelToInsert(formData);
-            await SaveHRC1LFManualDataAsync(models);
+            await SaveHRC1LFManualDataAsync(models, idPhieu);
         }
 
         public Task<List<Hrc1InsertModel>> BuildLFModelToInsert(JsonElement formData)
@@ -1461,7 +1466,7 @@ namespace dataproduct.api.Services
             return result;
         }
 
-        public async Task SaveHRC1LFManualDataAsync(List<Hrc1InsertModel> models)
+        public async Task SaveHRC1LFManualDataAsync(List<Hrc1InsertModel> models, Guid? idPhieu = null)
         {
             if (models == null || !models.Any()) return;
 
@@ -1513,7 +1518,8 @@ namespace dataproduct.api.Services
                         Ca = model.Ca,
                         IsNM = false,
                         IsEdited = false,
-                        NgayTao = DateTime.Now
+                        NgayTao = DateTime.Now,
+                        IDPhieu = idPhieu
                     };
                     await _context.Hrc1TieuHaos.AddAsync(entity);
                 }
@@ -1541,6 +1547,7 @@ namespace dataproduct.api.Services
                     existing.GhiChu = model.GhiChu;
                     existing.NgaySanXuat = model.NgaySanXuat;
                     existing.Ca = model.Ca;
+                    existing.IDPhieu ??= idPhieu;
                     existing.NgayCapNhat = DateTime.Now;
                     _context.Hrc1TieuHaos.Update(existing);
                     entity = existing;
@@ -1624,58 +1631,348 @@ namespace dataproduct.api.Services
         }
 
         // =========================================================
-        // REVERT ON REJECT (phiếu clone HRC1 Tiêu hao BOF/LF) — xem BmPheDuyetService.UpdateTinhTrangAsync
-        // nhánh Reject. Toàn bộ vùng này là code RIÊNG cho revert, KHÔNG sửa SaveHRC1ManualDataAsync/
-        // SaveHRC1LFManualDataAsync/BuildModelToInsert/BuildLFModelToInsert (2 cặp hàm đó dùng CHUNG cho
-        // luồng Lưu bình thường qua HRC1ManualFromPhieuFormJsonInitializer/HRC1LFManualFromPhieuFormJsonInitializer)
-        // — chỉ GỌI LẠI chúng sau khi tự khôi phục dòng cần thiết ở bước riêng bên dưới, để không đổi hành
-        // vi Lưu bình thường của 2 biểu mẫu này.
+        // NHÂN BẢN DỮ LIỆU KHI TẠO CLONE (phiếu "Đề nghị hiệu chỉnh") — TỰ ĐỨNG RIÊNG trong
+        // DLNMHRC1Service, KHÔNG đụng PhieuService/PhieuService.CloneAsync (dùng chung cho mọi module,
+        // không chỉ HRC1 Tiêu Hao). Được kích hoạt từ FE: 2 trang duy nhất đang dùng luồng "Đề nghị hiệu
+        // chỉnh" cho HRC1 Tiêu Hao là NM.HRC1/TieuHaoLoThoi/TaoTieuHaoLoThoi.tsx (BOF) và
+        // NM.HRC1/TieuHaoTinhLuyenLF/TaoTieuHaoTinhLuyenLF.tsx (LF) — 2 trang này truyền customPutApi
+        // (PhieuActionService.tsx) gọi API POST /api/DLNMHRC1/clone-tieuhao/{idPhieu} ngay sau khi
+        // PhieuApi.clone() thành công (cả khi bấm "Đề nghị hiệu chỉnh" LẪN mỗi lần "Lưu" bình thường —
+        // xem CloneTieuHaoDataIfNeededAsync tự guard idempotent + no-op nếu không phải phiếu clone).
         // =========================================================
 
-        /// <summary>
-        /// Đồng bộ TOÀN BỘ (full sync) bảng Hrc1TieuHao/Hrc1PhuLieu dùng chung về đúng snapshot DataJson
-        /// của phiếu — dùng khi Reject 1 phiếu clone: phiếu clone có thể đã Thêm/Xóa dòng hoặc thêm cột
-        /// phụ liệu trong lúc sửa (ghi thẳng vào bảng dùng chung theo Ngày/Ca/Lò, không tách riêng theo
-        /// phiếu) — chỉ upsert theo Id có trong DataJson (như Lưu bình thường) không đảo ngược được các
-        /// thay đổi thêm/xóa đó. Các bước:
-        /// 1. Khôi phục (IsDeleted=false) dòng bị xóa mềm trong lúc sửa clone mà phiếu cha vẫn tham chiếu.
-        /// 2. Upsert lại giá trị theo đúng snapshot (gọi nguyên SaveHRC1ManualDataAsync/LF, không đổi).
-        /// 3. Xóa mềm dòng "thêm tay" clone tự thêm mà phiếu cha không biết tới.
-        /// 4. Xóa các dòng Hrc1PhuLieu (cột phụ liệu) clone tự thêm mà phiếu cha không có.
-        /// KHÔNG thể khôi phục dòng thêm tay đã bị XÓA CỨNG trước khi DeleteManualRowAsync đổi sang xóa mềm.
-        /// </summary>
-        public async Task RevertHRC1ToSnapshotAsync(BmPhieu phieuGoc)
+        private static readonly HashSet<string> Hrc1TieuHaoMaBms = new(StringComparer.OrdinalIgnoreCase)
         {
-            if (string.IsNullOrWhiteSpace(phieuGoc.DataJson)) return;
+            "HRC1_BB_TieuHao_BOF",
+            "HRC1_BB_TieuHao_LF",
+        };
+
+        /// <summary>
+        /// Entry point gọi từ Controller (POST /api/DLNMHRC1/clone-tieuhao/{idPhieu}) — tự tra phiếu clone +
+        /// phiếu cha, tự guard để an toàn khi bị gọi nhiều lần (mỗi lần Lưu phiếu clone, không chỉ lúc vừa
+        /// tạo):
+        /// - Không phải phiếu clone (ID_PhieuGoc null) hoặc không phải BM Tiêu Hao BOF/LF -> no-op.
+        /// - Đã nhân bản rồi (đã có dòng Hrc1TieuHao nào đó IDPhieu = phiếu này) -> no-op, không nhân bản
+        ///   lại lần 2 (tránh tạo trùng dòng mỗi lần gọi).
+        /// Nhân bản xong thì ghi đè table1[].id trong DataJson của chính phiếu clone sang ID mới rồi lưu —
+        /// nếu không ghi đè, lần Lưu tiếp theo của clone sẽ match theo ID cũ và sửa nhầm lên dòng của cha.
+        /// </summary>
+        public async Task CloneTieuHaoDataIfNeededAsync(Guid idPhieuClone)
+        {
+            var phieuClone = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == idPhieuClone);
+            if (phieuClone == null || !phieuClone.ID_PhieuGoc.HasValue) return;
+            if (!Hrc1TieuHaoMaBms.Contains(phieuClone.MaBm ?? string.Empty)) return;
+
+            var alreadyCloned = await _context.Hrc1TieuHaos.AnyAsync(x => x.IDPhieu == idPhieuClone);
+            if (alreadyCloned) return;
+
+            var phieuGoc = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == phieuClone.ID_PhieuGoc.Value);
+            if (phieuGoc == null) return;
+
+            var idRemap = await DuplicateHrc1RowsForCloneAsync(phieuGoc, idPhieuClone);
+            if (idRemap.Count == 0 || string.IsNullOrWhiteSpace(phieuClone.DataJson)) return;
+
+            var jsonNode = System.Text.Json.Nodes.JsonNode.Parse(phieuClone.DataJson)?.AsObject();
+            var table1Node = jsonNode?["table1"]?.AsArray();
+            if (table1Node == null) return;
+
+            foreach (var rowNode in table1Node)
+            {
+                if (rowNode is not System.Text.Json.Nodes.JsonObject rowObj) continue;
+                if (!rowObj.TryGetPropertyValue("id", out var idNode) || idNode == null) continue;
+                if (idNode.GetValueKind() != JsonValueKind.Number) continue;
+                if (idRemap.TryGetValue(idNode.GetValue<int>(), out var newId))
+                    rowObj["id"] = newId;
+            }
+            phieuClone.DataJson = jsonNode!.ToJsonString();
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Nhân bản dòng Hrc1TieuHao/Hrc1PhuLieu thành bản sao riêng cho phiếu clone, để clone có thể sửa
+        /// độc lập mà không đụng dữ liệu của phiếu cha (đang bị khóa) — xem CloneTieuHaoDataIfNeededAsync
+        /// (entry point thực tế). Nhân bản TOÀN BỘ dòng (cả BOF lẫn LF, cả IsNM=true lẫn false):
+        /// - Dòng IsNM=true (nguồn NM): không thể giữ nguyên IDNM trên bản sao vì unique index
+        ///   UX_HRC1_TieuHao_IDNM_Scope_BieuMau (IDNM, Scope, BieuMau) chặn — bản sao được gán
+        ///   IDNM=NULL (né hẳn index, và khiến SP_HRC1_BOF_Sync_* không bao giờ khớp/ghi đè nhầm bản sao)
+        ///   + SourceIDNM = IDNM gốc (propagate xuyên chuỗi clone nhiều tầng — nếu src đã là 1 bản sao
+        ///   trung gian thì lấy lại src.SourceIDNM thay vì src.IDNM đang NULL, để luôn trỏ thẳng về đúng
+        ///   dòng canonical gốc bất kể sâu bao nhiêu tầng). Dùng để merge ngược lúc Duyệt — xem
+        ///   MergeAndCleanupHrc1CloneChainOnApproveAsync. Lúc Reject chỉ cần xóa thẳng (không cần revert
+        ///   theo snapshot nữa) vì dòng canonical chưa bao giờ bị đụng tới.
+        /// - Dòng IsNM=false/LF: giữ nguyên như trước (auto-sync 1 chiều từ BBGN_ThepLong cho LF — xem
+        ///   HRC1_BBGNRepository.UpsertLfTieuHaoFromMeAsync/SoftDeleteLfTieuHaoByMeThoiAsync, đã sửa để
+        ///   chọn đúng dòng "đang hoạt động" qua IDPhieu/IsLock thay vì thao tác mù theo MeThoi).
+        /// Trả về map ID cũ -> ID mới để bên gọi ghi đè table1[].id trong DataJson của clone.
+        /// </summary>
+        public async Task<Dictionary<int, int>> DuplicateHrc1RowsForCloneAsync(BmPhieu phieuGoc, Guid idPhieuClone)
+        {
+            var map = new Dictionary<int, int>();
+            if (string.IsNullOrWhiteSpace(phieuGoc.DataJson)) return map;
+            if (!Hrc1TieuHaoMaBms.Contains(phieuGoc.MaBm ?? string.Empty)) return map;
+
+            using var doc = JsonDocument.Parse(phieuGoc.DataJson);
+            if (!TryGetHRC1ScopeInfo(doc.RootElement, out var ngaySX, out var ca, out var scope)) return map;
 
             bool isLF = string.Equals(phieuGoc.MaBm, "HRC1_BB_TieuHao_LF", StringComparison.OrdinalIgnoreCase);
             string bieuMau = isLF ? "LF" : "BOF";
+            var caByte = (byte)ca;
 
-            using var doc = JsonDocument.Parse(phieuGoc.DataJson);
-            var formData = doc.RootElement;
+            // Khớp CHÍNH theo IDPhieu = phiếu cha (đáng tin cậy hơn suy ngược Ngày/Ca/Scope từ DataJson —
+            // đã xác nhận qua debug thực tế). Kèm fallback: dòng CHƯA từng gắn nhãn IDPhieu (tạo từ trước
+            // khi có cột này, chưa lưu lại lần nào từ đó) vẫn được nhận theo đúng Ngày/Ca/Scope/BieuMau, để
+            // không bỏ sót khi nhân bản cho các phiếu cũ.
+            var sourceRowsQuery = _context.Hrc1TieuHaos.Where(x =>
+                !x.IsDeleted && x.BieuMau == bieuMau &&
+                (
+                    x.IDPhieu == phieuGoc.Idphieu ||
+                    (x.IDPhieu == null && x.NgaySanXuat == ngaySX && x.Ca == caByte && x.Scope == scope)
+                ));
 
-            if (!TryGetHRC1ScopeInfo(formData, out var ngaySX, out var ca, out var scope)) return;
+            var sourceRows = await sourceRowsQuery.ToListAsync();
+            if (sourceRows.Count == 0) return map;
 
-            if (isLF)
+            var sourceIds = sourceRows.Select(x => x.ID).ToList();
+            var sourcePhuLieus = await _context.Hrc1PhuLieus
+                .Where(x => sourceIds.Contains(x.MeID) && !x.IsDeleted)
+                .ToListAsync();
+
+            var copies = new List<(int OldId, Hrc1TieuHao Copy)>();
+            foreach (var src in sourceRows)
             {
-                var models = await BuildLFModelToInsert(formData);
-                if (models.Count == 0) return;
-
-                await ReviveDeletedRevertRowsAsync(models);
-                await SaveHRC1LFManualDataAsync(models);
-                await RemoveExtraManualRowsAsync(ngaySX, ca, scope, "LF", models);
-                await RemoveExtraLFPhuLieuAsync(models);
+                var copy = new Hrc1TieuHao
+                {
+                    IsNM = src.IsNM,
+                    // Né unique index UX_HRC1_TieuHao_IDNM_Scope_BieuMau — xem doc comment của hàm này.
+                    IDNM = null,
+                    SourceIDNM = src.IsNM ? (src.IDNM ?? src.SourceIDNM) : null,
+                    IsEdited = src.IsEdited,
+                    BieuMau = src.BieuMau,
+                    Scope = src.Scope,
+                    MeThoi = src.MeThoi,
+                    MacThep = src.MacThep,
+                    MacThepOrig = src.MacThepOrig,
+                    MacThepIsManual = src.MacThepIsManual,
+                    O2 = src.O2,
+                    N2 = src.N2,
+                    AR = src.AR,
+                    IsChuyenCa = src.IsChuyenCa,
+                    CaChuyen = src.CaChuyen,
+                    QueLayMau = src.QueLayMau,
+                    QueDoNhiet = src.QueDoNhiet,
+                    GhiChu = src.GhiChu,
+                    KLGang = src.KLGang,
+                    KLGangLongCCT = src.KLGangLongCCT,
+                    KLThepPhe = src.KLThepPhe,
+                    KLThepPheOrig = src.KLThepPheOrig,
+                    KLThepPheIsManual = src.KLThepPheIsManual,
+                    KLThepPheGang = src.KLThepPheGang,
+                    KLThepLong = src.KLThepLong,
+                    Ca = src.Ca,
+                    NgaySanXuat = src.NgaySanXuat,
+                    ThoiDiemBatDau = src.ThoiDiemBatDau,
+                    ThoiDiemKetThuc = src.ThoiDiemKetThuc,
+                    ThoiGianLF = src.ThoiGianLF,
+                    NgayTao = DateTime.Now,
+                    IDPhieu = idPhieuClone,
+                };
+                copies.Add((src.ID, copy));
+                await _context.Hrc1TieuHaos.AddAsync(copy);
             }
-            else
+
+            await _context.SaveChangesAsync(); // cần ID mới (identity) để map MeID cho Hrc1PhuLieu bên dưới
+
+            foreach (var (oldId, copy) in copies)
+                map[oldId] = copy.ID;
+
+            foreach (var pl in sourcePhuLieus)
             {
-                var (models, manualColHeaderKeyIds) = await BuildModelToInsert(formData);
-                if (models.Count == 0) return;
-
-                await ReviveDeletedRevertRowsAsync(models);
-                await SaveHRC1ManualDataAsync(models, manualColHeaderKeyIds);
-                await RemoveExtraManualRowsAsync(ngaySX, ca, scope, "BOF", models);
-                await RemoveExtraAdjustPhuLieuAsync(models);
+                if (!map.TryGetValue(pl.MeID, out var newMeId)) continue;
+                await _context.Hrc1PhuLieus.AddAsync(new Hrc1PhuLieu
+                {
+                    MeID = newMeId,
+                    PhuLieuID = pl.PhuLieuID,
+                    TenPhuLieu = pl.TenPhuLieu,
+                    KLPhuGia = pl.KLPhuGia,
+                    ID_HeaderKey = pl.ID_HeaderKey,
+                    IsManual = pl.IsManual,
+                    KLPhuGia_Manual = pl.KLPhuGia_Manual,
+                    IsAddManual = pl.IsAddManual,
+                    IsPhanBo = pl.IsPhanBo,
+                    IsNM = pl.IsNM,
+                    IsEdited = pl.IsEdited,
+                    NgayTao = DateTime.Now,
+                });
             }
+
+            await _context.SaveChangesAsync();
+
+            // Vừa tạo dòng thứ 2 cùng MeThoi (bản sao clone) — tính lại IsTrungMeThoi. Vì phieuGoc.IsLock đã
+            // được set =1 trước khi hàm này được gọi (xem PhieuService.CloneAsync), SP (đã sửa để loại dòng
+            // thuộc phiếu khóa khỏi COUNT) sẽ tính đúng là KHÔNG trùng dù có 2 dòng vật lý.
+            var affectedMeThois = sourceRows.Select(x => x.MeThoi).Where(x => !string.IsNullOrEmpty(x))
+                .Cast<string>().Distinct();
+            foreach (var mt in affectedMeThois)
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", bieuMau, mt);
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// Xóa toàn bộ dòng Hrc1TieuHao/Hrc1PhuLieu "clone sở hữu riêng" (nhân bản bởi
+        /// DuplicateHrc1RowsForCloneAsync — nay gồm cả dòng IsNM=true, xem IDNM/SourceIDNM ở đó) khi phiếu
+        /// clone bị Reject — xem BmPheDuyetService.UpdateTinhTrangAsync — hoặc khi 1 tầng clone trung gian
+        /// bị dọn rác sau khi tầng con được Duyệt — xem MergeAndCleanupHrc1CloneChainOnApproveAsync. Dòng
+        /// canonical (IDNM còn giá trị thật) chưa bao giờ được gán IDPhieu = clone nên không bị xóa nhầm.
+        /// </summary>
+        public async Task DeleteHrc1RowsByPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.Hrc1TieuHaos
+                .Where(x => x.IDPhieu == idPhieu && !x.IsDeleted)
+                .ToListAsync();
+            if (rows.Count == 0) return;
+
+            var rowIds = rows.Select(x => x.ID).ToList();
+            var phuLieus = await _context.Hrc1PhuLieus
+                .Where(x => rowIds.Contains(x.MeID) && !x.IsDeleted)
+                .ToListAsync();
+
+            var affectedPairs = rows
+                .Where(x => !string.IsNullOrEmpty(x.MeThoi) && !string.IsNullOrEmpty(x.BieuMau))
+                .Select(x => (BieuMau: x.BieuMau!, MeThoi: x.MeThoi!))
+                .Distinct()
+                .ToList();
+
+            _context.Hrc1PhuLieus.RemoveRange(phuLieus);
+            _context.Hrc1TieuHaos.RemoveRange(rows);
+            await _context.SaveChangesAsync();
+
+            foreach (var (bm, mt) in affectedPairs)
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", bm, mt);
+        }
+
+        // =========================================================
+        // MERGE ON APPROVE (phiếu clone HRC1 Tiêu hao BOF/LF) — xem BmPheDuyetService.UpdateTinhTrangAsync
+        // nhánh Approve (allApproved). Đối xứng với DeleteHrc1RowsByPhieuAsync ở nhánh Reject: dòng NM
+        // (IsNM=true) giờ có bản sao riêng (IDNM=NULL + SourceIDNM, xem DuplicateHrc1RowsForCloneAsync) nên
+        // khi clone được Duyệt, giá trị đã sửa trên bản sao phải được ghi ngược về đúng dòng canonical
+        // (dòng còn giữ IDNM thật — nơi SP_HRC1_BOF_Sync_* tiếp tục đồng bộ trong tương lai), rồi xóa bản
+        // sao đi. Dòng thêm-tay/LF của chính phiếu vừa Duyệt KHÔNG đụng tới — bản thân chúng đã là dữ liệu
+        // chính thức mới (IDPhieu đã trỏ đúng phiếu này từ lúc nhân bản), y hệt cách "không làm gì" hiện có
+        // vẫn đúng cho nhánh IsNM=false.
+        // =========================================================
+
+        /// <summary>
+        /// Merge dữ liệu NM đã sửa trên phiếu clone vừa được Duyệt về đúng dòng canonical (qua
+        /// SourceIDNM), rồi dọn rác toàn bộ dữ liệu mồ côi của các tầng clone trung gian trong chuỗi
+        /// (A0 → A1 → A2 ...) — merge LUÔN đi thẳng 1 bước về canonical gốc bất kể phiếu vừa Duyệt nằm ở
+        /// tầng nào (SourceIDNM đã propagate xuyên suốt chuỗi ngay từ lúc nhân bản), không merge bắc cầu
+        /// qua từng tầng cha. Gọi từ BmPheDuyetService khi `allApproved` và `approvedPhieu.ID_PhieuGoc != null`.
+        /// </summary>
+        public async Task MergeAndCleanupHrc1CloneChainOnApproveAsync(BmPhieu approvedPhieu, int? nguoiDuyetId)
+        {
+            if (approvedPhieu.ID_PhieuGoc == null) return;
+            if (!Hrc1TieuHaoMaBms.Contains(approvedPhieu.MaBm ?? string.Empty)) return;
+
+            // Bước 1+2: merge từng dòng NM bản sao của phiếu vừa Duyệt về đúng dòng canonical.
+            var nmCopies = await _context.Hrc1TieuHaos
+                .Where(x => x.IDPhieu == approvedPhieu.Idphieu && x.SourceIDNM != null)
+                .ToListAsync();
+
+            var affectedPairs = new List<(string BieuMau, string MeThoi)>();
+
+            foreach (var copy in nmCopies)
+            {
+                var canonical = await _context.Hrc1TieuHaos
+                    .FirstOrDefaultAsync(x => x.IDNM == copy.SourceIDNM);
+                if (canonical == null) continue; // dòng canonical gốc đã bị xóa/không còn — bỏ qua, giữ nguyên bản sao lại cũng vô ích nên vẫn xóa ở bước 4
+
+                canonical.IsNM = copy.IsNM;
+                canonical.IsEdited = copy.IsEdited;
+                canonical.BieuMau = copy.BieuMau;
+                canonical.Scope = copy.Scope;
+                canonical.MeThoi = copy.MeThoi;
+                canonical.MacThep = copy.MacThep;
+                canonical.MacThepOrig = copy.MacThepOrig;
+                canonical.MacThepIsManual = copy.MacThepIsManual;
+                canonical.O2 = copy.O2;
+                canonical.N2 = copy.N2;
+                canonical.AR = copy.AR;
+                canonical.IsChuyenCa = copy.IsChuyenCa;
+                canonical.CaChuyen = copy.CaChuyen;
+                canonical.QueLayMau = copy.QueLayMau;
+                canonical.QueDoNhiet = copy.QueDoNhiet;
+                canonical.GhiChu = copy.GhiChu;
+                canonical.IsDeleted = copy.IsDeleted;
+                canonical.NgayXoa = copy.NgayXoa;
+                canonical.NguoiXoa = copy.NguoiXoa;
+                canonical.KLGang = copy.KLGang;
+                canonical.KLGangLongCCT = copy.KLGangLongCCT;
+                canonical.KLThepPhe = copy.KLThepPhe;
+                canonical.KLThepPheOrig = copy.KLThepPheOrig;
+                canonical.KLThepPheIsManual = copy.KLThepPheIsManual;
+                canonical.KLThepPheGang = copy.KLThepPheGang;
+                canonical.KLThepLong = copy.KLThepLong;
+                canonical.Ca = copy.Ca;
+                canonical.NgaySanXuat = copy.NgaySanXuat;
+                canonical.ThoiDiemBatDau = copy.ThoiDiemBatDau;
+                canonical.ThoiDiemKetThuc = copy.ThoiDiemKetThuc;
+                canonical.ThoiGianLF = copy.ThoiGianLF;
+                canonical.IDPhieu = approvedPhieu.Idphieu;
+                canonical.NgayCapNhat = DateTime.Now;
+                canonical.NguoiCapNhat = nguoiDuyetId;
+
+                // Bước 3: re-parent phụ liệu — bộ phụ liệu của bản sao (đã sửa trên clone) thay thế hoàn
+                // toàn bộ phụ liệu hiện có của canonical.
+                var canonicalOldPl = await _context.Hrc1PhuLieus
+                    .Where(x => x.MeID == canonical.ID && !x.IsDeleted)
+                    .ToListAsync();
+                _context.Hrc1PhuLieus.RemoveRange(canonicalOldPl);
+
+                var copyPl = await _context.Hrc1PhuLieus
+                    .Where(x => x.MeID == copy.ID && !x.IsDeleted)
+                    .ToListAsync();
+                foreach (var pl in copyPl)
+                    pl.MeID = canonical.ID;
+
+                if (!string.IsNullOrEmpty(canonical.BieuMau) && !string.IsNullOrEmpty(canonical.MeThoi))
+                    affectedPairs.Add((canonical.BieuMau, canonical.MeThoi));
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Bước 4: xóa các dòng bản sao NM vừa merge xong (phụ liệu của chúng đã re-parent sang canonical
+            // ở trên nên không bị đụng) — KHÔNG xóa dòng thêm-tay/LF khác của approvedPhieu, vì đó chính là
+            // dữ liệu chính thức mới cần giữ lại.
+            if (nmCopies.Count > 0)
+            {
+                _context.Hrc1TieuHaos.RemoveRange(nmCopies);
+                await _context.SaveChangesAsync();
+            }
+
+            // Bước 5: đi ngược ID_PhieuGoc, dọn rác toàn bộ dữ liệu (thêm-tay/LF/NM bản sao chưa kịp merge)
+            // của các tầng clone trung gian đã bị phiếu vừa Duyệt vượt qua — dừng lại đúng lúc gặp root thật
+            // (ID_PhieuGoc == null), vì đó là chủ sở hữu dòng canonical vừa được cập nhật ở trên, không xóa gì.
+            var currentAncestorId = approvedPhieu.ID_PhieuGoc;
+            while (currentAncestorId.HasValue)
+            {
+                var ancestor = await _context.BmPhieus
+                    .FirstOrDefaultAsync(x => x.Idphieu == currentAncestorId.Value && x.IsDelete != 1);
+                if (ancestor == null) break;
+                if (ancestor.ID_PhieuGoc == null) break;
+
+                await DeleteHrc1RowsByPhieuAsync(ancestor.Idphieu);
+                currentAncestorId = ancestor.ID_PhieuGoc;
+            }
+
+            // Bước 6: tính lại IsTrungMeThoi cho các MeThoi bị ảnh hưởng bởi merge.
+            foreach (var (bm, mt) in affectedPairs.Distinct())
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", bm, mt);
         }
 
         private static bool TryGetHRC1ScopeInfo(JsonElement formData, out DateOnly ngaySX, out int ca, out int scope)
@@ -1696,133 +1993,6 @@ namespace dataproduct.api.Services
             ca = caProp.GetInt32();
             ngaySX = DateOnly.Parse(ngaySXstr);
             return true;
-        }
-
-        /// <summary>
-        /// Khôi phục (IsDeleted=false) các dòng Hrc1TieuHao bị xóa mềm trong lúc sửa phiếu clone mà
-        /// snapshot phiếu cha vẫn tham chiếu đích danh theo Id — làm TRƯỚC khi gọi SaveHRC1ManualDataAsync/
-        /// LF (không đổi) để 2 hàm đó tìm thấy đúng dòng qua filter !IsDeleted như luồng Lưu bình thường.
-        /// </summary>
-        private async Task ReviveDeletedRevertRowsAsync(List<Hrc1InsertModel> models)
-        {
-            var ids = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).ToList();
-            if (ids.Count == 0) return;
-
-            var deletedRows = await _context.Hrc1TieuHaos
-                .Where(x => ids.Contains(x.ID) && x.IsDeleted)
-                .ToListAsync();
-            if (deletedRows.Count == 0) return;
-
-            foreach (var row in deletedRows)
-            {
-                row.IsDeleted = false;
-                row.NgayXoa = null;
-            }
-            await _context.SaveChangesAsync();
-        }
-
-        /// <summary>
-        /// Xóa mềm dòng "thêm tay" (IsNM=false) thuộc đúng Ngày/Ca/Lò/BieuMau nhưng KHÔNG có trong
-        /// snapshot phiếu cha — dòng do clone tự thêm trong lúc sửa mà phiếu cha không biết tới. CHỈ áp
-        /// dụng cho IsNM=false: không đụng dòng IsNM=true (nguồn NM) để tránh xóa nhầm mẻ sản xuất thật
-        /// phát sinh sau khi phiếu cha được lưu — không liên quan gì tới việc sửa phiếu clone.
-        /// </summary>
-        private async Task RemoveExtraManualRowsAsync(DateOnly ngaySX, int ca, int scope, string bieuMau, List<Hrc1InsertModel> models)
-        {
-            var keepIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).ToHashSet();
-
-            var extras = await _context.Hrc1TieuHaos
-                .Where(x => !x.IsDeleted && !x.IsNM && x.NgaySanXuat == ngaySX && x.Ca == (byte)ca
-                         && x.Scope == scope && x.BieuMau == bieuMau && !keepIds.Contains(x.ID))
-                .ToListAsync();
-            if (extras.Count == 0) return;
-
-            var affectedMeThois = extras.Select(x => x.MeThoi).Where(x => !string.IsNullOrEmpty(x))
-                .Cast<string>().Distinct().ToList();
-
-            foreach (var row in extras)
-            {
-                row.IsDeleted = true;
-                row.NgayXoa = DateTime.Now;
-            }
-            await _context.SaveChangesAsync();
-
-            // Mẻ trùng (clone thêm tay) vừa bị xóa mềm ở trên có thể là 1 trong 2 mẻ khiến
-            // SP_HRC1_BOF_CapNhatTrangThaiTrung đánh IsTrungMeThoi=1 cho mẻ CÒN LẠI (SaveHRC1LFManualDataAsync/
-            // SaveHRC1ManualDataAsync gọi SP này TRƯỚC khi hàm này chạy, lúc đó dòng trùng vẫn còn active nên
-            // tính đúng là trùng). Không recalc lại ở đây thì mẻ gốc sẽ mãi kẹt IsTrungMeThoi=1 dù chỉ còn 1
-            // dòng active — phải gọi lại SP cho đúng MeThoi sau khi đã xóa mềm dòng thừa.
-            foreach (var mt in affectedMeThois)
-            {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", bieuMau, mt);
-            }
-        }
-
-        /// <summary>
-        /// BOF: xóa Hrc1PhuLieu "thêm cột điều chỉnh" (IsAddManual=true, có PhuLieuID) mà clone tự thêm
-        /// trong lúc sửa, không có trong snapshot phiếu cha. CHỈ xóa loại IsAddManual — không đụng phụ
-        /// liệu baseline (IsAddManual=false, đến từ SP_Sync_HRC1_PhuLieu) vì baseline hợp lệ có thể = 0
-        /// nên không phải lúc nào cũng xuất hiện trong models (BuildPhuLieus bỏ qua baseline = 0 khi build
-        /// từ snapshot) — xóa theo baseline sẽ xóa nhầm dữ liệu sync hợp lệ. Bỏ qua IsPhanBo (dòng phân bổ
-        /// chênh lệch của module HRC1_STD_NXT, không liên quan tới việc sửa phiếu clone).
-        /// </summary>
-        private async Task RemoveExtraAdjustPhuLieuAsync(List<Hrc1InsertModel> models)
-        {
-            var meIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).Distinct().ToList();
-            if (meIds.Count == 0) return;
-
-            var keepPairs = new HashSet<(int MeId, int PhuLieuId)>();
-            foreach (var model in models)
-            {
-                if (!model.Id.HasValue || model.Id <= 0) continue;
-                foreach (var pl in model.PhuLieus)
-                {
-                    if (pl.PhuLieuID.HasValue && pl.IsAddManual == true)
-                        keepPairs.Add((model.Id.Value, pl.PhuLieuID.Value));
-                }
-            }
-
-            var extras = await _context.Hrc1PhuLieus
-                .Where(x => meIds.Contains(x.MeID) && !x.IsDeleted && !x.IsPhanBo && x.IsAddManual && x.PhuLieuID.HasValue)
-                .ToListAsync();
-            var toRemove = extras.Where(x => !keepPairs.Contains((x.MeID, x.PhuLieuID!.Value))).ToList();
-            if (toRemove.Count == 0) return;
-
-            _context.Hrc1PhuLieus.RemoveRange(toRemove);
-            await _context.SaveChangesAsync();
-        }
-
-        /// <summary>
-        /// LF: mọi phụ liệu của 1 mẻ đều nhập tay như nhau (không có baseline auto-sync như BOF, xem vùng
-        /// "LF manual save pipeline" phía trên), nên so khớp ĐẦY ĐỦ theo đúng bộ PhuLieuID mà snapshot
-        /// phiếu cha liệt kê cho từng dòng — phụ liệu nào clone tự thêm mà phiếu cha không có thì xóa. Bỏ
-        /// qua IsPhanBo (dòng phân bổ chênh lệch của module HRC1_STD_NXT).
-        /// </summary>
-        private async Task RemoveExtraLFPhuLieuAsync(List<Hrc1InsertModel> models)
-        {
-            var meIds = models.Where(m => m.Id.HasValue && m.Id > 0).Select(m => m.Id!.Value).Distinct().ToList();
-            if (meIds.Count == 0) return;
-
-            var keepPairs = new HashSet<(int MeId, int PhuLieuId)>();
-            foreach (var model in models)
-            {
-                if (!model.Id.HasValue || model.Id <= 0) continue;
-                foreach (var pl in model.PhuLieus)
-                {
-                    if (pl.PhuLieuID.HasValue)
-                        keepPairs.Add((model.Id.Value, pl.PhuLieuID.Value));
-                }
-            }
-
-            var extras = await _context.Hrc1PhuLieus
-                .Where(x => meIds.Contains(x.MeID) && !x.IsDeleted && !x.IsPhanBo && x.PhuLieuID.HasValue)
-                .ToListAsync();
-            var toRemove = extras.Where(x => !keepPairs.Contains((x.MeID, x.PhuLieuID!.Value))).ToList();
-            if (toRemove.Count == 0) return;
-
-            _context.Hrc1PhuLieus.RemoveRange(toRemove);
-            await _context.SaveChangesAsync();
         }
 
         // =========================================================
@@ -1883,6 +2053,10 @@ namespace dataproduct.api.Services
             var items = await _context.Hrc1TieuHaos
                 .Where(x => !x.IsDeleted && x.NgaySanXuat == ngay && x.Ca == (byte)ca
                          && x.BieuMau == bieuMau && x.Scope == scope)
+                // Loại dòng thuộc phiếu đã khóa (clone "Đề nghị hiệu chỉnh" đang mở), mirror GetAllAsync —
+                // tránh export ra 2 dòng trùng cho cùng 1 mẻ.
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                 .OrderBy(x => x.MeThoi)
                 .AsNoTracking()
                 .ToListAsync();
@@ -2729,6 +2903,11 @@ namespace dataproduct.api.Services
                         x.Scope == slot.Scope.Value &&
                         x.BieuMau == "BOF" &&
                         x.MeThoi != null)
+                    // Loại dòng thuộc phiếu đã khóa (clone "Đề nghị hiệu chỉnh" đang mở), mirror
+                    // GetAllAsync — RefreshGangMetricsForRowsAsync ghi đè field vô điều kiện lên mọi row
+                    // truyền vào nên phải chặn từ đây để không ghi nhầm cả dòng của phiếu cha lẫn clone.
+                    .Where(x => x.IDPhieu == null ||
+                        _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                     .ToListAsync();
                 foreach (var r in slotRows)
                     bofRowsById[r.ID] = r;
@@ -2747,6 +2926,10 @@ namespace dataproduct.api.Services
                         x.Scope == slot.Scope.Value &&
                         x.BieuMau == "LF" &&
                         x.MeThoi != null)
+                    // Loại dòng thuộc phiếu đã khóa (clone "Đề nghị hiệu chỉnh" đang mở) — xem comment ở
+                    // nhánh BOF phía trên.
+                    .Where(x => x.IDPhieu == null ||
+                        _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                     .ToListAsync();
                 foreach (var r in slotRows)
                     lfRowsById[r.ID] = r;

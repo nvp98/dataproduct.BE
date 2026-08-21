@@ -52,4 +52,15 @@ public class STD_NXT_TOTAL_HRC1
 
     [Column(TypeName = "decimal(18,3)")]
     public decimal? KLPB_LF { get; set; }
+
+    /// <summary>Tổng khối lượng "Thống Kê" hiệu lực của PhuLieuID này, gộp mọi Scope BOF (1-5), tại thời
+    /// điểm bấm Phân bổ/Không phân bổ gần nhất — cùng công thức api/DLNMHRC1/search-thongke, đã bao gồm
+    /// phần phân bổ nếu có. NULL nếu chưa bấm 1 trong 2 nút, hoặc vừa Thu hồi phân bổ (reset chờ quyết định
+    /// lại). Xem STD_XNT_HRC1Repository.ComputeKLTKAsync.</summary>
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLTK_BOF { get; set; }
+
+    /// <summary>Như KLTK_BOF, gộp mọi Scope LF (6-10).</summary>
+    [Column(TypeName = "decimal(18,3)")]
+    public decimal? KLTK_LF { get; set; }
 }

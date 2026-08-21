@@ -50,5 +50,11 @@ public partial class Hrc1TieuHao
     public int? NguoiCapNhat { get; set; }
     public string? ThoiGianLF {get;set;}
     public Guid? IDPhieu { get; set; }
+    // Chỉ có giá trị trên dòng "bản sao clone" của 1 dòng IsNM=true: giữ IDNM gốc mà dòng này che
+    // (bản thân IDNM luôn NULL trên dòng bản sao để né unique index UX_HRC1_TieuHao_IDNM_Scope_BieuMau —
+    // xem DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync). Không đánh index — chỉ dùng để merge ngược
+    // giá trị về dòng canonical (IDNM == SourceIDNM) lúc phiếu clone được Duyệt, xem
+    // DLNMHRC1Service.MergeAndCleanupHrc1CloneChainOnApproveAsync.
+    public int? SourceIDNM { get; set; }
 }
     

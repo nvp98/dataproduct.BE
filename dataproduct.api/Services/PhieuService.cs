@@ -509,7 +509,7 @@ namespace dataproduct.api.Business
                 // 4. Số phiếu clone = SoPhieu gốc + đuôi _HieuChinh_{VersionClone} (max 50 ký tự)
                 var nextVersion = (phieuGoc.VersionClone ?? 0) + 1;
                 var suffix = $"_HC_{nextVersion}";
-                // Strip đuôi _HC_{n} cũ (nếu có) để không bị cộng dồn _HC_1_HC_2...
+                // Strip đuôi _HC_{n} cũ (nếu có) để không bị cộng dồn _HC_1_HC_2... de
                 var soPhieuBase = System.Text.RegularExpressions.Regex.Replace(
                     (phieuGoc.SoPhieu ?? "").Trim(),
                     @"_HC_\d+$", "");

@@ -16,7 +16,15 @@ namespace dataproduct.api.Repositories
 
         public async Task<IEnumerable<Hrc1TieuHao>> GetAllAsync(DateOnly? ngaySanXuat, int? ca, int? scope, string? bieuMau = "BOF")
         {
-            var query = _context.Hrc1TieuHaos.Where(x => x.IsDeleted == false).AsQueryable();
+            // Loại dòng thuộc phiếu đã bị khóa (IsLock=1 — phiếu cha có clone "Đề nghị hiệu chỉnh" đang mở,
+            // xem PhieuService.CloneAsync) khỏi lưới nhập liệu, để không hiện song song dòng của phiếu cha
+            // (đã đông cứng) lẫn dòng nhân bản riêng của clone (DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync)
+            // cho cùng 1 mẻ. IDPhieu==null (dòng NM dùng chung/dữ liệu cũ chưa gắn nhãn) luôn được tính.
+            var query = _context.Hrc1TieuHaos
+                .Where(x => x.IsDeleted == false)
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
+                .AsQueryable();
 
             if (ngaySanXuat.HasValue)
                 query = query.Where(x => x.NgaySanXuat == ngaySanXuat.Value);
@@ -145,7 +153,13 @@ namespace dataproduct.api.Repositories
         private IQueryable<Hrc1TieuHao> BuildThongKeQuery(SearchThongKeHrc1 dto)
         {
             var bieuMau = string.IsNullOrWhiteSpace(dto.BieuMau) ? "BOF" : dto.BieuMau;
-            var query = _context.Hrc1TieuHaos.Where(x => x.BieuMau == bieuMau).AsQueryable();
+            // Loại dòng thuộc phiếu đã khóa (IsLock=1 — phiếu cha có clone "Đề nghị hiệu chỉnh" đang mở)
+            // khỏi Thống kê, mirror GetAllAsync — tránh đếm đôi dòng gốc + dòng nhân bản riêng của clone.
+            var query = _context.Hrc1TieuHaos
+                .Where(x => x.BieuMau == bieuMau)
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
+                .AsQueryable();
 
             if (dto.TuNgay.HasValue)
                 query = query.Where(x => x.NgaySanXuat >= DateOnly.FromDateTime(dto.TuNgay.Value));
@@ -298,6 +312,9 @@ namespace dataproduct.api.Repositories
         // đổi target từ DLNM_HRC2 sang Hrc1TieuHao (đã đổi tên từ HRC1_TieuHao_BOF, dùng chung BOF/LF).
         // Không đụng Hrc1PhuLieu: khác PhuLieu_HRC2 (khớp theo MeThoi/BieuMau, không có Ngay/Ca riêng),
         // Hrc1PhuLieu khớp qua MeID (FK tới đúng dòng Hrc1TieuHao vừa cập nhật) nên tự "theo" mẻ, không cần sửa.
+        // Lọc theo IDPhieu/IsLock (mirror GetAllAsync) để chỉ chuyển đúng dòng đang hoạt động — nếu có 1
+        // clone "Đề nghị hiệu chỉnh" đang mở cùng MeThoi (dòng nhân bản riêng cho clone, xem
+        // DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync), dòng của phiếu cha đã khóa sẽ KHÔNG bị chuyển.
         public async Task<bool> ChuyenMeThoiAsync(ChuyenMeThoiRequest request)
         {
             int? caKQ = null;
@@ -324,6 +341,8 @@ namespace dataproduct.api.Repositories
 
             var items = await _context.Hrc1TieuHaos
                 .Where(x => x.MeThoi == request.MeThoi && x.BieuMau == request.BieuMau && x.Scope == request.Scope && !x.IsDeleted)
+                .Where(x => x.IDPhieu == null ||
+                    _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                 .ToListAsync();
 
             if (items.Count == 0)
@@ -359,6 +378,9 @@ namespace dataproduct.api.Repositories
             var ngay = DateOnly.FromDateTime(ngaySX);
             var caByte = (byte)ca;
 
+            // Loại dòng thuộc phiếu đã khóa (IsLock=1) khỏi tổng — mirror GetAllAsync, tránh đếm đôi khi 1
+            // clone "Đề nghị hiệu chỉnh" đã Duyệt: dòng của phiếu cha (khóa vĩnh viễn) và dòng nhân bản
+            // riêng của clone cùng tồn tại cho 1 mẻ. IDPhieu==null (dòng NM/dữ liệu cũ) luôn được tính.
             var raw = await (
                 from pl in _context.Hrc1PhuLieus
                 join tieuHao in _context.Hrc1TieuHaos on pl.MeID equals tieuHao.ID
@@ -368,6 +390,8 @@ namespace dataproduct.api.Repositories
                       && pl.IsDeleted == false
                       && pl.IsPhanBo == false
                       && pl.PhuLieuID != null
+                      && (tieuHao.IDPhieu == null ||
+                          _context.BmPhieus.Any(p => p.Idphieu == tieuHao.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                 select new
                 {
                     tieuHao.BieuMau,
