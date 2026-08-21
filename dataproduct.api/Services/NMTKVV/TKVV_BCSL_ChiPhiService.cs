@@ -19,5 +19,14 @@ namespace dataproduct.api.Services.NMTKVV
         public Task<List<TKVVDuLieuCanDto>> GetDuLieuCanAsync(
             DateTime ngay, int ca, string maBM, string loaiDuLieu, int scope)
             => _repo.GetDuLieuCanAsync(ngay, ca, maBM, loaiDuLieu, scope);
+
+        public Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request)
+            => _repo.LoadAndSaveAsync(request);
+
+        public Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope)
+            => _repo.GetBaoCaoDataAsync(ngaySX, maBM, scope);
+
+        public Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request)
+            => _repo.SavePhieuRowsAsync(request);
     }
 }

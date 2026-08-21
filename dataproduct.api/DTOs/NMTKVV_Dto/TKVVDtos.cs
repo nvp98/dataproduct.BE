@@ -159,6 +159,72 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int SoLuongSilo { get; set; }
     }
 
+    // ─── TKVV_BaoCaoSanLuongChiPhi — bảng lưu dữ liệu cân + trạng thái điều chỉnh ─
+
+    public class TKVVBaoCaoSanLuongChiPhiDto
+    {
+        public long Id { get; set; }
+        public Guid? PhieuID { get; set; }
+        public DateOnly NgaySX { get; set; }
+        public int Ca { get; set; }
+        public string? Kip { get; set; }
+        public int? Scope { get; set; }          // INT — khớp cột Scope trong DB
+        public int? ThuTu { get; set; }
+        public int NguyenVatLieuID { get; set; }
+        public string? TenNVL { get; set; }
+        public decimal? KLAm { get; set; }
+        public decimal? KLAmAuto { get; set; }
+        public decimal? DoAm { get; set; }
+        public decimal? QuyKho { get; set; }
+        public decimal? ThanhPhamL1 { get; set; }
+        public decimal? ThanhPhamL2 { get; set; }
+        public string? GhiChu { get; set; }
+        public bool IsAdjusted { get; set; }
+        public int? AdjustedBy { get; set; }
+        public DateTime? AdjustedDate { get; set; }
+    }
+
+    public class LoadDuLieuCanRequestDto
+    {
+        public DateOnly NgaySX { get; set; }
+        public string MaBM { get; set; } = string.Empty;
+        public string LoaiDuLieu { get; set; } = "SANLUONG";
+        public int Scope { get; set; }           // INT 1-6
+        public int? CreatedBy { get; set; }
+    }
+
+    public class LoadDuLieuCanResultDto
+    {
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table1 { get; set; } = new(); // Ca ngày
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table2 { get; set; } = new(); // Ca đêm
+    }
+
+    public class SaveBcSlRowDto
+    {
+        public long? Id { get; set; }
+        public DateOnly NgaySX { get; set; }
+        public int Ca { get; set; }
+        public int? Scope { get; set; }          // INT
+        public int NguyenVatLieuID { get; set; }
+        public string? Kip { get; set; }
+        public int? ThuTu { get; set; }
+        public decimal? KLAm { get; set; }
+        public decimal? KLAmAuto { get; set; }
+        public decimal? DoAm { get; set; }
+        public decimal? QuyKho { get; set; }
+        public decimal? ThanhPhamL1 { get; set; }
+        public decimal? ThanhPhamL2 { get; set; }
+        public string? GhiChu { get; set; }
+    }
+
+    public class SaveBcSlPhieuRequestDto
+    {
+        public string MaBM { get; set; } = string.Empty;
+        public Guid? PhieuID { get; set; }
+        public int CurrentUserId { get; set; }
+        public List<SaveBcSlRowDto> Rows { get; set; } = new();
+    }
+
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────
 
     public class TKVVChiTietDto
