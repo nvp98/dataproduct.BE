@@ -56,6 +56,7 @@ namespace dataproduct.api.DTOs
         public bool? IsTrungMeThoi { get; set; }
         public string? GhiChuLo { get; set; }
         public decimal? KlThepLongPhanBo { get; set; }
+        public int? ChuyenVeMeId { get; set; }     // FK→HRC1_MeThep; chỉ áp dụng khi len_thang; null = không chuyển
     }
 
     // -------------------------------------------------------
@@ -118,6 +119,52 @@ namespace dataproduct.api.DTOs
     }
 
     public class HRC1_DucBoXacNhanRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    // Mẻ không xác nhận được vì thiếu dữ liệu bắt buộc (bị LT/TL xóa sau khi FE đã load) — xem CheckDucReady
+    public class HRC1_DucXacNhanThatBai
+    {
+        public int MeId { get; set; }
+        public string MaMe { get; set; } = string.Empty;
+        public List<string> LyDo { get; set; } = new();
+    }
+
+    public class HRC1_DucXacNhanResult
+    {
+        public List<int> ThanhCong { get; set; } = new();
+        public List<HRC1_DucXacNhanThatBai> ThatBai { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Máy đúc — xác nhận / không xác nhận / reset PCN (chỉ áp dụng mẻ IsThuNghiem=true)
+    // TrangThaiPCN: null=chưa xử lý, true=đã xác nhận, false=không xác nhận
+    // -------------------------------------------------------
+    public class HRC1_DucXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_DucKhongXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_DucResetXacNhanPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    // -------------------------------------------------------
+    // Chốt / bỏ chốt PCN (P.KH, từ trang Thống kê) — khóa vĩnh viễn TrangThaiPCN
+    // -------------------------------------------------------
+    public class HRC1_ChotPCNRequest
+    {
+        public List<int> MeIds { get; set; } = new();
+    }
+
+    public class HRC1_BoChotPCNRequest
     {
         public List<int> MeIds { get; set; } = new();
     }
@@ -198,6 +245,10 @@ namespace dataproduct.api.DTOs
         public DateOnly? TuNgayLoThoi { get; set; }
         public DateOnly? DenNgayLoThoi { get; set; }
         public string? MaMeChuyenVe { get; set; }  // chỉ lấy mẻ đã chuyển sang mẻ khác
+        public bool? IsThuNghiem { get; set; }
+        public bool? TrangThaiPCN { get; set; }    // chỉ áp dụng khi IsThuNghiem=true; true=đã xác nhận, false=không xác nhận
+        public bool? IsLenThang { get; set; }      // true = chỉ lấy mẻ lên thẳng (DichChuyen == "len_thang")
+        public bool? ChuaLenDuc { get; set; }      // true = chỉ lấy mẻ chưa có dữ liệu máy đúc (IdMayDucDich == null)
     }
 
     // -------------------------------------------------------
@@ -219,7 +270,10 @@ namespace dataproduct.api.DTOs
         public string? GhiChuLo { get; set; }
         public string? GhiChuTL { get; set; }
         public string? GhiChuDuc { get; set; }
+        public string? GhiChuPCN { get; set; }
         public bool? IsThuNghiem { get; set; }
+        public bool? TrangThaiPCN { get; set; }
+        public bool? TrangThaiChotPCN { get; set; }
         public string? TenMayDuc { get; set; }
         public string? MacThep { get; set; }
         public string? PhanLoai { get; set; }

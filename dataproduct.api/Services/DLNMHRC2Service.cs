@@ -32,6 +32,22 @@ namespace dataproduct.api.Services
             _lastSyncTimes[key] = now;
             return true;
         }
+
+        // Debounce riêng cho STD_NXT: sync này gộp toàn bộ BOF/LF/RH + mọi Scope cho 1 Ngày/Ca
+        // (nặng hơn sync theo từng BM/Scope) nên dùng cooldown dài hơn: tối đa 1 lần / 5 phút.
+        private static readonly ConcurrentDictionary<string, DateTime> _lastStdNxtSyncTimes = new();
+        private static readonly TimeSpan StdNxtSyncCooldown = TimeSpan.FromMinutes(5);
+
+        private static bool ShouldSyncStdNxt(DateTime ngaySX, int ca)
+        {
+            var key = $"{ngaySX:yyyy-MM-dd}_{ca}";
+            var now = DateTime.UtcNow;
+            if (_lastStdNxtSyncTimes.TryGetValue(key, out var last) && now - last < StdNxtSyncCooldown)
+                return false;
+            _lastStdNxtSyncTimes[key] = now;
+            return true;
+        }
+
         public DLNMHRC2Service(
             IDLNMHRC2Repository repo,
             HRC2_NMSyncService hrc2NMSyncService,
@@ -892,6 +908,19 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
+        /// Force sync NM cho Sổ Xuất-Nhập-Tồn (STD_NXT), bỏ qua cooldown. Dùng cho nút
+        /// "Đồng bộ lại từ NM" riêng ở FE — khác với "Làm mới" (chỉ đọc DB, xem FilterSTD_NXTAsync).
+        /// </summary>
+        public async Task ForceSyncStdNxtAsync(FilterSTD_NXTRequest request)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            // Reset cooldown để FilterSTD_NXTAsync gọi tiếp theo (nếu rỗng) cũng không bị chặn
+            var key = $"{request.NgaySX:yyyy-MM-dd}_{request.Ca}";
+            _lastStdNxtSyncTimes[key] = DateTime.MinValue;
+            await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
+        }
+
+        /// <summary>
         /// Làm mới KLGangLongCCT và KLThepPheGang cho các phiếu BOF được chọn.
         /// Từ idPhieu → tìm slot (Ngay/Ca/Scope) → load DLNM_HRC2 rows → gọi RefreshGangMetricsForRowsAsync.
         /// </summary>
@@ -922,7 +951,7 @@ namespace dataproduct.api.Services
                 var ngay = slot.NgaySX.Value.ToDateTime(TimeOnly.MinValue);
                 var slotRows = await _context.DLNM_HRC2s
                     .Where(x =>
-                        x.IsNM == true &&
+                        // x.IsNM == true &&
                         x.IsDelete != true &&
                         x.Ngay == ngay &&
                         x.Ca == slot.Ca.Value &&
@@ -1051,9 +1080,22 @@ namespace dataproduct.api.Services
 
         public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
         {
-            // Sync dữ liệu HRC2 mới nhất từ NM về DB hiện tại trước khi group/sum
-            await _hrc2NMSyncService.SyncFromNmStoredProcAsync();
+            // Không còn sync NM ngay từ đầu (nặng, làm nút "Làm mới" chậm mỗi lần bấm).
+            // Dữ liệu bình thường được giữ tươi bởi job đồng bộ chạy định kỳ ngoài app
+            // (xem sp_Sync_HRC2_FromNM_Now trong hrc2_syncTieuHao_now.sql) — ở đây chỉ đọc thẳng DB.
             var result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
+
+            // Fallback: chỉ khi DB hoàn toàn chưa có dữ liệu cho đúng Ngày/Ca này (job chưa từng
+            // chạm tới slot này — job downtime, NM trễ, hoặc slot quá cũ từ trước khi bật job) mới
+            // đồng bộ trực tiếp từ NM (nặng) rồi đọc lại — trường hợp hiếm nên chấp nhận chậm 1 lần.
+            // Vẫn debounce (5 phút/lần cho cùng Ngày/Ca) để tránh spam SP nếu slot thực sự không có
+            // dữ liệu (vd chọn nhầm ngày tương lai) hoặc nhiều tab cùng bấm "Làm mới" một lúc.
+            if (result.Count == 0 && ShouldSyncStdNxt(request.NgaySX, request.Ca))
+            {
+                await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
+                result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
+            }
+
             if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
             {
                 // Ưu tiên dùng danh sách HeaderKeyIds từ FE (phản ánh đúng bảng đang hiển thị, kể cả dòng mới chưa lưu)

@@ -27,6 +27,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
         private readonly string _gangLongConnStr;
+        private readonly BmConfigService _bmConfig;
 
         public BBGN_ThepLongService(
             IBBGN_ThepLongRepository repo,
@@ -36,7 +37,8 @@ namespace dataproduct.api.Services
             SyncPhanLoaiService syncPhanLoaiService,
             PheDuyetService pheDuyetService,
             IConverter pdfConverter,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _context = context;
@@ -50,6 +52,7 @@ namespace dataproduct.api.Services
                 config.GetConnectionString("GangLongDbConnection")
                 ?? config.GetConnectionString("MasterDbConnection")
                 ?? throw new InvalidOperationException("GangLongDbConnection/MasterDbConnection connection string is not configured");
+            _bmConfig = bmConfig;
         }
 
         public async Task<List<string>> SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
@@ -116,7 +119,6 @@ namespace dataproduct.api.Services
                     var oldMe = existing.Me;
                     existing.Me = me;
                     existing.MayDuc = GetString(row, "mayDuc");
-                    existing.IdMacThep = TryParseInt(row, "idMacThep");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
                     existing.KLLFSauThep = klLFSauThep;
@@ -162,7 +164,6 @@ namespace dataproduct.api.Services
                     {
                         Me = me,
                         MayDuc = GetString(row, "mayDuc"),
-                        IdMacThep = TryParseInt(row, "idMacThep"),
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
@@ -197,12 +198,31 @@ namespace dataproduct.api.Services
             if (toInsert.Any())
                 await _context.BBGN_ThepLongs.AddRangeAsync(toInsert);
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // Unique index UX_BBGN_ThepLong_IdPhieu_Me (migration bbgn_theplong_unique_idphieu_me.sql)
+                // chặn insert trùng (IdPhieu, Me) — xảy ra khi 2 request Lưu cho cùng 1 dòng mới
+                // (chưa có Id) được gửi gần nhau (double-click, "Làm mới dữ liệu" trong lúc đang Lưu...).
+                // Trả về cảnh báo thay vì để lộ lỗi 500 SQL thô cho FE.
+                warnings.Add(
+                    "Một số mẻ vừa được lưu trùng lúc từ nơi khác (có thể do bấm Lưu nhiều lần hoặc " +
+                    "\"Làm mới dữ liệu\" trong lúc đang lưu). Vui lòng bấm \"Làm mới dữ liệu\" để kiểm tra lại trước khi tiếp tục.");
+                return warnings;
+            }
 
             await UpdateDuplicateFlagsForMesAsync(affectedMes);
 
             return warnings;
         }
+
+        /// <summary>SQL Server: 2601/2627 = vi phạm unique index/constraint.</summary>
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
+            ex.InnerException is SqlException sqlEx &&
+            sqlEx.Errors.Cast<SqlError>().Any(e => e.Number is 2601 or 2627);
 
 
         private decimal? SumValues(params decimal?[] values)
@@ -375,8 +395,34 @@ namespace dataproduct.api.Services
                     .ToListAsync();
             }
 
+            rows = SortRowsByThoiGian(rows, request.Ca, request.NgaySX);
+
             await ResolveMacThepNamesAsync(rows);
             return rows;
+        }
+
+        /// <summary>
+        /// Xóa toàn bộ record BBGN_ThepLong sinh ra theo 1 phiếu (dùng khi phiếu "Đề nghị hiệu chỉnh"
+        /// (clone) bị Không xác nhận / bị hủy trước khi có dữ liệu chính thức) và tính lại cờ trùng mẻ
+        /// cho các mẻ bị ảnh hưởng, tránh để phiếu gốc bị đánh trùng "ma" với record đã xóa.
+        /// </summary>
+        public async Task DeleteAllByIdPhieuAsync(Guid idPhieu)
+        {
+            var rows = await _context.BBGN_ThepLongs
+                .Where(x => x.IdPhieu == idPhieu)
+                .ToListAsync();
+
+            if (rows.Count == 0) return;
+
+            var affectedMes = rows
+                .Where(x => !string.IsNullOrWhiteSpace(x.Me))
+                .Select(x => x.Me!)
+                .ToList();
+
+            _context.BBGN_ThepLongs.RemoveRange(rows);
+            await _context.SaveChangesAsync();
+
+            await UpdateDuplicateFlagsForMesAsync(affectedMes);
         }
 
         public async Task<bool> DeleteRowAsync(int id)
@@ -408,9 +454,17 @@ namespace dataproduct.api.Services
 
             if (mes.Count == 0) return;
 
-            var rows = await _context.BBGN_ThepLongs
-                .Where(x => x.IsGhost != true && x.Me != null && mes.Contains(x.Me))
-                .ToListAsync();
+            // Bỏ qua các dòng thuộc phiếu đã bị khóa (IsLock, ví dụ phiếu gốc bị khóa khi
+            // "Đề nghị hiệu chỉnh" sinh phiếu clone) hoặc đã xóa: phiếu này không còn hiển thị/
+            // hiệu lực nên không được tính vào việc phát hiện trùng mẻ với phiếu clone đang sửa.
+            var rows = await (
+                from x in _context.BBGN_ThepLongs
+                join p in _context.BmPhieus on x.IdPhieu equals p.Idphieu into pj
+                from p in pj.DefaultIfEmpty()
+                where x.IsGhost != true && x.Me != null && mes.Contains(x.Me)
+                      && p != null && p.IsLock != 1 && p.IsDelete != 1
+                select x
+            ).ToListAsync();
 
             bool changed = false;
             var groups = rows.GroupBy(x => x.Me!.Trim(), StringComparer.OrdinalIgnoreCase);
@@ -452,11 +506,36 @@ namespace dataproduct.api.Services
         {
             var rows = await _context.BBGN_ThepLongs
                 .Where(x => x.IdPhieu == idPhieu && x.IsGhost != true)
-                .OrderBy(x => x.ThoiGian)
-                .ThenBy(x => x.Id)
                 .ToListAsync();
+
+            var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == idPhieu);
+            rows = SortRowsByThoiGian(rows, phieu?.Ca, phieu?.NgaySX);
+
             await ResolveMacThepNamesAsync(rows);
             return rows;
+        }
+
+        /// <summary>
+        /// Ca 2 chạy từ 19:45 hôm nay → 19:45 hôm sau: ThoiGian &lt; "19:45" thuộc ngày hôm sau,
+        /// nên không thể sort trực tiếp theo chuỗi "HH:mm" (sẽ đẩy nhầm các giờ đầu ca 2 lên đầu
+        /// danh sách). Quy về sort-key "yyyy-MM-dd HH:mm" theo đúng thời điểm thực tế rồi mới sort.
+        /// </summary>
+        private static List<BBGN_ThepLong> SortRowsByThoiGian(List<BBGN_ThepLong> rows, int? ca, DateOnly? ngaySX)
+        {
+            var baseNgay = ngaySX ?? DateOnly.FromDateTime(DateTime.Today);
+
+            string SortKey(BBGN_ThepLong r)
+            {
+                if (string.IsNullOrWhiteSpace(r.ThoiGian)) return "9999-12-31 99:99";
+                var isNextDay = ca == 2 && string.Compare(r.ThoiGian, "19:45", StringComparison.Ordinal) < 0;
+                var ngay = isNextDay ? baseNgay.AddDays(1) : baseNgay;
+                return $"{ngay:yyyy-MM-dd} {r.ThoiGian}";
+            }
+
+            return rows
+                .OrderBy(SortKey, StringComparer.Ordinal)
+                .ThenBy(x => x.Id)
+                .ToList();
         }
 
         public async Task<PagedResult<BBGN_ThepLong>> SearchThongKeAsync(SearchThongKeBBGNThepLongRequest request)
@@ -559,9 +638,9 @@ namespace dataproduct.api.Services
 
             var nhomPhanLoai = await (
                 from row in baseQuery
-                where row.IdMacThep.HasValue
-                join mt in _context.MacTheps on row.IdMacThep!.Value equals mt.Id
-                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                where row.MacThepBKMIS != null
+                join mt in _context.MacTheps on row.MacThepBKMIS equals mt.TenMacThep
+                where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 2
                 join nhom in _context.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                 group row by nhom.TenNhom into g
                 orderby g.Key
@@ -684,7 +763,12 @@ namespace dataproduct.api.Services
         {
             var query = _context.BBGN_ThepLongs
                 .AsNoTracking()
-                .Where(x => x.IsGhost != true && x.BieuMau == request.BieuMau);
+                .Where(x => x.IsGhost != true && x.BieuMau == request.BieuMau)
+                // Bỏ các record thuộc phiếu đã bị khóa (IsLock, ví dụ phiếu gốc bị khóa khi có
+                // bản "Đề nghị hiệu chỉnh") hoặc đã xóa: phiếu này không còn hiệu lực nên không
+                // được tính vào thống kê.
+                .Where(x => _context.BmPhieus.Any(p =>
+                    p.Idphieu == x.IdPhieu && p.IsLock != 1 && p.IsDelete != 1));
 
             if (request.TuNgay.HasValue)
             {
@@ -728,8 +812,7 @@ namespace dataproduct.api.Services
                 var keyword = request.SearchString.Trim();
                 query = query.Where(x =>
                     (x.Me ?? string.Empty).Contains(keyword) ||
-                    (x.MacThep ?? string.Empty).Contains(keyword) ||
-                    _context.MacTheps.Any(m => m.Id == x.IdMacThep && m.TenMacThep.Contains(keyword)));
+                    (x.MacThepBKMIS ?? string.Empty).Contains(keyword));
             }
 
             if (!string.IsNullOrWhiteSpace(request.ThungSo))
@@ -753,12 +836,12 @@ namespace dataproduct.api.Services
             if (!string.IsNullOrWhiteSpace(request.PhanLoaiNhom))
             {
                 var phanLoaiNhom = request.PhanLoaiNhom.Trim();
-                var matchingMacThepIds = _context.MacTheps
-                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue &&
+                var matchingMacThepNames = _context.MacTheps
+                    .Where(m => m.Id_NhomPhanLoaiMacThep.HasValue && m.NhaMay == 2 &&
                         _context.NhomPhanLoaiMacTheps
                             .Any(n => n.Id == m.Id_NhomPhanLoaiMacThep.Value && n.TenNhom.Contains(phanLoaiNhom)))
-                    .Select(m => m.Id);
-                query = query.Where(x => x.IdMacThep.HasValue && matchingMacThepIds.Contains(x.IdMacThep.Value));
+                    .Select(m => m.TenMacThep);
+                query = query.Where(x => x.MacThepBKMIS != null && matchingMacThepNames.Contains(x.MacThepBKMIS));
             }
 
             if (request.IsTrungMeThoi.HasValue)
@@ -770,13 +853,18 @@ namespace dataproduct.api.Services
             return query;
         }
 
+        /// <summary>Suy ra Nhóm phân loại mác thép từ MacThepBKMIS (đồng bộ tự động), match theo tên với MacThep.TenMacThep.</summary>
         private async Task ResolveMacThepNamesAsync(List<BBGN_ThepLong> rows)
         {
-            var ids = rows.Where(x => x.IdMacThep.HasValue).Select(x => x.IdMacThep!.Value).Distinct().ToList();
-            if (ids.Count == 0) return;
+            var bkmisNames = rows
+                .Where(x => !string.IsNullOrWhiteSpace(x.MacThepBKMIS))
+                .Select(x => x.MacThepBKMIS!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (bkmisNames.Count == 0) return;
 
             var macTheps = await _context.MacTheps
-                .Where(x => ids.Contains(x.Id))
+                .Where(x => bkmisNames.Contains(x.TenMacThep) && x.NhaMay == 2 && x.IsLock != true)
                 .ToListAsync();
 
             var nhomIds = macTheps
@@ -791,12 +879,23 @@ namespace dataproduct.api.Services
                     .ToDictionaryAsync(x => x.Id, x => x.TenNhom)
                 : new Dictionary<int, string>();
 
-            var macThepMap = macTheps.ToDictionary(x => x.Id);
+            // Dữ liệu MacThep không có ràng buộc unique trên TenMacThep, thực tế đã ghi nhận
+            // các bản ghi trùng tên (khác Id) cho cùng NhaMay, ví dụ "SAE1010-2". Nhóm theo tên
+            // (không phân biệt hoa/thường) và ưu tiên bản ghi đã xác nhận / mới nhất để tránh lỗi
+            // "An item with the same key has already been added" khi ToDictionary.
+            var macThepMap = macTheps
+                .GroupBy(x => x.TenMacThep, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.IsXacNhan == true)
+                          .ThenByDescending(x => x.NgayTao)
+                          .ThenByDescending(x => x.Id)
+                          .First(),
+                    StringComparer.OrdinalIgnoreCase);
 
-            foreach (var row in rows.Where(x => x.IdMacThep.HasValue))
+            foreach (var row in rows.Where(x => !string.IsNullOrWhiteSpace(x.MacThepBKMIS)))
             {
-                if (!macThepMap.TryGetValue(row.IdMacThep!.Value, out var mt)) continue;
-                row.MacThep = mt.TenMacThep;
+                if (!macThepMap.TryGetValue(row.MacThepBKMIS!.Trim(), out var mt)) continue;
                 if (mt.Id_NhomPhanLoaiMacThep.HasValue &&
                     nhomMap.TryGetValue(mt.Id_NhomPhanLoaiMacThep.Value, out var tenNhom))
                     row.TenNhomPhanLoaiMacThep = tenNhom;
@@ -844,7 +943,7 @@ namespace dataproduct.api.Services
                   <td>{stt++}</td>
                   <td>{r.MayDuc ?? ""}</td>
                   <td{meStyle}>{r.Me ?? ""}</td>
-                  <td>{r.MacThep ?? ""}</td>
+                  <td>{r.MacThepBKMIS ?? ""}</td>
                   <td>{r.ThungSo ?? ""}</td>
                   <td>{r.ThoiGian ?? ""}</td>
                   <td>{(r.KlLan1.HasValue ? r.KlLan1.Value.ToString("0.##") : "")}</td>
@@ -869,8 +968,10 @@ namespace dataproduct.api.Services
             var html = await File.ReadAllTextAsync(templatePath);
 
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("BBGN_ThepLong");
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{Ca}}", ca.ToString())
                 .Replace("{{Kip}}", kip)
                 .Replace("{{TuGio}}", tuGio)
@@ -963,7 +1064,7 @@ namespace dataproduct.api.Services
                 ws.Cell(r, 3).Value = row.Me ?? "";                                                   // C - Mẻ
                 ws.Cell(r, 3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 
-                ws.Cell(r, 4).Value = row.MacThep ?? "";                                              // D - Mác thép
+                ws.Cell(r, 4).Value = row.MacThepBKMIS ?? "";                                        // D - Mác thép
                 ws.Cell(r, 5).Value = row.ThungSo ?? "";                                              // E - Thùng số
                 ws.Cell(r, 5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
 

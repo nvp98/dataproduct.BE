@@ -15,11 +15,16 @@ namespace dataproduct.api.Services
         private readonly IBMPheDuyetRepository _repo;
         private readonly ProductDataMasterDbContext _contextMaster;
         private readonly IPhieuRepository _phieuRepo;
+        private readonly BBGN_ThepLongService _bbgnThepLongService;
         private readonly DLNMHRC1Service _dlnmHrc1Service;
 
-        // Danh sách BM dùng cơ chế clone vật lý (nhân bản riêng dòng cho phiếu clone, kể cả dòng NM —
-        // xem DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync), áp dụng chung cho cả Reject (xóa dòng clone)
-        // lẫn Approve (merge dòng NM về canonical — DLNMHRC1Service.MergeAndCleanupHrc1CloneChainOnApproveAsync).
+        // Các maBm dùng bảng BBGN_ThepLong làm dữ liệu con theo IdPhieu (xem BBGN_ThepLongService/
+        // HRC2BBGNThepLongInitializer). Khi phiếu clone ("Đề nghị hiệu chỉnh") của các BM này bị
+        // Không xác nhận, phải dọn luôn các record con đã sinh ra theo IdPhieu của phiếu clone.
+        private static readonly HashSet<string> BmCoDuLieuBBGNThepLong = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong", "BBGN_ThepLong"
+        };
         private static readonly HashSet<string> Hrc1TieuHaoClonePhysicalMaBms = new(StringComparer.OrdinalIgnoreCase)
         {
             "HRC1_BB_TieuHao_BOF",
@@ -30,11 +35,13 @@ namespace dataproduct.api.Services
             IBMPheDuyetRepository repo,
             ProductDataMasterDbContext Mastercontext,
             IPhieuRepository phieuRepo,
+            BBGN_ThepLongService bbgnThepLongService,
             DLNMHRC1Service dlnmHrc1Service)
         {
             _repo = repo;
             _contextMaster = Mastercontext;
             _phieuRepo = phieuRepo;
+            _bbgnThepLongService = bbgnThepLongService;
             _dlnmHrc1Service = dlnmHrc1Service;
         }
 
@@ -175,6 +182,12 @@ namespace dataproduct.api.Services
                             await _dlnmHrc1Service.DeleteHrc1RowsByPhieuAsync(phieu.Idphieu);
                         }
                     }
+
+                    // Dọn dữ liệu con đã sinh theo phiếu clone bị từ chối, tránh mồ côi record
+                    // và tránh đánh trùng mẻ "ma" với dữ liệu của phiếu gốc vừa được mở khóa lại.
+                    if (!string.IsNullOrWhiteSpace(phieu.MaBm) && BmCoDuLieuBBGNThepLong.Contains(phieu.MaBm))
+                        await _bbgnThepLongService.DeleteAllByIdPhieuAsync(phieuId);
+
                     await _repo.DeleteByPhieuIdAsync(phieuId);
                     await _phieuRepo.DeleteAsync(phieuId);
                     return true;

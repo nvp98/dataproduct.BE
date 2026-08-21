@@ -214,6 +214,30 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdSiLo { get; set; }
     }
 
+    // ─── Sao chép mapping từ ca gần nhất có dữ liệu ──────────────────────────
+
+    public class CopyMappingFromPreviousShiftDto
+    {
+        public int IdLoCao { get; set; }
+        public DateTime Ngay { get; set; }
+        public int IdCa { get; set; }
+    }
+
+    /// <summary>
+    /// Kết quả sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu.
+    /// Found = false khi lùi hết ShiftsSearched ca mà không tìm thấy ca nào có mapping.
+    /// </summary>
+    public class CopyMappingFromPreviousShiftResultDto
+    {
+        public bool Found { get; set; }
+        public DateTime? SourceNgay { get; set; }   // ca đã tìm thấy mapping để sao chép
+        public int? SourceCa { get; set; }
+        public int ShiftsSearched { get; set; }     // số ca đã lùi qua để tìm được (hoặc tới khi bỏ cuộc)
+        public int CreatedCount { get; set; }        // số mapping tạo thành công
+        public int TotalToCreate { get; set; }        // số silo cần tạo (đã loại silo đã map ở ca hiện tại)
+        public string Message { get; set; } = string.Empty;
+    }
+
     /// </summary>
     public class LGNLDuLieuScadaDto
     {

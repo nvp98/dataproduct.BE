@@ -344,6 +344,20 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        [HttpPost("copy-mapping-from-previous-shift")]
+        public async Task<IActionResult> CopyMappingFromPreviousShift([FromBody] CopyMappingFromPreviousShiftDto dto)
+        {
+            try
+            {
+                if (dto.IdCa != 1 && dto.IdCa != 2)
+                    return BadRequest(new { message = "IdCa chỉ nhận giá trị 1 hoặc 2." });
+
+                var result = await _service.CopyMappingFromPreviousShiftAsync(dto.IdLoCao, dto.Ngay, dto.IdCa);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpGet("get-snapshot-silo")]
         public async Task<IActionResult> GetSnapshotSilo(
             [FromQuery] DateTime ngay,

@@ -104,11 +104,14 @@ namespace dataproduct.api.Repositories
                 ThuTu = null,
                 TyTrong = h.TyTrong.HasValue ? (decimal?)h.TyTrong.Value : null,
                 ThuTu_TK_BOF = h.ThuTu_TK_BOF,
-                ThuTu_TK_LFRH = h.ThuTu_TK_LFRH,
+                ThuTu_TK_LF = h.ThuTu_TK_LF,
+                ThuTu_TK_RH = h.ThuTu_TK_RH,
                 IsUsed_Excel = h.IsUsed_Excel,
                 LoaiExcel = h.LoaiExcel,
                 ThuTu_Excel_BOF = h.ThuTu_Excel_BOF,
-                ThuTu_Excel_LFRH = h.ThuTu_Excel_LFRH,
+                ThuTu_Excel_LF = h.ThuTu_Excel_LF,
+                ThuTu_Excel_RH = h.ThuTu_Excel_RH,
+                MaVatTuChiPhi = h.MaVatTuChiPhi,
                 HeaderMappings = mappings.TryGetValue(h.Id, out var list)
                     ? list
                     : new List<HeaderMapping_ResponseModel>()
@@ -133,6 +136,25 @@ namespace dataproduct.api.Repositories
             return await _context.Header_Mappings.AnyAsync(x => x.ID_HeaderKey == id);
         }
 
+        public async Task<Header_Key?> FindDuplicateThuTuAsync(ThuTuColumn column, int value, int? excludeId = null)
+        {
+            IQueryable<Header_Key> query = column switch
+            {
+                ThuTuColumn.TK_BOF     => _context.Header_Keys.Where(x => x.ThuTu_TK_BOF == value),
+                ThuTuColumn.TK_LF      => _context.Header_Keys.Where(x => x.ThuTu_TK_LF == value),
+                ThuTuColumn.TK_RH      => _context.Header_Keys.Where(x => x.ThuTu_TK_RH == value),
+                ThuTuColumn.Excel_BOF  => _context.Header_Keys.Where(x => x.ThuTu_Excel_BOF == value),
+                ThuTuColumn.Excel_LF   => _context.Header_Keys.Where(x => x.ThuTu_Excel_LF == value),
+                ThuTuColumn.Excel_RH   => _context.Header_Keys.Where(x => x.ThuTu_Excel_RH == value),
+                _ => throw new ArgumentOutOfRangeException(nameof(column))
+            };
+
+            if (excludeId.HasValue)
+                query = query.Where(x => x.Id != excludeId.Value);
+
+            return await query.FirstOrDefaultAsync();
+        }
+
         // Search theo 3 bảng Header_Key, Header_Mapping, PhuLieu_NM:
         // - Trả về 1 dòng / record
         // - Có móc nối: trả về dòng mapping
@@ -146,9 +168,10 @@ namespace dataproduct.api.Repositories
             bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
-            string? SortThuTu,
             int? IdNhom,
             bool? chuaMappingNM,
+            string? SortBy,
+            string? SortOrder,
             int page,
             int pageSize
         )
@@ -180,12 +203,15 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = pl != null ? pl.TenPhuLieu : null,
                     LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
                     ThuTu_TK_BOF = hk != null ? hk.ThuTu_TK_BOF : null,
-                    ThuTu_TK_LFRH = hk != null ? hk.ThuTu_TK_LFRH : null,
+                    ThuTu_TK_LF = hk != null ? hk.ThuTu_TK_LF : null,
+                    ThuTu_TK_RH = hk != null ? hk.ThuTu_TK_RH : null,
                     IsUsed_Excel = hk != null ? hk.IsUsed_Excel : null,
                     LoaiExcel = hk != null ? hk.LoaiExcel : null,
                     ThuTu_Excel_BOF = hk != null ? hk.ThuTu_Excel_BOF : null,
-                    ThuTu_Excel_LFRH = hk != null ? hk.ThuTu_Excel_LFRH : null,
-                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null
+                    ThuTu_Excel_LF = hk != null ? hk.ThuTu_Excel_LF : null,
+                    ThuTu_Excel_RH = hk != null ? hk.ThuTu_Excel_RH : null,
+                    ID_NhomKey = hk != null ? hk.ID_NhomKey : null,
+                    MaVatTuChiPhi = hk != null ? hk.MaVatTuChiPhi : null
                 };
 
             // (2) HeaderKey chưa được móc nối
@@ -212,12 +238,15 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = null,
                     LoaiThongKe = hk != null ? hk.LoaiThongKe : null,
                     ThuTu_TK_BOF = hk.ThuTu_TK_BOF,
-                    ThuTu_TK_LFRH = hk.ThuTu_TK_LFRH,
+                    ThuTu_TK_LF = hk.ThuTu_TK_LF,
+                    ThuTu_TK_RH = hk.ThuTu_TK_RH,
                     IsUsed_Excel = hk.IsUsed_Excel,
                     LoaiExcel = hk.LoaiExcel,
                     ThuTu_Excel_BOF = hk.ThuTu_Excel_BOF,
-                    ThuTu_Excel_LFRH = hk.ThuTu_Excel_LFRH,
-                    ID_NhomKey = hk.ID_NhomKey
+                    ThuTu_Excel_LF = hk.ThuTu_Excel_LF,
+                    ThuTu_Excel_RH = hk.ThuTu_Excel_RH,
+                    ID_NhomKey = hk.ID_NhomKey,
+                    MaVatTuChiPhi = hk.MaVatTuChiPhi
                 };
 
             // (3) PhuLieu_NM chưa được móc nối
@@ -244,12 +273,15 @@ namespace dataproduct.api.Repositories
                     TenPhuLieu = pl.TenPhuLieu,
                     LoaiThongKe = null,
                     ThuTu_TK_BOF = null,
-                    ThuTu_TK_LFRH = null,
+                    ThuTu_TK_LF = null,
+                    ThuTu_TK_RH = null,
                     IsUsed_Excel = null,
                     LoaiExcel = null,
                     ThuTu_Excel_BOF = null,
-                    ThuTu_Excel_LFRH = null,
-                    ID_NhomKey = null
+                    ThuTu_Excel_LF = null,
+                    ThuTu_Excel_RH = null,
+                    ID_NhomKey = null,
+                    MaVatTuChiPhi = null
                 };
 
             // Union 3 tập dữ liệu thành 1 query
@@ -354,10 +386,33 @@ namespace dataproduct.api.Repositories
             // Đếm tổng số records
             var totalCount = await query.CountAsync();
 
-            // Lấy dữ liệu với pagination: phụ liệu mới trước (NgayTaoPhuLieu DESC) rồi header key mới (NgayTao DESC)
-            var ordered = query.OrderByDescending(x => x.NgayTao);
-                //.OrderByDescending(x => x.NgayTaoPhuLieu)
-                //.ThenByDescending(x => x.NgayTao);
+            // Sort theo 1 trong 4 cột thứ tự (nếu FE yêu cầu) — sort + phân trang trên TOÀN BỘ
+            // dữ liệu đã lọc (không phải chỉ trang đang xem). Dòng không có giá trị ở cột đó
+            // luôn xếp cuối, bất kể asc/desc.
+            var descending = string.Equals(SortOrder, "descend", StringComparison.OrdinalIgnoreCase);
+            IOrderedQueryable<HeaderKeyMapping_ResponseModel> ordered = SortBy?.Trim().ToLowerInvariant() switch
+            {
+                "thutu_tk_bof" => descending
+                    ? query.OrderBy(x => x.ThuTu_TK_BOF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_BOF)
+                    : query.OrderBy(x => x.ThuTu_TK_BOF == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_BOF),
+                "thutu_tk_lf" => descending
+                    ? query.OrderBy(x => x.ThuTu_TK_LF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_LF)
+                    : query.OrderBy(x => x.ThuTu_TK_LF == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_LF),
+                "thutu_tk_rh" => descending
+                    ? query.OrderBy(x => x.ThuTu_TK_RH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_TK_RH)
+                    : query.OrderBy(x => x.ThuTu_TK_RH == null ? 1 : 0).ThenBy(x => x.ThuTu_TK_RH),
+                "thutu_excel_bof" => descending
+                    ? query.OrderBy(x => x.ThuTu_Excel_BOF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_BOF)
+                    : query.OrderBy(x => x.ThuTu_Excel_BOF == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_BOF),
+                "thutu_excel_lf" => descending
+                    ? query.OrderBy(x => x.ThuTu_Excel_LF == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_LF)
+                    : query.OrderBy(x => x.ThuTu_Excel_LF == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_LF),
+                "thutu_excel_rh" => descending
+                    ? query.OrderBy(x => x.ThuTu_Excel_RH == null ? 1 : 0).ThenByDescending(x => x.ThuTu_Excel_RH)
+                    : query.OrderBy(x => x.ThuTu_Excel_RH == null ? 1 : 0).ThenBy(x => x.ThuTu_Excel_RH),
+                // Mặc định: phụ liệu/header key mới trước (NgayTao DESC), giữ nguyên hành vi cũ
+                _ => query.OrderByDescending(x => x.NgayTao)
+            };
 
             var data = await ordered
                 .ThenBy(x => x.MappingId == null ? 1 : 0)

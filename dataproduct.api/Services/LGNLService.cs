@@ -291,6 +291,12 @@ namespace dataproduct.api.Services
             int idLoCao, DateTime ngay, int idCa)
             => _repo.GetSiloSnapshotAsync(idLoCao, ngay, idCa);
 
+        // ─── Sao chép mapping từ ca gần nhất có dữ liệu ─────────────
+
+        public Task<CopyMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int idCa)
+            => _repo.CopyMappingFromPreviousShiftAsync(idLoCao, ngay, idCa);
+
         // ─── Đổi NVL cho silo tại thời điểm cụ thể trong ca ─────────
 
         public async Task<LG_NL_Mapping> ChangeSiLoNVLAsync(
@@ -467,11 +473,8 @@ namespace dataproduct.api.Services
                         item.QuyKho = total * (100 - pct) / 100;
                 }
 
-                // Replace mode: xóa dữ liệu cũ rồi ghi mới (đã merge)
-                await _repo.DeleteChiTietByPhieuIdAsync(phieu.Idphieu);
-
-                if (items.Count > 0)
-                    await _repo.AddChiTietRangeAsync(items);
+                // Replace mode: xóa dữ liệu cũ rồi ghi mới (đã merge) — trong 1 transaction
+                await _repo.ReplaceChiTietAsync(phieu.Idphieu, items);
 
                 return items.Count;
             }
@@ -511,17 +514,12 @@ namespace dataproduct.api.Services
                 .GroupBy(r => r.IdNVL)
                 .ToDictionary(g => g.Key, g => g.First().DoAm!.Value);
 
-            // Lò 1-4 có soMe từ SCADA (batch number) → match theo (soMe, IDNVL) — đúng ngữ nghĩa, ổn định.
-            // Lò 5-6 không có ts0 → soMe trong pivot là null → dùng (ThuTu, IDNVL) làm fallback.
-            // (Không dùng ThoiGianNapLieu vì format FE toLocaleTimeString và BE HH:mm:ss có thể khác nhau.)
+            // SoMe (số mẻ từ tag TS0) là định danh duy nhất cho việc khớp/gộp dữ liệu nhập tay
+            // qua các lần Sync — có ở cả 6 lò cao. Không còn dùng ThuTu để khớp vì ThuTu chỉ là
+            // vị trí dòng, được đánh số lại mỗi lần Sync nên không ổn định giữa các lần.
             var manualBySoMe = savedRecords
                 .Where(r => r.ManualGiaTri && r.SoMe.HasValue)
                 .GroupBy(r => (r.SoMe, r.IdNVL))
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var manualByThuTu = savedRecords
-                .Where(r => r.ManualGiaTri)
-                .GroupBy(r => (r.ThuTu, r.IdNVL))
                 .ToDictionary(g => g.Key, g => g.First());
 
             // 4. Convert pivot rows → LG_NL_ChiTiet
@@ -529,6 +527,11 @@ namespace dataproduct.api.Services
             // so items are created in group/NVL order matching the UI column structure.
             var items = new List<LG_NL_ChiTiet>();
             int thuTu = 0;
+
+            // SoMe → ThuTu của dòng SCADA hiện tại — kể cả dòng "trắng" (mẻ không có NVL nào
+            // báo trọng lượng), để bản ghi nhập tay ở bước 5b tìm đúng dòng cần gộp vào thay vì
+            // luôn tách thành dòng mới nối đuôi bảng.
+            var soMeThuTuMap = new Dictionary<decimal, int>();
 
             foreach (var row in pivot.Rows)
             {
@@ -539,6 +542,8 @@ namespace dataproduct.api.Services
                 var thoiGian = DateTime.TryParse(timeStr, out var dt)
                                  ? dt.ToString("HH:mm:ss")
                                  : "";
+
+                if (soMe.HasValue) soMeThuTuMap[soMe.Value] = thuTu;
 
                 // Map group → NVL → item (group-first)
                 foreach (var groupCol in pivot.Columns)
@@ -578,15 +583,7 @@ namespace dataproduct.api.Services
             // 5. Merge: giữ giá trị nhập tay, cập nhật GiaTri_Goc = giá trị SCADA mới
             foreach (var item in items)
             {
-                // Lò 1-4: pivot có soMe → match theo batch number + NVL (ngữ nghĩa đúng)
-                // Lò 5-6: pivot không có soMe → match theo vị trí dòng (ThuTu) + NVL
-                LGNLChiTietDto? saved = null;
-                if (item.SoMe.HasValue)
-                    manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out saved);
-                else
-                    manualByThuTu.TryGetValue((item.ThuTu, item.IDNVL), out saved);
-
-                if (saved != null)
+                if (item.SoMe.HasValue && manualBySoMe.TryGetValue((item.SoMe, item.IDNVL), out var saved))
                 {
                     item.GiaTri_Goc   = item.GiaTri;
                     item.GiaTri       = saved.GiaTri;
@@ -595,36 +592,70 @@ namespace dataproduct.api.Services
                 }
             }
 
-            // 5b. Giữ lại bản ghi nhập tay cho NVL không có SCADA data (silo không có tagKey).
-            // Các NVL này không xuất hiện trong pivot.Rows nên items không có entry cho chúng.
-            // Nếu xóa hết rồi ghi mới mà thiếu các bản ghi này → mất data nhập tay.
+            // 5b. Giữ lại bản ghi cần bảo toàn qua lần Sync này — gồm 2 trường hợp:
+            //  (a) NVL hoàn toàn không có SCADA data (silo không có tagKey) — giữ mọi bản ghi
+            //      đã lưu (như cũ), vì đây là NVL nhập tay hoàn toàn.
+            //  (b) Bản ghi nhập tay (ManualGiaTri) cho 1 SoMe mà mẻ đó KHÔNG còn xuất hiện trong
+            //      SCADA hiện tại dưới bất kỳ NVL nào — đây là dòng người dùng tự bấm "+ Thêm
+            //      dòng" thêm hẳn, SCADA không có mẻ này.
+            //      Nếu SoMe đó VẪN còn trong SCADA hiện tại (chỉ đổi sang NVL khác do mapping
+            //      "Đổi NVL giữa ca" thay đổi) thì bản ghi cũ coi như lỗi thời — phải loại bỏ,
+            //      nếu không sẽ bị lặp lại vô hạn mỗi lần Sync (trước đây so theo (SoMe, IDNVL)
+            //      nên không phát hiện được trường hợp NVL đã đổi cho cùng 1 SoMe).
             var scadaNvlIds = items.Select(x => x.IDNVL).ToHashSet();
-            var noScadaItems = savedRecords
-                .Where(r => !scadaNvlIds.Contains(r.IdNVL))
-                .GroupBy(r => new { r.ThuTu, r.IdNVL })
+            var scadaSoMeSlots = items.Where(x => x.SoMe.HasValue).Select(x => x.SoMe!.Value).ToHashSet();
+            var preservedRecords = savedRecords
+                .Where(r => !scadaNvlIds.Contains(r.IdNVL)
+                    || (r.ManualGiaTri && r.SoMe.HasValue && !scadaSoMeSlots.Contains(r.SoMe.Value)))
+                .GroupBy(r => new { r.SoMe, r.IdNVL })
                 .Select(g => g.First())
-                .Select(r => new LG_NL_ChiTiet
-                {
-                    IDPhieu         = idPhieu,
-                    IDLoCao         = idLoCao,
-                    Ngay            = ngay,
-                    IDCa            = idCa,
-                    ThoiGianNapLieu = r.ThoiGianNapLieu,
-                    SoMe            = r.SoMe,
-                    MeGio           = r.MeGio,
-                    CheDo           = r.CheDo,
-                    ThuocThamLieu1  = r.ThuocThamLieu1,
-                    ThuocThamLieu2  = r.ThuocThamLieu2,
-                    GhiChu          = r.GhiChu,
-                    IDNVL           = r.IdNVL,
-                    GiaTri          = r.GiaTri,
-                    ThuTu           = r.ThuTu,
-                    NgayTao         = DateTime.Now,
-                    ManualGiaTri    = true,
-                    GiaTri_Goc      = r.GiaTri_Goc,
-                    DoAm            = r.DoAm,
-                })
                 .ToList();
+
+            LG_NL_ChiTiet BuildPreservedItem(LGNLChiTietDto r, int targetThuTu) => new()
+            {
+                IDPhieu         = idPhieu,
+                IDLoCao         = idLoCao,
+                Ngay            = ngay,
+                IDCa            = idCa,
+                ThoiGianNapLieu = r.ThoiGianNapLieu,
+                SoMe            = r.SoMe,
+                MeGio           = r.MeGio,
+                CheDo           = r.CheDo,
+                ThuocThamLieu1  = r.ThuocThamLieu1,
+                ThuocThamLieu2  = r.ThuocThamLieu2,
+                GhiChu          = r.GhiChu,
+                IDNVL           = r.IdNVL,
+                GiaTri          = r.GiaTri,
+                ThuTu           = targetThuTu,
+                NgayTao         = DateTime.Now,
+                ManualGiaTri    = true,
+                GiaTri_Goc      = r.GiaTri_Goc,
+                DoAm            = r.DoAm,
+            };
+
+            // Với mỗi bản ghi cần bảo toàn: nếu SoMe của nó TRÙNG với 1 dòng SCADA vừa build ở
+            // bước 4 (cùng 1 mẻ thực tế, ví dụ NVL hoàn toàn nhập tay nhưng vẫn cùng mẻ với các
+            // NVL khác đang có SCADA) → gộp vào ĐÚNG ThuTu của dòng đó, tránh 1 mẻ bị tách thành
+            // 2 dòng riêng biệt trên bảng. Chỉ khi mẻ đó hoàn toàn không có trong dữ liệu SCADA
+            // hiện tại mới đánh ThuTu mới, nối tiếp sau các dòng SCADA (group theo SoMe GỐC để
+            // các cột NVL cùng 1 mẻ vẫn được gộp chung 1 dòng mới).
+            var noScadaItems = new List<LG_NL_ChiTiet>();
+            var toAppend = new List<LGNLChiTietDto>();
+
+            foreach (var r in preservedRecords)
+            {
+                if (r.SoMe.HasValue && soMeThuTuMap.TryGetValue(r.SoMe.Value, out var matchedThuTu))
+                    noScadaItems.Add(BuildPreservedItem(r, matchedThuTu));
+                else
+                    toAppend.Add(r);
+            }
+
+            foreach (var group in toAppend.GroupBy(r => r.SoMe))
+            {
+                thuTu++;
+                foreach (var r in group)
+                    noScadaItems.Add(BuildPreservedItem(r, thuTu));
+            }
 
             items.AddRange(noScadaItems);
 
@@ -639,10 +670,8 @@ namespace dataproduct.api.Services
                     item.QuyKho = total * (100 - pct) / 100;
             }
 
-            // 7. Xóa cũ → ghi mới (đã merge)
-            await _repo.DeleteChiTietByPhieuIdAsync(idPhieu);
-            if (items.Count > 0)
-                await _repo.AddChiTietRangeAsync(items);
+            // 7. Xóa cũ → ghi mới (đã merge) — trong 1 transaction
+            await _repo.ReplaceChiTietAsync(idPhieu, items);
 
             return pivot;
         }
@@ -668,11 +697,26 @@ namespace dataproduct.api.Services
             var ngay    = firstRow?.Ngay ?? DateTime.MinValue;
             var ca      = firstRow?.IdCa ?? 0;
             var scope   = firstRow?.IdLoCao ?? 0;
+            var kip = phieu.Kip?.Trim().ToUpper() ?? "";
 
             var ngayDisplay = ngay != DateTime.MinValue ? ngay.ToString("dd/MM/yyyy") : "";
-            var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca}";
+            //   var caLabel     = ca == 1 ? "1" : ca == 2 ? "2" : $"{ca + kip}" ;
+            var caLabel = $"{ca}{kip}";
             var loCao       = scope > 0 ? scope.ToString() : "";
+
+            // Ca 1: 8h -> 20h cùng ngày; Ca 2: 20h -> 8h ngày hôm sau
+            var gioBatDau   = ca == 2 ? 20 : 8;
+            var gioKetThuc  = ca == 2 ? 8 : 20;
+            var ngayBatDauDisplay  = ngayDisplay;
+            var ngayKetThucDisplay = ngay != DateTime.MinValue
+                ? (ca == 2 ? ngay.AddDays(1) : ngay).ToString("dd/MM/yyyy")
+                : "";
+
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+
+            // Chỉ giữ NVL có ít nhất 1 dòng đã nhập giá trị trong phiếu này — loại bỏ NVL không dùng (toàn null)
+            var usedNvlIds = chiTiet.Where(x => x.GiaTri.HasValue).Select(x => x.IdNVL).ToHashSet();
+            nvlList = nvlList.Where(n => usedNvlIds.Contains(n.Id)).ToList();
 
             // Hàm lấy tên hiển thị NVL theo quyền: P.KH dùng TenNVL_TK (nếu đã xác nhận), còn lại dùng TenNVL_NM
             string NvlLabel(LGNLNvlDto n) =>
@@ -834,6 +878,10 @@ namespace dataproduct.api.Services
                 .Replace("{{LoCao}}", loCao)
                 .Replace("{{CaLabel}}", caLabel)
                 .Replace("{{NgaySX}}", ngayDisplay)
+                .Replace("{{GioBatDau}}", gioBatDau.ToString())
+                .Replace("{{NgayBatDau}}", ngayBatDauDisplay)
+                .Replace("{{GioKetThuc}}", gioKetThuc.ToString())
+                .Replace("{{NgayKetThuc}}", ngayKetThucDisplay)
                 .Replace("{{ColGroup}}", colGroup.ToString())
                 .Replace("{{TheadRow1}}", th1.ToString())
                 .Replace("{{TheadRow2}}", th2.ToString())
@@ -902,6 +950,10 @@ namespace dataproduct.api.Services
             var loCao = scope > 0 ? scope.ToString() : "";
 
             var nvlList = await _repo.GetNvlListAsync(scope > 0 ? scope : null);
+
+            // Chỉ giữ NVL có ít nhất 1 dòng đã nhập giá trị trong phiếu này — loại bỏ NVL không dùng (toàn null)
+            var usedNvlIds = chiTiet.Where(x => x.GiaTri.HasValue).Select(x => x.IdNVL).ToHashSet();
+            nvlList = nvlList.Where(n => usedNvlIds.Contains(n.Id)).ToList();
 
             string NvlLabel(LGNLNvlDto n) => n.TenNVL_NM ?? "";
 

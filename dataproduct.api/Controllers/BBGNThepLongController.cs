@@ -73,7 +73,7 @@ namespace dataproduct.api.Controllers
         //     }
         // }
 
-        [HttpPost("/api/phan-loai/sync")]
+        [HttpPost("phan-loai/sync")]
         public async Task<IActionResult> SyncPhanLoai([FromBody] SyncPhanLoaiRequest request)
         {
             try

@@ -15,6 +15,7 @@ namespace dataproduct.api.Repositories
         Task<HRC1_MeThep?> GetMeByMaMeAsync(string maMe);
         Task<List<HRC1_MeThep>> SearchMeThepAsync(string q, int limit);
         Task<HRC1_MePhanCong?> GetMePhanCongByIdAsync(int id);
+        Task<HRC1_MePhanCong?> GetLoThoiMePhanCongByMeIdAsync(int meId);
         Task<List<HRC1_MePhanCong>> GetMePhanCongsByPhieuAsync(Guid idPhieu, string congDoan, int? scopePhieu = null);
         Task<List<HRC1_MePhanCong>> GetAllMePhanCongsByMeIdAsync(int meId);
         Task<List<HRC1_MeThep>> GetMeThepsByIdsAsync(IEnumerable<int> meIds);
@@ -99,6 +100,12 @@ namespace dataproduct.api.Repositories
 
         public Task<HRC1_MePhanCong?> GetMePhanCongByIdAsync(int id) =>
             _ctx.HRC1_MePhanCongs.FindAsync(id).AsTask();
+
+        public Task<HRC1_MePhanCong?> GetLoThoiMePhanCongByMeIdAsync(int meId) =>
+            _ctx.HRC1_MePhanCongs
+                .Where(pc => pc.MeId == meId && pc.CongDoan == "lo_thoi")
+                .OrderByDescending(pc => pc.Id)
+                .FirstOrDefaultAsync();
 
         public Task<List<HRC1_MePhanCong>> GetMePhanCongsByPhieuAsync(Guid idPhieu, string congDoan, int? scopePhieu = null) =>
             _ctx.HRC1_MePhanCongs
@@ -292,7 +299,7 @@ namespace dataproduct.api.Repositories
                             m.TLDichSo,
                             m.DichChuyen,
                             m.TrangThaiTL,
-                            m.CapNhatBoi,
+                            m.CapNhatBoiTL,
                             m.NgayTao,
                             m.NgayNhanTL,
                             TenMayDuc = md != null ? md.TenMayDuc : null
@@ -305,8 +312,8 @@ namespace dataproduct.api.Repositories
             var meIds = raw.Select(m => m.Id).ToList();
 
             // Tra cứu họ tên người nhận từ master DB
-            var userIds = raw.Where(m => m.CapNhatBoi.HasValue && m.TrangThaiTL >= 1)
-                             .Select(m => m.CapNhatBoi!.Value).Distinct().ToList();
+            var userIds = raw.Where(m => m.CapNhatBoiTL.HasValue && m.TrangThaiTL >= 1)
+                             .Select(m => m.CapNhatBoiTL!.Value).Distinct().ToList();
             var names = userIds.Count > 0
                 ? await _masterCtx.Tbl_TaiKhoan
                     .Where(t => userIds.Contains(t.ID_TaiKhoan))
@@ -332,7 +339,7 @@ namespace dataproduct.api.Repositories
                 DichChuyen      = m.DichChuyen,
                 TrangThaiTL     = m.TrangThaiTL,
                 SoTinhLuyenNhan = (m.TrangThaiTL >= 1) && tlScopes.TryGetValue(m.Id, out var sc) ? sc : null,
-                TenNguoiNhan    = (m.TrangThaiTL >= 1) && m.CapNhatBoi.HasValue && names.TryGetValue(m.CapNhatBoi.Value, out var n) ? n : null,
+                TenNguoiNhan    = (m.TrangThaiTL >= 1) && m.CapNhatBoiTL.HasValue && names.TryGetValue(m.CapNhatBoiTL.Value, out var n) ? n : null,
                 NgayTao         = m.NgayTao,
                 NgayNhanTL      = m.NgayNhanTL,
                 TenMayDuc       = m.TenMayDuc
@@ -422,7 +429,7 @@ namespace dataproduct.api.Repositories
             if (meIdList.Count == 0) return new();
 
             var tlPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIdList.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
                 .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
@@ -501,7 +508,7 @@ namespace dataproduct.api.Repositories
                     from m2 in _ctx.HRC1_MeTheps
                     where m2.MacThepBKMIS != null
                     join mt in _ctx.MacTheps on m2.MacThepBKMIS equals mt.TenMacThep
-                    where mt.Id_NhomPhanLoaiMacThep.HasValue
+                    where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                     join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                     select m2.Id;
                 q = q.Where(m => !hasNhomIds.Contains(m.Id));
@@ -512,7 +519,7 @@ namespace dataproduct.api.Repositories
                     from m2 in _ctx.HRC1_MeTheps
                     where m2.MacThepBKMIS != null
                     join mt in _ctx.MacTheps on m2.MacThepBKMIS equals mt.TenMacThep
-                    where mt.Id_NhomPhanLoaiMacThep == f.IdNhomPhanLoai
+                    where mt.Id_NhomPhanLoaiMacThep == f.IdNhomPhanLoai && mt.NhaMay == 1
                     select m2.Id;
                 q = q.Where(m => nhomMeIds.Contains(m.Id));
             }
@@ -525,6 +532,14 @@ namespace dataproduct.api.Repositories
                     select pc.MeId;
                 q = q.Where(m => chuyenVeMeIds.Contains(m.Id));
             }
+            if (f.IsThuNghiem.HasValue)
+                q = q.Where(m => m.IsThuNghiem == f.IsThuNghiem);
+            if (f.TrangThaiPCN.HasValue)
+                q = q.Where(m => m.TrangThaiPCN == f.TrangThaiPCN);
+            if (f.IsLenThang == true)
+                q = q.Where(m => m.DichChuyen == "len_thang");
+            if (f.ChuaLenDuc == true)
+                q = q.Where(m => m.IdMayDucDich == null);
             return q;
         }
 
@@ -558,7 +573,7 @@ namespace dataproduct.api.Repositories
             {
                 var nhomData = await (
                     from mt in _ctx.MacTheps
-                    where bkmisList.Contains(mt.TenMacThep) && mt.Id_NhomPhanLoaiMacThep.HasValue
+                    where bkmisList.Contains(mt.TenMacThep) && mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                     join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                     select new { mt.TenMacThep, nhom.TenNhom }
                 ).ToListAsync();
@@ -566,11 +581,11 @@ namespace dataproduct.api.Repositories
                     nhomDict[x.TenMacThep] = x.TenNhom;
             }
 
-            // ChuyenVe: lấy ChuyenVeMeId từ MePhanCong tinh_luyen (dòng chính, ThuTuTL = null)
+            // ChuyenVe: lấy ChuyenVeMeId từ MePhanCong dòng chính (tinh_luyen hoặc lo_thoi, ThuTuTL = null)
             var meIds = mes.Select(m => m.Id).ToList();
             var chuyenVeDict = new Dictionary<int, (string? maMe, string? tenMayDuc)>();
             var tlPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIds.Contains(pc.MeId) && pc.ChuyenVeMeId.HasValue)
                 .Select(pc => new { pc.MeId, pc.ChuyenVeMeId })
                 .ToListAsync();
@@ -630,6 +645,8 @@ namespace dataproduct.api.Repositories
                 : (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null));
             int? caDuc = m.CaDucChuyen ?? (isLenThang ? m.Ca : m.CaTinhLuyen);
             chuyenVeDict.TryGetValue(m.Id, out var chuyenVe);
+            string? chuyenVeMaMe    = isLenThang ? m.MaMe    : chuyenVe.maMe;
+            string? tenMayDucChuyen = isLenThang ? tenMayDuc : chuyenVe.tenMayDuc;
             return new HRC1_ExportRow
             {
                 MeId               = m.Id,
@@ -645,7 +662,10 @@ namespace dataproduct.api.Repositories
                 GhiChuLo           = m.GhiChuLo,
                 GhiChuTL           = m.GhiChuTL,
                 GhiChuDuc          = m.GhiChuDuc,
+                GhiChuPCN          = m.GhiChuPCN,
                 IsThuNghiem        = m.IsThuNghiem,
+                TrangThaiPCN       = m.TrangThaiPCN,
+                TrangThaiChotPCN   = m.TrangThaiChotPCN,
                 IsManualTL         = m.IsManualTL,
                 TenMayDuc          = tenMayDuc,
                 MacThep            = m.MacThep,
@@ -668,8 +688,8 @@ namespace dataproduct.api.Repositories
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
                 TenCapNhatBoiDuc   = tenDuc,
-                ChuyenVeMaMe       = chuyenVe.maMe,
-                TenMayDucChuyen    = chuyenVe.tenMayDuc,
+                ChuyenVeMaMe       = chuyenVeMaMe,
+                TenMayDucChuyen    = tenMayDucChuyen,
                 NgayDuc            = ngayDuc,
                 CaDuc              = caDuc,
             };
@@ -726,7 +746,7 @@ namespace dataproduct.api.Repositories
             if (q.IsChuyenMe == true)
             {
                 var chuyenMeIds = _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue && pc.ChuyenVeMeId != pc.MeId)
                     .Select(pc => pc.MeId);
                 meQuery = meQuery.Where(m => chuyenMeIds.Contains(m.Id));
@@ -760,7 +780,7 @@ namespace dataproduct.api.Repositories
 
             // Mẻ trong tập lọc đã bị chuyển sang mẻ khác (ChuyenVeMeId != self)
             var srcPcsInSet = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && allMeIds.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue
                           && pc.ChuyenVeMeId != pc.MeId)
@@ -774,7 +794,7 @@ namespace dataproduct.api.Repositories
             if (nonSourceMeIds.Count > 0)
             {
                 var incomingPcs = await _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue
                               && nonSourceMeIds.Contains(pc.ChuyenVeMeId!.Value)
                               && pc.ChuyenVeMeId != pc.MeId)
@@ -924,7 +944,7 @@ namespace dataproduct.api.Repositories
                 from m in meQuery
                 where m.MacThepBKMIS != null
                 join mt in _ctx.MacTheps on m.MacThepBKMIS equals mt.TenMacThep
-                where mt.Id_NhomPhanLoaiMacThep.HasValue
+                where mt.Id_NhomPhanLoaiMacThep.HasValue && mt.NhaMay == 1
                 join nhom in _ctx.NhomPhanLoaiMacTheps on mt.Id_NhomPhanLoaiMacThep!.Value equals nhom.Id
                 group m by nhom.TenNhom into g
                 orderby g.Key
@@ -951,7 +971,7 @@ namespace dataproduct.api.Repositories
 
             // Mẻ trong tập đã bị chuyển sang mẻ khác (source mẻ → hiển thị 0)
             var srcPcs = await _ctx.HRC1_MePhanCongs
-                .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                           && meIds.Contains(pc.MeId)
                           && pc.ChuyenVeMeId.HasValue
                           && pc.ChuyenVeMeId != pc.MeId)
@@ -965,7 +985,7 @@ namespace dataproduct.api.Repositories
             if (nonSourceIds.Count > 0)
             {
                 var incomingPcs = await _ctx.HRC1_MePhanCongs
-                    .Where(pc => pc.CongDoan == "tinh_luyen" && pc.ThuTuTL == null
+                    .Where(pc => (pc.CongDoan == "tinh_luyen" || pc.CongDoan == "lo_thoi") && pc.ThuTuTL == null
                               && pc.ChuyenVeMeId.HasValue
                               && nonSourceIds.Contains(pc.ChuyenVeMeId!.Value)
                               && pc.ChuyenVeMeId != pc.MeId)
@@ -1014,10 +1034,10 @@ namespace dataproduct.api.Repositories
             if (meIds.Count == 0)
                 return (new List<int>(), new List<int>());
 
-            // Bên giao – tinh_luyen path: người đã "nhan_me" (TL nhận mẻ)
-            var tlGiaoIds = await _ctx.HRC1_LichSus
-                .Where(ls => meIds.Contains(ls.MeId) && ls.HanhDong == "nhan_me" && ls.TaiKhoanId.HasValue)
-                .Select(ls => ls.TaiKhoanId!.Value)
+            // Bên giao – tinh_luyen path: CapNhatBoiTL của mẻ qua tinh luyện (người sửa cuối)
+            var tlGiaoIds = await _ctx.HRC1_MeTheps
+                .Where(m => meIds.Contains(m.Id) && m.DichChuyen == "tinh_luyen" && m.CapNhatBoiTL.HasValue)
+                .Select(m => m.CapNhatBoiTL!.Value)
                 .Distinct()
                 .ToListAsync();
 

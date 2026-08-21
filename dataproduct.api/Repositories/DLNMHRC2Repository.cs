@@ -293,7 +293,9 @@ namespace dataproduct.api.Repositories
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
                                         ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkMe)
-                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkMe.ThuTu_Excel_BOF : hkMe.ThuTu_Excel_LFRH)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkMe.ThuTu_Excel_BOF
+                                               : string.Equals(baseRecord.BieuMau, "RH", StringComparison.OrdinalIgnoreCase) ? hkMe.ThuTu_Excel_RH
+                                               : hkMe.ThuTu_Excel_LF)
                                             : null
                                     };
                                 }
@@ -577,7 +579,9 @@ namespace dataproduct.api.Repositories
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
                                         ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkRN)
-                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkRN.ThuTu_Excel_BOF : hkRN.ThuTu_Excel_LFRH)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkRN.ThuTu_Excel_BOF
+                                               : string.Equals(baseRecord.BieuMau, "RH", StringComparison.OrdinalIgnoreCase) ? hkRN.ThuTu_Excel_RH
+                                               : hkRN.ThuTu_Excel_LF)
                                             : null
                                     };
                                 }
@@ -867,7 +871,9 @@ namespace dataproduct.api.Repositories
                                         LoaiPhuLieu = map.LoaiPhieu,
                                         MappingId = map.Id,
                                         ThuTu = headerKeys.TryGetValue(map.ID_HeaderKey, out var hkId)
-                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkId.ThuTu_Excel_BOF : hkId.ThuTu_Excel_LFRH)
+                                            ? (string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase) ? hkId.ThuTu_Excel_BOF
+                                               : string.Equals(baseRecord.BieuMau, "RH", StringComparison.OrdinalIgnoreCase) ? hkId.ThuTu_Excel_RH
+                                               : hkId.ThuTu_Excel_LF)
                                             : null
                                     };
                                 }
@@ -1148,6 +1154,11 @@ namespace dataproduct.api.Repositories
             {
                 var id    = baseRecord.ID;
                 var isBof = string.Equals(baseRecord.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase);
+                var isRh  = string.Equals(baseRecord.BieuMau, "RH", StringComparison.OrdinalIgnoreCase);
+                // Bitmask Header_Key.LoaiExcel cần khớp với biểu mẫu hiện tại (BOF=1, LF=2, RH=4)
+                // để cột phụ liệu hiển thị trong TaoPhieuBOF/LF/RH + ChiTietBOF/LF/RH — đồng bộ đúng
+                // config "Dùng cho Excel" đang dùng cho GetExportDataAsync (Excel export).
+                byte requiredExcelBit = isBof ? (byte)1 : (isRh ? (byte)4 : (byte)2);
 
                 // ---- Mapped + Unmapped ----
                 var groupedMapped   = new Dictionary<int,    HeaderKeyGroupedByReportNoModel>();
@@ -1166,6 +1177,14 @@ namespace dataproduct.api.Repositories
                                 foreach (var map in activeMaps)
                                 {
                                     var hkId = map.ID_HeaderKey;
+
+                                    // Chỉ hiển thị cột khi Header_Key có "Dùng cho Excel" và LoaiExcel
+                                    // bao gồm đúng bit của biểu mẫu hiện tại (BOF/LF/RH).
+                                    if (!allHeaderKeys.TryGetValue(hkId, out var hkInfo) ||
+                                        hkInfo.IsUsed_Excel != true ||
+                                        ((byte)(hkInfo.LoaiExcel ?? 0) & requiredExcelBit) == 0)
+                                        continue;
+
                                     var fmt  = hkId == 5
                                         ? (pl.KLPhuGia.HasValue
                                             ? (double?)Math.Round(pl.KLPhuGia.Value / 0.055, 0, MidpointRounding.AwayFromZero)
@@ -1188,9 +1207,7 @@ namespace dataproduct.api.Repositories
                                             KLPhuGia_Manual = pl.KLPhuGia_Manual,
                                             LoaiPhuLieu    = map.LoaiPhieu,
                                             MappingId      = map.Id,
-                                            ThuTu          = allHeaderKeys.TryGetValue(hkId, out var hkInfo)
-                                                ? (isBof ? hkInfo.ThuTu_Excel_BOF : hkInfo.ThuTu_Excel_LFRH)
-                                                : null
+                                            ThuTu          = isBof ? hkInfo.ThuTu_Excel_BOF : (isRh ? hkInfo.ThuTu_Excel_RH : hkInfo.ThuTu_Excel_LF)
                                         };
                                     }
                                     else if (pl.IsManual == true)
@@ -1929,22 +1946,19 @@ namespace dataproduct.api.Repositories
             var totalCount = totalByReportNo + totalManualRows;
 
             // === 3. Header columns ===
+            // LoaiThongKe là bitmask: BOF=1, LF=2, RH=4 (1 header có thể thuộc nhiều biểu mẫu cùng lúc).
             var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
-            HashSet<byte>? allowedLoaiThongKe = null;
-            if (loaiBmKey.Contains("BOF"))
-                allowedLoaiThongKe = new HashSet<byte> { 1, 3 };
-            else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
-                allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
-
             bool isBofTk2 = loaiBmKey.Contains("BOF");
+            bool isRhTk2  = loaiBmKey.Contains("RH");
+            byte? requiredBitTk2 = isBofTk2 ? (byte)1 : isRhTk2 ? (byte)4 : loaiBmKey.Contains("LF") ? (byte)2 : (byte?)null;
 
             // Load tất cả Header_Key (kể cả children có ID_NhomKey) để fetch đủ data
             var allHeaderKeysRaw = await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
-                    (allowedLoaiThongKe == null ||
-                     (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH, h.ID_NhomKey })
+                    (requiredBitTk2 == null ||
+                     (h.LoaiThongKe.HasValue && (h.LoaiThongKe.Value & requiredBitTk2.Value) != 0)))
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiThongKe, h.ThuTu_TK_BOF, h.ThuTu_TK_LF, h.ThuTu_TK_RH, h.ID_NhomKey })
                 .ToListAsync();
 
             // Load Header_Nhom được tham chiếu bởi children
@@ -1971,7 +1985,8 @@ namespace dataproduct.api.Repositories
                 {
                     LoaiThongKe = g.First().LoaiThongKe,
                     ThuTu_TK_BOF = g.Min(x => x.ThuTu_TK_BOF),
-                    ThuTu_TK_LFRH = g.Min(x => x.ThuTu_TK_LFRH)
+                    ThuTu_TK_LF = g.Min(x => x.ThuTu_TK_LF),
+                    ThuTu_TK_RH = g.Min(x => x.ThuTu_TK_RH)
                 });
 
             // Columns: Nhom groups (IDHeaderKey âm) + Header_Keys độc lập, sắp xếp chung theo ThuTu
@@ -1980,7 +1995,7 @@ namespace dataproduct.api.Repositories
                 nhomMeta.TryGetValue(n.Id, out var meta);
                 return new
                 {
-                    SortKey = isBofTk2 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (meta?.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortKey = isBofTk2 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (isRhTk2 ? (meta?.ThuTu_TK_RH ?? int.MaxValue) : (meta?.ThuTu_TK_LF ?? int.MaxValue)),
                     SortId = n.Id,
                     Header = new PhuLieuHeaderTable
                     {
@@ -1994,7 +2009,7 @@ namespace dataproduct.api.Repositories
                 .Where(h => !h.ID_NhomKey.HasValue)
                 .Select(h => new
                 {
-                    SortKey = isBofTk2 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortKey = isBofTk2 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (isRhTk2 ? (h.ThuTu_TK_RH ?? int.MaxValue) : (h.ThuTu_TK_LF ?? int.MaxValue)),
                     SortId = h.Id,
                     Header = new PhuLieuHeaderTable
                     {
@@ -2196,7 +2211,11 @@ namespace dataproduct.api.Repositories
                         if (detailById != null)
                         {
                             // Remap child HeaderKey → parent (-NhomId) giống regular path, rồi merge IsManual
+                            // Gộp thêm manualAdjustPhulieus (phụ liệu thêm tay trực tiếp vào Header_Key, không qua ID_PhuLieu)
+                            // — tương tự nhánh REPORT_NO gộp manualOnlyRaw vào mappedRaw — nếu không, các cột chỉ có
+                            // dữ liệu điều chỉnh tay sẽ bị bỏ trống trên bảng thống kê dù đã lưu trong PhuLieu_HRC2.
                             var mappedById = (detailById.mappedPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
+                                .Concat(detailById.manualAdjustPhulieus ?? new List<HeaderKeyGroupedByReportNoModel>())
                                 .Where(p => p.ID_HeaderKey.HasValue)
                                 .GroupBy(p => childToParentMap.TryGetValue(p.ID_HeaderKey!.Value, out var pid) ? pid : p.ID_HeaderKey!.Value)
                                 .ToDictionary(
@@ -2386,22 +2405,19 @@ namespace dataproduct.api.Repositories
                 return new List<ThongKeSumItem>();
 
             // === 1. Headers ===
+            // LoaiThongKe là bitmask: BOF=1, LF=2, RH=4 (1 header có thể thuộc nhiều biểu mẫu cùng lúc).
             var loaiBmKey = (dto.LoaiBM ?? "").Trim().ToUpperInvariant();
-            HashSet<byte>? allowedLoaiThongKe = null;
-            if (loaiBmKey.Contains("BOF"))
-                allowedLoaiThongKe = new HashSet<byte> { 1, 3 };
-            else if (loaiBmKey.Contains("LF") || loaiBmKey.Contains("RH"))
-                allowedLoaiThongKe = new HashSet<byte> { 2, 3 };
-
             bool isBofTk3 = loaiBmKey.Contains("BOF");
+            bool isRhTk3  = loaiBmKey.Contains("RH");
+            byte? requiredBitTk3 = isBofTk3 ? (byte)1 : isRhTk3 ? (byte)4 : loaiBmKey.Contains("LF") ? (byte)2 : (byte?)null;
 
             // Load tất cả Header_Key (kể cả children có ID_NhomKey)
             var allHeaderKeysRaw = await _context.Header_Keys
                 .Where(h =>
                     h.IsUsedThongKe == true &&
-                    (allowedLoaiThongKe == null ||
-                     (h.LoaiThongKe.HasValue && allowedLoaiThongKe.Contains(h.LoaiThongKe.Value))))
-                .Select(h => new { h.Id, h.TenHienThi, h.ThuTu_TK_BOF, h.ThuTu_TK_LFRH, h.ID_NhomKey })
+                    (requiredBitTk3 == null ||
+                     (h.LoaiThongKe.HasValue && (h.LoaiThongKe.Value & requiredBitTk3.Value) != 0)))
+                .Select(h => new { h.Id, h.TenHienThi, h.ThuTu_TK_BOF, h.ThuTu_TK_LF, h.ThuTu_TK_RH, h.ID_NhomKey })
                 .ToListAsync();
 
             if (!allHeaderKeysRaw.Any()) return new List<ThongKeSumItem>();
@@ -2429,7 +2445,8 @@ namespace dataproduct.api.Repositories
                 .ToDictionary(g => g.Key, g => new
                 {
                     ThuTu_TK_BOF = g.Min(x => x.ThuTu_TK_BOF),
-                    ThuTu_TK_LFRH = g.Min(x => x.ThuTu_TK_LFRH)
+                    ThuTu_TK_LF = g.Min(x => x.ThuTu_TK_LF),
+                    ThuTu_TK_RH = g.Min(x => x.ThuTu_TK_RH)
                 });
 
             // Headers: Nhom groups (IDHeaderKey âm) + standalone Header_Keys, sắp xếp chung theo ThuTu
@@ -2438,7 +2455,7 @@ namespace dataproduct.api.Repositories
                 nhomMeta3.TryGetValue(n.Id, out var meta);
                 return new
                 {
-                    SortKey = isBofTk3 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (meta?.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortKey = isBofTk3 ? (meta?.ThuTu_TK_BOF ?? int.MaxValue) : (isRhTk3 ? (meta?.ThuTu_TK_RH ?? int.MaxValue) : (meta?.ThuTu_TK_LF ?? int.MaxValue)),
                     SortId = n.Id,
                     IDHeaderKey = -n.Id,
                     TenHienThi = n.TenHienThi
@@ -2448,7 +2465,7 @@ namespace dataproduct.api.Repositories
                 .Where(h => !h.ID_NhomKey.HasValue)
                 .Select(h => new
                 {
-                    SortKey = isBofTk3 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (h.ThuTu_TK_LFRH ?? int.MaxValue),
+                    SortKey = isBofTk3 ? (h.ThuTu_TK_BOF ?? int.MaxValue) : (isRhTk3 ? (h.ThuTu_TK_RH ?? int.MaxValue) : (h.ThuTu_TK_LF ?? int.MaxValue)),
                     SortId = h.Id,
                     IDHeaderKey = h.Id,
                     TenHienThi = h.TenHienThi

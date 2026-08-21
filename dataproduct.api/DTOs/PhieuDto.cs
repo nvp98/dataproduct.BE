@@ -97,6 +97,13 @@ namespace dataproduct.api.DTOs
         public int? LoaiVung { get; set; }
         /// <summary>Đánh dấu user là PKH hoặc Admin, dùng để cho phép xem vùng 3 (Thống kê).</summary>
         public bool? IsThongKeUser { get; set; }
+        /// <summary>
+        /// Danh sách QuyenChucNang mở rộng (>= 6, khai báo ở FE trong bmQuyenConfig.ts field `extraQuyens`)
+        /// khớp đúng LoaiVung đang query — FE tự tính, BE chỉ dùng raw list này để lọc BmQuyenXl.QuyenChucNang,
+        /// không hard-code giá trị/ý nghĩa của từng maBm. Hiện dùng ở case LoaiVung=2 cho HRC1_BBGN_ThepLong
+        /// (quyền "Xác nhận PCN" = 6), tự động áp dụng cho mọi extraQuyens tương lai không cần sửa code BE.
+        /// </summary>
+        public List<byte>? ExtraQuyenChucNangs { get; set; }
         public int page { get; set; } = 1;
         public int pageSize { get; set; } = 10;
     }

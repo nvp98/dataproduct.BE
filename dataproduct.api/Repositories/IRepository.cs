@@ -1,4 +1,4 @@
-using dataproduct.api.DTOs;
+﻿using dataproduct.api.DTOs;
 using dataproduct.api.DTOs.CTD_Dto;
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
@@ -128,14 +128,17 @@ namespace dataproduct.api.Repositories
             bool? IsUsedThongKe,
             DateTime? FromDate,
             DateTime? ToDate,
-            string? SortThuTu,
             int? IdNhom,
             bool? chuaMappingNM,
+            string? SortBy,
+            string? SortOrder,
             int page,
             int pageSize
         );
         Task<bool> ExistsByTenHienThiAsync(string tenHienThi, int? excludeId = null);
         Task<bool> IsInUseAsync(int id);
+        /// <summary>Tìm Header_Key khác đang dùng cùng giá trị thứ tự ở cùng cột (nếu có).</summary>
+        Task<Header_Key?> FindDuplicateThuTuAsync(ThuTuColumn column, int value, int? excludeId = null);
     }
     public interface IHeaderMappingRepository
     {
@@ -411,9 +414,15 @@ namespace dataproduct.api.Repositories
         Task<List<LGNLSiloSnapshotDto>> GetSiloSnapshotAsync(
             int idLoCao, DateTime ngay, int idCa);
 
+        // Sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu — nếu ca liền kề
+        // chưa có mapping thì tự động lùi tiếp cho đến khi tìm được hoặc hết giới hạn tìm kiếm
+        Task<CopyMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int idCa);
+
         // Chi tiết nạp liệu theo phiếu
         Task DeleteChiTietByPhieuIdAsync(Guid idPhieu);
         Task AddChiTietRangeAsync(List<LG_NL_ChiTiet> entities);
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_NL_ChiTiet> entities);
         Task<List<LGNLChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
 
         // Phiếu
@@ -426,6 +435,133 @@ namespace dataproduct.api.Repositories
         Task XuLyDuLieuMeThoiGangLongAsync(List<string> data, FetchMeThoiRequest request);
     }
 
+    // ─── Phân bổ dữ liệu (QHLC / CVH / Than cốc <10mm) ────────────────────────
+
+    public interface INhomPhanBoRepository
+    {
+        Task<List<LG_PB_NhomPhanBo>> GetListAsync(byte? loaiPhanBo, int? idLoCao);
+        Task<LG_PB_NhomPhanBo?> GetByIdAsync(int id);
+        Task<LG_PB_NhomPhanBo> AddAsync(LG_PB_NhomPhanBo entity);
+        Task<LG_PB_NhomPhanBo?> UpdateAsync(int id, LG_PB_NhomPhanBo entity);
+        Task<bool> DeleteAsync(int id);
+
+        // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngay, Ca), không kế thừa
+        Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca);
+        Task<LG_PB_NVL_NhomPhanBo> AddNvlAsync(LG_PB_NVL_NhomPhanBo entity);
+        Task<bool> RemoveNvlAsync(int idNhomPhanBo, int idNvl, DateTime ngay, byte ca);
+
+        // Toàn bộ nhóm + NVL thành viên của 1 loại phân bổ tại đúng (Ngay, Ca, Lò cao), dùng cho PhanBoService.TinhPhanBoAsync
+        Task<List<(LG_PB_NhomPhanBo Nhom, List<LG_PB_NVL_NhomPhanBo> ThanhVien)>> GetNhomVaThanhVienAsync(byte loaiPhanBo, DateTime ngay, byte ca, int idLoCao);
+
+        Task<Dictionary<int, LG_PB_NhomPhanBo>> GetByIdsAsync(IEnumerable<int> ids);
+        Task<Dictionary<int, string?>> GetTenNvlMapAsync(IEnumerable<int> idNvlList);
+
+        Task<(DateTime Ngay, byte Ca)?> GetCaLienKe(int loaiPhanBo, int idLoCao, DateTime ngay, byte ca);
+    }
+
+    public interface ITyLePhanBoRepository
+    {
+        Task<List<LG_PB_TyLePhanBo>> GetHistoryAsync(int idNvl, DateTime? tuNgay, DateTime? denNgay);
+
+        // Tỷ lệ hiệu lực tại (ngay, ca) cho từng NVL: ưu tiên bản ghi đúng ca, fallback bản ghi Ca=NULL (áp dụng chung cả ngày)
+        Task<Dictionary<int, decimal>> GetHieuLucMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte? ca);
+
+        // Bản ghi ĐÚNG (Ngay, Ca) — không fallback Ca=NULL — dùng để so sánh "NVL này đang giữ đúng % nhóm
+        // hay đã bị sửa riêng", vì cascade nhóm luôn ghi với Ca cụ thể (không dùng Ca=NULL)
+        Task<Dictionary<int, decimal>> GetExactMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte ca);
+
+        // Ghi đè nếu đã có bản ghi cho đúng (IDNVL, Ngay, Ca) — cho phép sửa nhiều lần trước khi chốt
+        Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity);
+
+        // % theo nhóm (chỉ nhóm PP2), scoped (IDNhomPhanBo, Ngay, Ca, IDLoCao) — cascade xuống LG_PB_TyLePhanBo ở tầng Service
+        Task<LG_PB_TyLeNhom?> GetTyLeNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca, int idLoCao);
+        Task<LG_PB_TyLeNhom> UpsertTyLeNhomAsync(LG_PB_TyLeNhom entity);
+    }
+
+    public interface INapLieuPhanBoRepository
+    {
+        // SUM(QuyKho) GROUP BY IDCa, IDNVL cho 1 ngày + 1 lò cao (bỏ Kíp) — dùng LG_NL_ChiTiet.QuyKho có sẵn, không cần view
+        Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao);
+
+        // G của CVH: SUM(QuyKho) cho danh sách NVL "than cốc hoàn" đại diện theo lò cao
+        Task<List<TongNhanVeDto>> GetNapLieuTheoNvlListAsync(DateTime ngay, IEnumerable<int> idNvlList);
+
+        Task<Dictionary<int, int>> GetMapNvlCvhLoCaoAsync(); // IDLoCao -> IDNVL
+    }
+
+    public interface IBienBanNhanRepository
+    {
+        Task<List<LG_PB_BienBanNhanQHLCCVH>> GetByNgayAsync(DateTime ngay, byte loaiPhanBo);
+        Task UpsertAsync(LG_PB_BienBanNhanQHLCCVH entity); // match theo (Ngay, Ca, IDLoCao, LoaiPhanBo)
+        Task<Dictionary<int, int>> GetMapXuongLoCaoAsync(); // ID_Xuong -> IDLoCao
+    }
+
+    public interface IKetQuaPhanBoRepository
+    {
+        // Chốt/kiểm tra chốt luôn theo ĐÚNG (Ngày, Ca, Lò cao, Loại phân bổ) — không ảnh hưởng ca/lò cao khác
+        Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao);
+        // LG_PB_TyLePhanBo không lưu Lò cao (tỷ lệ dùng chung cho NVL đó ở mọi lò cao) — kiểm tra chốt ở
+        // BẤT KỲ lò cao nào của (Ngày, Ca) này để tránh sửa tỷ lệ ảnh hưởng ngược lò cao đã chốt.
+        Task<bool> IsCaDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca);
+        // Tập (Ca, Lò cao) đã chốt của 1 (Ngày, Loại phân bổ) — dùng để bỏ qua khi tính lại cả ngày
+        Task<List<(byte Ca, int IdLoCao)>> GetChotSetAsync(DateTime ngay, byte loaiPhanBo);
+        Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional
+        Task<List<LG_PB_KetQuaPhanBo>> GetByNgayAsync(DateTime ngay, byte? loaiPhanBo, int? idLoCao, byte? ca = null);
+        Task<int> ChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao, int idNguoiXacNhan);
+        Task<int> HuyChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao);
+        Task<List<LG_PB_KetQuaPhanBo>> GetBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo);
+
+        // Gán/sửa Mã công đoạn chi phí (DQ1/DQ2) cho toàn bộ dòng NHÁP (TrangThai=0) của 1 NVL trong ngày —
+        // trả về số dòng đã cập nhật (0 nếu ngày đã chốt hoặc NVL không có dòng kết quả nào).
+        Task<int> UpdateMaCongDoanChiPhiAsync(DateTime ngay, int idNvl, string? maCongDoanChiPhi);
+    }
+
+    public interface IBienBanGiaoNhanSourceRepository
+    {
+        // Dùng chung cho QHLC (idVatTu=470) và Than cốc <10mm (idVatTu=484)
+        // SUM(KL_QuyKho_BG) GROUP BY Ca, ID_Xuong_BG WHERE ID_TrangThai_BBGN=1 AND ID_Xuong_BG IN idXuongList (bỏ Kíp)
+        Task<List<(int IdXuong, byte? Ca, decimal KhoiLuong)>> GetTongNhanVeAsync(DateTime ngay, int idVatTu, IEnumerable<int> idXuongList);
+    }
+
+    public interface IHrc1SlabRepository
+    {
+        Task<Hrc1SlabSyncResult> UpsertFromApiAsync(List<TscSlabItem> items);
+        Task<(IEnumerable<Hrc1SlabItem> Data, int TotalCount)> SearchAsync(Hrc1SlabSearchRequest req);
+        Task<IEnumerable<Hrc1SlabTongHopItem>> GetTongHopAsync(DateOnly? tuNgay, DateOnly? denNgay, string? ca, string? kip);
+        Task<IEnumerable<Hrc1PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca);
+        Task<IEnumerable<Hrc1SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
+        Task<IEnumerable<Hrc1SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu);
+        Task<int> ChuyenPhoiAsync(List<int> idSlabs, Guid idPhieuNguon, string huong, int nguoiChuyen);
+        Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task<int> FillMacThepAsync();
+        Task<Dictionary<string, string>> GetTenVatTuMapAsync(IEnumerable<string?> macTheps);
+        Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req);
+        Task<Hrc1SlabItem> CreateSlabAsync(Hrc1SlabCreateRequest req);
+        Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu);
+        Task SaveTongHopGhiChuAsync(Hrc1SaveTongHopGhiChuRequest req);
+    }
+
+    public interface IHrc2SlabRepository
+    {
+        Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req);
+        Task<IEnumerable<Hrc2SlabTongHopItem>> GetTongHopAsync(string? tuNgay, string? denNgay, string? ca, string? kip);
+        Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca, string? tuNgay = null, string? denNgay = null);
+        Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu);
+        Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu, int? currentUserId = null);
+        Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task HuyXacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien);
+        Task ChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task HuyChotPhieuAsync(Guid idPhieu, int nguoiThucHien);
+        Task<int> ChuyenBbslAsync(List<int> idSlabs, Guid idPhieu, int nguoiThucHien, DateTime? thoiDiemThaoTac = null);
+        Task<int> ThuHoiAsync(List<int> idSlabs, int nguoiThucHien);
+        Task<SyncStatusItem> SyncAsync(DateOnly? ngayBatDau, DateOnly? ngayKetThuc);
+        Task CheckAsync(List<int> idSlabs, int idUser);
+        Task UnCheckAsync(List<int> idSlabs, int idUser);
+    }
+
     public interface IMacThepRepository
     {
         Task<IEnumerable<MacThep>> GetAllAsync(byte? nhaMay, bool? isLock, string? tenMacThep, List<int>? idMayDucs = null);
@@ -434,6 +570,17 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(MacThep entity);
         Task DeleteAsync(int id);
         Task<bool> ExistsByTenAndMayDucAsync(string tenMacThep, List<int> idMayDucs, int? excludeId = null);
+    }
+
+    public interface IMaVatTuRepository
+    {
+        Task<(IEnumerable<MaVatTuItem> Data, int TotalCount)> SearchAsync(MaVatTuSearchRequest req);
+        Task<MaVatTuItem?> GetByIdAsync(int id);
+        Task<MaVatTuItem> CreateAsync(MaVatTuUpsertDto dto);
+        Task<MaVatTuBulkCreateResult> BulkCreateAsync(List<MaVatTuUpsertDto> items);
+        Task<bool> UpdateAsync(int id, MaVatTuUpsertDto dto);
+        Task<bool> DeleteAsync(int id);
+        Task<Dictionary<string, string>> GetMaVatTuMapAsync(string nhaMay, IEnumerable<string> macThepNames);
     }
 
     public interface IMacThep_MayDucRepository

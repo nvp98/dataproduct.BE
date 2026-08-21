@@ -88,8 +88,7 @@
         <img src="{{LogoUrl}}" alt="Logo" />
       </div>
       <div class="header-right">
-        BM.16/QT.05.10 <br />
-        Ngày hiệu lực: 01/09/2023
+        {{BmCode}}
       </div>
     </div>
 
@@ -102,7 +101,7 @@
     <!-- THÀNH PHẦN -->
     <div style="margin: 8px 0 4px;">Chúng tôi gồm:</div>
     <div style="margin: 3px 0;">
-      1. Bên giao &nbsp;: Ông/ Bà: <strong>{{TenBenGiao}}</strong> &nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: {{ChucVuBenGiao}} - {{NhaMayBenGiao}}
+      1. Bên giao: Ông/ Bà: <strong>{{TenBenGiao}}</strong> &nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: {{ChucVuBenGiao}} - {{NhaMayBenGiao}}
     </div>
     <div style="margin: 3px 0;">
       2. Bên nhận: Ông/ Bà: <strong>{{TenBenNhan}}</strong> &nbsp;&nbsp;&nbsp;&nbsp; Chức vụ: {{ChucVuBenNhan}} - {{NhaMayBenNhan}}
@@ -153,11 +152,11 @@
       <tr>
         <td style="width:50%; text-align:center; border:none; vertical-align:top;">
           <div style="font-weight:bold; font-size:11pt; margin-bottom:8px;">Xưởng tinh luyện</div>
-          {{BenGiaoHtml}}
+          {{BenNhanHtml}}
         </td>
         <td style="width:50%; text-align:center; border:none; vertical-align:top;">
           <div style="font-weight:bold; font-size:11pt; margin-bottom:8px;">Xưởng đúc</div>
-          {{BenNhanHtml}}
+          {{BenGiaoHtml}}
         </td>
       </tr>
     </table>

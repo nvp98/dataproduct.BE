@@ -60,7 +60,6 @@ namespace dataproduct.api.Services
             var maMesCoData = phanLoaiMap.Keys.ToList();
             var rows = await _context.BBGN_ThepLongs
                 .Where(x => maMesCoData.Contains(x.Me!)
-                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
                          && x.BieuMau == request.BieuMau
                          && x.IsGhost != true)
                 .ToListAsync();
@@ -71,7 +70,7 @@ namespace dataproduct.api.Services
                 if (row.Me != null && phanLoaiMap.TryGetValue(row.Me, out var entry))
                 {
                     row.PhanLoai = entry.PhanLoai;
-                    row.MacThepBKMIS = entry.GradeCode;
+                    row.MacThepBKMIS = entry.GradeCode?.Trim();
                     _context.BBGN_ThepLongs.Update(row);
                     updated++;
                 }
@@ -135,6 +134,21 @@ namespace dataproduct.api.Services
                 TotalFromMySQL = phanLoaiMap.Count,
                 TotalUpdated   = updated
             };
+        }
+
+        /// <summary>
+        /// Trả về map MaMe → GradeCode (MacThep) bằng cách gọi thẳng SP usp_GetPhanLoaiThepLong.
+        /// Dùng cho HRC1 Slab: không cần qua HRC1_MeThep vì bảng đó không có dữ liệu phôi tấm.
+        /// </summary>
+        public async Task<Dictionary<string, string>> GetMacThepMapAsync(List<string> maMes)
+        {
+            if (maMes == null || maMes.Count == 0)
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var raw = await QueryViaStoredProcAsync("view_dq1_nmlt_nuocthep", maMes);
+            return raw
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value.GradeCode))
+                .ToDictionary(kv => kv.Key, kv => kv.Value.GradeCode!.Trim(), StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>

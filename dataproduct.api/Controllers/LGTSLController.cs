@@ -233,6 +233,20 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
+        [HttpPost("post-tonsilo-mapping-copy-from-previous-shift")]
+        public async Task<IActionResult> CopyMappingFromPreviousShift([FromBody] CopyLGTSMappingFromPreviousShiftDto dto)
+        {
+            try
+            {
+                if (dto.Ca != 1 && dto.Ca != 2)
+                    return BadRequest(new { message = "Ca chỉ nhận giá trị 1 hoặc 2." });
+
+                var result = await _service.CopyMappingFromPreviousShiftAsync(dto.IdLoCao, dto.Ngay, dto.Ca);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
         [HttpDelete("delete-tonsilo-mapping/{id}")]
         public async Task<IActionResult> DeleteMapping(int id)
         {

@@ -179,6 +179,140 @@ namespace dataproduct.api.Services
 
         public Task<bool> DeleteMappingAsync(int id) => _repo.DeleteMappingAsync(id);
 
+        // ─── Sao chép mapping từ ca gần nhất có dữ liệu ─────────────────────────
+
+        // Số ca tối đa lùi lại để tìm mapping (30 ngày x 2 ca) — tránh vòng lặp vô hạn
+        // nếu dữ liệu chưa từng được cấu hình.
+        private const int MaxShiftLookback = 60;
+
+        // Ca liền trước: Ca 2 -> Ca 1 cùng ngày; Ca 1 -> Ca 2 ngày hôm trước.
+        private static (DateTime Ngay, int Ca) GetPrevShift(DateTime ngay, int caNum)
+        {
+            var prevCa = caNum == 2 ? 1 : 2;
+            var prevNgay = caNum == 2 ? ngay.Date : ngay.Date.AddDays(-1);
+            return (prevNgay, prevCa);
+        }
+
+        /// <summary>
+        /// Sao chép mapping Silo→NVL từ ca gần nhất có dữ liệu, thay vì chỉ đúng ca liền kề:
+        /// nếu ca liền kề cũng chưa có mapping, tiếp tục lùi dần cho đến khi tìm được ca có
+        /// mapping hoặc hết MaxShiftLookback. Silo chưa có mapping ở ca hiện tại → tạo mới
+        /// (chỉ những silo ca nguồn đã gán NVL). Silo đã có mapping ở ca hiện tại → không ghi
+        /// đè DB, chỉ trả về DraftPrefill để FE gợi ý cập nhật nháp.
+        /// </summary>
+        public async Task<CopyLGTSMappingFromPreviousShiftResultDto> CopyMappingFromPreviousShiftAsync(
+            int idLoCao, DateTime ngay, int ca)
+        {
+            var sourceNgay = ngay.Date;
+            var sourceCa = ca;
+            List<LGTSMappingDto> sourceList = [];
+            var shiftsSearched = 0;
+
+            for (var i = 0; i < MaxShiftLookback; i++)
+            {
+                (sourceNgay, sourceCa) = GetPrevShift(sourceNgay, sourceCa);
+                shiftsSearched++;
+
+                var list = await _repo.GetMappingListAsync(idLoCao, sourceNgay, sourceCa);
+                if (list.Count > 0)
+                {
+                    sourceList = list;
+                    break;
+                }
+            }
+
+            if (sourceList.Count == 0)
+            {
+                return new CopyLGTSMappingFromPreviousShiftResultDto
+                {
+                    Found = false,
+                    ShiftsSearched = shiftsSearched,
+                    MessageType = "warning",
+                    Message = $"Không tìm thấy ca nào có mapping trong {MaxShiftLookback} ca gần nhất để sao chép"
+                };
+            }
+
+            var currentList = await _repo.GetMappingListAsync(idLoCao, ngay.Date, ca);
+            var currentSiloIds = currentList.Select(x => x.IdSiLo).ToHashSet();
+
+            var newSilos = sourceList.Where(x => !currentSiloIds.Contains(x.IdSiLo)).ToList();
+            var toCreate = newSilos.Where(x => x.IdNVL > 0).ToList();
+            var noNvlCount = newSilos.Count - toCreate.Count;
+
+            var createdCount = 0;
+            var failedCount = 0;
+            foreach (var item in toCreate)
+            {
+                try
+                {
+                    await AddMappingAsync(new CreateLGTSMappingDto
+                    {
+                        IdLoCao = idLoCao,
+                        IdSiLo  = item.IdSiLo,
+                        IdNVL   = item.IdNVL,
+                        Ngay    = ngay.Date,
+                        Ca      = ca,
+                        GhiChu  = item.GhiChu,
+                    });
+                    createdCount++;
+                }
+                catch
+                {
+                    failedCount++;
+                }
+            }
+
+            // Silo đã có mapping ở ca hiện tại → chỉ gợi ý pre-fill draft NVL, không ghi đè DB.
+            var draftPrefill = sourceList
+                .Where(x => currentSiloIds.Contains(x.IdSiLo) && x.IdNVL > 0)
+                .GroupBy(x => x.IdSiLo)
+                .ToDictionary(g => g.Key, g => g.First().IdNVL);
+
+            var prevLabel = $"Ca {sourceCa} ngày {sourceNgay:dd/MM/yyyy}";
+            string messageType;
+            string messageText;
+
+            if (failedCount > 0 && createdCount == 0 && draftPrefill.Count == 0)
+            {
+                messageType = "error";
+                messageText = $"Không thể tạo mapping từ {prevLabel}: {failedCount} silo bị lỗi. Kiểm tra kết nối hoặc dữ liệu.";
+            }
+            else if (createdCount > 0 || draftPrefill.Count > 0)
+            {
+                var parts = new List<string>();
+                if (createdCount > 0) parts.Add($"tạo mới {createdCount} silo");
+                if (draftPrefill.Count > 0) parts.Add($"cập nhật nháp {draftPrefill.Count} silo");
+                if (failedCount > 0) parts.Add($"{failedCount} silo bị lỗi khi tạo");
+                if (noNvlCount > 0) parts.Add($"{noNvlCount} silo ca trước chưa có NVL");
+                messageType = "success";
+                messageText = $"Đã sao chép từ {prevLabel}: {string.Join(", ", parts)}. Kiểm tra và nhấn \"Lưu map\" cho từng dòng nếu cần.";
+            }
+            else if (noNvlCount > 0 && toCreate.Count == 0 && draftPrefill.Count == 0)
+            {
+                messageType = "warning";
+                messageText = $"Ca trước ({prevLabel}) có {noNvlCount} silo nhưng chưa được gán NVL nào. Hãy cấu hình mapping cho ca trước trước.";
+            }
+            else
+            {
+                messageType = "info";
+                messageText = "Tất cả Silo của ca hiện tại đã có mapping hoặc ca trước không có NVL.";
+            }
+
+            return new CopyLGTSMappingFromPreviousShiftResultDto
+            {
+                Found          = true,
+                SourceNgay     = sourceNgay,
+                SourceCa       = sourceCa,
+                ShiftsSearched = shiftsSearched,
+                CreatedCount   = createdCount,
+                FailedCount    = failedCount,
+                NoNvlCount     = noNvlCount,
+                DraftPrefill   = draftPrefill,
+                MessageType    = messageType,
+                Message        = messageText,
+            };
+        }
+
         // ─── Chi tiết tồn silo theo phiếu ────────────────────────────────────────
 
         public Task UpsertChiTietAsync(UpsertLGTSChiTietDto dto) => _repo.UpsertChiTietAsync(dto);
@@ -500,7 +634,7 @@ namespace dataproduct.api.Services
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{LoCao}}", loCao)
-                .Replace("{{CaLabel}}", $"{caLabel} {kip}")
+                .Replace("{{CaLabel}}", $"{caLabel}{kip}")
                 .Replace("{{NgaySX}}", ngayDisplay)
                 .Replace("{{Rows}}", rows.ToString())
                 .Replace("{{TongKhoiLuong}}", tongKL.ToString("N3"))

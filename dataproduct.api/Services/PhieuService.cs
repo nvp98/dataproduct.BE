@@ -572,10 +572,64 @@ namespace dataproduct.api.Business
             //}
             //}
 
+            if (status == 5)
+                await CaptureExcelHeaderSnapshotIfApplicableAsync(existing);
+
             existing.TinhTrang = status;
             await _repo.UpdateAsync(existing);
 
             return true;
+        }
+
+        /// <summary>MaBm → bieuMau ngắn (BOF/LF/RH) — 3 biểu mẫu Tiêu Hao Nấu Luyện HRC2 áp dụng
+        /// cơ chế snapshot cấu hình Excel lúc Chốt (xem CaptureExcelHeaderSnapshotIfApplicableAsync).</summary>
+        private static readonly Dictionary<string, string> HRC2_TieuHao_MaBm_To_BieuMau =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                { "HRC2_BB_NauLuyen_BOF", "BOF" },
+                { "HRC2_BB_NauLuyen_LF", "LF" },
+                { "HRC2_BB_NauLuyen_RH", "RH" },
+            };
+
+        /// <summary>
+        /// Đúng lúc phiếu chuyển sang trạng thái Chốt (TinhTrang=5): chụp lại TOÀN BỘ danh sách cột
+        /// theo config Excel hiện tại của Header_Key (IsUsed_Excel/LoaiExcel/ThuTu_Excel_*) và lưu
+        /// vào DataJson[PhieuDetailExcelService.ExcelHeaderSnapshotJsonKey]. Mục đích: export Excel/
+        /// PDF sau này (PhieuDetailExcelService.GetExportDataAsync) sẽ đọc lại đúng snapshot này thay
+        /// vì tính lại theo config hiện tại — tránh việc phiếu Chốt "mất" cột phụ liệu nếu sau này ai
+        /// đó đổi config Excel. Chỉ áp dụng cho 3 biểu mẫu Tiêu Hao Nấu Luyện HRC2 (BOF/LF/RH) — các
+        /// biểu mẫu khác không dùng cơ chế Header_Key Excel config này nên bỏ qua.
+        /// Không throw nếu lỗi — không được chặn việc chốt phiếu chỉ vì chụp snapshot thất bại;
+        /// export sẽ tự fallback về config live nếu không tìm thấy/đọc được snapshot.
+        /// </summary>
+        private async Task CaptureExcelHeaderSnapshotIfApplicableAsync(BmPhieu phieu)
+        {
+            if (phieu?.MaBm == null || !HRC2_TieuHao_MaBm_To_BieuMau.TryGetValue(phieu.MaBm, out var bieuMau))
+                return;
+
+            try
+            {
+                var (headersBOF, headersLF, headersRH) = await _detailExcelService.GetLiveExcelHeadersAsync();
+                var headers = bieuMau == "BOF" ? headersBOF : (bieuMau == "RH" ? headersRH : headersLF);
+
+                var snapshot = headers
+                    .Select(h => new { headerKeyId = h.IDHeaderKey, label = h.TenPhuLieu, loaiPhieu = h.LoaiPhieu })
+                    .ToList();
+
+                var root = string.IsNullOrWhiteSpace(phieu.DataJson)
+                    ? new System.Text.Json.Nodes.JsonObject()
+                    : (System.Text.Json.Nodes.JsonNode.Parse(phieu.DataJson) as System.Text.Json.Nodes.JsonObject)
+                        ?? new System.Text.Json.Nodes.JsonObject();
+
+                root[PhieuDetailExcelService.ExcelHeaderSnapshotJsonKey] =
+                    JsonSerializer.SerializeToNode(snapshot);
+
+                phieu.DataJson = root.ToJsonString();
+            }
+            catch
+            {
+                // Không chặn việc chốt phiếu nếu chụp snapshot lỗi — export sẽ tự fallback về config live.
+            }
         }
 
         public async Task ChotNhieuPhieuAsync(List<Guid> idPhieus, int? idUser, int status)
@@ -617,6 +671,9 @@ namespace dataproduct.api.Business
 
             foreach (var phieu in phieus)
             {
+                if (status == 5)
+                    await CaptureExcelHeaderSnapshotIfApplicableAsync(phieu);
+
                 phieu.TinhTrang = status;
                 await _repo.UpdateAsync(phieu);
             }
@@ -896,6 +953,26 @@ namespace dataproduct.api.Business
             phieu.IsDelete = 0;
             phieu.IsClone = false;
             // phieu.NgayTao = DateTime.Now;
+            // nếu MaBm = CTD_BienBan_SanLuong thì check ở BK_KCS_BBXNSanLuong reset IDPhieu = null và sau đó call đến store sp_Sync_BK_KCS_BBXN_SANLUONG truyền ngày sx vào
+            if (phieu.MaBm == "CTD_BienBan_SanLuong")
+            {
+                var relatedRecords = await _context.BkKcsBbxnSanLuongs
+                                            .Where(x => x.IDPhieu == phieu.Idphieu)
+                                            .ToListAsync();
+
+                if (relatedRecords.Any())
+                {
+                    foreach (var item in relatedRecords)
+                    {
+                        item.IDPhieu = null;
+                    }
+
+                    await _context.SaveChangesAsync();
+                    // Gọi store procedure để đồng bộ dữ liệu
+                    await _context.Database.ExecuteSqlRawAsync("EXEC sp_Sync_BK_KCS_BBXN_SANLUONG @FromDate = {0} @ToDate = {1}", phieu.NgaySX, phieu.NgaySX);
+                }
+
+            }
 
             await _repo.UpdateAsync(phieu);
 
