@@ -142,6 +142,8 @@ namespace dataproduct.api.Services
 
         public Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req) => _repo.UpdateSlabAsync(id, req);
 
+        public Task<Hrc1SlabItem> CreateSlabAsync(Hrc1SlabCreateRequest req) => _repo.CreateSlabAsync(req);
+
         public Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
             => _repo.GetTongHopGhiChuAsync(idPhieu);
 

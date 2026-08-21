@@ -200,6 +200,22 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        // ── Thêm mới slab thủ công ────────────────────────────────────────────
+
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateSlab([FromBody] Hrc1SlabCreateRequest req)
+        {
+            try
+            {
+                var item = await _svc.CreateSlabAsync(req);
+                return Ok(item);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         [HttpGet("tonghop-ghi-chu/{idPhieu:guid}")]

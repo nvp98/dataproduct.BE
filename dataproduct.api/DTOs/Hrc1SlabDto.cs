@@ -116,6 +116,24 @@ namespace dataproduct.api.DTOs
         public string? MaVatTu { get; set; }
     }
 
+    // ── Thêm mới slab thủ công (tab "Chi tiết slab") ─────────────────────────
+    // NgaySX/CaSX/KipSX KHÔNG nhận từ client — server tự lấy từ phiếu (IdPhieu) để đảm bảo
+    // slab mới luôn khớp đúng phiếu đang xem (GetSlabsByPhieuAsync match theo NgaySX + CaSX).
+    public class Hrc1SlabCreateRequest
+    {
+        public Guid IdPhieu { get; set; }
+        public string IDSlab { get; set; } = "";
+        public string? IDPiece { get; set; }
+        public string? MaMe { get; set; }
+        public string? MacThep { get; set; }
+        public string? MayDuc { get; set; }
+        public DateTime? CutDate { get; set; }
+        public decimal? ChieuDay { get; set; }
+        public decimal? ChieuRong { get; set; }
+        public decimal? ChieuDai { get; set; }
+        public decimal? KhoiLuong { get; set; }
+    }
+
     // ── Tổng hợp ghi chú ─────────────────────────────────────────────────────
 
     public class Hrc1TongHopGhiChuItem

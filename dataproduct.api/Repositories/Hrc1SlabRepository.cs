@@ -822,6 +822,52 @@ namespace dataproduct.api.Repositories
             await _context.SaveChangesAsync();
         }
 
+        // ── Thêm mới slab thủ công (tab "Chi tiết slab") ──────────────────────
+        // NgaySX/CaSX/KipSX lấy từ phiếu (không nhận từ client) để slab mới khớp đúng phiếu
+        // đang xem — cùng điều kiện match "slab tự nhiên" dùng trong GetSlabsByPhieuAsync.
+        public async Task<Hrc1SlabItem> CreateSlabAsync(Hrc1SlabCreateRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.IDSlab))
+                throw new InvalidOperationException("ID Slab không được để trống.");
+
+            var phieu = await _context.BmPhieus
+                .FirstOrDefaultAsync(p => p.Idphieu == req.IdPhieu && p.MaBm == MaBm)
+                ?? throw new InvalidOperationException("Phiếu không tồn tại.");
+
+            if (phieu.TinhTrang == 5)
+                throw new InvalidOperationException("Phiếu đã chốt, không thể thêm slab mới.");
+
+            var idSlab = req.IDSlab.Trim();
+            var trung = await _context.Hrc1Slabs.AnyAsync(s => s.IDSlab == idSlab);
+            if (trung)
+                throw new InvalidOperationException($"ID Slab '{idSlab}' đã tồn tại.");
+
+            var slab = new Hrc1Slab
+            {
+                IDSlab = idSlab,
+                IDPiece = req.IDPiece,
+                MaMe = req.MaMe,
+                MacThep = req.MacThep,
+                NgaySX = phieu.NgaySX,
+                CaSX = phieu.Ca?.ToString(),
+                KipSX = phieu.Kip,
+                MayDuc = req.MayDuc,
+                CutDate = req.CutDate,
+                ChieuDay = req.ChieuDay,
+                ChieuRong = req.ChieuRong,
+                ChieuDai = req.ChieuDai,
+                KhoiLuong = req.KhoiLuong,
+            };
+            _context.Hrc1Slabs.Add(slab);
+            await _context.SaveChangesAsync();
+
+            var mvt = string.IsNullOrEmpty(slab.MacThep)
+                ? null
+                : (await GetMaVatTuLookupAsync([slab.MacThep])).GetValueOrDefault(slab.MacThep);
+
+            return MapToItem(slab, null, phieu, ResolveMaVatTu(slab, null, mvt), mvt?.TenVatTu);
+        }
+
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         public async Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
