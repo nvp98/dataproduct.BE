@@ -82,6 +82,12 @@ public class HRC1_MeThep
     [MaxLength(1)]
     public string? KipTinhLuyen { get; set; }  // kíp khi TL nhận mẻ; dùng để lọc kíp cho phiếu máy đúc
 
+    // Ghi đè routing sang phiếu Đúc — dùng khi TL bấm "Chuyển ca" (mẻ luyện xong sát ranh giới ca
+    // nên vẫn thuộc CaTinhLuyen cũ, nhưng lúc đem đúc thực tế đã rơi vào ca sau). null = dùng mặc định
+    // NgayNhanTL/CaTinhLuyen. Không ảnh hưởng NgayNhanTL/CaTinhLuyen (vẫn đúng cho công đoạn TL/tiêu hao LF).
+    public DateOnly? NgaySXDucChuyen { get; set; }
+    public int? CaDucChuyen { get; set; }
+
     public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
 
     [MaxLength(1)]

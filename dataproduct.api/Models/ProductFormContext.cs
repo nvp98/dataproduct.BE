@@ -54,8 +54,13 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
     public virtual DbSet<PhuLieu_NM> PhuLieu_NMs { get; set; }
     public virtual DbSet<PhuLieu_HRC2> PhuLieu_HRC2s { get; set; }
+    public virtual DbSet<Hrc1TieuHao> Hrc1TieuHaos { get; set; }
+    public virtual DbSet<Hrc1PhuLieu> Hrc1PhuLieus { get; set; }
+    public virtual DbSet<Hrc1PhuLieuNm> Hrc1PhuLieuNms { get; set; }
     public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
+    public virtual DbSet<STD_XUAT_NHAP_TON_HRC1> STD_XUAT_NHAP_TON_HRC1s { get; set; }
+    public virtual DbSet<STD_NXT_TOTAL_HRC1> STD_NXT_TOTAL_HRC1s { get; set; }
     public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
     public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
 
@@ -515,6 +520,95 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsManual).HasColumnName("IsManual");
             entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
         });
+
+        modelBuilder.Entity<Hrc1TieuHao>(entity =>
+        {
+            entity.ToTable("HRC1_TieuHao", tb =>
+            {
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_SoftDelete");
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_GangLong");
+            });
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.IDNM).HasColumnName("IDNM");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.MacThepOrig).HasColumnName("MacThepOrig");
+            entity.Property(e => e.MacThepIsManual).HasColumnName("MacThepIsManual");
+            entity.Property(e => e.O2).HasColumnName("O2");
+            entity.Property(e => e.N2).HasColumnName("N2");
+            entity.Property(e => e.AR).HasColumnName("AR");
+            entity.Property(e => e.IsChuyenCa).HasColumnName("IsChuyenCa");
+            entity.Property(e => e.CaChuyen).HasColumnName("CaChuyen");
+            entity.Property(e => e.IsTrungMeThoi).HasColumnName("IsTrungMeThoi");
+            entity.Property(e => e.QueLayMau).HasColumnName("QueLayMau");
+            entity.Property(e => e.QueDoNhiet).HasColumnName("QueDoNhiet");
+            entity.Property(e => e.GhiChu).HasColumnName("GhiChu");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NgayXoa).HasColumnName("NgayXoa");
+            entity.Property(e => e.NguoiXoa).HasColumnName("NguoiXoa");
+            entity.Property(e => e.ThoiDiemKetThuc).HasColumnName("ThoiDiemKetThuc");
+            entity.Property(e => e.KLGang).HasColumnName("KLGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLGangLongCCT).HasColumnName("KLGangLongCCT").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheOrig).HasColumnName("KLThepPheOrig").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheIsManual).HasColumnName("KLThepPheIsManual");
+            entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepLong).HasColumnName("KLThepLong").HasPrecision(18, 3);
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
+            entity.Property(e => e.ThoiDiemBatDau).HasColumnName("ThoiDiemBatDau");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+            entity.Property(e => e.IDPhieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.SourceIDNM).HasColumnName("SourceIDNM");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieu>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieu", tb => tb.HasTrigger("trg_HRC1_PhuLieu_ChiPhi"));
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.MeID).HasColumnName("MeID");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia").HasPrecision(18, 3);
+            entity.Property(e => e.KLPhanBo).HasColumnName("KLPhanBo").HasPrecision(18, 3);
+            entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
+            entity.Property(e => e.IsManual).HasColumnName("IsManual");
+            entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual").HasPrecision(18, 3);
+            entity.Property(e => e.IsAddManual).HasColumnName("IsAddManual");
+            entity.Property(e => e.IsPhanBo).HasColumnName("IsPhanBo");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieuNm>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieuNM");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.TenPhuLieuNM).HasColumnName("TenPhuLieuNM");
+            entity.Property(e => e.DangSuDung).HasColumnName("DangSuDung");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
+            entity.Property(e => e.MaVatTuChiPhi).HasColumnName("MaVatTuChiPhi");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+        });
+
         modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC2>(entity =>
         {
             entity.ToTable("STD_XUAT_NHAP_TON_HRC2");
@@ -546,6 +640,43 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Ca).HasColumnName("Ca");
             entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
             entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
+            entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
+            entity.Property(e => e.TongTonCuoiCa).HasColumnName("TongTonCuoiCa");
+            entity.Property(e => e.TongSuDung).HasColumnName("TongSuDung");
+            entity.Property(e => e.TongSDTrenSoSach).HasColumnName("TongSDTrenSoSach");
+            entity.Property(e => e.ChenhLech).HasColumnName("ChenhLech");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.HasPhanBo).HasColumnName("HasPhanBo");
+        });
+        modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC1>(entity =>
+        {
+            entity.ToTable("STD_XUAT_NHAP_TON_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.ViTri).HasColumnName("ViTri");
+            entity.Property(e => e.TonDauCa).HasColumnName("TonDauCa");
+            entity.Property(e => e.TuongQuanDauCa).HasColumnName("TuongQuanDauCa");
+            entity.Property(e => e.NhapVaoTrongCa).HasColumnName("NhapVaoTrongCa");
+            entity.Property(e => e.TonCuoiCa).HasColumnName("TonCuoiCa");
+            entity.Property(e => e.TuongQuanCuoiCa).HasColumnName("TuongQuanCuoiCa");
+            entity.Property(e => e.TongThucTe).HasColumnName("TongThucTe");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.IDSilo).HasColumnName("IDSilo");
+        });
+        modelBuilder.Entity<STD_NXT_TOTAL_HRC1>(entity =>
+        {
+            entity.ToTable("STD_NXT_TOTAL_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
             entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
             entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
             entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
@@ -724,7 +855,7 @@ public partial class ProductFormContext : DbContext
         // --- HRC1 ---
         modelBuilder.Entity<HRC1_MeThep>(entity =>
         {
-            entity.ToTable("HRC1_MeThep");
+            entity.ToTable("HRC1_MeThep", tb => tb.HasTrigger("trg_HRC1_MeThep_ChiPhi"));
             entity.Property(e => e.MaMe).HasMaxLength(30);
             entity.Property(e => e.ThungSo).HasMaxLength(20);
             entity.Property(e => e.ThoiGian).HasMaxLength(5);

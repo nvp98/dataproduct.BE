@@ -234,17 +234,28 @@ namespace dataproduct.api.Controllers
             return Ok(new { bmQuyenXlList, quyenTheoLo, quyenTheoScope });
         }
 
+        // scope optional — không truyền thì giữ nguyên hành vi cũ (không lọc theo khu vực), để không ảnh
+        // hưởng các trang khác đang gọi API này mà chưa truyền scope (vd Giao nhận thép lỏng, các BM
+        // không có khái niệm Lò/Scope). Khi có scope: 1 người chỉ được liệt kê nếu MaKhuVuc của họ ở
+        // đúng maBm này là "ALL" (không giới hạn khu vực) hoặc khớp đúng scope của phiếu đang mở — quy
+        // ước "ALL" đã dùng sẵn ở PhanQuyenBieuMau.tsx/BulkSave, MaKhuVuc null coi như chưa gán khu vực
+        // cụ thể (cũng không giới hạn), tránh loại nhầm các dòng quyền cũ tạo trước khi có khái niệm scope.
         [HttpGet("list-ky-duyet")]
-        public async Task<IActionResult> ListkyDuyet([FromQuery] string maBm, int loaiQuyen)
+        public async Task<IActionResult> ListkyDuyet([FromQuery] string maBm, int loaiQuyen, [FromQuery] string? scope = null)
         {
             var quyenChucNangList = loaiQuyen == (int)LoaiQuyenChucNangEnum.NguoiTao
                 ? new List<byte> { 1, 4 }
                 : new List<byte> { 2, 4 };
 
-            var idTaiKhoans = await _formContext.BmQuyenXls
+            var query = _formContext.BmQuyenXls
                 .Where(x => x.MaBm == maBm
                     && x.QuyenChucNang != null
-                    && quyenChucNangList.Contains(x.QuyenChucNang.Value))
+                    && quyenChucNangList.Contains(x.QuyenChucNang.Value));
+
+            if (!string.IsNullOrEmpty(scope))
+                query = query.Where(x => x.MaKhuVuc == null || x.MaKhuVuc == "ALL" || x.MaKhuVuc == scope);
+
+            var idTaiKhoans = await query
                 .Select(x => x.IdTaiKhoan)
                 .Where(id => id != null)
                 .Select(id => id!.Value)
