@@ -71,7 +71,7 @@ namespace dataproduct.api.Repositories
                 int? Scope = formData.TryGetProperty("scope", out var scopeProp) && scopeProp.ValueKind == JsonValueKind.Number
                     ? scopeProp.GetInt32()
                     : (int?)null;
-                DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp)
+                DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp) || formData.TryGetProperty("ngaySX", out ngaySXProp)
                                 ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
                                 : null;
                 string soPhieu = await SoPhieuHelper.GenerateAutoSoPhieu(_context, prefix, Scope ?? 0, Ca, NgaySX);
