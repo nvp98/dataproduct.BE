@@ -232,6 +232,45 @@ namespace dataproduct.api.Controllers
             }
         }
 
+        // ── Xóa mềm / Khôi phục slab ─────────────────────────────────────────
+
+        [HttpPost("xoa")]
+        public async Task<IActionResult> DeleteSlabs([FromBody] Hrc1SlabDeleteRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            try
+            {
+                var affected = await _svc.DeleteSlabsAsync(request);
+                return Ok(new WorkflowResult
+                {
+                    Success = true,
+                    Message = $"Đã xóa {affected} slab.",
+                    AffectedRows = affected
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("khoi-phuc")]
+        public async Task<IActionResult> RestoreSlabs([FromBody] Hrc1SlabDeleteRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            var affected = await _svc.RestoreSlabsAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã khôi phục {affected} slab.",
+                AffectedRows = affected
+            });
+        }
+
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
 
         [HttpGet("tonghop-ghi-chu/{idPhieu:guid}")]

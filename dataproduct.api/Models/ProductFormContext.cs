@@ -422,6 +422,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Scope).HasColumnName("Scope");
             entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
             entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.MacThep_Manual).HasColumnName("MacThep_Manual");
+            entity.Property(e => e.IsManualMacThep).HasColumnName("IsManualMacThep");
             entity.Property(e => e.O2).HasColumnName("O2");
             entity.Property(e => e.AR_RH).HasColumnName("AR_RH");
             entity.Property(e => e.N2).HasColumnName("N2");
@@ -932,7 +934,9 @@ public partial class ProductFormContext : DbContext
         });
         modelBuilder.Entity<BkHrc2Slab>(entity =>
         {
-            entity.ToTable("BK_HRC2_Slab");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_BkHrc2Slab_SanLuong) —
+            // báo cho EF Core biết bảng có trigger để KHÔNG dùng OUTPUT clause khi INSERT/UPDATE.
+            entity.ToTable("BK_HRC2_Slab", tb => tb.HasTrigger("trg_BkHrc2Slab_SanLuong"));
 
             entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
             entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
@@ -977,7 +981,8 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<BkHrc2SlabTrangThai>(entity =>
         {
-            entity.ToTable("BK_HRC2_Slab_TrangThai");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_BkHrc2SlabTrangThai_SanLuong).
+            entity.ToTable("BK_HRC2_Slab_TrangThai", tb => tb.HasTrigger("trg_BkHrc2SlabTrangThai_SanLuong"));
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.NgayChuyenKCS).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
@@ -1011,7 +1016,8 @@ public partial class ProductFormContext : DbContext
         // --- HRC1 Slab ---
         modelBuilder.Entity<Hrc1Slab>(entity =>
         {
-            entity.ToTable("HRC1_Slab");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_Hrc1Slab_SanLuong).
+            entity.ToTable("HRC1_Slab", tb => tb.HasTrigger("trg_Hrc1Slab_SanLuong"));
             entity.Property(e => e.IDSlab).HasColumnName("IDSlab").HasMaxLength(50).IsRequired();
             entity.Property(e => e.IDPiece).HasColumnName("IDPiece").HasMaxLength(50);
             entity.Property(e => e.MaMe).HasMaxLength(50);
@@ -1031,6 +1037,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.MaVatTu).HasMaxLength(100);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.NgayXoa).HasColumnType("datetime");
 
         });
 
@@ -1081,7 +1089,8 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<Hrc1SlabTrangThai>(entity =>
         {
-            entity.ToTable("HRC1_Slab_TrangThai");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_Hrc1SlabTrangThai_SanLuong_ChuyenCa).
+            entity.ToTable("HRC1_Slab_TrangThai", tb => tb.HasTrigger("trg_Hrc1SlabTrangThai_SanLuong_ChuyenCa"));
             entity.HasIndex(e => e.IdSlab).IsUnique();
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.NgayChuyen).HasColumnType("datetime");

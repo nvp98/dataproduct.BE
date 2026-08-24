@@ -541,6 +541,8 @@ namespace dataproduct.api.Repositories
         Task UpdateSlabAsync(int id, Hrc1SlabUpdateRequest req);
         Task<Hrc1SlabItem> CreateSlabAsync(Hrc1SlabCreateRequest req);
         Task EditSlabAsync(int id, Hrc1SlabEditRequest req);
+        Task<int> DeleteSlabsAsync(List<int> idSlabs, int nguoiThucHien);
+        Task<int> RestoreSlabsAsync(List<int> idSlabs, int nguoiThucHien);
         Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu);
         Task SaveTongHopGhiChuAsync(Hrc1SaveTongHopGhiChuRequest req);
     }

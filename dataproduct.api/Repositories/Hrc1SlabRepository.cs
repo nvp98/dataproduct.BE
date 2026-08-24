@@ -57,7 +57,10 @@ namespace dataproduct.api.Repositories
                 if (existing.TryGetValue(item.SLAB_ID, out var slab))
                 {
                     trangThaiMap.TryGetValue(slab.Id, out var tt);
-                    if (slab.CutDate.HasValue
+                    // IsDeleted: slab đã bị xóa mềm thủ công — Sync KHÔNG được ghi đè / hồi sinh,
+                    // dù TSC luôn trả về đủ slab của ca (xem comment trên Hrc1Slab.IsDeleted).
+                    if (slab.IsDeleted
+                        || slab.CutDate.HasValue
                         || tt?.TrangThaiCan == 1
                         || tt?.TrangThaiC4 == true
                         || tt?.TrangThaiPKH == 1) continue;
@@ -126,7 +129,7 @@ namespace dataproduct.api.Repositories
 
         public async Task<(IEnumerable<Hrc1SlabItem> Data, int TotalCount)> SearchAsync(Hrc1SlabSearchRequest req)
         {
-            var query = _context.Hrc1Slabs.AsNoTracking();
+            var query = _context.Hrc1Slabs.AsNoTracking().Where(s => !s.IsDeleted);
 
             if (req.TuNgay.HasValue)  query = query.Where(s => s.NgaySX >= req.TuNgay);
             if (req.DenNgay.HasValue) query = query.Where(s => s.NgaySX <= req.DenNgay);
@@ -208,7 +211,7 @@ namespace dataproduct.api.Repositories
         public async Task<IEnumerable<Hrc1SlabTongHopItem>> GetTongHopAsync(
             DateOnly? tuNgay, DateOnly? denNgay, string? ca, string? kip)
         {
-            var query = _context.Hrc1Slabs.AsNoTracking();
+            var query = _context.Hrc1Slabs.AsNoTracking().Where(s => !s.IsDeleted);
 
             if (tuNgay.HasValue)  query = query.Where(s => s.NgaySX >= tuNgay);
             if (denNgay.HasValue) query = query.Where(s => s.NgaySX <= denNgay);
@@ -255,7 +258,7 @@ namespace dataproduct.api.Repositories
 
             var allNatural = await _context.Hrc1Slabs
                 .AsNoTracking()
-                .Where(s => ngaySXList.Contains(s.NgaySX!.Value))
+                .Where(s => ngaySXList.Contains(s.NgaySX!.Value) && !s.IsDeleted)
                 .ToListAsync();
 
             var naturalIds = allNatural.Select(s => s.Id).ToList();
@@ -267,10 +270,13 @@ namespace dataproduct.api.Repositories
                 : new Dictionary<int, Hrc1SlabTrangThai>();
 
             var phieuIds = phieus.Select(p => p.Idphieu).ToList();
-            var transferredIn = await _context.Hrc1SlabTrangThais
-                .AsNoTracking()
-                .Where(t => t.IsChuyenCa && t.IdPhieuBBSL != null && phieuIds.Contains(t.IdPhieuBBSL!.Value))
-                .ToListAsync();
+            // Join Hrc1Slabs để loại slab đã xóa mềm — TrangThai không tự biết slab bị xóa.
+            var transferredIn = await (
+                from t in _context.Hrc1SlabTrangThais.AsNoTracking()
+                join s in _context.Hrc1Slabs.AsNoTracking() on t.IdSlab equals s.Id
+                where t.IsChuyenCa && t.IdPhieuBBSL != null && phieuIds.Contains(t.IdPhieuBBSL!.Value) && !s.IsDeleted
+                select t
+            ).ToListAsync();
             var transferredByPhieu = transferredIn
                 .GroupBy(t => t.IdPhieuBBSL!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -351,7 +357,7 @@ namespace dataproduct.api.Repositories
             // Natural slabs (theo Ca/NgaySX, chưa bị chuyển đi)
             var naturalSlabs = await _context.Hrc1Slabs
                 .AsNoTracking()
-                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr
+                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr && !s.IsDeleted
                             && !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.IsChuyenCa))
                 .ToListAsync();
 
@@ -373,7 +379,7 @@ namespace dataproduct.api.Repositories
             var transferredSlabMap = transferredSlabIds.Count > 0
                 ? await _context.Hrc1Slabs
                     .AsNoTracking()
-                    .Where(s => transferredSlabIds.Contains(s.Id))
+                    .Where(s => transferredSlabIds.Contains(s.Id) && !s.IsDeleted)
                     .ToDictionaryAsync(s => s.Id)
                 : new Dictionary<int, Hrc1Slab>();
 
@@ -431,7 +437,7 @@ namespace dataproduct.api.Repositories
             var now = DateTime.Now;
 
             var slabs = await _context.Hrc1Slabs
-                .Where(s => idSlabs.Contains(s.Id))
+                .Where(s => idSlabs.Contains(s.Id) && !s.IsDeleted)
                 .ToListAsync();
 
             var trangThaiMap = await _context.Hrc1SlabTrangThais
@@ -500,7 +506,7 @@ namespace dataproduct.api.Repositories
         public async Task XacNhanAsync(List<int> idSlabs, string loaiXacNhan, int nguoiThucHien)
         {
             var slabs = await _context.Hrc1Slabs
-                .Where(s => idSlabs.Contains(s.Id))
+                .Where(s => idSlabs.Contains(s.Id) && !s.IsDeleted)
                 .ToListAsync();
 
             var trangThaiMap = await _context.Hrc1SlabTrangThais
@@ -623,7 +629,7 @@ namespace dataproduct.api.Repositories
 
             // Natural slabs (chưa bị chuyền đi)
             var naturalSlabs = await _context.Hrc1Slabs
-                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr
+                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr && !s.IsDeleted
                             && !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.IsChuyenCa))
                 .ToListAsync();
 
@@ -634,10 +640,13 @@ namespace dataproduct.api.Repositories
                     .ToDictionaryAsync(t => t.IdSlab)
                 : new Dictionary<int, Hrc1SlabTrangThai>();
 
-            // Transferred-in slabs
-            var transferredRecords = await _context.Hrc1SlabTrangThais
-                .Where(t => t.IsChuyenCa && t.IdPhieuBBSL == idPhieu)
-                .ToListAsync();
+            // Transferred-in slabs (join Hrc1Slabs để loại slab đã xóa mềm)
+            var transferredRecords = await (
+                from t in _context.Hrc1SlabTrangThais
+                join s in _context.Hrc1Slabs on t.IdSlab equals s.Id
+                where t.IsChuyenCa && t.IdPhieuBBSL == idPhieu && !s.IsDeleted
+                select t
+            ).ToListAsync();
 
             var chuaXacNhan = naturalSlabs.Count(s =>
                     !naturalTTMap.TryGetValue(s.Id, out var tt) || tt.TrangThaiDuc != 1 || tt.TrangThaiCan != 1 || !tt.TrangThaiC4)
@@ -692,7 +701,7 @@ namespace dataproduct.api.Repositories
             // Natural slabs: lấy Id trước, rồi load TrangThai
             var naturalSlabIds = await _context.Hrc1Slabs
                 .AsNoTracking()
-                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr)
+                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr && !s.IsDeleted)
                 .Select(s => s.Id)
                 .ToListAsync();
 
@@ -702,10 +711,13 @@ namespace dataproduct.api.Repositories
                     .ToListAsync()
                 : [];
 
-            // Transferred-in
-            var transferredRecords = await _context.Hrc1SlabTrangThais
-                .Where(t => t.IsChuyenCa && t.IdPhieuBBSL == idPhieu)
-                .ToListAsync();
+            // Transferred-in (join Hrc1Slabs để loại slab đã xóa mềm)
+            var transferredRecords = await (
+                from t in _context.Hrc1SlabTrangThais
+                join s in _context.Hrc1Slabs on t.IdSlab equals s.Id
+                where t.IsChuyenCa && t.IdPhieuBBSL == idPhieu && !s.IsDeleted
+                select t
+            ).ToListAsync();
 
             foreach (var t in naturalTrangThais.Concat(transferredRecords))
             {
@@ -724,7 +736,7 @@ namespace dataproduct.api.Repositories
         public async Task<int> FillMacThepAsync()
         {
             var slabs = await _context.Hrc1Slabs
-                .Where(s => s.MacThep == null && s.MaMe != null)
+                .Where(s => s.MacThep == null && s.MaMe != null && !s.IsDeleted)
                 .ToListAsync();
 
             if (slabs.Count == 0) return 0;
@@ -811,6 +823,8 @@ namespace dataproduct.api.Repositories
         {
             var slab = await _context.Hrc1Slabs.FindAsync(id)
                 ?? throw new InvalidOperationException($"Slab {id} không tồn tại.");
+            if (slab.IsDeleted)
+                throw new InvalidOperationException("Slab đã bị xóa, không thể chỉnh sửa.");
 
             var tt = await _context.Hrc1SlabTrangThais.FirstOrDefaultAsync(t => t.IdSlab == id);
             if (tt?.TrangThaiPKH == 1)
@@ -878,6 +892,8 @@ namespace dataproduct.api.Repositories
 
             var slab = await _context.Hrc1Slabs.FindAsync(id)
                 ?? throw new InvalidOperationException($"Slab {id} không tồn tại.");
+            if (slab.IsDeleted)
+                throw new InvalidOperationException("Slab đã bị xóa, không thể chỉnh sửa.");
 
             var tt = await _context.Hrc1SlabTrangThais.FirstOrDefaultAsync(t => t.IdSlab == id);
             if (tt?.TrangThaiPKH == 1)
@@ -900,6 +916,60 @@ namespace dataproduct.api.Repositories
             slab.KhoiLuong = req.KhoiLuong;
             slab.NgayCapNhat = DateTime.Now;
             await _context.SaveChangesAsync();
+        }
+
+        // ── Xóa mềm slab ──────────────────────────────────────────────────────
+        // Xóa cứng (DELETE) không dùng được: TSC luôn trả về đủ slab của ca nên SyncAsync sẽ
+        // insert lại ngay lần làm mới kế tiếp. Xóa mềm + guard IsDeleted trong UpsertFromApiAsync
+        // là cách duy nhất giữ được trạng thái "đã loại bỏ" qua các lần Sync.
+        public async Task<int> DeleteSlabsAsync(List<int> idSlabs, int nguoiThucHien)
+        {
+            var slabs = await _context.Hrc1Slabs
+                .Where(s => idSlabs.Contains(s.Id) && !s.IsDeleted)
+                .ToListAsync();
+            if (slabs.Count == 0) return 0;
+
+            var slabIds = slabs.Select(s => s.Id).ToList();
+            var trangThaiMap = await _context.Hrc1SlabTrangThais
+                .Where(t => slabIds.Contains(t.IdSlab))
+                .ToDictionaryAsync(t => t.IdSlab);
+
+            var daChot = slabs.Count(s => trangThaiMap.TryGetValue(s.Id, out var tt) && tt.TrangThaiPKH == 1);
+            if (daChot > 0)
+                throw new InvalidOperationException($"Có {daChot} slab đã chốt PKH, không thể xóa.");
+
+            var now = DateTime.Now;
+            foreach (var slab in slabs)
+            {
+                slab.IsDeleted = true;
+                slab.NguoiXoa = nguoiThucHien;
+                slab.NgayXoa = now;
+                slab.NgayCapNhat = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return slabs.Count;
+        }
+
+        // ── Khôi phục slab đã xóa mềm ─────────────────────────────────────────
+        public async Task<int> RestoreSlabsAsync(List<int> idSlabs, int nguoiThucHien)
+        {
+            var slabs = await _context.Hrc1Slabs
+                .Where(s => idSlabs.Contains(s.Id) && s.IsDeleted)
+                .ToListAsync();
+            if (slabs.Count == 0) return 0;
+
+            var now = DateTime.Now;
+            foreach (var slab in slabs)
+            {
+                slab.IsDeleted = false;
+                slab.NguoiXoa = null;
+                slab.NgayXoa = null;
+                slab.NgayCapNhat = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return slabs.Count;
         }
 
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
@@ -955,7 +1025,7 @@ namespace dataproduct.api.Repositories
 
             var natural = await _context.Hrc1Slabs
                 .AsNoTracking()
-                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr
+                .Where(s => s.NgaySX == ngaySX && s.CaSX == caStr && !s.IsDeleted
                             && !_context.Hrc1SlabTrangThais.Any(t => t.IdSlab == s.Id && t.IsChuyenCa))
                 .OrderBy(s => s.MayDuc).ThenBy(s => s.IDSlab)
                 .ToListAsync();
@@ -969,7 +1039,7 @@ namespace dataproduct.api.Repositories
             var transferred = transferredSlabIds.Count > 0
                 ? await _context.Hrc1Slabs
                     .AsNoTracking()
-                    .Where(s => transferredSlabIds.Contains(s.Id))
+                    .Where(s => transferredSlabIds.Contains(s.Id) && !s.IsDeleted)
                     .OrderBy(s => s.MayDuc).ThenBy(s => s.IDSlab)
                     .ToListAsync()
                 : [];

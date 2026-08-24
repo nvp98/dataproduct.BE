@@ -20,4 +20,12 @@ public class Hrc1Slab
     public DateTime? NgayCapNhat { get; set; }
     public string? GhiChu { get; set; }
     public string? MaVatTu { get; set; }
+
+    // ── Xóa mềm ────────────────────────────────────────────────────────────
+    // Đánh dấu để loại khỏi mọi hiển thị/luồng nghiệp vụ, đồng thời chặn SyncAsync
+    // ghi đè lại dữ liệu — khác xóa cứng (DELETE) trước đây sẽ bị Sync insert lại
+    // vì TSC luôn trả về đủ slab của ca.
+    public bool IsDeleted { get; set; }
+    public int? NguoiXoa { get; set; }
+    public DateTime? NgayXoa { get; set; }
 }

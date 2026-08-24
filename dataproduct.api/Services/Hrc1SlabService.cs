@@ -146,6 +146,12 @@ namespace dataproduct.api.Services
 
         public Task EditSlabAsync(int id, Hrc1SlabEditRequest req) => _repo.EditSlabAsync(id, req);
 
+        public Task<int> DeleteSlabsAsync(Hrc1SlabDeleteRequest req)
+            => _repo.DeleteSlabsAsync(req.IdSlabs, req.NguoiThucHien);
+
+        public Task<int> RestoreSlabsAsync(Hrc1SlabDeleteRequest req)
+            => _repo.RestoreSlabsAsync(req.IdSlabs, req.NguoiThucHien);
+
         public Task<IEnumerable<Hrc1TongHopGhiChuItem>> GetTongHopGhiChuAsync(Guid idPhieu)
             => _repo.GetTongHopGhiChuAsync(idPhieu);
 

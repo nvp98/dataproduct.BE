@@ -153,6 +153,14 @@ namespace dataproduct.api.DTOs
         public decimal? KhoiLuong { get; set; }
     }
 
+    // ── Xóa mềm / Khôi phục ───────────────────────────────────────────────────
+
+    public class Hrc1SlabDeleteRequest
+    {
+        public List<int> IdSlabs { get; set; } = new();
+        public int NguoiThucHien { get; set; }
+    }
+
     // ── Tổng hợp ghi chú ─────────────────────────────────────────────────────
 
     public class Hrc1TongHopGhiChuItem
