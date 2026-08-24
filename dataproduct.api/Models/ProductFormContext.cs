@@ -123,6 +123,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<TKVV_NVL_SiloMapping> TKVV_NVL_SiloMapping { get; set; }
     public virtual DbSet<TKVV_Silo_TagMapping> TKVV_Silo_TagMapping { get; set; }
     public virtual DbSet<TKVV_BaoCaoSanLuongChiPhi> TKVV_BaoCaoSanLuongChiPhi { get; set; }
+    public virtual DbSet<TKVV_TonSilo> TKVV_TonSilo { get; set; }
     public virtual DbSet<EMS_MappingTag> EMS_MappingTag { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
@@ -836,6 +837,20 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
             entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
             entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");
+        });
+        modelBuilder.Entity<TKVV_TonSilo>(entity =>
+        {
+            entity.ToTable("TKVV_TonSilo");
+            entity.Property(e => e.Kip).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.DoAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonDau).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.Nhap).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.Xuat).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonCuoi).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
         });
         // Không ToTable(): type này chỉ dùng qua FromSqlRaw (EXEC dbo.EMS_GetMappingTag),
         // không có bảng/view vật lý nào trong PRODUCT_FORM để ánh xạ.
