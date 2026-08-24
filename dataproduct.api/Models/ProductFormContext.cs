@@ -124,6 +124,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<TKVV_Silo_TagMapping> TKVV_Silo_TagMapping { get; set; }
     public virtual DbSet<TKVV_BaoCaoSanLuongChiPhi> TKVV_BaoCaoSanLuongChiPhi { get; set; }
     public virtual DbSet<TKVV_TonSilo> TKVV_TonSilo { get; set; }
+    public virtual DbSet<TKVV_NVL_BBGN_Mapping> TKVV_NVL_BBGN_Mapping { get; set; }
     public virtual DbSet<EMS_MappingTag> EMS_MappingTag { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
@@ -851,6 +852,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TonCuoi).HasColumnType("decimal(18,3)");
             entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
             entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
+        });
+        modelBuilder.Entity<TKVV_NVL_BBGN_Mapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_BBGN_Mapping");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgayTao).HasColumnType("datetime2");
         });
         // Không ToTable(): type này chỉ dùng qua FromSqlRaw (EXEC dbo.EMS_GetMappingTag),
         // không có bảng/view vật lý nào trong PRODUCT_FORM để ánh xạ.
