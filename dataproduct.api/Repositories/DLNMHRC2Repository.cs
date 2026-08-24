@@ -156,7 +156,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         O2 = FormatNumber(baseRecord.O2),
                         AR_RH = FormatNumber(baseRecord.AR_RH),
                         N2 = FormatNumber(baseRecord.N2),
@@ -446,7 +448,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         IsNM = baseRecord.IsNM,
                         IsChuyenCa = baseRecord.IsChuyenCa,
                         O2 = FormatNumber(baseRecord.O2),
@@ -738,7 +742,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         O2 = FormatNumber(baseRecord.O2),
                         AR_RH = FormatNumber(baseRecord.AR_RH),
                         N2 = FormatNumber(baseRecord.N2),
@@ -1034,7 +1040,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         IsNM = baseRecord.IsNM,
                         IsChuyenCa = baseRecord.IsChuyenCa,
                         O2 = FormatNumber(baseRecord.O2),
@@ -1310,7 +1318,9 @@ namespace dataproduct.api.Repositories
                         BieuMau         = baseRecord.BieuMau,
                         Scope           = baseRecord.Scope,
                         MeThoi          = baseRecord.MeThoi,
-                        MacThep         = baseRecord.MacThep,
+                        MacThep         = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc      = baseRecord.MacThep,
                         IsNM            = baseRecord.IsNM,
                         IsChuyenCa      = baseRecord.IsChuyenCa,
                         O2              = FormatNumber(baseRecord.O2),
@@ -1445,7 +1455,7 @@ namespace dataproduct.api.Repositories
                 else
                 {
                     query = query.Where(x =>
-                        (x.MacThep ?? string.Empty).Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? string.Empty).Contains(search) ||
                         (x.MeThoi ?? string.Empty).Contains(search));
                 }
             }
@@ -1917,7 +1927,7 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.REPORT_NO == searchReportNo);
                 else
                     query = query.Where(x =>
-                        (x.MacThep ?? "").Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
             if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value)
@@ -2359,7 +2369,7 @@ namespace dataproduct.api.Repositories
                         BieuMau = x.BieuMau,
                         Scope = x.Scope,
                         MeThoi = x.MeThoi,
-                        MacThep = x.MacThep,
+                        MacThep = x.MacThep_Manual ?? x.MacThep,
                         O2 = FormatNumber(x.O2),
                         AR_RH = FormatNumber(x.AR_RH),
                         N2 = FormatNumber(x.N2),
@@ -2502,7 +2512,7 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.REPORT_NO == searchReportNo);
                 else
                     query = query.Where(x =>
-                        (x.MacThep ?? "").Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
 

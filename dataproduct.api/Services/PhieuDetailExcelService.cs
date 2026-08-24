@@ -155,7 +155,13 @@ namespace dataproduct.api.Services
 
             // Lấy DataJson overrides từ phiếu (nếu có idPhieu) để ưu tiên giá trị user đã sửa tay.
             // DataJson là nguồn sự thật cho manual overrides trên UI.
-            var dataJsonOverrides = await LoadDataJsonOverridesAsync(idPhieu);
+            // Khóa chính là "id" (DLNM_HRC2.ID trong table1 row) — GIỐNG applyManualOverrides bên FE
+            // (rowIdField:"id", fallbackKeyField:"meThoi") — vì MeThoi có thể TRÙNG giữa 2 mẻ khác
+            // nhau (IsTrungMeThoi). Nếu chỉ khoá theo MeThoi, 2 mẻ trùng tên sẽ ghi đè lẫn nhau trong
+            // dictionary và export sẽ lấy nhầm override của mẻ này gán cho mẻ kia dù UI vẫn render
+            // đúng (UI khoá theo id trước). Chỉ fallback về MeThoi khi row JSON không có "id" (dữ liệu
+            // cũ trước khi field này tồn tại).
+            var (dataJsonOverridesById, dataJsonOverridesByMeThoi) = await LoadDataJsonOverridesAsync(idPhieu);
 
             // Map: mọi DLNM_HRC2.ID trong cùng REPORT_NO group → display item ID (max ID đã chọn).
             // Mục đích: bắt cả phụ liệu được lưu theo ID khác (không phải max) trong cùng REPORT_NO.
@@ -331,10 +337,16 @@ namespace dataproduct.api.Services
                         var effectiveKL = klPhuGia_Manual ?? klPhuGia;
 
                         // Ưu tiên DataJson: giá trị user đã sửa tay trên UI (nguồn sự thật cao nhất).
-                        // Dùng meThoi để match vì id trong DataJson có thể khác id export pick.
-                        if (!string.IsNullOrEmpty(x.MeThoi) &&
-                            dataJsonOverrides.TryGetValue(x.MeThoi, out var meThOiOverrides) &&
-                            meThOiOverrides.TryGetValue(h.IDHeaderKey, out var jsonOverrideVal))
+                        // Match theo ID trước (giống FE) để không bị lẫn khi 2 mẻ trùng MeThoi;
+                        // chỉ fallback về MeThoi khi row JSON không có "id" (dữ liệu cũ).
+                        Dictionary<int, double?>? rowOverrides = null;
+                        if (!dataJsonOverridesById.TryGetValue(x.ID, out rowOverrides) &&
+                            !string.IsNullOrEmpty(x.MeThoi))
+                        {
+                            dataJsonOverridesByMeThoi.TryGetValue(x.MeThoi, out rowOverrides);
+                        }
+
+                        if (rowOverrides != null && rowOverrides.TryGetValue(h.IDHeaderKey, out var jsonOverrideVal))
                         {
                             effectiveKL = jsonOverrideVal;
                             klPhuGia_Manual = jsonOverrideVal;
@@ -378,7 +390,7 @@ namespace dataproduct.api.Services
                             BieuMau = x.BieuMau,
                             Scope = x.Scope,
                             MeThoi = x.MeThoi,
-                            MacThep = x.MacThep,
+                            MacThep = x.MacThep_Manual ?? x.MacThep,
                             O2 = RoundNumber(x.O2),
                             AR_RH = RoundNumber(x.AR_RH),
                             N2 = RoundNumber(x.N2),
@@ -543,13 +555,20 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Đọc DataJson của phiếu và trích xuất manual overrides:
-        /// meThoi → headerKeyId → giá trị user đã sửa.
+        /// Đọc DataJson của phiếu và trích xuất manual overrides: headerKeyId → giá trị user đã sửa,
+        /// cho từng row của table1. Trả về 2 dictionary tra cứu, GIỐNG cách FE khoá row
+        /// (HRC2TableService.applyManualOverrides: rowIdField="id", fallbackKeyField="meThoi"):
+        /// - ById: khoá theo "id" (= DLNM_HRC2.ID) của row — dùng khi row JSON có field "id".
+        /// - ByMeThoi: khoá theo "meThoi" — CHỈ dùng cho row JSON không có "id" (dữ liệu cũ trước khi
+        ///   field này tồn tại). Nếu khoá luôn theo meThoi thì 2 mẻ TRÙNG MeThoi (IsTrungMeThoi) sẽ
+        ///   ghi đè lẫn nhau trong dictionary → export lấy nhầm override của mẻ này gán cho mẻ kia,
+        ///   dù UI vẫn render đúng vì UI khoá theo id trước.
         /// </summary>
-        private async Task<Dictionary<string, Dictionary<int, double?>>> LoadDataJsonOverridesAsync(Guid? idPhieu)
+        private async Task<(Dictionary<long, Dictionary<int, double?>> ById, Dictionary<string, Dictionary<int, double?>> ByMeThoi)> LoadDataJsonOverridesAsync(Guid? idPhieu)
         {
-            var result = new Dictionary<string, Dictionary<int, double?>>(StringComparer.OrdinalIgnoreCase);
-            if (!idPhieu.HasValue) return result;
+            var resultById = new Dictionary<long, Dictionary<int, double?>>();
+            var resultByMeThoi = new Dictionary<string, Dictionary<int, double?>>(StringComparer.OrdinalIgnoreCase);
+            if (!idPhieu.HasValue) return (resultById, resultByMeThoi);
 
             var dataJson = await _context.BmPhieus
                 .AsNoTracking()
@@ -557,7 +576,7 @@ namespace dataproduct.api.Services
                 .Select(p => p.DataJson)
                 .FirstOrDefaultAsync();
 
-            if (string.IsNullOrWhiteSpace(dataJson)) return result;
+            if (string.IsNullOrWhiteSpace(dataJson)) return (resultById, resultByMeThoi);
 
             try
             {
@@ -565,14 +584,25 @@ namespace dataproduct.api.Services
                 var root = doc.RootElement;
 
                 if (!root.TryGetProperty("table1", out var table1) || table1.ValueKind != JsonValueKind.Array)
-                    return result;
+                    return (resultById, resultByMeThoi);
 
                 foreach (var row in table1.EnumerateArray())
                 {
-                    if (!row.TryGetProperty("meThoi", out var meProp) || meProp.ValueKind != JsonValueKind.String)
-                        continue;
-                    var meThoi = meProp.GetString();
-                    if (string.IsNullOrWhiteSpace(meThoi)) continue;
+                    string? meThoi = row.TryGetProperty("meThoi", out var meProp) && meProp.ValueKind == JsonValueKind.String
+                        ? meProp.GetString()
+                        : null;
+
+                    long? rowId = null;
+                    if (row.TryGetProperty("id", out var idProp))
+                    {
+                        if (idProp.ValueKind == JsonValueKind.Number && idProp.TryGetInt64(out var idNum))
+                            rowId = idNum;
+                        else if (idProp.ValueKind == JsonValueKind.String &&
+                                 long.TryParse(idProp.GetString(), out var idParsed))
+                            rowId = idParsed;
+                    }
+
+                    if (rowId == null && string.IsNullOrWhiteSpace(meThoi)) continue;
 
                     var rowOverrides = new Dictionary<int, double?>();
 
@@ -599,8 +629,13 @@ namespace dataproduct.api.Services
                         rowOverrides[headerKeyId] = val;
                     }
 
-                    if (rowOverrides.Count > 0)
-                        result[meThoi] = rowOverrides;
+                    if (rowOverrides.Count == 0) continue;
+
+                    // Khoá theo id khi có (giống FE); chỉ fallback về meThoi khi row không có id.
+                    if (rowId.HasValue)
+                        resultById[rowId.Value] = rowOverrides;
+                    else if (!string.IsNullOrWhiteSpace(meThoi))
+                        resultByMeThoi[meThoi] = rowOverrides;
                 }
             }
             catch
@@ -608,7 +643,7 @@ namespace dataproduct.api.Services
                 // DataJson parse failure → trả về empty, không ảnh hưởng export
             }
 
-            return result;
+            return (resultById, resultByMeThoi);
         }
 
         private static double? RoundNumber(double? value)

@@ -12,7 +12,14 @@ namespace dataproduct.api.ResponseModels
         public string? BieuMau { get; set; }
         public int? Scope { get; set; }
         public string? MeThoi { get; set; }
+        /// <summary>Giá trị HIỆU LỰC = MacThep_Manual ?? MacThep (gốc NM). Dùng để hiển thị/export.</summary>
         public string? MacThep { get; set; }
+        /// <summary>true nếu đang có override tay (MacThep_Manual != null) — dùng ở các API nạp dữ liệu
+        /// cho màn hình sửa (filter/grouped-detail) để FE dựng lại macThep__orig/__IsManual trên row,
+        /// phục vụ highlight "đã sửa tay". KHÔNG set ở SearchThongKeApiAsync/export (chỉ trả hiệu lực).</summary>
+        public bool? IsManualMacThep { get; set; }
+        /// <summary>Giá trị GỐC từ NM (không bị ảnh hưởng bởi override) — chỉ có ý nghĩa khi IsManualMacThep=true, dùng làm baseline "Tự động: X" cho tooltip diff bên FE.</summary>
+        public string? MacThepGoc { get; set; }
         public double? O2 { get; set; }
         public double? AR_RH { get; set; }
         public double? N2 { get; set; }
