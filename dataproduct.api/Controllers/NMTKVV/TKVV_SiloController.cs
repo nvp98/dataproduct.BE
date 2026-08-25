@@ -9,10 +9,12 @@ namespace dataproduct.api.Controllers.NMTKVV
     public class TKVV_SiloController : ControllerBase
     {
         private readonly TKVV_SiloService _service;
+        private readonly TKVV_NvlBbgnMappingService _nvlBbgnMappingService;
 
-        public TKVV_SiloController(TKVV_SiloService service)
+        public TKVV_SiloController(TKVV_SiloService service, TKVV_NvlBbgnMappingService nvlBbgnMappingService)
         {
             _service = service;
+            _nvlBbgnMappingService = nvlBbgnMappingService;
         }
 
         // ─── Silo ──────────────────────────────────────────────────────────────
@@ -153,6 +155,48 @@ namespace dataproduct.api.Controllers.NMTKVV
         public async Task<IActionResult> DeleteSiloTagMapping(int id)
         {
             var ok = await _service.DeleteSiloTagMappingAsync(id);
+            if (!ok) return NotFound();
+            return Ok();
+        }
+
+        // ─── Tra cứu Vật tư SAP (PRODUCTDATA.Tbl_VatTu) ──────────────────────────
+
+        [HttpGet("vattu-search")]
+        public async Task<IActionResult> SearchVatTu(
+            [FromQuery] string? searchKey,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
+        {
+            return Ok(await _nvlBbgnMappingService.SearchVatTuAsync(searchKey, page, pageSize));
+        }
+
+        // ─── NVL ↔ Vật tư BBGN Mapping ────────────────────────────────────────
+
+        [HttpGet("nvl-vattu-mapping")]
+        public async Task<IActionResult> GetNvlVatTuMappingList([FromQuery] int? tkvvNvlId)
+        {
+            return Ok(await _nvlBbgnMappingService.GetListAsync(tkvvNvlId));
+        }
+
+        [HttpPost("nvl-vattu-mapping")]
+        public async Task<IActionResult> AddNvlVatTuMapping([FromBody] CreateTKVVNvlBbgnMappingDto dto)
+        {
+            var result = await _nvlBbgnMappingService.AddAsync(dto);
+            return Ok(result);
+        }
+
+        [HttpPut("nvl-vattu-mapping/{id}")]
+        public async Task<IActionResult> UpdateNvlVatTuMapping(int id, [FromBody] UpdateTKVVNvlBbgnMappingDto dto)
+        {
+            var result = await _nvlBbgnMappingService.UpdateAsync(id, dto);
+            if (result == null) return NotFound();
+            return Ok(result);
+        }
+
+        [HttpDelete("nvl-vattu-mapping/{id}")]
+        public async Task<IActionResult> DeleteNvlVatTuMapping(int id)
+        {
+            var ok = await _nvlBbgnMappingService.DeleteAsync(id);
             if (!ok) return NotFound();
             return Ok();
         }

@@ -156,6 +156,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string TenNVL { get; set; } = string.Empty;
         public string? DonViTinh { get; set; }
         public decimal GiaTri { get; set; }
+        public decimal GiaTriXuat { get; set; }
         public int SoLuongSilo { get; set; }
     }
 

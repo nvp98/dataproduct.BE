@@ -51,16 +51,16 @@ namespace dataproduct.api.Repositories.NMTKVV
                     result.Add(new TKVVGiaTriNVLAutoDto
                     {
                         NguyenVatLieuID = reader["NguyenVatLieuID"] == DBNull.Value ? 0 : Convert.ToInt32(reader["NguyenVatLieuID"]),
-                        MaBM            = reader["MaBM"]?.ToString() ?? string.Empty,
-                        TenNVL          = reader["TenNVL"]?.ToString() ?? string.Empty,
-                        DonViTinh       = reader["DonViTinh"] == DBNull.Value ? null : reader["DonViTinh"].ToString(),
-                        ThuTu           = reader["ThuTu"] == DBNull.Value ? null : Convert.ToInt32(reader["ThuTu"]),
-                        Scope           = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
-                        TenScope        = reader["TenScope"] == DBNull.Value ? null : reader["TenScope"].ToString(),
-                        GiaTri          = reader["GiaTri"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTri"]),
-                        SoLuongTag      = reader["SoLuongTag"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoLuongTag"]),
-                        ThoiGianTu      = reader["ThoiGianTu"] == DBNull.Value ? null : Convert.ToDateTime(reader["ThoiGianTu"]),
-                        ThoiGianDen     = reader["ThoiGianDen"] == DBNull.Value ? null : Convert.ToDateTime(reader["ThoiGianDen"]),
+                        MaBM = reader["MaBM"]?.ToString() ?? string.Empty,
+                        TenNVL = reader["TenNVL"]?.ToString() ?? string.Empty,
+                        DonViTinh = reader["DonViTinh"] == DBNull.Value ? null : reader["DonViTinh"].ToString(),
+                        ThuTu = reader["ThuTu"] == DBNull.Value ? null : Convert.ToInt32(reader["ThuTu"]),
+                        Scope = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
+                        TenScope = reader["TenScope"] == DBNull.Value ? null : reader["TenScope"].ToString(),
+                        GiaTri = reader["GiaTri"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTri"]),
+                        SoLuongTag = reader["SoLuongTag"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoLuongTag"]),
+                        ThoiGianTu = reader["ThoiGianTu"] == DBNull.Value ? null : Convert.ToDateTime(reader["ThoiGianTu"]),
+                        ThoiGianDen = reader["ThoiGianDen"] == DBNull.Value ? null : Convert.ToDateTime(reader["ThoiGianDen"]),
                     });
                 }
             }
@@ -98,18 +98,19 @@ namespace dataproduct.api.Repositories.NMTKVV
                 {
                     result.Add(new TKVVDuLieuCanDto
                     {
-                        Ngay             = ngay.Date,
-                        Ca               = ca,
-                        MaBM             = maBM,
-                        Scope            = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
-                        Xuong            = reader["Xuong"] == DBNull.Value ? null : reader["Xuong"].ToString(),
-                        SiloID           = reader["SiloID"] == DBNull.Value ? null : Convert.ToInt32(reader["SiloID"]),
-                        MaSilo           = reader["MaSilo"] == DBNull.Value ? null : reader["MaSilo"].ToString(),
-                        NguyenVatLieuID  = reader["NguyenVatLieuID"] == DBNull.Value ? 0 : Convert.ToInt32(reader["NguyenVatLieuID"]),
-                        TenNVL           = reader["TenNVL"]?.ToString() ?? string.Empty,
-                        DonViTinh        = reader["DonViTinh"] == DBNull.Value ? null : reader["DonViTinh"].ToString(),
-                        GiaTri           = reader["GiaTri"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTri"]),
-                        SoLuongSilo      = reader["SoLuongSilo"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoLuongSilo"]),
+                        Ngay = ngay.Date,
+                        Ca = ca,
+                        MaBM = maBM,
+                        Scope = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
+                        Xuong = reader["Xuong"] == DBNull.Value ? null : reader["Xuong"].ToString(),
+                        SiloID = reader["SiloID"] == DBNull.Value ? null : Convert.ToInt32(reader["SiloID"]),
+                        MaSilo = reader["MaSilo"] == DBNull.Value ? null : reader["MaSilo"].ToString(),
+                        NguyenVatLieuID = reader["NguyenVatLieuID"] == DBNull.Value ? 0 : Convert.ToInt32(reader["NguyenVatLieuID"]),
+                        TenNVL = reader["TenNVL"]?.ToString() ?? string.Empty,
+                        DonViTinh = reader["DonViTinh"] == DBNull.Value ? null : reader["DonViTinh"].ToString(),
+                        GiaTri = reader["GiaTri"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTri"]),
+                        GiaTriXuat = reader["GiaTriXuat"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["GiaTriXuat"]),
+                        SoLuongSilo = reader["SoLuongSilo"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoLuongSilo"]),
                     });
                 }
             }
