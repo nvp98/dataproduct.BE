@@ -11,7 +11,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -22,7 +22,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? DonViTinh { get; set; }
         public int? ThuTu { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -34,7 +34,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? ThuTu { get; set; }
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
-        public string? Scope { get; set; }
+        public int? Scope { get; set; }
         public string? TenScope { get; set; }
     }
 
@@ -97,8 +97,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
     {
         public long Id { get; set; }
         public string TagID { get; set; } = string.Empty;
-        public string? MaKey { get; set; }
-        public decimal? Value { get; set; }
+        public decimal? GiaTriTuDong { get; set; }
+        public decimal? GiaTriDieuChinh { get; set; }
         public DateOnly Ngay { get; set; }
         public byte Ca { get; set; }
         public string Scope { get; set; } = string.Empty;
