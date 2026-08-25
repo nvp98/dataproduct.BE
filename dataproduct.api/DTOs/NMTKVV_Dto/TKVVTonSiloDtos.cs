@@ -20,7 +20,9 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? DoAm { get; set; }
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
+        public decimal? NhapAuto { get; set; }
         public decimal? Xuat { get; set; }
+        public decimal? XuatAuto { get; set; }
         public decimal? TonCuoi { get; set; }
         public decimal? TonCuoiAuto { get; set; }
         public string? GhiChu { get; set; }
@@ -51,7 +53,9 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? DoAm { get; set; }
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
+        public decimal? NhapAuto { get; set; }
         public decimal? Xuat { get; set; }
+        public decimal? XuatAuto { get; set; }
         public decimal? TonCuoi { get; set; }
         public decimal? TonCuoiAuto { get; set; }
         public string? GhiChu { get; set; }

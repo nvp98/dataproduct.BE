@@ -53,4 +53,29 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public bool TrangThai { get; set; }
         public string? GhiChu { get; set; }
     }
+
+    // ─── Dữ liệu nhận BBGN theo NVL (dbo.sp_TKVV_Get_NVL_BBGN) ──────────────────
+    // SP tự join TKVV_NVL_BBGN_Mapping + chi tiết BBGN theo (Ngay, Ca, TKVV_NVL_ID, Scope).
+    // Trả theo NVL (không theo Silo) — dùng để tự điền cột Nhập ở TKVV_TonSilo/init-rows.
+
+    public class TKVVNvlBbgnDataDto
+    {
+        public int MappingId { get; set; }
+        public int TkvvNvlId { get; set; }
+        public int IdVatTuBBGN { get; set; }
+        public bool MappingTrangThai { get; set; }
+        public string? Kip { get; set; }
+        public int Ca { get; set; }
+        public int? IdXuongBG { get; set; }
+        public int? IdXuongBN { get; set; }
+        public long IdCtBBGN { get; set; }
+        public int IdVatTu { get; set; }
+        public string? MaLo { get; set; }
+        public decimal? DoAmW { get; set; }
+        public decimal? KhoiLuongBG { get; set; }
+        public decimal? KLQuyKhoBG { get; set; }
+        public decimal? KhoiLuongBN { get; set; }
+        public decimal? KLQuyKhoBN { get; set; }
+        public string? BBGNGhiChu { get; set; }
+    }
 }

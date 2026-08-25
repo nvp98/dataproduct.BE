@@ -17,7 +17,9 @@ namespace dataproduct.api.Models
         public decimal? DoAm { get; set; }
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
+        public decimal? NhapAuto { get; set; } // giá trị tự động từ BBGN (sp_TKVV_Get_NVL_BBGN)
         public decimal? Xuat { get; set; }
+        public decimal? XuatAuto { get; set; }
         public decimal? TonCuoi { get; set; }     // = TonDau + Nhap - Xuat, backend tự tính khi save
         public decimal? TonCuoiAuto { get; set; } // giá trị tự động từ nguồn EMS/cảm biến
         public string? GhiChu { get; set; }

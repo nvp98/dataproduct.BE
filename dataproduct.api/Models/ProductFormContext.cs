@@ -848,10 +848,14 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.DoAm).HasColumnType("decimal(18,3)");
             entity.Property(e => e.TonDau).HasColumnType("decimal(18,3)");
             entity.Property(e => e.Nhap).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.NhapAuto).HasColumnType("decimal(18,3)");
             entity.Property(e => e.Xuat).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.XuatAuto).HasColumnType("decimal(18,3)");
             entity.Property(e => e.TonCuoi).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonCuoiAuto).HasColumnType("decimal(18,3)");
             entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
             entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");
         });
         modelBuilder.Entity<TKVV_NVL_BBGN_Mapping>(entity =>
         {
