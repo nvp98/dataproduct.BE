@@ -27,7 +27,7 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto> AddNvlAsync(CreateTKVVNguyenVatLieuDto dto)
         {
-            var scopeCode = dto.Scope.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(dto.Scope.Value) : null;
+            var scopeCode = ResolveScopeCodeFromString(dto.Scope);
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -45,7 +45,7 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto?> UpdateNvlAsync(int id, UpdateTKVVNguyenVatLieuDto dto)
         {
-            var scopeCode = dto.Scope.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(dto.Scope.Value) : null;
+            var scopeCode = ResolveScopeCodeFromString(dto.Scope);
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -61,6 +61,16 @@ namespace dataproduct.api.Services
             return result == null ? null : MapNvl(result);
         }
 
+        // Chấp nhận cả mã chuỗi ("TK1".."VV2") lẫn số cũ ("1"-"6") từ client để không phá các
+        // caller còn gửi số — giống chuẩn hoá đang dùng ở TKVV_BBSLRepository.GetNvlListAsync.
+        private static string? ResolveScopeCodeFromString(string? scope)
+        {
+            if (string.IsNullOrWhiteSpace(scope)) return null;
+            return int.TryParse(scope.Trim(), out var numericScope)
+                ? TKVV_BBSLRepository.ResolveScopeCode(numericScope)
+                : scope.Trim();
+        }
+
         public Task<bool> DeleteNvlAsync(int id) => _repo.DeleteNvlAsync(id);
 
         private static TKVVNguyenVatLieuDto MapNvl(TKVV_NguyenVatLieu e) => new()
@@ -72,7 +82,7 @@ namespace dataproduct.api.Services
             ThuTu = e.ThuTu,
             TrangThai = e.TrangThai,
             GhiChu = e.GhiChu,
-            Scope = TKVV_BBSLRepository.ResolveScopeNumber(e.Scope),
+            Scope =e.Scope,
             TenScope = e.TenScope ?? e.Scope,
         };
 
@@ -421,7 +431,7 @@ namespace dataproduct.api.Services
             if (el.ValueKind == JsonValueKind.String)
                 return decimal.TryParse(
                     el.GetString(),
-                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.NumberStyles.Any, 
                     System.Globalization.CultureInfo.InvariantCulture,
                     out result);
 

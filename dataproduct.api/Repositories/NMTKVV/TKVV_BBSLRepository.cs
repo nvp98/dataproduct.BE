@@ -64,7 +64,7 @@ namespace dataproduct.api.Repositories
                     ThuTu = x.ThuTu,
                     TrangThai = x.TrangThai,
                     GhiChu = x.GhiChu,
-                    Scope = ResolveScopeNumber(x.Scope),
+                    Scope =x.Scope,
                     TenScope = x.TenScope ?? x.Scope,
                 })
                 .AsNoTracking()
