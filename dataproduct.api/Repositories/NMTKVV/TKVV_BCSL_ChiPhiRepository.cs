@@ -171,144 +171,342 @@ namespace dataproduct.api.Repositories.NMTKVV
         public async Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request)
         {
             var ngay = new DateTime(request.NgaySX.Year, request.NgaySX.Month, request.NgaySX.Day);
+            // ============================================================
+            // CHẠY TUẦN TỰ
+            // Cả 2 nhóm dữ liệu đều dùng chung DbContext
+            // ============================================================
 
-            // Chạy tuần tự — cả 2 dùng chung 1 DbConnection, không thể song song
-            var spCa1 = await GetDuLieuCanAsync(ngay, 1, request.MaBM, request.LoaiDuLieu, request.Scope);
-            var spCa2 = await GetDuLieuCanAsync(ngay, 2, request.MaBM, request.LoaiDuLieu, request.Scope);
-            var spTongBBGN1 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(ngay, 1, request.Scope);
-            var spTongBBGN2 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(ngay, 2, request.Scope);
+            var spCa1 = await GetDuLieuCanAsync(
+                ngay,
+                1,
+                request.MaBM,
+                request.LoaiDuLieu,
+                request.Scope);
 
-            await using var tx = await _context.Database.BeginTransactionAsync();
-            try
+            var spCa2 = await GetDuLieuCanAsync(
+                ngay,
+                2,
+                request.MaBM,
+                request.LoaiDuLieu,
+                request.Scope);
+
+            var spTongBBGN1 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(
+                ngay,
+                1,
+                request.Scope);
+
+            var spTongBBGN2 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(
+                ngay,
+                2,
+                request.Scope);
+
+
+            // ============================================================
+            // TRANSACTION 1
+            // XỬ LÝ DỮ LIỆU CÂN NVL / SILO
+            // ============================================================
+
+            await using (var tx1 = await _context.Database.BeginTransactionAsync())
             {
-                // Load existing records for this NgaySX + Scope (int)
-                var existing = await _context.TKVV_BaoCaoSanLuongChiPhi
-                    .Where(x => x.NgaySX == request.NgaySX && x.Scope == request.Scope && !x.IsDelete)
-                    .ToListAsync();
-
-                void UpsertItem(TKVVDuLieuCanDto item, int ca, int thuTu)
+                try
                 {
-                    var klAmAuto = item.GiaTri;
-                    // Khóa nghiệp vụ: NgaySX + Ca + Scope + NguyenVatLieuID (không có SiloID)
-                    var rec = existing.FirstOrDefault(x =>
-                        x.Ca == ca &&
-                        x.NguyenVatLieuID == item.NguyenVatLieuID);
+                    // --------------------------------------------------------
+                    // Load existing records
+                    // Ngày SX + Scope
+                    // --------------------------------------------------------
 
-                    if (rec == null)
-                    {
-                        _context.TKVV_BaoCaoSanLuongChiPhi.Add(new TKVV_BaoCaoSanLuongChiPhi
-                        {
-                            NgaySX = request.NgaySX,
-                            Ca = (byte)ca,
-                            Scope = request.Scope,
-                            NguyenVatLieuID = item.NguyenVatLieuID,
-                            Kip = item.MaSilo,
-                            ThuTu = thuTu,
-                            KLAmAuto = klAmAuto,
-                            KLAm = klAmAuto,   // Rule INSERT: KLAm = KLAmAuto, IsAdjusted = 0
-                            IsAdjusted = false,
-                            CreatedDate = DateTime.Now,
-                            CreatedBy = request.CreatedBy
-                        });
-                    }
-                    else
-                    {
-                        rec.KLAmAuto = klAmAuto;
-                        rec.UpdatedDate = DateTime.Now;
-                        // Rule 3: chưa điều chỉnh → cập nhật cả KLAm
-                        // Rule 4: đã điều chỉnh → chỉ cập nhật KLAmAuto, giữ nguyên KLAm
-                        if (!rec.IsAdjusted)
-                            rec.KLAm = klAmAuto;
-                        rec.Kip = item.MaSilo;
-                    }
-                }
-                void UpsertThanhPham(
-                    TKVVDuLieuSanLuongTongBBGNDto item,
-                    int ca,
-                    int thuTu)
-                {
-                    // Lấy toàn bộ record của Ca + Scope,
-                    // sau đó sắp xếp theo thứ tự đã lưu
-                    var records = existing
+                    var existing = await _context.TKVV_BaoCaoSanLuongChiPhi
                         .Where(x =>
+                            x.NgaySX == request.NgaySX &&
+                            x.Scope == request.Scope &&
+                            !x.IsDelete)
+                        .ToListAsync();
+
+
+                    // ========================================================
+                    // UPSERT DỮ LIỆU CÂN NVL / SILO
+                    // ========================================================
+
+                    void UpsertItem(
+                        TKVVDuLieuCanDto item,
+                        int ca,
+                        int thuTu)
+                    {
+                        var klAmAuto = item.GiaTri;
+
+                        // ----------------------------------------------------
+                        // Khóa nghiệp vụ:
+                        //
+                        // NgaySX
+                        // + Ca
+                        // + Scope
+                        // + NguyenVatLieuID
+                        //
+                        // Không có SiloID
+                        // ----------------------------------------------------
+
+                        var rec = existing.FirstOrDefault(x =>
                             x.Ca == ca &&
-                            x.Scope == request.Scope)
-                        //.OrderBy(x => x.ThuTu)
-                        .ToList();
+                            x.NguyenVatLieuID == item.NguyenVatLieuID);
 
-                    TKVV_BaoCaoSanLuongChiPhi rec = null;
 
-                    // ---------------------------------------------------------
-                    // Nếu đã có record tương ứng theo thứ tự
-                    // ---------------------------------------------------------
-                    if (thuTu <= records.Count)
-                    {
-                        rec = records[thuTu - 1];
-                    }
+                        // ====================================================
+                        // INSERT
+                        // ====================================================
 
-                    if (rec == null)
-                    {
-                        _context.TKVV_BaoCaoSanLuongChiPhi.Add(
-                            new TKVV_BaoCaoSanLuongChiPhi
+                        if (rec == null)
+                        {
+                            rec = new TKVV_BaoCaoSanLuongChiPhi
                             {
                                 NgaySX = request.NgaySX,
+
                                 Ca = (byte)ca,
+
                                 Scope = request.Scope,
 
-                                // Không phải silo/NVL
-                                Kip = null,
+                                NguyenVatLieuID = item.NguyenVatLieuID,
+
+                                Kip = item.MaSilo,
 
                                 ThuTu = thuTu,
 
-                                // Sản lượng BBGN
-                                ThanhPhamL1 = item.GiaTri,
-                                ThanhPham_Note = item.MaPB_BN + " - " + item.TenXuong_BN,
+                                KLAmAuto = klAmAuto,
+
+                                // Rule INSERT:
+                                // KLAm = KLAmAuto
+                                KLAm = klAmAuto,
+
+                                // Rule INSERT:
+                                // IsAdjusted = 0
+                                IsAdjusted = false,
 
                                 CreatedDate = DateTime.Now,
-                                CreatedBy = request.CreatedBy,
 
-                                IsAdjusted = false
-                            });
+                                CreatedBy = request.CreatedBy
+                            };
+
+                            _context.TKVV_BaoCaoSanLuongChiPhi.Add(rec);
+
+                            // ------------------------------------------------
+                            // Quan trọng:
+                            // Thêm record mới vào existing
+                            // để các vòng xử lý tiếp theo nhìn thấy
+                            // ------------------------------------------------
+
+                            existing.Add(rec);
+                        }
+                        else
+                        {
+                            // =================================================
+                            // UPDATE
+                            // =================================================
+
+                            // Luôn cập nhật KLAmAuto
+                            rec.KLAmAuto = klAmAuto;
+
+                            rec.UpdatedDate = DateTime.Now;
+
+                            // -------------------------------------------------
+                            // Rule 3:
+                            // Chưa điều chỉnh → cập nhật cả KLAm
+                            //
+                            // Rule 4:
+                            // Đã điều chỉnh → chỉ cập nhật KLAmAuto
+                            // -------------------------------------------------
+
+                            if (!rec.IsAdjusted)
+                            {
+                                rec.KLAm = klAmAuto;
+                            }
+
+                            // Giữ nguyên logic hiện tại
+                            rec.Kip = item.MaSilo;
+
+                            rec.ThuTu = thuTu;
+                        }
                     }
-                    else
+
+
+                    // ========================================================
+                    // CA 1
+                    // ========================================================
+
+                    for (int i = 0; i < spCa1.Count; i++)
                     {
-                        // Cập nhật sản lượng thành phẩm
+                        UpsertItem(
+                            spCa1[i],
+                            1,
+                            i + 1);
+                    }
+
+
+                    // ========================================================
+                    // CA 2
+                    // ========================================================
+
+                    for (int i = 0; i < spCa2.Count; i++)
+                    {
+                        UpsertItem(
+                            spCa2[i],
+                            2,
+                            i + 1);
+                    }
+
+
+                    // ========================================================
+                    // SAVE TRANSACTION 1
+                    // ========================================================
+
+                    await _context.SaveChangesAsync();
+
+                    await tx1.CommitAsync();
+                }
+                catch
+                {
+                    await tx1.RollbackAsync();
+                    throw;
+                }
+            }
+
+
+            // ============================================================
+            // TRANSACTION 2
+            // XỬ LÝ SẢN LƯỢNG BBGN / THÀNH PHẨM
+            // ============================================================
+
+            await using (var tx2 = await _context.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    // --------------------------------------------------------
+                    // Load lại dữ liệu từ DB
+                    //
+                    // Không dùng lại existing của Transaction 1
+                    // --------------------------------------------------------
+
+                    var existing = await _context.TKVV_BaoCaoSanLuongChiPhi
+                        .Where(x =>
+                            x.NgaySX == request.NgaySX &&
+                            x.Scope == request.Scope &&
+                            !x.IsDelete)
+                        .OrderBy(x => x.Ca)
+                        .ThenBy(x => x.ThuTu)
+                        .ToListAsync();
+
+
+                    // ========================================================
+                    // UPDATE SẢN LƯỢNG BBGN
+                    // ========================================================
+
+                    void UpsertThanhPham(
+                        TKVVDuLieuSanLuongTongBBGNDto item,
+                        int ca,
+                        int thuTu)
+                    {
+                        // ----------------------------------------------------
+                        // Lấy danh sách record của Ca + Scope
+                        //
+                        // Không map NguyenVatLieuID
+                        // Không map ID NVL
+                        // ----------------------------------------------------
+
+                        var records = existing
+                            .Where(x =>
+                                x.Ca == ca &&
+                                x.Scope == request.Scope &&
+                                !x.IsDelete)
+                            .OrderBy(x => x.ThuTu)
+                            .ToList();
+
+
+                        // ----------------------------------------------------
+                        // Không có dòng tương ứng
+                        // ----------------------------------------------------
+
+                        if (thuTu > records.Count)
+                        {
+                            throw new InvalidOperationException(
+                                $"Không đủ dòng để cập nhật sản lượng BBGN. " +
+                                $"Ngày={request.NgaySX}; " +
+                                $"Ca={ca}; " +
+                                $"Scope={request.Scope}; " +
+                                $"ThuTu={thuTu}; " +
+                                $"SoDongHienCo={records.Count}; " +
+                                $"MaPB={item.MaPB_BN}; " +
+                                $"Xuong={item.TenXuong_BN}"
+                            );
+                        }
+
+
+                        // ----------------------------------------------------
+                        // Lấy record theo thứ tự
+                        //
+                        // thuTu = 1 → records[0]
+                        // thuTu = 2 → records[1]
+                        // thuTu = 3 → records[2]
+                        // ...
+                        // ----------------------------------------------------
+
+                        var rec = records[thuTu - 1];
+
+
+                        // ====================================================
+                        // UPDATE THÀNH PHẨM
+                        // ====================================================
+
                         rec.ThanhPhamL1 = item.GiaTri;
 
-                        rec.ThanhPham_Note = item.MaPB_BN + " - " + item.TenXuong_BN;
+                        rec.ThanhPham_Note =
+                            item.MaPB_BN
+                            + " - "
+                            + item.TenXuong_BN;
+
                         rec.UpdatedDate = DateTime.Now;
                     }
+
+
+                    // ========================================================
+                    // CA 1 - BBGN
+                    // ========================================================
+
+                    for (int i = 0; i < spTongBBGN1.Count; i++)
+                    {
+                        UpsertThanhPham(
+                            spTongBBGN1[i],
+                            1,
+                            i + 1);
+                    }
+
+
+                    // ========================================================
+                    // CA 2 - BBGN
+                    // ========================================================
+
+                    for (int i = 0; i < spTongBBGN2.Count; i++)
+                    {
+                        UpsertThanhPham(
+                            spTongBBGN2[i],
+                            2,
+                            i + 1);
+                    }
+
+
+                    // ========================================================
+                    // SAVE TRANSACTION 2
+                    // ========================================================
+
+                    await _context.SaveChangesAsync();
+
+                    await tx2.CommitAsync();
                 }
-
-
-                for (int i = 0; i < spCa1.Count; i++) UpsertItem(spCa1[i], 1, i + 1);
-                for (int i = 0; i < spCa2.Count; i++) UpsertItem(spCa2[i], 2, i + 1);
-                for (int i = 0; i < spTongBBGN1.Count; i++)
+                catch
                 {
-                    UpsertThanhPham(
-                        spTongBBGN1[i],
-                        1,
-                        i + 1
-                    );
+                    await tx2.RollbackAsync();
+                    throw;
                 }
-
-                for (int i = 0; i < spTongBBGN2.Count; i++)
-                {
-                    UpsertThanhPham(
-                        spTongBBGN2[i],
-                        2,
-                        i + 1
-                    );
-                }
-
-                await _context.SaveChangesAsync();
-                await tx.CommitAsync();
             }
-            catch
-            {
-                await tx.RollbackAsync();
-                throw;
-            }
+
+
 
             return await GetBaoCaoDataAsync(request.NgaySX, request.MaBM, request.Scope);
         }
@@ -376,6 +574,7 @@ namespace dataproduct.api.Repositories.NMTKVV
 
                     if (rec == null) continue;
 
+                    rec.PhieuID = request.PhieuID;
                     rec.KLAm = row.KLAm;
                     rec.DoAm = row.DoAm;
                     rec.QuyKho = row.QuyKho;
