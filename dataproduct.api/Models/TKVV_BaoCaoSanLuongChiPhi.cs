@@ -19,6 +19,8 @@ namespace dataproduct.api.Models
         public decimal? QuyKho { get; set; }
         public decimal? ThanhPhamL1 { get; set; }
         public decimal? ThanhPhamL2 { get; set; }
+        public decimal? ThanhPhamL3 { get; set; }
+        public string? ThanhPham_Note { get; set; }
         public string? GhiChu { get; set; }
         public bool IsAdjusted { get; set; }
         public int? AdjustedBy { get; set; }

@@ -160,6 +160,22 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int SoLuongSilo { get; set; }
     }
 
+    // ─── Dữ liệu cân từ sp_TKVV_GetSanLuongTong_BBGN — đổ bảng khi tạo phiếu BC SLCP ──
+    // Gọi với (Ngay, Ca, MaBM, LoaiDuLieu, Scope int) — trả từng dòng NVL/Silo.
+
+    public class TKVVDuLieuSanLuongTongBBGNDto
+    {
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+        public string? Scope { get; set; }
+        public string? Xuong { get; set; }
+        public decimal GiaTri { get; set; }
+        public string? TenXuong_BN { get; set; } = string.Empty;
+        public string? MaPB_BN { get; set; } = string.Empty;
+        public string? MaLo { get; set; } = string.Empty;
+        public string? BBGN_GhiChu { get; set; } = string.Empty;
+    }
+
     // ─── TKVV_BaoCaoSanLuongChiPhi — bảng lưu dữ liệu cân + trạng thái điều chỉnh ─
 
     public class TKVVBaoCaoSanLuongChiPhiDto
@@ -179,7 +195,9 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? QuyKho { get; set; }
         public decimal? ThanhPhamL1 { get; set; }
         public decimal? ThanhPhamL2 { get; set; }
+        public decimal? ThanhPhamL3 { get; set; }
         public string? GhiChu { get; set; }
+        public string? ThanhPham_Note { get; set; }
         public bool IsAdjusted { get; set; }
         public int? AdjustedBy { get; set; }
         public DateTime? AdjustedDate { get; set; }
@@ -215,6 +233,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? QuyKho { get; set; }
         public decimal? ThanhPhamL1 { get; set; }
         public decimal? ThanhPhamL2 { get; set; }
+        public decimal? ThanhPhamL3 { get; set; }
         public string? GhiChu { get; set; }
     }
 

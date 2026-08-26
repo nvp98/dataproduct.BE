@@ -826,7 +826,7 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<TKVV_Silo_TagMapping>(entity => { entity.ToTable("TKVV_Silo_TagMapping"); });
         modelBuilder.Entity<TKVV_BaoCaoSanLuongChiPhi>(entity =>
         {
-            entity.ToTable("TKVV_BaoCaoSanLuongChiPhi");
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
             entity.Property(e => e.Kip).HasMaxLength(10);
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.NgaySX).HasColumnType("date");
@@ -836,6 +836,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.QuyKho).HasColumnType("decimal(18,3)");
             entity.Property(e => e.ThanhPhamL1).HasColumnType("decimal(18,3)");
             entity.Property(e => e.ThanhPhamL2).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL3).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPham_Note).HasMaxLength(150);
             entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
             entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
             entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");

@@ -122,6 +122,50 @@ namespace dataproduct.api.Repositories.NMTKVV
             return result;
         }
 
+        public async Task<List<TKVVDuLieuSanLuongTongBBGNDto>> GetDuLieuDuLieuSanLuongTongBBGNAsync(
+            DateTime ngay, int ca, int scope)
+        {
+            var result = new List<TKVVDuLieuSanLuongTongBBGNDto>();
+
+            var conn = _context.Database.GetDbConnection();
+            var wasOpen = conn.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "dbo.sp_TKVV_GetSanLuongTong_BBGN";
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.CommandTimeout = 30;
+                cmd.Parameters.Add(new SqlParameter("@Ngay", ngay.Date));
+                cmd.Parameters.Add(new SqlParameter("@Ca", ca));
+                cmd.Parameters.Add(new SqlParameter("@Scope", scope));
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new TKVVDuLieuSanLuongTongBBGNDto
+                    {
+                        Ngay = ngay.Date,
+                        Ca = ca,
+                        Scope = reader["Scope"] == DBNull.Value ? null : reader["Scope"].ToString(),
+                        Xuong = reader["MaXuong"] == DBNull.Value ? null : reader["MaXuong"].ToString(),
+                        GiaTri = reader["KhoiLuong_BG"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["KhoiLuong_BG"]),
+                        TenXuong_BN = reader["TenXuong_BN"] == DBNull.Value ? null : reader["TenXuong_BN"].ToString(),
+                        MaPB_BN = reader["MaPB_BN"] == DBNull.Value ? null : reader["MaPB_BN"].ToString(),
+                        MaLo = reader["MaLo"] == DBNull.Value ? null : reader["MaLo"].ToString(),
+                        BBGN_GhiChu = reader["BBGN_GhiChu"] == DBNull.Value ? null : reader["BBGN_GhiChu"].ToString(),
+                    });
+                }
+            }
+            finally
+            {
+                if (!wasOpen) await conn.CloseAsync();
+            }
+
+            return result;
+        }
+
         // ─── TKVV_BaoCaoSanLuongChiPhi ────────────────────────────────────────────
 
         public async Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request)
@@ -131,6 +175,8 @@ namespace dataproduct.api.Repositories.NMTKVV
             // Chạy tuần tự — cả 2 dùng chung 1 DbConnection, không thể song song
             var spCa1 = await GetDuLieuCanAsync(ngay, 1, request.MaBM, request.LoaiDuLieu, request.Scope);
             var spCa2 = await GetDuLieuCanAsync(ngay, 2, request.MaBM, request.LoaiDuLieu, request.Scope);
+            var spTongBBGN1 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(ngay, 1, request.Scope);
+            var spTongBBGN2 = await GetDuLieuDuLieuSanLuongTongBBGNAsync(ngay, 2, request.Scope);
 
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
@@ -162,7 +208,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             KLAm = klAmAuto,   // Rule INSERT: KLAm = KLAmAuto, IsAdjusted = 0
                             IsAdjusted = false,
                             CreatedDate = DateTime.Now,
-                            CreatedBy = request.CreatedBy,
+                            CreatedBy = request.CreatedBy
                         });
                     }
                     else
@@ -176,9 +222,84 @@ namespace dataproduct.api.Repositories.NMTKVV
                         rec.Kip = item.MaSilo;
                     }
                 }
+                void UpsertThanhPham(
+                    TKVVDuLieuSanLuongTongBBGNDto item,
+                    int ca,
+                    int thuTu)
+                {
+                    // Lấy toàn bộ record của Ca + Scope,
+                    // sau đó sắp xếp theo thứ tự đã lưu
+                    var records = existing
+                        .Where(x =>
+                            x.Ca == ca &&
+                            x.Scope == request.Scope)
+                        //.OrderBy(x => x.ThuTu)
+                        .ToList();
+
+                    TKVV_BaoCaoSanLuongChiPhi rec = null;
+
+                    // ---------------------------------------------------------
+                    // Nếu đã có record tương ứng theo thứ tự
+                    // ---------------------------------------------------------
+                    if (thuTu <= records.Count)
+                    {
+                        rec = records[thuTu - 1];
+                    }
+
+                    if (rec == null)
+                    {
+                        _context.TKVV_BaoCaoSanLuongChiPhi.Add(
+                            new TKVV_BaoCaoSanLuongChiPhi
+                            {
+                                NgaySX = request.NgaySX,
+                                Ca = (byte)ca,
+                                Scope = request.Scope,
+
+                                // Không phải silo/NVL
+                                Kip = null,
+
+                                ThuTu = thuTu,
+
+                                // Sản lượng BBGN
+                                ThanhPhamL1 = item.GiaTri,
+                                ThanhPham_Note = item.MaPB_BN + " - " + item.TenXuong_BN,
+
+                                CreatedDate = DateTime.Now,
+                                CreatedBy = request.CreatedBy,
+
+                                IsAdjusted = false
+                            });
+                    }
+                    else
+                    {
+                        // Cập nhật sản lượng thành phẩm
+                        rec.ThanhPhamL1 = item.GiaTri;
+
+                        rec.ThanhPham_Note = item.MaPB_BN + " - " + item.TenXuong_BN;
+                        rec.UpdatedDate = DateTime.Now;
+                    }
+                }
+
 
                 for (int i = 0; i < spCa1.Count; i++) UpsertItem(spCa1[i], 1, i + 1);
                 for (int i = 0; i < spCa2.Count; i++) UpsertItem(spCa2[i], 2, i + 1);
+                for (int i = 0; i < spTongBBGN1.Count; i++)
+                {
+                    UpsertThanhPham(
+                        spTongBBGN1[i],
+                        1,
+                        i + 1
+                    );
+                }
+
+                for (int i = 0; i < spTongBBGN2.Count; i++)
+                {
+                    UpsertThanhPham(
+                        spTongBBGN2[i],
+                        2,
+                        i + 1
+                    );
+                }
 
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
@@ -216,6 +337,8 @@ namespace dataproduct.api.Repositories.NMTKVV
                                   QuyKho = r.QuyKho,
                                   ThanhPhamL1 = r.ThanhPhamL1,
                                   ThanhPhamL2 = r.ThanhPhamL2,
+                                  ThanhPhamL3 = r.ThanhPhamL3,
+                                  ThanhPham_Note = r.ThanhPham_Note,
                                   GhiChu = r.GhiChu,
                                   IsAdjusted = r.IsAdjusted,
                                   AdjustedBy = r.AdjustedBy,
@@ -258,6 +381,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                     rec.QuyKho = row.QuyKho;
                     rec.ThanhPhamL1 = row.ThanhPhamL1;
                     rec.ThanhPhamL2 = row.ThanhPhamL2;
+                    rec.ThanhPhamL3 = row.ThanhPhamL3;
                     rec.GhiChu = row.GhiChu;
                     rec.Kip = row.Kip;
                     rec.PhieuID = request.PhieuID;
