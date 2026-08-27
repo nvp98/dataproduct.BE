@@ -21,7 +21,7 @@ namespace dataproduct.api.Repositories
         // Chi tiết sản lượng theo phiếu
         Task ReplaceChiTietAsync(Guid idPhieu, List<TKVV_SanLuongChiTiet> entities);
         Task<List<TKVVChiTietDto>> GetChiTietByPhieuAsync(Guid idPhieu);
-
+        Task<bool> HasDuLieuByNgayCaScopeAsync(DateTime ngay, int ca, int scope);
         // Phiếu
         Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
     }
