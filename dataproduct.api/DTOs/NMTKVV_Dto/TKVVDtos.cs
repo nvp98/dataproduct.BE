@@ -38,59 +38,6 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? TenScope { get; set; }
     }
 
-    // ─── Mapping NVL ↔ Tag EMS + Ca (bảng TKVV_NVL_TagMapping) ─────────────────
-    // 1 bản ghi = 1 NVL dùng TagIDEMS nào ở Ca nào. Scope không lưu ở mapping —
-    // kế thừa từ TKVV_NguyenVatLieu.Scope qua NguyenVatLieuID.
-
-    public class TKVVMappingDto
-    {
-        public int Id { get; set; }
-        public int NguyenVatLieuID { get; set; }
-        public string? TenNVL { get; set; }
-        public string? ScopeNVL { get; set; }
-        public string TagIDEMS { get; set; } = string.Empty;
-        public int Ca { get; set; }
-        public bool TrangThai { get; set; }
-        public string? GhiChu { get; set; }
-        public DateTime NgayCapNhat { get; set; }
-    }
-
-    public class CreateTKVVMappingDto
-    {
-        public int NguyenVatLieuID { get; set; }
-        public string TagIDEMS { get; set; } = string.Empty;
-        public int Ca { get; set; }
-        public string? GhiChu { get; set; }
-    }
-
-    public class UpdateTKVVMappingDto
-    {
-        public int NguyenVatLieuID { get; set; }
-        public string TagIDEMS { get; set; } = string.Empty;
-        public int Ca { get; set; }
-        public bool TrangThai { get; set; }
-        public string? GhiChu { get; set; }
-    }
-
-    // ─── Danh sách Tag PLC từ EMS (dbo.EMS_GetMappingTag) để chọn khi tạo Mapping ─
-    // Không lọc theo Loai — dùng chung cho toàn NM.TKVV, không riêng biên bản sản
-    // lượng, nên trả mọi loại Tag của xưởng (SANLUONG, TONSILO, ...). Ca suy ra từ
-    // LoaiDuLieu: "1"=ngày, "2"=đêm; "0" (đang tích lũy ca hiện tại, không cố định
-    // ngày/đêm) trả về Ca=null — không dùng để Mapping.
-
-    public class EMSMappingTagDto
-    {
-        public int Id { get; set; }
-        public string Xuong { get; set; } = string.Empty;
-        public string? Loai { get; set; }
-        public string? MaCan { get; set; }
-        public string? TenCan { get; set; }
-        public string TagIDEMS { get; set; } = string.Empty;
-        public string TagName { get; set; } = string.Empty;
-        public int? Ca { get; set; }
-        public string? GhiChu { get; set; }
-    }
-
     // ─── Dữ liệu thô lọc theo Scope/khoảng ngày ────────────────────────────────
 
     public class TKVVDuLieuRawDto
@@ -226,61 +173,11 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public List<SaveBcSlRowDto> Rows { get; set; } = new();
     }
 
-    // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp (bảng TKVV_SanLuongMapping) ─
-
-    public class TKVVSanLuongMappingDto
-    {
-        public long Id { get; set; }
-        public string TagID { get; set; } = string.Empty;
-        public string? Scope { get; set; }
-        public string? TenCan { get; set; }
-        public byte Ca { get; set; }
-        public string? Kip { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public bool TrangThai { get; set; }
-        public string? GhiChu { get; set; }
-        public DateTime NgayTao { get; set; }
-        public int? NguoiTaoID { get; set; }
-    }
-
-    public class CreateTKVVSanLuongMappingDto
-    {
-        public string TagID { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public string? Kip { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public string? GhiChu { get; set; }
-        public int? NguoiTaoID { get; set; }
-    }
-
-    public class UpdateTKVVSanLuongMappingDto
-    {
-        public string TagID { get; set; } = string.Empty;
-        public string Scope { get; set; } = string.Empty;
-        public byte Ca { get; set; }
-        public string? Kip { get; set; }
-        public DateOnly? TuNgay { get; set; }
-        public DateOnly? DenNgay { get; set; }
-        public bool TrangThai { get; set; }
-        public string? GhiChu { get; set; }
-        public int? NguoiTaoID { get; set; }
-    }
-
     // ─── Request đơn giản cho controller ───────────────────────────────────────
 
     public class UpdateGiaTriDieuChinhRequestDto
     {
         public decimal? GiaTriDieuChinh { get; set; }
-    }
-
-    public class SyncDuLieuTuEmsRequestDto
-    {
-        public DateTime Ngay { get; set; }
-        public byte Ca { get; set; }
-        public int Scope { get; set; }
     }
 
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────
