@@ -423,21 +423,6 @@ namespace dataproduct.api.Repositories.NMTKVV
                         // Không có dòng tương ứng
                         // ----------------------------------------------------
 
-                        if (thuTu > records.Count)
-                        {
-                            throw new InvalidOperationException(
-                                $"Không đủ dòng để cập nhật sản lượng BBGN. " +
-                                $"Ngày={request.NgaySX}; " +
-                                $"Ca={ca}; " +
-                                $"Scope={request.Scope}; " +
-                                $"ThuTu={thuTu}; " +
-                                $"SoDongHienCo={records.Count}; " +
-                                $"MaPB={item.MaPB_BN}; " +
-                                $"Xuong={item.TenXuong_BN}"
-                            );
-                        }
-
-
                         // ----------------------------------------------------
                         // Lấy record theo thứ tự
                         //
@@ -446,6 +431,10 @@ namespace dataproduct.api.Repositories.NMTKVV
                         // thuTu = 3 → records[2]
                         // ...
                         // ----------------------------------------------------
+
+                        // Unique index (NgaySX, Ca, Scope, NguyenVatLieuID) chỉ cho 1 row/NVL
+                        // → BBGN items vượt quá số NVL rows thì bỏ qua, không thể lưu thêm
+                        if (thuTu > records.Count) return;
 
                         var rec = records[thuTu - 1];
 
