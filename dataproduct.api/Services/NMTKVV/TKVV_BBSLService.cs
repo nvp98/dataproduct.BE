@@ -86,85 +86,6 @@ namespace dataproduct.api.Services
             TenScope = e.TenScope ?? e.Scope,
         };
 
-        // ─── Mapping NVL ↔ Tag EMS + Ca ─────────────────────────────────────────
-        // Scope kế thừa từ NVL — không lưu lại ở bảng mapping.
-
-        public Task<List<TKVVMappingDto>> GetMappingListAsync()
-            => _repo.GetMappingListAsync();
-
-        public async Task<TKVVMappingDto?> GetMappingByIdAsync(int id)
-        {
-            var e = await _repo.GetMappingByIdAsync(id);
-            return e == null ? null : MapMapping(e);
-        }
-
-        public async Task<TKVVMappingDto> AddMappingAsync(CreateTKVVMappingDto dto)
-        {
-            var entity = new TKVV_NVL_TagMapping
-            {
-                NguyenVatLieuID = dto.NguyenVatLieuID,
-                TagIDEMS = dto.TagIDEMS,
-                Ca = dto.Ca,
-                GhiChu = dto.GhiChu,
-                TrangThai = true,
-            };
-            var result = await _repo.AddMappingAsync(entity);
-            return MapMapping(result);
-        }
-
-        public async Task<TKVVMappingDto?> UpdateMappingAsync(int id, UpdateTKVVMappingDto dto)
-        {
-            var entity = new TKVV_NVL_TagMapping
-            {
-                NguyenVatLieuID = dto.NguyenVatLieuID,
-                TagIDEMS = dto.TagIDEMS,
-                Ca = dto.Ca,
-                TrangThai = dto.TrangThai,
-                GhiChu = dto.GhiChu,
-            };
-            var result = await _repo.UpdateMappingAsync(id, entity);
-            return result == null ? null : MapMapping(result);
-        }
-
-        public Task<bool> DeleteMappingAsync(int id) => _repo.DeleteMappingAsync(id);
-
-        private static TKVVMappingDto MapMapping(TKVV_NVL_TagMapping e) => new()
-        {
-            Id = e.ID,
-            NguyenVatLieuID = e.NguyenVatLieuID,
-            TagIDEMS = e.TagIDEMS,
-            Ca = e.Ca,
-            TrangThai = e.TrangThai,
-            GhiChu = e.GhiChu,
-            NgayCapNhat = e.NgayCapNhat,
-        };
-
-        // ─── Danh sách Tag PLC từ EMS để chọn khi tạo Mapping ──────────────────
-        // Không lọc theo Loai — dùng chung cho toàn NM.TKVV (không chỉ riêng biên
-        // bản sản lượng), nên trả mọi loại Tag của xưởng (SANLUONG, TONSILO, ...).
-        // Ca suy ra từ LoaiDuLieu: "1"=ngày, "2"=đêm; "0" (đang tích lũy ca hiện
-        // tại) trả Ca=null vì không cố định ngày/đêm.
-        public async Task<List<EMSMappingTagDto>> GetEmsTagListAsync(string? xuong, string? tagName)
-        {
-            var raw = await _repo.GetEmsTagListAsync(xuong, tagName);
-            return raw
-                .Where(x => x.TagIDEMS != null)
-                .Select(x => new EMSMappingTagDto
-                {
-                    Id = x.ID,
-                    Xuong = x.Xuong?.Trim() ?? string.Empty,
-                    Loai = x.Loai?.Trim(),
-                    MaCan = x.MaCan?.Trim(),
-                    TenCan = x.TenCan?.Trim(),
-                    TagIDEMS = x.TagIDEMS!.Value.ToString(),
-                    TagName = x.TagName?.Trim() ?? string.Empty,
-                    Ca = x.LoaiDuLieu?.Trim() switch { "1" => 1, "2" => 2, _ => null },
-                    GhiChu = x.GhiChu?.Trim(),
-                })
-                .OrderBy(x => x.Xuong).ThenBy(x => x.TenCan).ThenBy(x => x.Ca)
-                .ToList();
-        }
-
         // ─── Dữ liệu PLC thô ─────────────────────────────────────────────────
 
         public Task<List<TKVVDuLieuRawDto>> GetDataByFilterAsync(
@@ -175,107 +96,9 @@ namespace dataproduct.api.Services
             => _repo.UpdateGiaTriDieuChinhAsync(id, giaTriDieuChinh);
 
         // ─── Tổng tự động (PLC) theo Ngay/Ca/Scope toàn cục (1-6) ──────────────
-        // 1 Tag = 1 BM/xưởng, chỉ có 1 số tổng duy nhất (không tách theo sản phẩm).
-        // Chỉ để KTV/KCS đối chiếu — KHÔNG tự điền vào Loại 1/2/3/Phế phẩm vì PLC
-        // chỉ báo tổng khối lượng, không tự phân loại được.
 
         public Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay, int ca, int scope)
             => _repo.GetTongTuDongAsync(ngay, ca, scope);
-
-        // ─── Mapping Cân (EMS) → Xưởng theo Ngày/Ca/Kíp ─────────────────────────
-
-        public async Task<List<TKVVSanLuongMappingDto>> GetSanLuongMappingListAsync(string? scope)
-        {
-            var list = await _repo.GetSanLuongMappingListAsync(scope);
-            if (list.Count == 0) return list;
-
-            // Enrich TenCan từ danh mục Cân EMS (không có bảng local — chỉ gọi qua SP linked
-            // server) để hiển thị tên cân bên cạnh TagID cho dễ đọc, không bắt buộc khớp được.
-            try
-            {
-                var emsTags = await _repo.GetEmsTagListAsync(null, null);
-                var tenCanByTagId = emsTags
-                    .Where(t => t.TagIDEMS != null)
-                    .GroupBy(t => t.TagIDEMS!.Value.ToString())
-                    .ToDictionary(g => g.Key, g => g.First().TenCan);
-
-                foreach (var item in list)
-                    item.TenCan = tenCanByTagId.GetValueOrDefault(item.TagID);
-            }
-            catch
-            {
-                // Lỗi gọi linked server EMS không được chặn việc xem danh sách mapping đã lưu
-            }
-
-            return list;
-        }
-
-        public async Task<TKVVSanLuongMappingDto?> GetSanLuongMappingByIdAsync(long id)
-        {
-            var e = await _repo.GetSanLuongMappingByIdAsync(id);
-            return e == null ? null : MapSanLuongMapping(e);
-        }
-
-        public async Task<TKVVSanLuongMappingDto> AddSanLuongMappingAsync(CreateTKVVSanLuongMappingDto dto)
-        {
-            var entity = new TKVV_SanLuongMapping
-            {
-                TagID = dto.TagID,
-                Scope = dto.Scope,
-                Ca = dto.Ca,
-                Kip = dto.Kip,
-                TuNgay = dto.TuNgay,
-                DenNgay = dto.DenNgay,
-                GhiChu = dto.GhiChu,
-                NguoiTaoID = dto.NguoiTaoID,
-                TrangThai = true,
-            };
-            var result = await _repo.AddSanLuongMappingAsync(entity);
-            return MapSanLuongMapping(result);
-        }
-
-        public async Task<TKVVSanLuongMappingDto?> UpdateSanLuongMappingAsync(long id, UpdateTKVVSanLuongMappingDto dto)
-        {
-            var entity = new TKVV_SanLuongMapping
-            {
-                TagID = dto.TagID,
-                Scope = dto.Scope,
-                Ca = dto.Ca,
-                Kip = dto.Kip,
-                TuNgay = dto.TuNgay,
-                DenNgay = dto.DenNgay,
-                GhiChu = dto.GhiChu,
-                NguoiTaoID = dto.NguoiTaoID,
-                TrangThai = dto.TrangThai,
-            };
-            var result = await _repo.UpdateSanLuongMappingAsync(id, entity);
-            return result == null ? null : MapSanLuongMapping(result);
-        }
-
-        public Task<bool> DeleteSanLuongMappingAsync(long id) => _repo.DeleteSanLuongMappingAsync(id);
-
-        private static TKVVSanLuongMappingDto MapSanLuongMapping(TKVV_SanLuongMapping e) => new()
-        {
-            Id = e.ID,
-            TagID = e.TagID,
-            Scope = e.Scope,
-            Ca = e.Ca,
-            Kip = e.Kip,
-            TuNgay = e.TuNgay,
-            DenNgay = e.DenNgay,
-            TrangThai = e.TrangThai,
-            GhiChu = e.GhiChu,
-            NgayTao = e.NgayTao,
-            NguoiTaoID = e.NguoiTaoID,
-        };
-
-        // ─── Đồng bộ dữ liệu cân/PLC thô (SP_TKVV_GetDuLieuCan_TuMapping) ───────────
-
-        public Task<int> SyncDuLieuTuEmsAsync(DateTime ngay, byte ca, int scope)
-        {
-            var scopeCode = TKVV_BBSLRepository.ResolveScopeCode(scope);
-            return _repo.SyncDuLieuTuEmsAsync(ngay, ca, scopeCode);
-        }
 
         // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────
 
@@ -283,14 +106,7 @@ namespace dataproduct.api.Services
             => _repo.GetChiTietByPhieuAsync(idPhieu);
 
         // ─── Ghi chi tiết từ JSON của phiếu (hook post-save từ PhieuService) ──
-        // table1[i] có dạng: { thuTu, thoiGian, nguyenVatLieuID, ghiChu,
-        //   "1": giaTriLoai1, "2": giaTriLoai2, "3": giaTriLoai3, "4": giaTriPhePham }
-        // Mỗi dòng trên bảng UI = đúng 1 bản ghi TKVV_SanLuongChiTiet (4 cột Loai1/
-        // Loai2/Loai3/PhePham nằm ngang trên cùng 1 dòng, không nổ thành nhiều dòng
-        // theo PhanLoai nữa). Mọi giá trị đều do KTV/KCS tự nhập tay nên IsEdited
-        // luôn true. SkippedRows = số dòng có nhập ít nhất 1 giá trị Loại 1-4 nhưng
-        // bị bỏ qua vì chưa xác định được Sản lượng (nguyenVatLieuID) — dùng để cảnh
-        // báo người dùng thay vì âm thầm lưu phiếu "thành công" mà bảng chi tiết trống trơn.
+
         public async Task<(int ItemCount, int SkippedRows)> InsertFromPhieuJsonAsync(BmPhieu phieu)
         {
             if (phieu == null || string.IsNullOrWhiteSpace(phieu.DataJson))
