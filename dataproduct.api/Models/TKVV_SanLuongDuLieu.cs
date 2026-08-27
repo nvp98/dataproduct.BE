@@ -7,7 +7,7 @@ namespace dataproduct.api.Models
     {
         [Key]
         public long ID { get; set; }
-        public string TagID { get; set; } = string.Empty;
+        public string? TagID { get; set; } = string.Empty;
         public decimal? GiaTriTuDong { get; set; }
         public decimal? GiaTriDieuChinh { get; set; }
         public DateOnly Ngay { get; set; }
