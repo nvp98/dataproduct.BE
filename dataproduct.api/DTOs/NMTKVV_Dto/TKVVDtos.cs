@@ -66,6 +66,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
     public class TKVVTongTuDongDto
     {
         public decimal TongTuDong { get; set; }
+        public string? Message { get; set; }
+        public bool HasData { get; set; }
     }
 
     // ─── Giá trị NVL tự động từ EMS (SP_TKVV_GetGiaTriNVL_Auto) ────────────────

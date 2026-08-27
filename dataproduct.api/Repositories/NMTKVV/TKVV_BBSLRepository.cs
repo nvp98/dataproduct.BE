@@ -227,5 +227,17 @@ namespace dataproduct.api.Repositories
 
         public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
             => await _context.BmPhieus.FindAsync(idPhieu);
+
+
+        public async Task<bool> HasDuLieuByNgayCaScopeAsync(DateTime ngay,int ca,int scope) 
+        {
+
+            var ngayOnly = DateOnly.FromDateTime(ngay);
+
+            var scopeValue = scope.ToString();
+            return await _context.TKVV_SanLuongDuLieu.AsNoTracking().AnyAsync(d => d.Ngay == ngayOnly &&
+            d.Ca == (byte)ca &&
+            d.Scope == scopeValue);
+        }
     }
 }

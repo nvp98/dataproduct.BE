@@ -89,8 +89,26 @@ namespace dataproduct.api.Services
 
         // ─── Tổng tự động (PLC) theo Ngay/Ca/Scope toàn cục (1-6) ──────────────
 
-        public Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay, int ca, int scope)
-            => _repo.GetTongTuDongAsync(ngay, ca, scope);
+        public async Task<TKVVTongTuDongDto> GetTongTuDongAsync( DateTime ngay,int ca, int scope)
+        {
+            var hasData = await _repo.HasDuLieuByNgayCaScopeAsync(ngay,ca,scope);
+
+            if (!hasData)
+            {
+                return new TKVVTongTuDongDto
+                {
+                    TongTuDong = 0,
+                    HasData = false,
+                    Message = $"Chưa có dữ liệu của ngày {ngay:dd/MM/yyyy}, ca {ca}, xưởng {scope}."
+                };
+            }
+
+            var result = await _repo.GetTongTuDongAsync(ngay,ca, scope);
+            result.HasData =true;
+            result.Message = null;
+            return result;
+        }
+
 
         // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────
 
