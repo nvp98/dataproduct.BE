@@ -45,9 +45,9 @@ namespace dataproduct.api.Repositories
 
         public async Task<List<TKVVNguyenVatLieuDto>> GetNvlListAsync(string? maBM, string? scope)
         {
-            var scopeCode = string.IsNullOrWhiteSpace(scope)
-                ? null
-                : (int.TryParse(scope.Trim(), out var numericScope) ? ResolveScopeCode(numericScope) : scope.Trim());
+            // TKVV_NguyenVatLieu.Scope lưu mã số "1".."6" — chấp nhận filter truyền vào ở
+            // cả 2 dạng ("TK1" hoặc "1") rồi luôn quy về số để so khớp đúng dữ liệu trong DB.
+            var scopeCode = ResolveScopeNumber(scope)?.ToString();
 
             return await _context.TKVV_NguyenVatLieu
                 .Where(x => (maBM == null || x.MaBM == maBM)
@@ -144,14 +144,14 @@ namespace dataproduct.api.Repositories
         // ─── Tổng tự động (PLC) theo (Ngay, Ca, Scope toàn cục 1-6) ─────────────
         public async Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay,int ca,int scope)
         {
-            var scopeCode = ResolveScopeCode(scope);
+            //var scopeCode = ResolveScopeCode(scope);
             var ngayOnly = DateOnly.FromDateTime(ngay);
 
             var tong = await _context.TKVV_SanLuongDuLieu
                 .Where(d =>
                     d.Ngay == ngayOnly &&
                     d.Ca == (byte)ca &&
-                    d.Scope == scopeCode)
+                    d.Scope == scope.ToString())
                 .SumAsync(d =>
                     (decimal?)(d.GiaTriDieuChinh ?? d.GiaTriTuDong)) ?? 0;
 

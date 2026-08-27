@@ -27,7 +27,8 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto> AddNvlAsync(CreateTKVVNguyenVatLieuDto dto)
         {
-            var scopeCode = ResolveScopeCodeFromString(dto.Scope);
+            var scopeNumber = TKVV_BBSLRepository.ResolveScopeNumber(dto.Scope);
+            var scopeValue = scopeNumber?.ToString();
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -36,8 +37,8 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 GhiChu = dto.GhiChu,
                 TrangThai = true,
-                Scope = scopeCode,
-                TenScope = dto.TenScope ?? scopeCode,
+                Scope = scopeValue,
+                TenScope = dto.TenScope ?? (scopeNumber.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(scopeNumber.Value) : null),
             };
             var result = await _repo.AddNvlAsync(entity);
             return MapNvl(result);
@@ -45,7 +46,8 @@ namespace dataproduct.api.Services
 
         public async Task<TKVVNguyenVatLieuDto?> UpdateNvlAsync(int id, UpdateTKVVNguyenVatLieuDto dto)
         {
-            var scopeCode = ResolveScopeCodeFromString(dto.Scope);
+            var scopeNumber = TKVV_BBSLRepository.ResolveScopeNumber(dto.Scope);
+            var scopeValue = scopeNumber?.ToString();
             var entity = new TKVV_NguyenVatLieu
             {
                 MaBM = dto.MaBM,
@@ -54,21 +56,11 @@ namespace dataproduct.api.Services
                 ThuTu = dto.ThuTu,
                 TrangThai = dto.TrangThai,
                 GhiChu = dto.GhiChu,
-                Scope = scopeCode,
-                TenScope = dto.TenScope ?? scopeCode,
+                Scope = scopeValue,
+                TenScope = dto.TenScope ?? (scopeNumber.HasValue ? TKVV_BBSLRepository.ResolveScopeCode(scopeNumber.Value) : null),
             };
             var result = await _repo.UpdateNvlAsync(id, entity);
             return result == null ? null : MapNvl(result);
-        }
-
-        // Chấp nhận cả mã chuỗi ("TK1".."VV2") lẫn số cũ ("1"-"6") từ client để không phá các
-        // caller còn gửi số — giống chuẩn hoá đang dùng ở TKVV_BBSLRepository.GetNvlListAsync.
-        private static string? ResolveScopeCodeFromString(string? scope)
-        {
-            if (string.IsNullOrWhiteSpace(scope)) return null;
-            return int.TryParse(scope.Trim(), out var numericScope)
-                ? TKVV_BBSLRepository.ResolveScopeCode(numericScope)
-                : scope.Trim();
         }
 
         public Task<bool> DeleteNvlAsync(int id) => _repo.DeleteNvlAsync(id);
