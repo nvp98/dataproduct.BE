@@ -15,6 +15,7 @@ namespace dataproduct.api.Models
         public int SiloID { get; set; }
         public int? NguyenVatLieuID { get; set; } // snapshot NVL hiện đang mapping vào Silo
         public decimal? DoAm { get; set; }
+        public string? DoAmText { get; set; }  // nối tất cả DoAm từ BBGN: "12.5, 13.0, 11.8"
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
         public decimal? NhapAuto { get; set; } // giá trị tự động từ BBGN (sp_TKVV_Get_NVL_BBGN)

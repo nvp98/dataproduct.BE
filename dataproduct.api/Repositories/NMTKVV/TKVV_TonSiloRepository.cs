@@ -96,19 +96,35 @@ namespace dataproduct.api.Repositories.NMTKVV
 
             var nhapAutoBySilo = new Dictionary<int, decimal>();
             var doAmAutoBySilo = new Dictionary<int, decimal>();
+            var doAmTextBySilo = new Dictionary<int, string>();
+            // Silo từ thứ 2 trở đi cùng NVL → Nhap/NhapAuto phải được xóa
+            var nonFirstNvlSiloIds = new HashSet<int>();
             foreach (var (nvlId, siloIdsForNvl) in siloIdsByNvl)
             {
+                // Track các silo không phải đầu tiên (dù SP có dữ liệu hay không)
+                for (int i = 1; i < siloIdsForNvl.Count; i++)
+                    nonFirstNvlSiloIds.Add(siloIdsForNvl[i]);
+
                 try
                 {
                     var ngay = new DateTime(ngaySX.Year, ngaySX.Month, ngaySX.Day);
                     var bbgnRows = await _nvlBbgnRepo.GetNvlBbgnDataAsync(ngay, ca, nvlId, scope);
-                    var count = Math.Min(bbgnRows.Count, siloIdsForNvl.Count);
-                    for (int i = 0; i < count; i++)
-                    {
-                        var siloId = siloIdsForNvl[i];
-                        if (bbgnRows[i].KhoiLuongBG.HasValue) nhapAutoBySilo[siloId] = bbgnRows[i].KhoiLuongBG!.Value;
-                        if (bbgnRows[i].DoAmW.HasValue) doAmAutoBySilo[siloId] = bbgnRows[i].DoAmW!.Value;
-                    }
+                    if (bbgnRows.Count == 0) continue;
+
+                    // Sum toàn bộ KhoiLuongBG → 1 giá trị NhapAuto chung cho cả NVL
+                    var sumNhap = bbgnRows.Where(r => r.KhoiLuongBG.HasValue).Sum(r => r.KhoiLuongBG!.Value);
+                    // Nối tất cả DoAmW → DoAmText hiển thị (vd "12.5, 13.0")
+                    var doAmParts = bbgnRows.Where(r => r.DoAmW.HasValue)
+                                            .Select(r => r.DoAmW!.Value.ToString("0.##"))
+                                            .ToList();
+                    var doAmText = string.Join(", ", doAmParts);
+                    var firstDoAm = bbgnRows.FirstOrDefault(r => r.DoAmW.HasValue)?.DoAmW;
+
+                    // DoAm, Nhap, DoAmText → chỉ silo đầu tiên của NVL
+                    var firstSiloId = siloIdsForNvl[0];
+                    if (firstDoAm.HasValue) doAmAutoBySilo[firstSiloId] = firstDoAm.Value;
+                    if (sumNhap > 0) nhapAutoBySilo[firstSiloId] = sumNhap;
+                    if (!string.IsNullOrEmpty(doAmText)) doAmTextBySilo[firstSiloId] = doAmText;
                 }
                 catch { /* SP lỗi hoặc chưa có mapping/dữ liệu cho NVL này — không block */ }
             }
@@ -133,6 +149,7 @@ namespace dataproduct.api.Repositories.NMTKVV
 
                     decimal? nhapAuto = nhapAutoBySilo.TryGetValue(silo.ID, out var na) ? na : null;
                     decimal? doAmAuto = doAmAutoBySilo.TryGetValue(silo.ID, out var da) ? da : null;
+                    string? doAmText = doAmTextBySilo.TryGetValue(silo.ID, out var dt) ? dt : null;
                     decimal? xuatAuto = xuatAutoBySilo.TryGetValue(silo.ID, out var xa) ? xa : null;
 
                     if (!existingBySilo.TryGetValue(silo.ID, out var rec))
@@ -156,6 +173,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             ThuTu = silos.IndexOf(silo) + 1,
                             TonDau = carryForward,
                             DoAm = doAmAuto,
+                            DoAmText = doAmText,
                             Nhap = nhapAuto,
                             NhapAuto = nhapAuto,
                             Xuat = xuatAuto,
@@ -177,9 +195,21 @@ namespace dataproduct.api.Repositories.NMTKVV
                         // giữ nguyên TonCuoi/Nhap/DoAm/Xuat người dùng đã nhập (chỉ backfill nếu còn trống)
                         var tonCuoi = rec.TonCuoi ?? tonCuoiAuto ?? 0m;
                         var isAdj = tonCuoiAuto.HasValue && tonCuoi != tonCuoiAuto.Value;
-                        rec.Nhap ??= nhapAuto;
-                        rec.NhapAuto = nhapAuto;
-                        rec.DoAm ??= doAmAuto;
+                        if (nonFirstNvlSiloIds.Contains(silo.ID))
+                        {
+                            // Silo không phải đầu tiên của NVL → xóa Nhap/NhapAuto/DoAm/DoAmText
+                            rec.Nhap = null;
+                            rec.NhapAuto = null;
+                            rec.DoAm = null;
+                            rec.DoAmText = null;
+                        }
+                        else
+                        {
+                            rec.Nhap ??= nhapAuto;
+                            rec.NhapAuto = nhapAuto;
+                            rec.DoAm ??= doAmAuto;
+                            rec.DoAmText = doAmText;
+                        }
                         rec.Xuat ??= xuatAuto;
                         rec.XuatAuto = xuatAuto;
                         rec.TonDau = carryForward;
@@ -224,6 +254,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                     NguyenVatLieuID = rec?.NguyenVatLieuID ?? mapping?.NguyenVatLieuID,
                     TenNVL = nvl?.TenNVL,
                     DoAm = rec?.DoAm,
+                    DoAmText = rec?.DoAmText,
                     TonDau = rec?.TonDau,
                     Nhap = rec?.Nhap,
                     NhapAuto = rec?.NhapAuto,
@@ -279,6 +310,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                     NguyenVatLieuID = r.NguyenVatLieuID,
                     TenNVL = nvl?.TenNVL,
                     DoAm = r.DoAm,
+                    DoAmText = r.DoAmText,
                     TonDau = r.TonDau,
                     Nhap = r.Nhap,
                     NhapAuto = r.NhapAuto,
@@ -331,6 +363,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             Kip = row.Kip,
                             ThuTu = row.ThuTu,
                             DoAm = row.DoAm,
+                            DoAmText = row.DoAmText,
                             TonDau = row.TonDau,
                             Nhap = row.Nhap,
                             NhapAuto = row.NhapAuto,
@@ -353,6 +386,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                         rec.Kip = row.Kip;
                         rec.ThuTu = row.ThuTu;
                         rec.DoAm = row.DoAm;
+                        rec.DoAmText = row.DoAmText;
                         rec.TonDau = row.TonDau;
                         rec.Nhap = row.Nhap;
                         rec.NhapAuto = row.NhapAuto;
