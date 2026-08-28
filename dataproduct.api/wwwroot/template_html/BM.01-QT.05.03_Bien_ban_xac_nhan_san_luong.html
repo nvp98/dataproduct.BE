@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Biên bản xác nhận sản lượng</title>
+
+    <style>
+         /* =========================================================
+        PAGE
+        A4 Landscape: 297mm x 210mm
+        ========================================================= */
+         @page {
+             size: A4 landscape;
+             margin: 0;
+         }
+
+         * {
+             box-sizing: border-box;
+         }
+
+         html,
+         body {
+             margin: 0;
+             padding: 0;
+             width: 100%;
+             min-height: 100%;
+         }
+
+         body {
+             font-family: "Times New Roman", Times, serif;
+             font-size: 16px;
+             color: #000;
+             background: #fff;
+         }
+
+         /* =========================================================
+        PAGE CONTAINER
+        ========================================================= */
+         .page {
+             width: 100%;
+             min-height: 210mm;
+             /*
+          * Lề:
+          * Trên: 10mm
+          * Phải: 15mm
+          * Dưới: 15mm
+          * Trái: 35mm
+          */
+             padding: 7mm 15mm 15mm 35mm;
+             margin: 0;
+         }
+
+         /* =========================================================
+        HEADER
+        ========================================================= */
+         .header {
+             width: 100%;
+             display: table;
+             table-layout: fixed;
+             margin-bottom: 4px;
+         }
+
+         .header-left,
+         .header-right {
+             display: table-cell;
+             vertical-align: top;
+         }
+
+         .header-left {
+             width: 60%;
+             text-align: left;
+         }
+
+         .header-right {
+             width: 40%;
+             text-align: right;
+             font-size: 19px;
+             font-weight: bold;
+             line-height: 1.4;
+         }
+
+         .header-left img {
+             max-width: 260px;
+             max-height: 85px;
+             width: auto;
+             height: auto;
+         }
+
+         /* =========================================================
+        TITLE
+        ========================================================= */
+         .document-title {
+             width: 100%;
+             margin: 4px 0 3px 0;
+             text-align: center;
+             font-size: 32px;
+             line-height: 1.2;
+             font-weight: bold;
+             text-transform: uppercase;
+         }
+
+         .document-subtitle {
+             width: 100%;
+             margin: 0 0 6px 0;
+             text-align: center;
+             font-size: 18px;
+             line-height: 1.4;
+         }
+
+         /* =========================================================
+        CONTENT
+        ========================================================= */
+         .content {
+             width: 100%;
+             font-size: 20px;
+             line-height: 1.45;
+         }
+
+             .content p {
+                 margin: 4px 0;
+                 padding: 0;
+             }
+
+         /* =========================================================
+        INFORMATION TABLE
+        ========================================================= */
+         .info-table {
+             width: 100%;
+             border-collapse: collapse;
+             table-layout: fixed;
+             margin: 4px 0 5px 0;
+             font-size: 20px;
+         }
+
+             .info-table td {
+                 padding: 2px 0;
+                 vertical-align: bottom;
+                 text-align: left;
+                 line-height: 1.4;
+             }
+
+             .info-table .col-name {
+                 width: 40%;
+             }
+
+             .info-table .col-position {
+                 width: 35%;
+             }
+
+             .info-table .col-department {
+                 width: 25%;
+             }
+
+         /* =========================================================
+        DATA TABLE
+        ========================================================= */
+         .data-table {
+             width: 100%;
+             border-collapse: collapse;
+             border-spacing: 0;
+             margin-top: 8px;
+             table-layout: fixed;
+             font-size: 20px;
+         }
+
+             .data-table th,
+             .data-table td {
+                 border: 1px solid #000;
+                 padding: 5px 4px;
+                 text-align: center;
+                 vertical-align: middle;
+                 line-height: 1.25;
+             }
+
+             .data-table th {
+                 font-weight: bold;
+             }
+
+             .data-table thead {
+                 display: table-header-group;
+             }
+
+             .data-table tbody {
+                 display: table-row-group;
+             }
+
+             .data-table tr {
+                 page-break-inside: avoid;
+             }
+
+             .data-table tbody tr.data-row td {
+                 height: 28px;
+             }
+
+             .data-table .total-row td {
+                 font-weight: bold;
+             }
+
+         /* =========================================================
+        TEXT ALIGNMENT
+        ========================================================= */
+         .text-left {
+             text-align: left !important;
+         }
+
+         .text-center {
+             text-align: center !important;
+         }
+
+         .text-right {
+             text-align: right !important;
+         }
+
+         /* =========================================================
+        NOTE
+        ========================================================= */
+         .note {
+             width: 100%;
+             margin-top: 8px;
+             font-size: 20px;
+             line-height: 1.4;
+             font-style: italic;
+         }
+
+             .note p {
+                 margin: 2px 0;
+                 padding: 0;
+             }
+
+         .note-title {
+             font-weight: bold;
+         }
+
+         /* =========================================================
+        SIGNATURE
+        ========================================================= */
+         .sign-table {
+             width: 100%;
+             margin-top: 16px;
+             border-collapse: collapse;
+             border-spacing: 0;
+             table-layout: fixed;
+             text-align: center;
+             font-size: 20px;
+         }
+
+             .sign-table td {
+                 border: none;
+                 padding: 0;
+                 text-align: center;
+                 vertical-align: top;
+             }
+
+         .sign-position {
+             height: 25px;
+             font-weight: bold;
+         }
+
+         .sign-name {
+             height: 90px;
+             padding-top: 5px !important;
+             vertical-align: bottom !important;
+         }
+
+             .sign-name img {
+                 max-width: 180px;
+                 max-height: 80px;
+                 width: auto;
+                 height: auto;
+             }
+
+         .sign-person {
+             padding-top: 3px !important;
+             font-weight: bold;
+         }
+
+         /* =========================================================
+        PRINT / PDF
+        ========================================================= */
+         @media print {
+
+             html,
+             body {
+                 width: 100%;
+                 height: auto;
+             }
+
+             .page {
+                 page-break-after: auto;
+             }
+
+             .data-table tr {
+                 page-break-inside: avoid;
+             }
+         }
+    </style>
+
+</head>
+
+<body>
+    <div class="page">
+
+        <!-- =====================================================
+             HEADER
+             ===================================================== -->
+        <div class="header">
+
+            <div class="header-left">
+                <img src="{{LogoUrl}}"
+                     alt="Logo" />
+            </div>
+
+            <div class="header-right">
+                <div>BM.01/QT.05.03</div>
+                <div>Ngày hiệu lực: 01/06/2023</div>
+            </div>
+
+        </div>
+
+
+        <!-- =====================================================
+             TITLE
+             ===================================================== -->
+        <div class="document-title">
+            BIÊN BẢN XÁC NHẬN SẢN LƯỢNG
+        </div>
+
+        <div class="document-subtitle">
+            Kíp {{CaKip}}
+            &nbsp;&nbsp;&nbsp;
+            Ngày {{Ngay}} tháng {{Thang}} năm {{Nam}}
+        </div>
+
+
+        <!-- =====================================================
+             CONTENT
+             ===================================================== -->
+        <div class="content">
+
+            <p>
+                Áp dụng cho {{Xuong}}
+            </p>
+
+            <p>
+                Chúng tôi gồm:
+            </p>
+
+
+            <!-- THÔNG TIN CÁC BÊN -->
+            <table class="info-table">
+
+                <tbody>
+
+                    <tr>
+                        <td class="col-name">
+                            1. Ông/ bà: {{Name_TKVV}}
+                        </td>
+
+                        <td class="col-position">
+                            Chức vụ: {{ChucVu_TKVV}}
+                        </td>
+
+                        <td class="col-department">
+                            BP: {{BoPhan_TKVV}}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="col-name">
+                            2. Ông/ bà: {{Name_QLCL}}
+                        </td>
+
+                        <td class="col-position">
+                            Chức vụ: {{ChucVu_QLCL}}
+                        </td>
+
+                        <td class="col-department">
+                            BP: {{BoPhan_QLCL}}
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+
+            <p>
+                Cùng nhau lập biên bản xác nhận sản lượng sản xuất như sau:
+            </p>
+
+        </div>
+
+
+        <!-- =====================================================
+             DATA TABLE
+             ===================================================== -->
+        <table class="data-table">
+
+            <thead>
+                <tr>
+
+                    <th style="width: 5%;">
+                        STT
+                    </th>
+
+                    <th style="width: 12%;">
+                        Thời gian
+                    </th>
+
+                    <th style="width: 22%;">
+                        Sản lượng
+                    </th>
+
+                    <th style="width: 8%;">
+                        ĐVT
+                    </th>
+
+                    <th style="width: 8%;">
+                        Lô<br />
+                        (Batch)
+                    </th>
+
+                    <th style="width: 10%;">
+                        Loại 1
+                    </th>
+
+                    <th style="width: 10%;">
+                        Loại 2
+                    </th>
+
+                    <th style="width: 10%;">
+                        Loại 3
+                    </th>
+
+                    <th style="width: 8%;">
+                        Phế phẩm
+                    </th>
+
+                    <th style="width: 7%;">
+                        Ghi chú
+                    </th>
+
+                </tr>
+            </thead>
+
+
+            <tbody>
+
+                <!--
+                    C# sẽ render dữ liệu vào đây.
+
+                    Ví dụ:
+
+                    <tr class="data-row">
+                        <td>1</td>
+                        <td>08:00 - 09:00</td>
+                        <td>1,250.50</td>
+                        <td>Tấn</td>
+                        <td>ABC001</td>
+                        <td>1,200.00</td>
+                        <td>30.00</td>
+                        <td>20.50</td>
+                        <td>0</td>
+                        <td></td>
+                    </tr>
+                -->
+                {{Rows}}
+
+            </tbody>
+
+        </table>
+
+
+        <!-- =====================================================
+             NOTE
+             ===================================================== -->
+        <div class="note">
+
+            <p class="note-title">
+                * Ghi chú:
+            </p>
+
+            <p>
+                - Khối lượng giao nhận được xác định qua cân băng tải/ cân bàn.
+            </p>
+
+            <p>
+                - Biên bản được lập thành 03 bản. Mỗi bên giữ một bản và giao
+                phòng NS 01 bản có giá trị như nhau.
+            </p>
+
+        </div>
+
+
+        <!-- =====================================================
+             SIGNATURE
+             ===================================================== -->
+        <table class="sign-table">
+
+            <tbody>
+
+                <tr>
+
+                    <td style="width: 50%;" class="sign-position">
+                        P.QLCL
+                    </td>
+
+                    <td style="width: 50%;" class="sign-position">
+                        NM.TKVV
+                    </td>
+
+                </tr>
+
+
+                <tr>
+
+                    <td class="sign-name">
+                        {{Sign_QLCL}}
+                    </td>
+
+                    <td class="sign-name">
+                        {{Sign_TKVV}}
+                    </td>
+
+                </tr>
+
+
+                <tr>
+
+                    <td class="sign-person">
+                        {{Name_QLCL}}
+                    </td>
+
+                    <td class="sign-person">
+                        {{Name_TKVV}}
+                    </td>
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+</body>
+</html>
