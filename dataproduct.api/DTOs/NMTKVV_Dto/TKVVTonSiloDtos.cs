@@ -18,6 +18,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int? NguyenVatLieuID { get; set; }
         public string? TenNVL { get; set; }
         public decimal? DoAm { get; set; }
+        public string? DoAmText { get; set; }
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
         public decimal? NhapAuto { get; set; }
@@ -51,6 +52,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? Kip { get; set; }
         public int? ThuTu { get; set; }
         public decimal? DoAm { get; set; }
+        public string? DoAmText { get; set; }
         public decimal? TonDau { get; set; }
         public decimal? Nhap { get; set; }
         public decimal? NhapAuto { get; set; }
