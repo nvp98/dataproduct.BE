@@ -539,6 +539,45 @@ namespace dataproduct.api.Repositories.NMTKVV
             };
         }
 
+        public async Task<LoadDuLieuCanResultDto> GetByPhieuIdAsync(Guid phieuId)
+        {
+            var rows = await (from r in _context.TKVV_BaoCaoSanLuongChiPhi
+                              join nvl in _context.TKVV_NguyenVatLieu on r.NguyenVatLieuID equals nvl.ID into nvlG
+                              from nvl in nvlG.DefaultIfEmpty()
+                              where r.PhieuID == phieuId && !r.IsDelete
+                              orderby r.Ca, r.ThuTu, r.NguyenVatLieuID
+                              select new TKVVBaoCaoSanLuongChiPhiDto
+                              {
+                                  Id = r.ID,
+                                  PhieuID = r.PhieuID,
+                                  NgaySX = r.NgaySX,
+                                  Ca = r.Ca,
+                                  Kip = r.Kip,
+                                  Scope = r.Scope,
+                                  ThuTu = r.ThuTu,
+                                  NguyenVatLieuID = r.NguyenVatLieuID,
+                                  TenNVL = nvl != null ? nvl.TenNVL : null,
+                                  KLAm = r.KLAm,
+                                  KLAmAuto = r.KLAmAuto,
+                                  DoAm = r.DoAm,
+                                  QuyKho = r.QuyKho,
+                                  ThanhPhamL1 = r.ThanhPhamL1,
+                                  ThanhPhamL2 = r.ThanhPhamL2,
+                                  ThanhPhamL3 = r.ThanhPhamL3,
+                                  ThanhPham_Note = r.ThanhPham_Note,
+                                  GhiChu = r.GhiChu,
+                                  IsAdjusted = r.IsAdjusted,
+                                  AdjustedBy = r.AdjustedBy,
+                                  AdjustedDate = r.AdjustedDate,
+                              }).AsNoTracking().ToListAsync();
+
+            return new LoadDuLieuCanResultDto
+            {
+                Table1 = rows.Where(x => x.Ca == 1).ToList(),
+                Table2 = rows.Where(x => x.Ca == 2).ToList(),
+            };
+        }
+
         public async Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request)
         {
             if (request.Rows.Count == 0) return;
