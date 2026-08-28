@@ -56,5 +56,7 @@ public partial class Hrc1TieuHao
     // giá trị về dòng canonical (IDNM == SourceIDNM) lúc phiếu clone được Duyệt, xem
     // DLNMHRC1Service.MergeAndCleanupHrc1CloneChainOnApproveAsync.
     public int? SourceIDNM { get; set; }
+
+    public int? IDMeThep { get; set; }
 }
     

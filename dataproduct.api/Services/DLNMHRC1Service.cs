@@ -594,6 +594,10 @@ namespace dataproduct.api.Services
             if (models == null || !models.Any()) return;
 
             var meMap = new Dictionary<Guid, Hrc1TieuHao>();
+            // Mẻ thêm tay MỚI tạo trong lượt lưu này — sau SaveChangesAsync sẽ gọi
+            // RefreshGangMetricsForRowsAsync để bổ sung KLGangLongCCT ngay, không đợi tới lượt
+            // SyncHRC1FromNMAsync kế tiếp (có thể bị ShouldSync throttle) mới có giá trị.
+            var newManualRows = new List<Hrc1TieuHao>();
 
             var allMeThois = models.Select(m => m.MeThoi).Distinct().ToList();
             var allIds = models.Where(m => m.Id.HasValue && m.Id.Value > 0).Select(m => m.Id!.Value).ToList();
@@ -709,6 +713,7 @@ namespace dataproduct.api.Services
                         IDPhieu = idPhieu
                     };
                     await _context.Hrc1TieuHaos.AddAsync(entity);
+                    newManualRows.Add(entity);
                 }
                 else
                 {
@@ -734,6 +739,14 @@ namespace dataproduct.api.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // Mẻ thêm tay mới tạo: bổ sung ngay KLGangLongCCT/KLThepPheGang (tra theo MeThoi ở DB
+            // GangLong, mirror EnsureGangLongMetricsAsync) — không chờ tới lượt SyncHRC1FromNMAsync kế
+            // tiếp (chỉ chạy khi ShouldSync cho phép) mới có giá trị.
+            if (newManualRows.Count > 0)
+            {
+                await _syncService.RefreshGangMetricsForRowsAsync(newManualRows);
+            }
 
             // Check trùng (SP_HRC1_BOF_CapNhatTrangThaiTrung) cho mọi MeThoi bị ảnh hưởng — mới lẫn cũ bị đổi
             var affectedMeThois = meMap.Values
@@ -895,26 +908,30 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Xóa mềm 1 mẻ thêm tay (IsNM = false) — dòng do người dùng tự thêm qua nút "+ Thêm dòng". Chỉ chấp
-        /// nhận xóa cho dòng IsNM = false; nếu ai đó gọi nhầm lên 1 dòng IsNM = true thì từ chối để tránh mất
-        /// dữ liệu NM (phải dùng DeleteRowNMAsync). Trước đây xóa CỨNG (kèm xóa hẳn Hrc1PhuLieu liên quan) —
-        /// đổi sang xóa mềm (mirror DeleteRowNMAsync, không đụng Hrc1PhuLieu — ẩn theo transitively qua MeID).
+        /// Xóa CỨNG 1 mẻ thêm tay (IsNM = false) — dòng do người dùng tự thêm qua nút "+ Thêm dòng", không
+        /// gắn với dữ liệu NM nào nên không cần giữ lại để đối chiếu (khác DeleteRowNMAsync, luôn xóa mềm vì
+        /// dòng NM còn dùng để đối chiếu ngược lại nguồn). Xóa kèm Hrc1PhuLieu liên quan (qua MeID) để không
+        /// để lại phụ liệu mồ côi. Chỉ chấp nhận xóa cho dòng IsNM = false; nếu ai đó gọi nhầm lên 1 dòng
+        /// IsNM = true thì từ chối để tránh mất dữ liệu NM (phải dùng DeleteRowNMAsync).
         /// </summary>
         public async Task<bool> DeleteManualRowAsync(int id)
         {
             var existing = await _context.Hrc1TieuHaos.FirstOrDefaultAsync(x => x.ID == id && !x.IsDeleted);
             if (existing == null || existing.IsNM) return false;
 
-            existing.IsDeleted = true;
-            existing.NgayXoa = DateTime.Now;
-            _context.Hrc1TieuHaos.Update(existing);
+            var phuLieus = await _context.Hrc1PhuLieus.Where(x => x.MeID == id).ToListAsync();
+            if (phuLieus.Count > 0) _context.Hrc1PhuLieus.RemoveRange(phuLieus);
+
+            var meThoi = existing.MeThoi;
+            var bieuMau = existing.BieuMau;
+            _context.Hrc1TieuHaos.Remove(existing);
             await _context.SaveChangesAsync();
 
-            if (!string.IsNullOrEmpty(existing.MeThoi))
+            if (!string.IsNullOrEmpty(meThoi))
             {
                 await _context.Database.ExecuteSqlRawAsync(
                     "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}",
-                    existing.BieuMau ?? "BOF", existing.MeThoi);
+                    bieuMau ?? "BOF", meThoi);
             }
 
             return true;
@@ -2255,8 +2272,8 @@ namespace dataproduct.api.Services
 
             ClearRowsFrom(ws, 4);
             string isoText = bieuMau == "LF"
-                ? "BM.14/QT.05.15\nNgày hiệu lực: 10/01/2025\nLần sửa đổi: 00"
-                : "BM.08/QT.05.15\nNgày hiệu lực: 10/01/2025\nLần sửa đổi: 00";
+                ? "BM.14/QT.05.10\nNgày hiệu lực: 01/09/2023\nLần sửa đổi: 00"
+                : "BM.07/QT.05.10\nNgày hiệu lực: 01/07/2024\nLần sửa đổi: 02";
             UpdateHeaderRowMerges(ws, lastCol, isoText);
             RenderInfoRows(ws, rows, lastCol, scope, ngayPhieu, caPhieu, kip, bieuMau);
 
@@ -2702,8 +2719,8 @@ namespace dataproduct.api.Services
             // Mã ISO riêng theo biểu mẫu — mirror isoInfo.code trong BM_config/HRC1_BB_TieuHao_BOF.json
             // (BM.08/QT.05.15) và HRC1_BB_TieuHao_LF.json (BM.14/QT.05.15).
             string bmCode = isLF
-                ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00"
-                : "BM.08/QT.05.15 <br /> Ngày hiệu lực: 10/01/2025 <br /> Lần sửa đổi: 00";
+                ? "BM.14/QT.05.10 <br /> Ngày hiệu lực: 01/09/2023 <br /> Lần sửa đổi: 00"
+                : "BM.07/QT.05.10 <br /> Ngày hiệu lực: 01/07/2024 <br /> Lần sửa đổi: 02";
 
             string thead = PdfThead(headers, bieuMau);
             string tbody = PdfTbody(headers, rows, bieuMau);

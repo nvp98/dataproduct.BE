@@ -829,7 +829,7 @@ namespace dataproduct.api.Services
 
             // Mẻ rời khỏi TL — xóa mềm dòng Tiêu hao LF liên kết vô điều kiện (kể cả đã sửa tay);
             // nhận lại mẻ sẽ tự tạo lại dòng mới nên không cần giữ lại
-            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(me.MaMe);
+            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(me.Id, me.MaMe);
 
             // Recalc trùng cho các mẻ cùng MaMe còn lại (bao gồm cả len_thang)
             await RecalcTrungMeByMaMeAsync(me.MaMe);
@@ -1269,7 +1269,7 @@ namespace dataproduct.api.Services
             await _repo.SaveChangesAsync();
 
             // Xóa dòng Tiêu hao LF liên kết vô điều kiện (kể cả đã sửa tay)
-            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(maMe);
+            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(me.Id, maMe);
 
             // Recalc trùng cho các mẻ cùng MaMe còn lại (bao gồm cả len_thang)
             await RecalcTrungMeByMaMeAsync(maMe);
