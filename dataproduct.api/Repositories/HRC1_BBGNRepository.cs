@@ -45,7 +45,8 @@ namespace dataproduct.api.Repositories
 
         /// <summary>
         /// Liên kết 1 chiều: mẻ TL nhận/nhập liệu → upsert dòng Hrc1TieuHao(BieuMau=LF) cùng
-        /// MeThoi=MaMe, Scope=TL số, Ngày/Ca = đúng công đoạn tinh luyện (không phải Ca đúc đã chuyển).
+        /// IDMeThep=me.Id (khóa định danh dòng LF — xem GetActiveLfRowAsync), MeThoi=MaMe (chỉ để hiển
+        /// thị/báo cáo), Scope=TL số, Ngày/Ca = đúng công đoạn tinh luyện (không phải Ca đúc đã chuyển).
         /// Không ghi đè nếu dòng LF đã bị sửa tay (IsEdited=true) — theo đúng nguyên tắc IsEdited chung
         /// của module Tiêu hao (xem .claude/hrc1_tieuhaoBOF.md mục 3.3).
         /// </summary>
@@ -53,7 +54,7 @@ namespace dataproduct.api.Repositories
 
         /// <summary>Mẻ rời khỏi TL (hủy nhận / xóa mẻ tay) → xóa mềm dòng LF liên kết vô điều kiện
         /// (kể cả đã sửa tay) — nhận lại mẻ sẽ tự tạo lại dòng mới.</summary>
-        Task SoftDeleteLfTieuHaoByMeThoiAsync(string? maMe);
+        Task SoftDeleteLfTieuHaoByMeThoiAsync(int idMeThep, string? maMe);
 
         void AddMeThep(HRC1_MeThep me);
         void RemoveMeThep(HRC1_MeThep me);
@@ -152,33 +153,40 @@ namespace dataproduct.api.Repositories
         }
 
         /// <summary>
-        /// Chọn dòng Hrc1TieuHao (LF) "đang hoạt động" theo MeThoi — kể từ khi clone "Đề nghị hiệu chỉnh"
-        /// nhân bản riêng dòng LF cho chính nó (DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync), có thể tồn
-        /// tại 2 dòng cùng MeThoi song song: 1 của phiếu cha (đã bị khóa IsLock=1) và 1 của clone (chưa
-        /// khóa). Đồng bộ từ BBGN_ThepLong (hàm này chạy ngoài luồng lưu phiếu) phải nhắm đúng dòng chưa bị
-        /// khóa — ưu tiên dòng có IDPhieu trỏ tới phiếu không khóa; dòng chưa gắn nhãn IDPhieu (dữ liệu cũ)
-        /// vẫn được coi là hợp lệ. Nếu vẫn còn nhiều hơn 1 (không nên xảy ra) lấy dòng tạo mới nhất.
+        /// Chọn dòng Hrc1TieuHao (LF) "đang hoạt động" theo IDMeThep (khóa HRC1_MeThep.Id) — KHÔNG dùng
+        /// MeThoi/MaMe vì MaMe không phải khóa duy nhất của mẻ (2 mẻ khác nhau có thể trùng MaMe, xem
+        /// HRC1_MeThep.IsTrungMeThoi); lọc theo MaMe từng khiến hàm này trả nhầm dòng LF của mẻ khác cùng
+        /// MaMe. Kể từ khi clone "Đề nghị hiệu chỉnh" nhân bản riêng dòng LF cho chính nó
+        /// (DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync), có thể tồn tại 2 dòng cùng IDMeThep song song:
+        /// 1 của phiếu cha (đã bị khóa IsLock=1) và 1 của clone (chưa khóa). Đồng bộ từ BBGN_ThepLong (hàm
+        /// này chạy ngoài luồng lưu phiếu) phải nhắm đúng dòng chưa bị khóa — ưu tiên dòng có IDPhieu trỏ
+        /// tới phiếu không khóa; dòng chưa gắn nhãn IDPhieu (dữ liệu cũ) vẫn được coi là hợp lệ. Nếu vẫn còn
+        /// nhiều hơn 1 (không nên xảy ra) lấy dòng tạo mới nhất.
         /// </summary>
-        private async Task<Hrc1TieuHao?> GetActiveLfRowAsync(string meThoi)
+        private async Task<Hrc1TieuHao?> GetActiveLfRowAsync(int idMeThep)
         {
-            var candidates = await (
+            return await (
                 from x in _ctx.Hrc1TieuHaos
-                join p in _ctx.BmPhieus on x.IDPhieu equals p.Idphieu into pj
+                join p in _ctx.BmPhieus
+                    on x.IDPhieu equals p.Idphieu into pj
                 from p in pj.DefaultIfEmpty()
-                where x.BieuMau == "LF" && x.MeThoi == meThoi && !x.IsDeleted
-                      && (x.IDPhieu == null || (p != null && p.IsLock != 1 && p.IsDelete != 1))
+                where x.BieuMau == "LF"
+                    && x.IDMeThep == idMeThep
+                    && !x.IsDeleted
+                    && (
+                        x.IDPhieu == null
+                        || (p != null && p.IsLock != 1 && p.IsDelete != 1)
+                    )
                 orderby x.NgayTao descending
                 select x
-            ).ToListAsync();
-
-            return candidates.FirstOrDefault();
+            ).FirstOrDefaultAsync();
         }
 
         public async Task UpsertLfTieuHaoFromMeAsync(HRC1_MeThep me, int? scopeTL, DateOnly? ngaySanXuat, int? ca)
         {
             if (string.IsNullOrWhiteSpace(me.MaMe) || ngaySanXuat is null || ca is null) return;
 
-            var existing = await GetActiveLfRowAsync(me.MaMe);
+            var existing = await GetActiveLfRowAsync(me.Id);
 
             if (existing == null)
             {
@@ -187,6 +195,7 @@ namespace dataproduct.api.Repositories
                     BieuMau = "LF",
                     Scope = scopeTL,
                     MeThoi = me.MaMe,
+                    IDMeThep = me.Id,
                     MacThep = me.MacThepBKMIS,
                     KLThepLong = me.KlThepLong,
                     NgaySanXuat = ngaySanXuat,
@@ -217,23 +226,24 @@ namespace dataproduct.api.Repositories
                 "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", "LF", me.MaMe);
         }
 
-        public async Task SoftDeleteLfTieuHaoByMeThoiAsync(string? maMe)
+        public async Task SoftDeleteLfTieuHaoByMeThoiAsync(int idMeThep, string? maMe)
         {
-            if (string.IsNullOrWhiteSpace(maMe)) return;
-
             // Xóa vô điều kiện (kể cả đã sửa tay) — mẻ rời khỏi TL thì tiêu hao LF không còn ý nghĩa;
             // nếu TL nhận lại mẻ này sau đó, UpsertLfTieuHaoFromMeAsync sẽ tự tạo lại dòng mới.
             // CHỈ xóa đúng 1 dòng "đang hoạt động" (xem GetActiveLfRowAsync) — nếu có 1 clone "Đề nghị
             // hiệu chỉnh" đang mở cùng MeThoi, dòng riêng của phiếu cha (đã khóa) phải được giữ nguyên để
             // còn khôi phục lại nếu clone bị Reject.
-            var row = await GetActiveLfRowAsync(maMe);
+            var row = await GetActiveLfRowAsync(idMeThep);
             if (row == null) return;
 
             _ctx.Hrc1TieuHaos.Remove(row);
 
             await _ctx.SaveChangesAsync();
-            await _ctx.Database.ExecuteSqlRawAsync(
-                "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", "LF", maMe);
+            if (!string.IsNullOrWhiteSpace(maMe))
+            {
+                await _ctx.Database.ExecuteSqlRawAsync(
+                    "EXEC dbo.SP_HRC1_BOF_CapNhatTrangThaiTrung @BieuMau={0}, @MeThoi={1}", "LF", maMe);
+            }
         }
 
         // Phiếu BBGN thép lỏng (công đoạn đúc) theo danh sách ngày — lọc thêm theo Ca ở tầng service
