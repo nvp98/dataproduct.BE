@@ -179,14 +179,31 @@ namespace dataproduct.api.Repositories
             return query;
         }
 
-        // Trả null nếu phụ liệu này thực sự không có số liệu nào (kể cả trường hợp "xóa manual về ban
-        // đầu" — IsManual=true nhưng KLPhuGia_Manual=null, xem DLNMHRC1Service.SaveHRC1ManualDataAsync)
-        // — để Thống kê/Export hiển thị ô trống thay vì "0" gây hiểu nhầm là đã đo được giá trị 0.
-        private static double? ComputeEffectiveTotal(Hrc1PhuLieu p)
+        // Gộp 1 dòng "đo thực"/chỉnh tay (IsPhanBo=false) + 1 dòng "phân bổ" (IsPhanBo=true, cùng
+        // PhuLieuID nhưng LÀ BẢN GHI RIÊNG — xem STD_XNT_HRC1Repository.PhanBoAsync, PhanBo ghi lượng
+        // phân bổ vào KLPhuGia của record IsPhanBo=true, KHÔNG ghi cột KLPhanBo) thành 1 giá trị hiển thị
+        // duy nhất cho FE. Trước đây 2 record này bị đưa thẳng thành 2 phần tử Values cùng PhuLieuID
+        // khiến FE (Map theo PhuLieuID) ghi đè, giá trị đo thực/chỉnh tay bị mất — chỉ còn thấy lượng
+        // phân bổ. Mirror cách HRC2 tách 2 query rồi merge (DLNMHRC2Repository).
+        private static Hrc1ThongKeValue MergePhuLieuValue(int phuLieuId, Hrc1PhuLieu? thucTe, Hrc1PhuLieu? phanBo)
         {
-            double? effective = p.IsManual ? (double?)p.KLPhuGia_Manual : (double?)p.KLPhuGia;
-            if (!effective.HasValue && !p.KLPhanBo.HasValue) return null;
-            return (effective ?? 0) + (double)(p.KLPhanBo ?? 0);
+            double? klPhuGia = (double?)thucTe?.KLPhuGia;
+            double? klPhuGiaManual = (double?)thucTe?.KLPhuGia_Manual;
+            bool isManual = thucTe?.IsManual ?? false;
+            double? klPhanBo = (double?)phanBo?.KLPhuGia;
+
+            double? effective = isManual ? klPhuGiaManual : klPhuGia;
+            double? total = (!effective.HasValue && !klPhanBo.HasValue) ? null : (effective ?? 0) + (klPhanBo ?? 0);
+
+            return new Hrc1ThongKeValue
+            {
+                PhuLieuID = phuLieuId,
+                KLPhuGia = klPhuGia,
+                KLPhuGia_Manual = klPhuGiaManual,
+                IsManual = isManual,
+                KLPhanBo = klPhanBo,
+                TotalKLPhuGia = total,
+            };
         }
 
         public async Task<SearchThongKeHrc1ApiResponse> SearchThongKeApiAsync(SearchThongKeHrc1 dto)
@@ -227,15 +244,13 @@ namespace dataproduct.api.Repositories
                 var row = new Hrc1ThongKeRow { Data = MapData(b) };
                 if (plByMeId.TryGetValue(b.ID, out var pls))
                 {
-                    row.Values = pls.Select(p => new Hrc1ThongKeValue
-                    {
-                        PhuLieuID = p.PhuLieuID!.Value,
-                        KLPhuGia = (double?)p.KLPhuGia,
-                        KLPhuGia_Manual = (double?)p.KLPhuGia_Manual,
-                        IsManual = p.IsManual,
-                        KLPhanBo = (double?)p.KLPhanBo,
-                        TotalKLPhuGia = ComputeEffectiveTotal(p),
-                    }).ToList();
+                    row.Values = pls
+                        .GroupBy(p => p.PhuLieuID!.Value)
+                        .Select(g => MergePhuLieuValue(
+                            g.Key,
+                            g.FirstOrDefault(x => !x.IsPhanBo),
+                            g.FirstOrDefault(x => x.IsPhanBo)))
+                        .ToList();
                 }
                 return row;
             }).ToList();
@@ -263,13 +278,19 @@ namespace dataproduct.api.Repositories
 
             var nmNames = await _context.Hrc1PhuLieuNms.ToDictionaryAsync(x => x.ID, x => x.TenPhuLieu);
 
+            // Gộp đo thực + phân bổ theo (MeID, PhuLieuID) trước khi cộng dồn theo PhuLieuID — nếu không,
+            // mỗi mẻ có phân bổ sẽ bị CỘNG THÊM giá trị phân bổ (record IsPhanBo=true) như 1 dòng riêng
+            // biệt trong tổng, chưa kể lượng đo thực đã tính; hoặc bỏ lỡ phân bổ nếu chỉ Sum theo record
+            // đo thực. Mirror MergePhuLieuValue dùng ở SearchThongKeApiAsync.
             return plRows
-                .GroupBy(x => x.PhuLieuID!.Value)
+                .GroupBy(x => new { x.MeID, PhuLieuID = x.PhuLieuID!.Value })
+                .Select(g => MergePhuLieuValue(g.Key.PhuLieuID, g.FirstOrDefault(x => !x.IsPhanBo), g.FirstOrDefault(x => x.IsPhanBo)))
+                .GroupBy(v => v.PhuLieuID)
                 .Select(g => new ThongKeSumItemHrc1
                 {
                     PhuLieuID = g.Key,
                     TenPhuLieu = nmNames.TryGetValue(g.Key, out var n) ? n : null,
-                    TotalKLPhuGia = g.Sum(ComputeEffectiveTotal),
+                    TotalKLPhuGia = g.Sum(v => v.TotalKLPhuGia),
                 })
                 .ToList();
         }

@@ -2112,15 +2112,13 @@ namespace dataproduct.api.Services
                 var row = new Hrc1ThongKeRow { Data = MapData(b) };
                 if (plByMeId.TryGetValue(b.ID, out var pls))
                 {
-                    row.Values = pls.Select(p => new Hrc1ThongKeValue
-                    {
-                        PhuLieuID = p.PhuLieuID!.Value,
-                        KLPhuGia = (double?)p.KLPhuGia,
-                        KLPhuGia_Manual = (double?)p.KLPhuGia_Manual,
-                        IsManual = p.IsManual,
-                        KLPhanBo = (double?)p.KLPhanBo,
-                        TotalKLPhuGia = ComputeEffectiveTotal(p),
-                    }).ToList();
+                    row.Values = pls
+                        .GroupBy(p => p.PhuLieuID!.Value)
+                        .Select(g => MergePhuLieuValue(
+                            g.Key,
+                            g.FirstOrDefault(x => !x.IsPhanBo),
+                            g.FirstOrDefault(x => x.IsPhanBo)))
+                        .ToList();
                 }
                 return row;
             }).ToList();
@@ -2168,14 +2166,29 @@ namespace dataproduct.api.Services
             }
         }
 
-        // Trả null nếu phụ liệu này thực sự không có số liệu nào (kể cả trường hợp "xóa manual về ban
-        // đầu" — IsManual=true nhưng KLPhuGia_Manual=null) — để Export hiển thị ô trống thay vì "0"
-        // gây hiểu nhầm là đã đo được giá trị 0 (xem DLNMHRC1Repository.ComputeEffectiveTotal — bản gốc).
-        private static double? ComputeEffectiveTotal(Hrc1PhuLieu p)
+        // Gộp 1 dòng "đo thực"/chỉnh tay (IsPhanBo=false) + 1 dòng "phân bổ" (IsPhanBo=true, cùng
+        // PhuLieuID nhưng LÀ BẢN GHI RIÊNG — xem STD_XNT_HRC1Repository.PhanBoAsync) thành 1 giá trị
+        // duy nhất. Mirror DLNMHRC1Repository.MergePhuLieuValue — 2 record cùng PhuLieuID trước đây bị
+        // đưa thẳng thành 2 phần tử Values khiến FE (Map theo PhuLieuID) ghi đè, mất giá trị đo thực.
+        private static Hrc1ThongKeValue MergePhuLieuValue(int phuLieuId, Hrc1PhuLieu? thucTe, Hrc1PhuLieu? phanBo)
         {
-            double? effective = p.IsManual ? (double?)p.KLPhuGia_Manual : (double?)p.KLPhuGia;
-            if (!effective.HasValue && !p.KLPhanBo.HasValue) return null;
-            return (effective ?? 0) + (double)(p.KLPhanBo ?? 0);
+            double? klPhuGia = (double?)thucTe?.KLPhuGia;
+            double? klPhuGiaManual = (double?)thucTe?.KLPhuGia_Manual;
+            bool isManual = thucTe?.IsManual ?? false;
+            double? klPhanBo = (double?)phanBo?.KLPhuGia;
+
+            double? effective = isManual ? klPhuGiaManual : klPhuGia;
+            double? total = (!effective.HasValue && !klPhanBo.HasValue) ? null : (effective ?? 0) + (klPhanBo ?? 0);
+
+            return new Hrc1ThongKeValue
+            {
+                PhuLieuID = phuLieuId,
+                KLPhuGia = klPhuGia,
+                KLPhuGia_Manual = klPhuGiaManual,
+                IsManual = isManual,
+                KLPhanBo = klPhanBo,
+                TotalKLPhuGia = total,
+            };
         }
 
         private static Hrc1TieuHao_ResponseModel MapData(Hrc1TieuHao b) => new Hrc1TieuHao_ResponseModel
@@ -2725,7 +2738,7 @@ namespace dataproduct.api.Services
             string thead = PdfThead(headers, bieuMau);
             string tbody = PdfTbody(headers, rows, bieuMau);
             int lastCol = ComputeLastCol(headers.Count, bieuMau);
-            // string footer = PdfFooterHtml(lastCol, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName);
+            string footer = PdfFooterHtml(lastCol, chuKyTruongKipHtml, chuKyNguoiLapHtml, truongKipName, nguoiLapName);
 
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BB_NauLuyen.html");
             var html = await File.ReadAllTextAsync(templatePath);
@@ -2736,8 +2749,8 @@ namespace dataproduct.api.Services
                 .Replace("{{TenBieuMau}}", tenBm)
                 .Replace("{{InfoKip}}", infoKip)
                 .Replace("{{TheadRows}}", thead)
-                .Replace("{{TbodyRows}}", tbody);
-                // .Replace("{{FooterHtml}}", footer);
+                .Replace("{{TbodyRows}}", tbody)
+                .Replace("{{FooterHtml}}", footer);
         }
 
         private static string PdfThead(List<Hrc1PhuLieuHeaderTable> h, string bieuMau)

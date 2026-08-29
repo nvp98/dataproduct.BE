@@ -113,6 +113,11 @@ namespace dataproduct.api.Services
             var phieu = await GetPhieuAsync(idPhieu);
             var (soPhieu, ngaySX, _, _) = ExtractPhieuInfo(phieu);
 
+            // "Ca BBSL" = Ca + Ngày SX của chính phiếu BBSL đang chứa các slab này (khác "Ca SX" của slab).
+            var caBbsl = phieu?.Ca.HasValue == true && phieu.NgaySX.HasValue
+                ? $"Ca {phieu.Ca}{phieu.Kip} - {phieu.NgaySX:dd/MM/yyyy}"
+                : "";
+
             var trangThais = await GetTrangThaisAsync(idPhieu);
 
             // "Đã check" chỉ tính riêng cho user hiện tại — độc lập với workflow xác nhận ở trên.
@@ -136,7 +141,7 @@ namespace dataproduct.api.Services
             var ws = workbook.Worksheet(1);
 
             const int startRow = 6;
-            const int checkCol = 14;
+            const int checkCol = 18;
             var rowIndex = startRow;
             var stt = 1;
 
@@ -157,11 +162,11 @@ namespace dataproduct.api.Services
                     cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
             }
 
-            // Header cột mới — copy style từ header "TT PKH" (cột 13) để đồng bộ giao diện với template có sẵn.
+            // Header cột mới — copy style từ header "TT PKH" (cột 17) để đồng bộ giao diện với template có sẵn.
             var headerRow = startRow - 1;
             var checkHeaderCell = ws.Cell(headerRow, checkCol);
             checkHeaderCell.Value = "Đã check";
-            checkHeaderCell.Style = ws.Cell(headerRow, 13).Style;
+            checkHeaderCell.Style = ws.Cell(headerRow, 17).Style;
             ws.Column(checkCol).Width = 14;
 
             foreach (var tt in trangThais)
@@ -171,22 +176,31 @@ namespace dataproduct.api.Services
                     ? $"{FmtKichThuoc(slab.ChieuDay.Value)}x{FmtKichThuoc(slab.ChieuRong.Value)}x{FmtKichThuoc(slab.ChieuDai.Value)}"
                     : "";
 
+                // Phôi nguội/nóng xác định theo tiền tố OrderId ("203" = nguội, khác = nóng) — quy ước riêng
+                // cho 2 cột này, khác GetPivotKeys() vốn dựa trên LoaiPhoi cho báo cáo tổng hợp.
+                var kl = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
+                var laPhoiNguoi = (slab.OrderId ?? "").StartsWith("203");
+
                 if (rowIndex > startRow)
                     ws.Row(startRow).CopyTo(ws.Row(rowIndex));
 
                 ws.Cell(rowIndex, 1).Value = stt;
-                ws.Cell(rowIndex, 2).Value = slab.ShiftName ?? "";
-                ws.Cell(rowIndex, 3).Value = slab.IdSlab ?? "";
-                ws.Cell(rowIndex, 4).Value = slab.OrderId ?? "";
-                ws.Cell(rowIndex, 5).Value = slab.MeThep ?? "";
-                ws.Cell(rowIndex, 6).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
-                ws.Cell(rowIndex, 7).Value = kt;
-                ws.Cell(rowIndex, 8).Value = slab.MacThep ?? "";
-                ws.Cell(rowIndex, 9).Value = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
-                ws.Cell(rowIndex, 10).Value = slab.ChatLuong ?? "";
-                SetTrangThaiCell(rowIndex, 11, tt.TrangThaiDuc);
-                SetTrangThaiCell(rowIndex, 12, tt.TrangThaiKho);
-                SetTrangThaiCell(rowIndex, 13, tt.TrangThaiPKH);
+                ws.Cell(rowIndex, 2).Value = caBbsl;
+                ws.Cell(rowIndex, 3).Value = slab.ShiftName ?? "";
+                ws.Cell(rowIndex, 4).Value = laPhoiNguoi ? kl : 0;
+                ws.Cell(rowIndex, 5).Value = laPhoiNguoi ? 0 : kl;
+                ws.Cell(rowIndex, 6).Value = slab.IdSlab ?? "";
+                ws.Cell(rowIndex, 7).Value = slab.OrderId ?? "";
+                ws.Cell(rowIndex, 8).Value = slab.MeThep ?? "";
+                ws.Cell(rowIndex, 9).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
+                ws.Cell(rowIndex, 10).Value = kt;
+                ws.Cell(rowIndex, 11).Value = slab.MacThep ?? "";
+                ws.Cell(rowIndex, 12).Value = kl;
+                ws.Cell(rowIndex, 13).Value = slab.ChatLuong ?? "";
+                ws.Cell(rowIndex, 14).Value = GetPhanLoaiLabel(slab.PhanLoai);
+                SetTrangThaiCell(rowIndex, 15, tt.TrangThaiDuc);
+                SetTrangThaiCell(rowIndex, 16, tt.TrangThaiKho);
+                SetTrangThaiCell(rowIndex, 17, tt.TrangThaiPKH);
                 SetCheckCell(rowIndex, checkCol, checkedSlabIds.Contains(tt.IdSlab));
 
                 rowIndex++;
@@ -609,6 +623,22 @@ namespace dataproduct.api.Services
             }
             catch { return ""; }
         }
+
+        // Nhãn hiển thị của PhanLoai (L1/L2/L2TP/L3/L3TP/ND/PP) — đồng bộ với HRC2_PHAN_LOAI_LABEL
+        // ở dataproduct.UI/src/utils/enums/Hrc2PhanLoaiEnum.ts, phải sửa cả hai nơi khi đổi nhãn.
+        private static readonly Dictionary<string, string> Hrc2PhanLoaiLabel = new()
+        {
+            ["L1"]   = "Loại 1",
+            ["L2"]   = "Loại 2",
+            ["L2TP"] = "Loại 2 TP",
+            ["L3"]   = "Loại 3",
+            ["L3TP"] = "Loại 3 TP",
+            ["ND"]   = "Ngắn dài",
+            ["PP"]   = "Phế phẩm",
+        };
+
+        private static string GetPhanLoaiLabel(string? phanLoai)
+            => string.IsNullOrEmpty(phanLoai) ? "" : Hrc2PhanLoaiLabel.GetValueOrDefault(phanLoai, phanLoai);
 
         // Xác định cột pivot (nguội/nóng × loại) cho biểu mẫu ISO cố định (BM.36/QT.05.15 — layout
         // 10 nhóm, KHÔNG được đổi: nguội có 6 nhóm loại1/2/2TP/3/3TP/ngắn-dài, nóng chỉ có 4 nhóm

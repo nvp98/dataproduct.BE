@@ -1705,6 +1705,8 @@ namespace dataproduct.api.Services
                 ChuyenVeMaMe = chuyenVeMaMe,
                 TenMayDucChuyen = tenMayDucChuyen,
                 IsChuyenCaDuc = m.CaDucChuyen.HasValue || m.NgaySXDucChuyen.HasValue,
+                NgayDuc = m.NgaySXDucChuyen ?? (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null),
+                CaDuc = m.CaDucChuyen ?? m.CaTinhLuyen,
             };
         }
 

@@ -71,6 +71,11 @@ namespace dataproduct.api.ResponseModels
 
         // Chuyển ca Đúc (routing sang phiếu Đúc ca sau) — không đổi Ca của chính công đoạn TL
         public bool IsChuyenCaDuc { get; set; }
+
+        // Ca/Ngày của phiếu Đúc mà mẻ này đang thuộc về (đã áp dụng Chuyển ca nếu có).
+        // Mặc định = NgayNhanTL/CaTinhLuyen; nếu đã Chuyển ca thì = NgaySXDucChuyen/CaDucChuyen.
+        public DateOnly? NgayDuc { get; set; }
+        public int? CaDuc { get; set; }
     }
 
     public class HRC1_ChoNhanMeVm
