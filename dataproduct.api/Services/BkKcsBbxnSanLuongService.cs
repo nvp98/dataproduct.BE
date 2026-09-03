@@ -943,7 +943,7 @@ namespace dataproduct.api.Services
                 int row = 9;
                 int stt = 1;
 
-                foreach (var item in data.Where(x => x.SoPhieu != null))
+                foreach (var item in data)
                 {
                     // STT
                     ws.Cell(row, 1).Value = stt++;

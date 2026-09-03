@@ -16,6 +16,15 @@ namespace dataproduct.api.Repositories
         {
             var query = _context.BkKcsBbxnSanLuongs.AsNoTracking().AsQueryable();
 
+            // Chỉ lấy dữ liệu nếu tồn tại phiếu tương ứng trong BM_Phieu
+            query = query.Where(x =>
+                _context.BmPhieus.Any(p =>
+                    p.NgaySX == x.NgaySX &&
+                    p.MayDuc.ToString() == x.IDXuongCan &&
+                    p.MaBm == "CTD_BienBan_SanLuong"
+                )
+            );
+
             if (ngaySX.HasValue)
                 query = query.Where(x => x.NgaySX == ngaySX.Value);
 
