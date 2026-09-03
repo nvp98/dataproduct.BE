@@ -88,6 +88,9 @@ public class HRC1_MeThep
     public DateOnly? NgaySXDucChuyen { get; set; }
     public int? CaDucChuyen { get; set; }
 
+    [MaxLength(1)]
+    public string? KipDucChuyen { get; set; }  // kíp tương ứng NgaySXDucChuyen/CaDucChuyen; null = dùng KipTinhLuyen (mặc định)
+
     public int? Ca { get; set; }               // ca của phiếu lò thổi (1=ngày, 2=đêm)
 
     [MaxLength(1)]

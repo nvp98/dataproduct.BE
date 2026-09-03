@@ -693,7 +693,7 @@ namespace dataproduct.api.Repositories
                 Kip                = m.Kip,
                 NgayNhanTL         = m.NgayNhanTL,
                 CaTinhLuyen        = m.CaTinhLuyen,
-                KipTinhLuyen       = m.KipTinhLuyen,
+                KipTinhLuyen       = m.KipDucChuyen ?? m.KipTinhLuyen,
                 TenNhomPhanLoai    = tenNhom,
                 TenCapNhatBoiLo    = tenLoThoi,
                 TenCapNhatBoiTL    = tenTinhLuyen,
@@ -725,7 +725,7 @@ namespace dataproduct.api.Repositories
             if (q.Ca.HasValue)
                 mes = mes.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
-                mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
+                mes = mes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen)) == q.Kip).ToList();
 
             var rows = mes.Select(m => MapToExportRow(m, mayDucs, userNames, nhomDict, chuyenVeDict, tlScopeDict)).ToList();
 
@@ -779,7 +779,7 @@ namespace dataproduct.api.Repositories
             if (q.Ca.HasValue)
                 allMes = allMes.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca).ToList();
             if (!string.IsNullOrEmpty(q.Kip))
-                allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip).ToList();
+                allMes = allMes.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen)) == q.Kip).ToList();
 
             int total = allMes.Count;
             decimal? totalKl       = allMes.Sum(m => m.KlThepLong);
@@ -877,7 +877,7 @@ namespace dataproduct.api.Repositories
             if (q.Ca.HasValue)
                 meQuery = meQuery.Where(m => (m.CaDucChuyen ?? (m.DichChuyen == "len_thang" ? m.Ca : m.CaTinhLuyen)) == q.Ca);
             if (!string.IsNullOrEmpty(q.Kip))
-                meQuery = meQuery.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) == q.Kip);
+                meQuery = meQuery.Where(m => (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen)) == q.Kip);
             // ── 1. Phân loại ──────────────────────────────────────────────────
             var phanLoai = await meQuery
                 .Where(m => !string.IsNullOrEmpty(m.PhanLoai))
@@ -901,9 +901,9 @@ namespace dataproduct.api.Repositories
 
             // ── 3. Kíp ────────────────────────────────────────────────────────
             var kip = await meQuery
-                .Where(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) != null
-                         && (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen) != "")
-                .GroupBy(m => (m.DichChuyen == "len_thang" ? m.Kip : m.KipTinhLuyen)!)
+                .Where(m => (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen)) != null
+                         && (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen)) != "")
+                .GroupBy(m => (m.DichChuyen == "len_thang" ? m.Kip : (m.KipDucChuyen ?? m.KipTinhLuyen))!)
                 .OrderBy(g => g.Key)
                 .Select(g => new HRC1_TongHopItem { Label = g.Key, KlThepLong = g.Sum(m => m.KlThepLong ?? 0) })
                 .ToListAsync();

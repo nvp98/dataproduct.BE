@@ -636,9 +636,16 @@ namespace dataproduct.api.Services
             if (phieuDich?.TinhTrang == 5)
                 throw new InvalidOperationException("Phiếu đúc ca đích đã chốt, không thể chuyển mẻ sang ca đó.");
 
+            // Kíp trực của ca đích — khác kíp TL đã nhận mẻ (KipTinhLuyen) vì đây là ca/ngày Đúc thực tế
+            var kipMoi = await _masterCtx.Tbl_Kip.AsNoTracking()
+                .Where(k => k.NgayLamViec == ngayMoi && k.TenCa == caMoi.ToString())
+                .Select(k => k.TenKip)
+                .FirstOrDefaultAsync();
+
             var old = Snapshot(me);
             me.NgaySXDucChuyen = ngayMoi;
             me.CaDucChuyen = caMoi;
+            me.KipDucChuyen = kipMoi;
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
@@ -668,6 +675,7 @@ namespace dataproduct.api.Services
             var old = Snapshot(me);
             me.NgaySXDucChuyen = null;
             me.CaDucChuyen = null;
+            me.KipDucChuyen = null;
             me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
