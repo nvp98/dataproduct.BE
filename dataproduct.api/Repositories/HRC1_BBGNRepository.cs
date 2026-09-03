@@ -464,17 +464,23 @@ namespace dataproduct.api.Repositories
         // ── Helper: áp dụng filter trực tiếp lên HRC1_MeThep ──────────────────────
         private IQueryable<HRC1_MeThep> ApplyMeThepFilters(IQueryable<HRC1_MeThep> q, HRC1_ExportQuery f)
         {
+            // Ngày đúc hiệu lực để lọc: ưu tiên NgaySXDucChuyen (đã bấm "Chuyển ca"), mặc định
+            // len_thang=NgayTao, tinh_luyen=NgayNhanTL — khớp đúng cách MapToExportRow tính NgayDuc.
             if (f.TuNgay.HasValue)
             {
-                var _tuNgay = f.TuNgay.Value.ToDateTime(TimeOnly.MinValue);
-                q = q.Where(m => (m.DichChuyen == "len_thang" && m.NgayTao   >= _tuNgay)
-                               || (m.DichChuyen != "len_thang" && m.NgayNhanTL >= _tuNgay));
+                var _tuNgayDate = f.TuNgay.Value;
+                var _tuNgay = _tuNgayDate.ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => (m.NgaySXDucChuyen.HasValue && m.NgaySXDucChuyen.Value >= _tuNgayDate)
+                               || (!m.NgaySXDucChuyen.HasValue && m.DichChuyen == "len_thang" && m.NgayTao   >= _tuNgay)
+                               || (!m.NgaySXDucChuyen.HasValue && m.DichChuyen != "len_thang" && m.NgayNhanTL >= _tuNgay));
             }
             if (f.DenNgay.HasValue)
             {
-                var _denNgay = f.DenNgay.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
-                q = q.Where(m => (m.DichChuyen == "len_thang" && m.NgayTao   < _denNgay)
-                               || (m.DichChuyen != "len_thang" && m.NgayNhanTL < _denNgay));
+                var _denNgayDate = f.DenNgay.Value.AddDays(1);
+                var _denNgay = _denNgayDate.ToDateTime(TimeOnly.MinValue);
+                q = q.Where(m => (m.NgaySXDucChuyen.HasValue && m.NgaySXDucChuyen.Value < _denNgayDate)
+                               || (!m.NgaySXDucChuyen.HasValue && m.DichChuyen == "len_thang" && m.NgayTao   < _denNgay)
+                               || (!m.NgaySXDucChuyen.HasValue && m.DichChuyen != "len_thang" && m.NgayNhanTL < _denNgay));
             }
             if (f.TuNgayLoThoi.HasValue)
             {
