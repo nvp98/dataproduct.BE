@@ -2169,9 +2169,10 @@ namespace dataproduct.api.Services
             int row = DATA_START, stt = 1;
             foreach (var item in data)
             {
-                // Ngày đúc hiệu lực (TL: NgayNhanTL; lên thẳng: NgayTao)
-                var ngayDucHieuLuc = item.NgayNhanTL.HasValue
-                    ? item.NgayNhanTL.Value.ToString("dd/MM/yyyy")
+                // Ngày đúc hiệu lực — ưu tiên NgaySXDucChuyen (đã bấm "Chuyển ca"), rồi mới đến
+                // mặc định TL: NgayNhanTL; lên thẳng: NgayTao (đã tính sẵn trong item.NgayDuc).
+                var ngayDucHieuLuc = item.NgayDuc.HasValue
+                    ? item.NgayDuc.Value.ToString("dd/MM/yyyy")
                     : item.NgayTao.ToString("dd/MM/yyyy");
                 var caDucHieuLuc = FmtCa(item.CaDuc ?? item.CaTinhLuyen ?? item.Ca);
                 var kipDuc = item.KipTinhLuyen ?? item.Kip ?? "";
