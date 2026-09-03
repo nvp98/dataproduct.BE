@@ -25,6 +25,7 @@ namespace dataproduct.api.Models
         public decimal? TonCuoiAuto { get; set; } // giá trị tự động từ nguồn EMS/cảm biến
         public string? GhiChu { get; set; }
         public bool IsAdjusted { get; set; }      // true khi TonCuoi != TonCuoiAuto
+        public bool IsTachLieu { get; set; }      // true khi dòng này sinh ra từ tách liệu
         public int? AdjustedBy { get; set; }
         public DateTime? AdjustedDate { get; set; }
         public DateTime CreatedDate { get; set; }

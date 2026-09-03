@@ -28,6 +28,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? TonCuoiAuto { get; set; }
         public string? GhiChu { get; set; }
         public bool IsAdjusted { get; set; }
+        public bool IsTachLieu { get; set; }
         public int? AdjustedBy { get; set; }
         public DateTime? AdjustedDate { get; set; }
     }
@@ -60,6 +61,8 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal? XuatAuto { get; set; }
         public decimal? TonCuoi { get; set; }
         public decimal? TonCuoiAuto { get; set; }
+        public bool IsAdjusted { get; set; }
+        public bool IsTachLieu { get; set; }
         public string? GhiChu { get; set; }
     }
 
