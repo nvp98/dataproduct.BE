@@ -66,7 +66,7 @@ namespace dataproduct.api.Controllers.NMTKVV
             }
         }
 
-        // Tải dữ liệu cân từ EMS (cả Ca 1 + Ca 2), upsert vào TKVV_BaoCaoSanLuongChiPhi,
+        // Tải dữ liệu cân từ EMS cho 1 Ca, upsert vào TKVV_BaoCaoSanLuongChiPhi,
         // trả về dữ liệu đã lưu kèm KLAmAuto và IsAdjusted.
         [HttpPost("load-dulieu")]
         public async Task<IActionResult> LoadDuLieu([FromBody] LoadDuLieuCanRequestDto request)
@@ -77,6 +77,8 @@ namespace dataproduct.api.Controllers.NMTKVV
                     return BadRequest(new { message = "Thiếu tham số maBM." });
                 if (request.Scope < 1 || request.Scope > 6)
                     return BadRequest(new { message = "scope phải từ 1 đến 6." });
+                if (request.CaSX != 1 && request.CaSX != 2)
+                    return BadRequest(new { message = "caSX chỉ nhận giá trị 1 hoặc 2." });
                 var result = await _service.LoadAndSaveAsync(request);
                 return Ok(result);
             }
@@ -86,18 +88,21 @@ namespace dataproduct.api.Controllers.NMTKVV
             }
         }
 
-        // Lấy dữ liệu đã lưu theo ngày và scope int 1-6 (dùng khi load lại phiếu).
+        // Lấy dữ liệu đã lưu theo ngày, scope int 1-6 và ca sx (dùng khi load lại phiếu).
         [HttpGet("get-baocao-data")]
         public async Task<IActionResult> GetBaoCaoData(
             [FromQuery] DateOnly ngaySX,
             [FromQuery] string maBM,
-            [FromQuery] int scope)
+            [FromQuery] int scope,
+            [FromQuery] int? caSX = null)
         {
             try
             {
                 if (scope < 1 || scope > 6)
                     return BadRequest(new { message = "scope phải từ 1 đến 6." });
-                var result = await _service.GetBaoCaoDataAsync(ngaySX, maBM, scope);
+                if (caSX.HasValue && caSX != 1 && caSX != 2)
+                    return BadRequest(new { message = "caSX chỉ nhận giá trị 1 hoặc 2." });
+                var result = await _service.GetBaoCaoDataAsync(ngaySX, maBM, scope, caSX);
                 return Ok(result);
             }
             catch (Exception ex)

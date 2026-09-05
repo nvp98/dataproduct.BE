@@ -158,13 +158,13 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string MaBM { get; set; } = string.Empty;
         public string LoaiDuLieu { get; set; } = "SANLUONG";
         public int Scope { get; set; }           // INT 1-6
+        public int? CaSX { get; set; }           // Ca đang chọn trên form; bắt buộc 1 hoặc 2 (1 phiếu = 1 ca)
         public int? CreatedBy { get; set; }
     }
 
     public class LoadDuLieuCanResultDto
     {
-        public List<TKVVBaoCaoSanLuongChiPhiDto> Table1 { get; set; } = new(); // Ca ngày
-        public List<TKVVBaoCaoSanLuongChiPhiDto> Table2 { get; set; } = new(); // Ca đêm
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table { get; set; } = new(); // Chỉ dữ liệu của ca đang chọn
     }
 
     public class SaveBcSlRowDto
