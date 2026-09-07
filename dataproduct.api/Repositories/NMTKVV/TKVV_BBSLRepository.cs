@@ -131,33 +131,27 @@ namespace dataproduct.api.Repositories
             return await query.AsNoTracking().ToListAsync();
         }
 
-        public async Task<bool> UpdateGiaTriDieuChinhAsync(long id, decimal? giaTriDieuChinh)
-        {
-            var existing = await _context.TKVV_SanLuongDuLieu.FindAsync(id);
-            if (existing == null) return false;
-
-            existing.GiaTriDieuChinh = giaTriDieuChinh;
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
         // ─── Tổng tự động (PLC) theo (Ngay, Ca, Scope toàn cục 1-6) ─────────────
         public async Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay,int ca,int scope)
         {
             //var scopeCode = ResolveScopeCode(scope);
+
             var ngayOnly = DateOnly.FromDateTime(ngay);
 
-            var tong = await _context.TKVV_SanLuongDuLieu
+            var duLieu = await _context.TKVV_SanLuongDuLieu
                 .Where(d =>
                     d.Ngay == ngayOnly &&
-                    d.Ca == (byte)ca &&
+                    d.Ca ==  ca &&
                     d.Scope == scope.ToString())
-                .SumAsync(d =>
-                    (decimal?)(d.GiaTriDieuChinh ?? d.GiaTriTuDong)) ?? 0;
+                .Select(d => new
+                {
+                    GiaTri = d.GiaTriDieuChinh ?? d.GiaTriTuDong
+                })
+                .FirstOrDefaultAsync();
 
             return new TKVVTongTuDongDto
             {
-                TongTuDong = tong
+                TongTuDong = duLieu?.GiaTri ?? 0
             };
         }
 
