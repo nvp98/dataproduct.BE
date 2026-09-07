@@ -7,5 +7,6 @@ namespace dataproduct.api.Repositories.NMTKVV
         Task<List<TKVVTonSiloRowDto>> InitRowsAsync(InitTonSiloRowsRequestDto request);
         Task<List<TKVVTonSiloRowDto>> GetRowsByPhieuIdAsync(Guid phieuId);
         Task SavePhieuRowsAsync(SaveTonSiloPhieuRequestDto request);
+        Task ResetPhieuAsync(DateOnly ngaySX, int ca, int scope);
     }
 }
