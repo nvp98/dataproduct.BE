@@ -57,11 +57,19 @@ namespace dataproduct.api.Repositories.NMTKVV
                 .Where(t => siloIds.Contains(t.SiloID) && !t.IsDelete
                          && (t.NgaySX < ngaySX || (t.NgaySX == ngaySX && t.Ca < ca)))
                 .ToListAsync();
+            // Tồn đầu = TonCuoi của dòng cuối cùng (theo ThuTu) trong ca gần nhất —
+            // khi có tách liệu, lấy dòng có ThuTu lớn nhất (dòng cuối cùng của Silo đó).
             var lastTonCuoiBySilo = tonSiloCandidates
                 .GroupBy(t => t.SiloID)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.OrderByDescending(t => t.NgaySX).ThenByDescending(t => t.Ca).First().TonCuoi);
+                    g => {
+                        var latest = g.OrderByDescending(t => t.NgaySX).ThenByDescending(t => t.Ca).First();
+                        return g
+                            .Where(t => t.NgaySX == latest.NgaySX && t.Ca == latest.Ca)
+                            .OrderByDescending(t => t.ID)
+                            .First().TonCuoi; 
+                    });
 
             // ── 4. TonCuoiAuto/XuatAuto từ SP_TKVV_GetDuLieuCan (cùng 1 lần gọi, theo Silo) ──
             var tonCuoiAutoBySilo = new Dictionary<int, decimal>();
@@ -130,14 +138,17 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
 
             // ── 5. Bản ghi đã tồn tại trong DB cho ngaySX+Ca+Scope này ─────────────
+            // Dùng List vì 1 Silo có thể có nhiều dòng do tách liệu.
             var existingRows = await _context.TKVV_TonSilo
                 .Where(t => siloIds.Contains(t.SiloID)
                          && t.NgaySX == ngaySX && t.Ca == ca && t.Scope == scope
                          && !t.IsDelete)
                 .ToListAsync();
-            var existingBySilo = existingRows.ToDictionary(t => t.SiloID);
+            var existingBySilo = existingRows
+                .GroupBy(t => t.SiloID)
+                .ToDictionary(g => g.Key, g => g.OrderBy(t => t.ID).ToList());
 
-            // ── 6. Upsert: INSERT mới hoặc UPDATE TonCuoiAuto cho bản ghi đã có ─────
+            // ── 6. Upsert: INSERT mới hoặc UPDATE dòng gốc; dòng tách chỉ cập nhật TonDau ──
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -152,17 +163,11 @@ namespace dataproduct.api.Repositories.NMTKVV
                     string? doAmText = doAmTextBySilo.TryGetValue(silo.ID, out var dt) ? dt : null;
                     decimal? xuatAuto = xuatAutoBySilo.TryGetValue(silo.ID, out var xa) ? xa : null;
 
-                    if (!existingBySilo.TryGetValue(silo.ID, out var rec))
+                    if (!existingBySilo.TryGetValue(silo.ID, out var siloRecs) || siloRecs.Count == 0)
                     {
                         // Chưa có bản ghi — INSERT với dữ liệu khởi tạo
-                        // TonDau = carry-forward từ kíp gần nhất trước (null nếu chưa có lịch sử)
-                        // TonCuoi = TonCuoiAuto (giá trị sensor/điều chỉnh); không tính từ công thức khi mới khởi tạo
-                        // Nhap/DoAm = dòng SP BBGN tương ứng của Silo này (xem mục 4b)
-                        // Xuat = XuatAuto (cùng SP_TKVV_GetDuLieuCan với TonCuoiAuto, đã theo Silo sẵn)
                         var tonCuoi = tonCuoiAuto ?? 0m;
-                        var isAdj = false;
-
-                        rec = new TKVV_TonSilo
+                        var rec = new TKVV_TonSilo
                         {
                             PhieuID = request.PhieuID,
                             NgaySX = ngaySX,
@@ -180,24 +185,21 @@ namespace dataproduct.api.Repositories.NMTKVV
                             XuatAuto = xuatAuto,
                             TonCuoiAuto = tonCuoiAuto,
                             TonCuoi = tonCuoi,
-                            IsAdjusted = isAdj,
-                            AdjustedBy = isAdj ? request.CurrentUserId : null,
-                            AdjustedDate = isAdj ? DateTime.Now : null,
+                            IsAdjusted = false,
                             CreatedDate = DateTime.Now,
                             CreatedBy = request.CurrentUserId,
                         };
                         _context.TKVV_TonSilo.Add(rec);
-                        existingBySilo[silo.ID] = rec;
+                        existingBySilo[silo.ID] = new List<TKVV_TonSilo> { rec };
                     }
                     else
                     {
-                        // Đã có bản ghi — cập nhật TonCuoiAuto/NhapAuto/XuatAuto + carry-forward,
-                        // giữ nguyên TonCuoi/Nhap/DoAm/Xuat người dùng đã nhập (chỉ backfill nếu còn trống)
+                        // Dòng gốc (ID nhỏ nhất) — cập nhật auto values
+                        var rec = siloRecs[0];
                         var tonCuoi = rec.TonCuoi ?? tonCuoiAuto ?? 0m;
                         var isAdj = tonCuoiAuto.HasValue && tonCuoi != tonCuoiAuto.Value;
                         if (nonFirstNvlSiloIds.Contains(silo.ID))
                         {
-                            // Silo không phải đầu tiên của NVL → xóa Nhap/NhapAuto/DoAm/DoAmText
                             rec.Nhap = null;
                             rec.NhapAuto = null;
                             rec.DoAm = null;
@@ -219,6 +221,13 @@ namespace dataproduct.api.Repositories.NMTKVV
                         rec.AdjustedBy = isAdj ? request.CurrentUserId : null;
                         rec.AdjustedDate = isAdj ? DateTime.Now : null;
                         rec.UpdatedDate = DateTime.Now;
+
+                        // Dòng tách (ID lớn hơn) — chỉ cập nhật TonDau, giữ nguyên phần còn lại
+                        foreach (var tachRec in siloRecs.Skip(1))
+                        {
+                            tachRec.TonDau = carryForward;
+                            tachRec.UpdatedDate = DateTime.Now;
+                        }
                     }
                 }
 
@@ -231,42 +240,59 @@ namespace dataproduct.api.Repositories.NMTKVV
                 throw;
             }
 
-            // ── 7. Trả về DTO đầy đủ (kèm ID thực từ DB) ───────────────────────────
+            // ── 7. Trả về DTO đầy đủ — bao gồm tất cả dòng tách liệu ───────────────
             var result = new List<TKVVTonSiloRowDto>();
-            for (int i = 0; i < silos.Count; i++)
+            foreach (var silo in silos)
             {
-                var silo = silos[i];
                 nearestMappingBySilo.TryGetValue(silo.ID, out var mapping);
-                var nvl = mapping != null ? nvlList.FirstOrDefault(n => n.ID == mapping.NguyenVatLieuID) : null;
-                existingBySilo.TryGetValue(silo.ID, out var rec);
-
-                result.Add(new TKVVTonSiloRowDto
+                if (!existingBySilo.TryGetValue(silo.ID, out var siloRecs) || siloRecs.Count == 0)
                 {
-                    Id = rec?.ID ?? 0,
-                    PhieuID = rec?.PhieuID,
-                    NgaySX = ngaySX,
-                    Ca = ca,
-                    Scope = scope,
-                    ThuTu = i + 1,
-                    SiloID = silo.ID,
-                    MaSilo = silo.MaSilo,
-                    TenSilo = silo.TenSilo,
-                    NguyenVatLieuID = rec?.NguyenVatLieuID ?? mapping?.NguyenVatLieuID,
-                    TenNVL = nvl?.TenNVL,
-                    DoAm = rec?.DoAm,
-                    DoAmText = rec?.DoAmText,
-                    TonDau = rec?.TonDau,
-                    Nhap = rec?.Nhap,
-                    NhapAuto = rec?.NhapAuto,
-                    Xuat = rec?.Xuat,
-                    XuatAuto = rec?.XuatAuto,
-                    TonCuoi = rec?.TonCuoi,
-                    TonCuoiAuto = rec?.TonCuoiAuto,
-                    GhiChu = rec?.GhiChu,
-                    IsAdjusted = rec?.IsAdjusted ?? false,
-                    AdjustedBy = rec?.AdjustedBy,
-                    AdjustedDate = rec?.AdjustedDate,
-                });
+                    result.Add(new TKVVTonSiloRowDto
+                    {
+                        SiloID = silo.ID,
+                        MaSilo = silo.MaSilo,
+                        TenSilo = silo.TenSilo,
+                        NgaySX = ngaySX,
+                        Ca = ca,
+                        Scope = scope,
+                    });
+                    continue;
+                }
+
+                foreach (var rec in siloRecs)
+                {
+                    var nvl = rec.NguyenVatLieuID.HasValue
+                        ? nvlList.FirstOrDefault(n => n.ID == rec.NguyenVatLieuID)
+                        : null;
+                    result.Add(new TKVVTonSiloRowDto
+                    {
+                        Id = rec.ID,
+                        PhieuID = rec.PhieuID,
+                        NgaySX = ngaySX,
+                        Ca = ca,
+                        Scope = scope,
+                        ThuTu = rec.ThuTu,
+                        SiloID = silo.ID,
+                        MaSilo = silo.MaSilo,
+                        TenSilo = silo.TenSilo,
+                        NguyenVatLieuID = rec.NguyenVatLieuID,
+                        TenNVL = nvl?.TenNVL,
+                        DoAm = rec.DoAm,
+                        DoAmText = rec.DoAmText,
+                        TonDau = rec.TonDau,
+                        Nhap = rec.Nhap,
+                        NhapAuto = rec.NhapAuto,
+                        Xuat = rec.Xuat,
+                        XuatAuto = rec.XuatAuto,
+                        TonCuoi = rec.TonCuoi,
+                        TonCuoiAuto = rec.TonCuoiAuto,
+                        GhiChu = rec.GhiChu,
+                        IsAdjusted = rec.IsAdjusted,
+                        IsTachLieu = rec.IsTachLieu,
+                        AdjustedBy = rec.AdjustedBy,
+                        AdjustedDate = rec.AdjustedDate,
+                    });
+                }
             }
             return result;
         }
@@ -320,6 +346,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                     TonCuoiAuto = r.TonCuoiAuto,
                     GhiChu = r.GhiChu,
                     IsAdjusted = r.IsAdjusted,
+                    IsTachLieu = r.IsTachLieu,
                     AdjustedBy = r.AdjustedBy,
                     AdjustedDate = r.AdjustedDate,
                 };
@@ -340,15 +367,18 @@ namespace dataproduct.api.Repositories.NMTKVV
                     if (row.Id.HasValue && row.Id > 0)
                         rec = await _context.TKVV_TonSilo.FindAsync(row.Id.Value);
 
+                    // Fallback theo (NgaySX, Ca, Scope, SiloID, NguyenVatLieuID) — thêm NVL vào key
+                    // để dòng tách cùng Silo nhưng khác NVL không bị ghi đè lên nhau → INSERT mới.
                     rec ??= await _context.TKVV_TonSilo.FirstOrDefaultAsync(x =>
                         x.NgaySX == row.NgaySX &&
                         x.Ca == row.Ca &&
                         x.Scope == row.Scope &&
                         x.SiloID == row.SiloID &&
+                        x.NguyenVatLieuID == row.NguyenVatLieuID &&
                         !x.IsDelete);
 
                     var tonCuoi = row.TonCuoi ?? row.TonCuoiAuto ?? 0m;
-                    var isAdjusted = row.TonCuoiAuto.HasValue && tonCuoi != row.TonCuoiAuto.Value;
+                    var isAdjusted = row.IsAdjusted || (row.TonCuoiAuto.HasValue && tonCuoi != row.TonCuoiAuto.Value);
 
                     if (rec == null)
                     {
@@ -373,6 +403,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             TonCuoiAuto = row.TonCuoiAuto,
                             GhiChu = row.GhiChu,
                             IsAdjusted = isAdjusted,
+                            IsTachLieu = row.IsTachLieu,
                             AdjustedBy = isAdjusted ? request.CurrentUserId : null,
                             AdjustedDate = isAdjusted ? DateTime.Now : null,
                             CreatedDate = DateTime.Now,
@@ -396,6 +427,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                         rec.TonCuoiAuto = row.TonCuoiAuto;
                         rec.GhiChu = row.GhiChu;
                         rec.IsAdjusted = isAdjusted;
+                        rec.IsTachLieu = row.IsTachLieu;
                         rec.AdjustedBy = isAdjusted ? request.CurrentUserId : null;
                         rec.AdjustedDate = isAdjusted ? DateTime.Now : null;
                         rec.UpdatedDate = DateTime.Now;

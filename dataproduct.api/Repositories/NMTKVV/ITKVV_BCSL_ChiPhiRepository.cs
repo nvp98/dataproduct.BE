@@ -16,8 +16,8 @@ namespace dataproduct.api.Repositories.NMTKVV
         // trả về dữ liệu đã lưu (table1=Ca ngày, table2=Ca đêm)
         Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request);
 
-        // Lấy dữ liệu đã lưu theo ngày và scope (int 1-6)
-        Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope);
+        // Lấy dữ liệu đã lưu theo ngày, scope (int 1-6) và ca sx
+        Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope, int? caSX = null);
 
         // Lấy dữ liệu đã lưu theo IDPhieu (dùng cho export PDF/Excel)
         Task<LoadDuLieuCanResultDto> GetByPhieuIdAsync(Guid phieuId);

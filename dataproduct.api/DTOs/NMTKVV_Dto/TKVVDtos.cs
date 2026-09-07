@@ -123,6 +123,38 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? MaPB_BN { get; set; } = string.Empty;
         public string? MaLo { get; set; } = string.Empty;
         public string? BBGN_GhiChu { get; set; } = string.Empty;
+        public int? ID_CT_BBGN { get; set; }
+    }
+
+    // ─── Tổng sản lượng tự động theo Scope (SP_TKVV_GetTongSanLuong) ───────────
+    // Gọi với (Ngay, Ca, MaBM="TONGSANLUONG_{ScopeCode}", LoaiDuLieu="TONGSANLUONG").
+    // 1 Scope chỉ có 1 số tổng/Ngay+Ca (không tách theo NVL) — dùng để cập nhật
+    // GiaTriTuDong của TKVV_SanLuongDuLieu.
+
+    public class TKVVTongSanLuongAutoDto
+    {
+        public DateTime Ngay { get; set; }
+        public int Ca { get; set; }
+        public string? MaBM { get; set; }
+        public string? LoaiDuLieu { get; set; }
+        public string? TagIDEMS_SuDung { get; set; }
+        public decimal TongSanLuong { get; set; }
+        public int SoTagCoDuLieu { get; set; }
+    }
+
+    // ─── TKVV_SanLuongDuLieu — dữ liệu PLC thô (GiaTriTuDong) + điều chỉnh tay ──
+
+    public class TKVVSanLuongDuLieuDto
+    {
+        public long Id { get; set; }
+        public string? TagID { get; set; }
+        public decimal? GiaTriTuDong { get; set; }
+        public decimal? GiaTriDieuChinh { get; set; }
+        public DateOnly Ngay { get; set; }
+        public int Ca { get; set; }
+        public string? Scope { get; set; }
+        public DateTime? ThoiGian { get; set; }
+        public DateTime NgayTao { get; set; }
     }
 
     // ─── TKVV_BaoCaoSanLuongChiPhi — bảng lưu dữ liệu cân + trạng thái điều chỉnh ─
@@ -150,6 +182,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public bool IsAdjusted { get; set; }
         public int? AdjustedBy { get; set; }
         public DateTime? AdjustedDate { get; set; }
+        public int? ID_CT_BBGN { get; set; }
     }
 
     public class LoadDuLieuCanRequestDto
@@ -158,13 +191,14 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string MaBM { get; set; } = string.Empty;
         public string LoaiDuLieu { get; set; } = "SANLUONG";
         public int Scope { get; set; }           // INT 1-6
+        public int? CaSX { get; set; }           // Ca đang chọn trên form; bắt buộc 1 hoặc 2 (1 phiếu = 1 ca)
         public int? CreatedBy { get; set; }
     }
 
     public class LoadDuLieuCanResultDto
     {
-        public List<TKVVBaoCaoSanLuongChiPhiDto> Table1 { get; set; } = new(); // Ca ngày
-        public List<TKVVBaoCaoSanLuongChiPhiDto> Table2 { get; set; } = new(); // Ca đêm
+        public List<TKVVBaoCaoSanLuongChiPhiDto> Table { get; set; } = new(); // Chỉ dữ liệu của ca đang chọn
+        public TKVVSanLuongDuLieuDto? TongSanLuong { get; set; } // TKVV_SanLuongDuLieu theo Ngay+Ca+Scope
     }
 
     public class SaveBcSlRowDto

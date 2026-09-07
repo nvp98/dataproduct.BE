@@ -29,5 +29,6 @@ namespace dataproduct.api.Models
         public int? CreatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
         public bool IsDelete { get; set; }
+        public int? ID_CT_BBGN { get; set; }
     }
 }

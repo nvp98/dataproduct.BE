@@ -1,6 +1,9 @@
 using dataproduct.api.DTOs.NMTKVV_Dto;
+using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Services.NMTKVV;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Controllers.NMTKVV
 {
@@ -9,10 +12,42 @@ namespace dataproduct.api.Controllers.NMTKVV
     public class TKVV_BCSL_ChiPhiController : ControllerBase
     {
         private readonly TKVV_BCSL_ChiPhiService _service;
+        private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
 
-        public TKVV_BCSL_ChiPhiController(TKVV_BCSL_ChiPhiService service)
+        public TKVV_BCSL_ChiPhiController(TKVV_BCSL_ChiPhiService service, ProductFormContext context, ProductDataMasterDbContext masterContext)
         {
             _service = service;
+            _context = context;
+            _masterContext = masterContext;
+        }
+
+        [HttpGet("scope-xuong-mapping")]
+        public async Task<IActionResult> GetScopeXuongMapping([FromQuery] int scope)
+        {
+            var mapping = await _context.TKVV_Scope_Xuong_Mapping
+                .FirstOrDefaultAsync(m => m.Scope == scope);
+            if (mapping == null)
+                return NotFound(new { message = $"Không tìm thấy mapping cho scope {scope}" });
+
+            string? tenVatTu = null;
+            if (mapping.ID_NVL_BBGN_ThanhPham.HasValue)
+            {
+                var vatTu = await _masterContext.Tbl_VatTu
+                    .FirstOrDefaultAsync(v => v.ID_VatTu == mapping.ID_NVL_BBGN_ThanhPham.Value);
+                tenVatTu = vatTu?.TenVatTu;
+            }
+
+            return Ok(new
+            {
+                id = mapping.ID,
+                scope = mapping.Scope,
+                maXuong = mapping.MaXuong,
+                tenXuong = mapping.TenXuong,
+                idXuongBBGN = mapping.ID_Xuong_BBGN,
+                idNvlBbgnThanhPham = mapping.ID_NVL_BBGN_ThanhPham,
+                tenVatTu,
+            });
         }
 
         // Đổ giá trị NVL tự động từ EMS (SP_TKVV_GetGiaTriNVL_Auto) vào bảng khi
@@ -66,7 +101,7 @@ namespace dataproduct.api.Controllers.NMTKVV
             }
         }
 
-        // Tải dữ liệu cân từ EMS (cả Ca 1 + Ca 2), upsert vào TKVV_BaoCaoSanLuongChiPhi,
+        // Tải dữ liệu cân từ EMS cho 1 Ca, upsert vào TKVV_BaoCaoSanLuongChiPhi,
         // trả về dữ liệu đã lưu kèm KLAmAuto và IsAdjusted.
         [HttpPost("load-dulieu")]
         public async Task<IActionResult> LoadDuLieu([FromBody] LoadDuLieuCanRequestDto request)
@@ -77,6 +112,8 @@ namespace dataproduct.api.Controllers.NMTKVV
                     return BadRequest(new { message = "Thiếu tham số maBM." });
                 if (request.Scope < 1 || request.Scope > 6)
                     return BadRequest(new { message = "scope phải từ 1 đến 6." });
+                if (request.CaSX != 1 && request.CaSX != 2)
+                    return BadRequest(new { message = "caSX chỉ nhận giá trị 1 hoặc 2." });
                 var result = await _service.LoadAndSaveAsync(request);
                 return Ok(result);
             }
@@ -86,18 +123,21 @@ namespace dataproduct.api.Controllers.NMTKVV
             }
         }
 
-        // Lấy dữ liệu đã lưu theo ngày và scope int 1-6 (dùng khi load lại phiếu).
+        // Lấy dữ liệu đã lưu theo ngày, scope int 1-6 và ca sx (dùng khi load lại phiếu).
         [HttpGet("get-baocao-data")]
         public async Task<IActionResult> GetBaoCaoData(
             [FromQuery] DateOnly ngaySX,
             [FromQuery] string maBM,
-            [FromQuery] int scope)
+            [FromQuery] int scope,
+            [FromQuery] int? caSX = null)
         {
             try
             {
                 if (scope < 1 || scope > 6)
                     return BadRequest(new { message = "scope phải từ 1 đến 6." });
-                var result = await _service.GetBaoCaoDataAsync(ngaySX, maBM, scope);
+                if (caSX.HasValue && caSX != 1 && caSX != 2)
+                    return BadRequest(new { message = "caSX chỉ nhận giá trị 1 hoặc 2." });
+                var result = await _service.GetBaoCaoDataAsync(ngaySX, maBM, scope, caSX);
                 return Ok(result);
             }
             catch (Exception ex)

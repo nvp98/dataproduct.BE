@@ -47,8 +47,8 @@ namespace dataproduct.api.Services.NMTKVV
         public Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request)
             => _repo.LoadAndSaveAsync(request);
 
-        public Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope)
-            => _repo.GetBaoCaoDataAsync(ngaySX, maBM, scope);
+        public Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope, int? caSX = null)
+            => _repo.GetBaoCaoDataAsync(ngaySX, maBM, scope, caSX);
 
         public Task<LoadDuLieuCanResultDto> GetByPhieuIdAsync(Guid phieuId)
             => _repo.GetByPhieuIdAsync(phieuId);
@@ -77,8 +77,9 @@ namespace dataproduct.api.Services.NMTKVV
             var nguoiGiaoKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 0);
             var nguoiNhanKip = pheDuyets.FirstOrDefault(x => x.CapDuyet == 1);
 
-            var rowsNgay = BuildRows(data.Table1, 1, out var tongNgay);
-            var rowsDem = BuildRows(data.Table2, 2, out var tongDem);
+            var caInPhieu = data.Table.FirstOrDefault()?.Ca ?? 1;
+            var rowsNgay = caInPhieu == 1 ? BuildRows(data.Table, 1, out var tongNgay) : "";
+            var rowsDem = caInPhieu == 2 ? BuildRows(data.Table, 2, out var tongDem) : "";
 
             var logoBase64 = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var signGiaoKip = await FormatChuKyBase64Async(nguoiGiaoKip?.ChuKy, nguoiGiaoKip?.TinhTrang == 1);
@@ -96,8 +97,8 @@ namespace dataproduct.api.Services.NMTKVV
                 .Replace("{{NgayKetThuc}}", ngaySau.Day.ToString("00"))
                 .Replace("{{ThangKetThuc}}", ngaySau.Month.ToString("00"))
                 .Replace("{{Nam}}", ngaySau.Year.ToString())
-                .Replace("{{RowsNgay}}", rowsNgay + BuildTongRow(tongNgay))
-                .Replace("{{RowsDem}}", rowsDem + BuildTongRow(tongDem))
+                // .Replace("{{RowsNgay}}", caInPhieu == 1 ? rowsNgay + BuildTongRow(tongNgay) : "")
+                // .Replace("{{RowsDem}}", caInPhieu == 2 ? rowsDem + BuildTongRow(tongDem) : "")
                 .Replace("{{Sign_GiaoKip}}", signGiaoKip)
                 .Replace("{{Sign_NhanKip}}", signNhanKip)
                 .Replace("{{Name_GiaoKip}}", System.Net.WebUtility.HtmlEncode(nguoiGiaoKip?.HoVaTen ?? ""))
