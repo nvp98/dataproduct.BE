@@ -9,6 +9,8 @@ namespace dataproduct.api.Models
         public long ID { get; set; }
         public string? TagID { get; set; } = string.Empty;
         public decimal? GiaTriTuDong { get; set; }
+        // Chỉ dùng để đọc/hiển thị (vd: đối chiếu số liệu đã điều chỉnh thủ công trước đây),
+        // không có API cập nhật cột này.
         public decimal? GiaTriDieuChinh { get; set; }
         public DateOnly Ngay { get; set; }
         public byte Ca { get; set; }

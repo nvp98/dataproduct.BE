@@ -45,6 +45,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public long Id { get; set; }
         public string TagID { get; set; } = string.Empty;
         public decimal? GiaTriTuDong { get; set; }
+        // Chỉ để đọc/hiển thị, không có API cập nhật.
         public decimal? GiaTriDieuChinh { get; set; }
         public DateOnly Ngay { get; set; }
         public byte Ca { get; set; }
@@ -192,13 +193,6 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public Guid? PhieuID { get; set; }
         public int CurrentUserId { get; set; }
         public List<SaveBcSlRowDto> Rows { get; set; } = new();
-    }
-
-    // ─── Request đơn giản cho controller ───────────────────────────────────────
-
-    public class UpdateGiaTriDieuChinhRequestDto
-    {
-        public decimal? GiaTriDieuChinh { get; set; }
     }
 
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────

@@ -80,18 +80,6 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // KTV/KCS chỉnh tay GiaTriDieuChinh cho 1 dòng dữ liệu thô khi nghi ngờ PLC báo sai
-        [HttpPut("dulieu-tho/dieu-chinh/{id}")]
-        public async Task<IActionResult> UpdateGiaTriDieuChinh(long id, [FromBody] UpdateGiaTriDieuChinhRequestDto dto)
-        {
-            try
-            {
-                var ok = await _service.UpdateGiaTriDieuChinhAsync(id, dto.GiaTriDieuChinh);
-                return ok ? Ok(new { message = "Đã lưu giá trị điều chỉnh." }) : NotFound(new { message = $"Không tìm thấy dữ liệu ID={id}" });
-            }
-            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
-        }
-
         [HttpGet("get-tong-tudong")]
         public async Task<IActionResult> GetTongTuDong(
             [FromQuery] DateTime ngay,

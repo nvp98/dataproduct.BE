@@ -105,9 +105,6 @@ namespace dataproduct.api.Services
             string? scope, DateTime? ngayBatDau, DateTime? ngayKetThuc)
             => _repo.GetDataByFilterAsync(scope, ngayBatDau, ngayKetThuc);
 
-        public Task<bool> UpdateGiaTriDieuChinhAsync(long id, decimal? giaTriDieuChinh)
-            => _repo.UpdateGiaTriDieuChinhAsync(id, giaTriDieuChinh);
-
         // ─── Tổng tự động (PLC) theo Ngay/Ca/Scope toàn cục (1-6) ──────────────
 
         public async Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay, int ca, int scope)

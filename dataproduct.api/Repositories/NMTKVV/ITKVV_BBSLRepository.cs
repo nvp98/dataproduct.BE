@@ -14,7 +14,6 @@ namespace dataproduct.api.Repositories
 
         Task<List<TKVVDuLieuRawDto>> GetDataByFilterAsync(
             string? scope, DateTime? ngayBatDau, DateTime? ngayKetThuc);
-        Task<bool> UpdateGiaTriDieuChinhAsync(long id, decimal? giaTriDieuChinh);
 
         Task<TKVVTongTuDongDto> GetTongTuDongAsync(DateTime ngay, int ca, int scope);
 
