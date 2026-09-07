@@ -234,6 +234,36 @@ namespace dataproduct.api.Controllers
             return Ok(new { bmQuyenXlList, quyenTheoLo, quyenTheoScope });
         }
 
+        [HttpGet("nguoiky-by-scope")]
+        public async Task<IActionResult> GetNguoiKyByScope([FromQuery] int scope)
+        {
+            var mapping = await _formContext.TKVV_Scope_Xuong_Mapping
+                .FirstOrDefaultAsync(m => m.Scope == scope);
+
+            if (mapping?.ID_Xuong_BBGN == null)
+                return Ok(new List<object>());
+
+            var idXuong = mapping.ID_Xuong_BBGN.Value;
+
+            var list = await _context.Tbl_TaiKhoan
+                .Include(x => x.PhongBan)
+                .Where(x => x.ID_PhanXuong == idXuong)
+                .Select(x => new
+                {
+                    x.ID_TaiKhoan,
+                    x.HoVaTen,
+                    x.TenTaiKhoan,
+                    x.PhongBan_API,
+                    x.Xuong_API,
+                    x.PhongBan.TenNgan,
+                    x.ChuKy,
+                    TenPhongBan = x.PhongBan != null ? x.PhongBan.TenPhongBan : null
+                })
+                .ToListAsync();
+
+            return Ok(list);
+        }
+
         [HttpGet("list-ky-duyet")]
         public async Task<IActionResult> ListkyDuyet([FromQuery] string maBm, int loaiQuyen)
         {

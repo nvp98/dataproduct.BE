@@ -155,6 +155,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                         MaPB_BN = reader["MaPB_BN"] == DBNull.Value ? null : reader["MaPB_BN"].ToString(),
                         MaLo = reader["MaLo"] == DBNull.Value ? null : reader["MaLo"].ToString(),
                         BBGN_GhiChu = reader["BBGN_GhiChu"] == DBNull.Value ? null : reader["BBGN_GhiChu"].ToString(),
+                        ID_CT_BBGN = reader["ID_CT_BBGN"] == DBNull.Value ? null : Convert.ToInt32(reader["ID_CT_BBGN"]),
                     });
                 }
             }
@@ -164,6 +165,75 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
 
             return result;
+        }
+
+        // SP tự tổng hợp theo Tag PLC đang dùng cho Scope — 1 dòng kết quả duy nhất
+        // cho mỗi (Ngay, Ca, MaBM, LoaiDuLieu). MaBM truyền vào có dạng "TONGSANLUONG_{ScopeCode}".
+        public async Task<TKVVTongSanLuongAutoDto?> GetTongSanLuongAutoAsync(
+            DateTime ngay, int ca, string maBM, string loaiDuLieu)
+        {
+            TKVVTongSanLuongAutoDto? result = null;
+
+            var conn = _context.Database.GetDbConnection();
+            var wasOpen = conn.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "dbo.SP_TKVV_GetTongSanLuong";
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.CommandTimeout = 30;
+                cmd.Parameters.Add(new SqlParameter("@Ngay", ngay.Date));
+                cmd.Parameters.Add(new SqlParameter("@Ca", ca));
+                cmd.Parameters.Add(new SqlParameter("@MaBM", maBM));
+                cmd.Parameters.Add(new SqlParameter("@LoaiDuLieu", loaiDuLieu));
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    result = new TKVVTongSanLuongAutoDto
+                    {
+                        Ngay = ngay.Date,
+                        Ca = ca,
+                        MaBM = reader["MaBM"]?.ToString() ?? maBM,
+                        LoaiDuLieu = reader["LoaiDuLieu"]?.ToString() ?? loaiDuLieu,
+                        TagIDEMS_SuDung = reader["TagIDEMS_SuDung"] == DBNull.Value ? null : reader["TagIDEMS_SuDung"].ToString(),
+                        TongSanLuong = reader["TongSanLuong"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["TongSanLuong"]),
+                        SoTagCoDuLieu = reader["SoTagCoDuLieu"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SoTagCoDuLieu"]),
+                    };
+                }
+            }
+            finally
+            {
+                if (!wasOpen) await conn.CloseAsync();
+            }
+
+            return result;
+        }
+
+        // Đọc TKVV_SanLuongDuLieu đã lưu theo khóa nghiệp vụ Ngay+Ca+Scope (không upsert).
+        // scope: chuỗi số "1".."6" (int scope ép chuỗi) — KHÔNG phải mã "TK1" (khác quy ước
+        // với @MaBM của SP_TKVV_GetTongSanLuong), khớp đúng cột Scope của TKVV_SanLuongDuLieu.
+        private async Task<TKVVSanLuongDuLieuDto?> GetTongSanLuongDuLieuDtoAsync(DateOnly ngay, int ca, string scope)
+        {
+            var rec = await _context.TKVV_SanLuongDuLieu
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Ngay == ngay && x.Ca == ca && x.Scope == scope);
+            if (rec == null) return null;
+
+            return new TKVVSanLuongDuLieuDto
+            {
+                Id = rec.ID,
+                TagID = rec.TagID,
+                GiaTriTuDong = rec.GiaTriTuDong,
+                GiaTriDieuChinh = rec.GiaTriDieuChinh,
+                Ngay = rec.Ngay,
+                Ca = rec.Ca,
+                Scope = rec.Scope,
+                ThoiGian = rec.ThoiGian,
+                NgayTao = rec.NgayTao,
+            };
         }
 
         // ─── TKVV_BaoCaoSanLuongChiPhi ────────────────────────────────────────────
@@ -178,17 +248,42 @@ namespace dataproduct.api.Repositories.NMTKVV
             // caSX là ca đang được chọn trên form, không load cả 2 ca cùng lúc.
             // ============================================================
 
-            var spCa = await GetDuLieuCanAsync(
-                ngay,
-                caLoad,
-                request.MaBM,
-                request.LoaiDuLieu,
-                request.Scope);
+            // Lấy từ TKVV_TonSilo, group theo NguyenVatLieuID, tổng Xuat
+            var spCa = (await _context.TKVV_TonSilo
+                .Where(x =>
+                    x.NgaySX == request.NgaySX &&
+                    x.Ca == caLoad &&
+                    x.Scope == request.Scope &&
+                    x.NguyenVatLieuID != null &&
+                    !x.IsDelete)
+                .GroupBy(x => x.NguyenVatLieuID)
+                .Select(g => new
+                {
+                    NguyenVatLieuID = g.Key!.Value,
+                    GiaTri = g.Sum(x => x.Xuat ?? 0),
+                })
+                .OrderBy(x => x.NguyenVatLieuID)
+                .AsNoTracking()
+                .ToListAsync())
+                .Select(g => new TKVVDuLieuCanDto
+                {
+                    NguyenVatLieuID = g.NguyenVatLieuID,
+                    GiaTri = g.GiaTri,
+                    MaSilo = null,
+                })
+                .ToList();
 
             var spTongBBGN = await GetDuLieuDuLieuSanLuongTongBBGNAsync(
                 ngay,
                 caLoad,
                 request.Scope);
+
+            var scopeCode = ResolveScopeCode(request.Scope);
+            var spTongSanLuong = await GetTongSanLuongAutoAsync(
+                ngay,
+                caLoad,
+                $"TONGSANLUONG_{scopeCode}",
+                "TONGSANLUONG");
 
 
             // ============================================================
@@ -428,6 +523,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             + " - "
                             + item.TenXuong_BN;
 
+                        rec.ID_CT_BBGN = item.ID_CT_BBGN;
                         rec.UpdatedDate = DateTime.Now;
                     }
 
@@ -461,8 +557,65 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
 
 
+            // ============================================================
+            // TRANSACTION 3
+            // UPSERT TỔNG SẢN LƯỢNG TỰ ĐỘNG (SP_TKVV_GetTongSanLuong)
+            // → TKVV_SanLuongDuLieu.GiaTriTuDong theo khóa Ngay + Ca + Scope
+            // ============================================================
 
-            return await GetBaoCaoDataAsync(request.NgaySX, request.MaBM, request.Scope, caSX: request.CaSX is > 0 and <= 2 ? request.CaSX.Value : 1);
+            if (spTongSanLuong != null)
+            {
+                await using (var tx3 = await _context.Database.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        var rec = await _context.TKVV_SanLuongDuLieu.FirstOrDefaultAsync(x =>
+                            x.Ngay == request.NgaySX &&
+                            x.Ca == caLoad &&
+                            x.Scope == request.Scope.ToString());
+
+                        if (rec == null)
+                        {
+                            rec = new TKVV_SanLuongDuLieu
+                            {
+                                TagID = spTongSanLuong.TagIDEMS_SuDung,
+                                GiaTriTuDong = spTongSanLuong.TongSanLuong,
+                                Ngay = request.NgaySX,
+                                Ca = (byte)caLoad,
+                                Scope = request.Scope.ToString(),
+                                // Rule INSERT: GiaTriDieuChinh = GiaTriTuDong — mới tạo thì chưa ai
+                                // điều chỉnh tay, seed bằng giá trị tự động (khớp rule KLAm=KLAmAuto
+                                // của TKVV_BaoCaoSanLuongChiPhi).
+                                GiaTriDieuChinh = spTongSanLuong.TongSanLuong,
+                                ThoiGian = DateTime.Now,
+                                NgayTao = DateTime.Now,
+                            };
+                            _context.TKVV_SanLuongDuLieu.Add(rec);
+                        }
+                        else
+                        {
+                            // Luôn cập nhật GiaTriTuDong — không đụng GiaTriDieuChinh
+                            // (giữ nguyên giá trị người dùng đã điều chỉnh tay, nếu có)
+                            rec.TagID = spTongSanLuong.TagIDEMS_SuDung;
+                            rec.GiaTriTuDong = spTongSanLuong.TongSanLuong;
+                            rec.ThoiGian = DateTime.Now;
+                        }
+
+                        await _context.SaveChangesAsync();
+                        await tx3.CommitAsync();
+                    }
+                    catch
+                    {
+                        await tx3.RollbackAsync();
+                        throw;
+                    }
+                }
+            }
+
+
+            var result = await GetBaoCaoDataAsync(request.NgaySX, request.MaBM, request.Scope, caSX: request.CaSX is > 0 and <= 2 ? request.CaSX.Value : 1);
+            result.TongSanLuong = await GetTongSanLuongDuLieuDtoAsync(request.NgaySX, caLoad, request.Scope.ToString());
+            return result;
         }
 
         public async Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope, int? caSX = null)
@@ -494,6 +647,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                              IsAdjusted = r.IsAdjusted,
                              AdjustedBy = r.AdjustedBy,
                              AdjustedDate = r.AdjustedDate,
+                             ID_CT_BBGN = r.ID_CT_BBGN,
                          });
 
             if (caSX is > 0 and <= 2)
@@ -501,10 +655,10 @@ namespace dataproduct.api.Repositories.NMTKVV
 
             var rows = await query.OrderBy(x => x.Ca).ThenBy(x => x.ThuTu).ThenBy(x => x.NguyenVatLieuID).AsNoTracking().ToListAsync();
 
-            return new LoadDuLieuCanResultDto
-            {
-                Table = rows,
-            };
+            var result = new LoadDuLieuCanResultDto { Table = rows };
+            if (caSX is > 0 and <= 2)
+                result.TongSanLuong = await GetTongSanLuongDuLieuDtoAsync(ngaySX, caSX.Value, scope.ToString());
+            return result;
         }
 
         public async Task<LoadDuLieuCanResultDto> GetByPhieuIdAsync(Guid phieuId)
@@ -537,12 +691,14 @@ namespace dataproduct.api.Repositories.NMTKVV
                                   IsAdjusted = r.IsAdjusted,
                                   AdjustedBy = r.AdjustedBy,
                                   AdjustedDate = r.AdjustedDate,
+                                  ID_CT_BBGN = r.ID_CT_BBGN,
                               }).AsNoTracking().ToListAsync();
 
-            return new LoadDuLieuCanResultDto
-            {
-                Table = rows,
-            };
+            var result = new LoadDuLieuCanResultDto { Table = rows };
+            var first = rows.FirstOrDefault();
+            if (first?.Scope is > 0 and <= 6)
+                result.TongSanLuong = await GetTongSanLuongDuLieuDtoAsync(first.NgaySX, first.Ca, first.Scope.Value.ToString());
+            return result;
         }
 
         public async Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request)

@@ -1,6 +1,9 @@
 using dataproduct.api.DTOs.NMTKVV_Dto;
+using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Services.NMTKVV;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Controllers.NMTKVV
 {
@@ -9,10 +12,42 @@ namespace dataproduct.api.Controllers.NMTKVV
     public class TKVV_BCSL_ChiPhiController : ControllerBase
     {
         private readonly TKVV_BCSL_ChiPhiService _service;
+        private readonly ProductFormContext _context;
+        private readonly ProductDataMasterDbContext _masterContext;
 
-        public TKVV_BCSL_ChiPhiController(TKVV_BCSL_ChiPhiService service)
+        public TKVV_BCSL_ChiPhiController(TKVV_BCSL_ChiPhiService service, ProductFormContext context, ProductDataMasterDbContext masterContext)
         {
             _service = service;
+            _context = context;
+            _masterContext = masterContext;
+        }
+
+        [HttpGet("scope-xuong-mapping")]
+        public async Task<IActionResult> GetScopeXuongMapping([FromQuery] int scope)
+        {
+            var mapping = await _context.TKVV_Scope_Xuong_Mapping
+                .FirstOrDefaultAsync(m => m.Scope == scope);
+            if (mapping == null)
+                return NotFound(new { message = $"Không tìm thấy mapping cho scope {scope}" });
+
+            string? tenVatTu = null;
+            if (mapping.ID_NVL_BBGN_ThanhPham.HasValue)
+            {
+                var vatTu = await _masterContext.Tbl_VatTu
+                    .FirstOrDefaultAsync(v => v.ID_VatTu == mapping.ID_NVL_BBGN_ThanhPham.Value);
+                tenVatTu = vatTu?.TenVatTu;
+            }
+
+            return Ok(new
+            {
+                id = mapping.ID,
+                scope = mapping.Scope,
+                maXuong = mapping.MaXuong,
+                tenXuong = mapping.TenXuong,
+                idXuongBBGN = mapping.ID_Xuong_BBGN,
+                idNvlBbgnThanhPham = mapping.ID_NVL_BBGN_ThanhPham,
+                tenVatTu,
+            });
         }
 
         // Đổ giá trị NVL tự động từ EMS (SP_TKVV_GetGiaTriNVL_Auto) vào bảng khi

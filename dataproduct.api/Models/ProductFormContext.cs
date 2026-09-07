@@ -123,6 +123,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<TKVV_BaoCaoSanLuongChiPhi> TKVV_BaoCaoSanLuongChiPhi { get; set; }
     public virtual DbSet<TKVV_TonSilo> TKVV_TonSilo { get; set; }
     public virtual DbSet<TKVV_NVL_BBGN_Mapping> TKVV_NVL_BBGN_Mapping { get; set; }
+    public virtual DbSet<TKVV_Scope_Xuong_Mapping> TKVV_Scope_Xuong_Mapping { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
     public virtual DbSet<LG_PB_KetQuaPhanBo> LG_PB_KetQuaPhanBo { get; set; }
