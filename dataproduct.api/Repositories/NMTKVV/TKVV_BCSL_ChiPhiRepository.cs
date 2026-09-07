@@ -586,7 +586,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                                 // Rule INSERT: GiaTriDieuChinh = GiaTriTuDong — mới tạo thì chưa ai
                                 // điều chỉnh tay, seed bằng giá trị tự động (khớp rule KLAm=KLAmAuto
                                 // của TKVV_BaoCaoSanLuongChiPhi).
-                                GiaTriDieuChinh = spTongSanLuong.TongSanLuong,
+                                // GiaTriDieuChinh = spTongSanLuong.TongSanLuong,
                                 ThoiGian = DateTime.Now,
                                 NgayTao = DateTime.Now,
                             };
