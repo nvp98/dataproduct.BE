@@ -62,5 +62,26 @@ namespace dataproduct.api.Controllers.NMTKVV
                 return StatusCode(500, new { message = ex.Message, detail = ex.InnerException?.Message });
             }
         }
+
+        [HttpDelete("reset")]
+        public async Task<IActionResult> ResetPhieu(
+            [FromQuery] DateOnly ngaySX,
+            [FromQuery] int ca,
+            [FromQuery] int scope)
+        {
+            try
+            {
+                if (ca != 1 && ca != 2)
+                    return BadRequest(new { message = "ca chỉ nhận 1 hoặc 2." });
+                if (scope < 1 || scope > 6)
+                    return BadRequest(new { message = "scope phải từ 1 đến 6." });
+                await _service.ResetPhieuAsync(ngaySX, ca, scope);
+                return Ok(new { message = "Đã xóa dữ liệu." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }

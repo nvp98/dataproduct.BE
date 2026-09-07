@@ -443,5 +443,19 @@ namespace dataproduct.api.Repositories.NMTKVV
                 throw;
             }
         }
+
+        public async Task ResetPhieuAsync(DateOnly ngaySX, int ca, int scope)
+        {
+            var rows = await _context.TKVV_TonSilo
+                .Where(x => x.NgaySX == ngaySX && x.Ca == ca && x.Scope == scope && !x.IsDelete)
+                .ToListAsync();
+
+            if (rows.Count == 0) return;
+
+            foreach (var r in rows)
+                r.IsDelete = true;
+
+            await _context.SaveChangesAsync();
+        }
     }
 }
