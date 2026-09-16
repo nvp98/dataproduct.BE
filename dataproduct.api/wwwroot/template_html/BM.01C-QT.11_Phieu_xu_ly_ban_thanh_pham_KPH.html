@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Biên bản xác nhận sản lượng phôi thép</title>
+    <title>Phiếu xử lý bán thành phẩm/sản phẩm không phù hợp</title>
 
     <style>
       @page {
@@ -208,22 +208,21 @@
       </div>
 
       <!-- TITLE -->
-      <div class="title">PHIẾU XỬ LÝ BÁN THÀNH PHẨM/SẢN PHẨM KHÔNG PHÙ HỢP</div>
+      <div class="title">PHIẾU XỬ LÝ BÁN THÀNH PHẨM/<br />SẢN PHẨM KHÔNG PHÙ HỢP</div>
 
       <div class="sub-title">
-        <div class="mayduc-line">
-          {{sx}} Trong quá trình sản xuất {{luukho}} Trong quá trình lưu kho
-        </div>
-        <div class="kip-line">
-          Hôm nay, Kíp {{Ca}}{{Kip}} ngày {{NgaySX}} tháng {{ThangSX}} năm
-          {{NamSX}} xử lý về kíp {{CaXuLy}}{{KipXuLy}} thời gian sản xuất ngày
-          {{NgayXuLy}} tháng {{ThangXuLy}} năm {{NamXuLy}} - LSX:
-          {{LenhSanXuat}}
-        </div>
+        ☐ Trong quá trình sản xuất&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;☐ Trong quá trình lưu kho
       </div>
 
       <!-- CONTENT -->
       <div class="content">
+        <p style="font-style: italic">
+          Hôm nay, Kíp {{Ca}}{{Kip}} Ngày {{NgaySX}} tháng {{ThangSX}} năm
+          {{NamSX}} xử lý về kíp {{CaXuLy}} thời gian sản xuất ngày
+          {{NgayXuLy}} tháng {{ThangXuLy}} năm {{NamXuLy}} - LSX (Order):
+          {{LenhSanXuat}}
+        </p>
+        <p>Căn cứ vào BB KPH số:…........./.............................</p>
         <p>
           P.QLCL xác nhận việc xử lý sản phẩm KPH tại công đoạn Phân xưởng cán
           {{MayDuc}} như sau:
@@ -234,10 +233,10 @@
       <table>
         <thead>
           <tr>
-            <th colspan="9">SẢN PHẨM TRƯỚC SỬ LÝ</th>
+            <th colspan="9">SẢN PHẨM TRƯỚC XỬ LÝ</th>
             <th rowspan="2">Nguyên nhân</th>
             <th rowspan="2">Biện pháp xử lý</th>
-            <th colspan="7">SẢN PHẨM SAU SỬ LÝ</th>
+            <th colspan="7">SẢN PHẨM SAU XỬ LÝ</th>
           </tr>
           <tr>
             <th>TT</th>
@@ -279,7 +278,9 @@
       </table>
 
       <!-- NOTE -->
-      <div class="note">Tổng sản phẩm không phù hợp còn lại........(tấn)</div>
+      <div class="note">
+        Tổng sản phẩm không phù hợp còn lại................. (tấn).
+      </div>
       <table
         class="sign-table"
         style="width: 100%; margin-top: 20px; text-align: center"

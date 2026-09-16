@@ -241,12 +241,25 @@ namespace dataproduct.api.Services
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
 
             // Parse date from phieu
-            var ngaySX = phieu.NgaySX?.ToString("dd/MM/yyyy") ?? "";
+            var ngaySX = phieu.NgaySX?.Day.ToString("D2") ?? "";
             var thangSX = phieu.NgaySX?.Month.ToString("D2") ?? "";
             var namSX = phieu.NgaySX?.Year.ToString() ?? "";
             var ca = phieu.Ca?.ToString() ?? "";
             var kip = phieu.Kip ?? "";
             var mayDuc = phieu.MayDuc?.ToString() ?? "";
+
+            // Parse thông tin xử lý (kíp/ngày/LSX) từ SoPhieu
+            string ngayXL = "", thangXL = "", namXL = "", caXL = "", lenhSX = "";
+            try
+            {
+                var info = ParseSoPhieu(phieu.SoPhieu ?? "");
+                ngayXL = info.NgayXuLy?.Day.ToString("D2") ?? "";
+                thangXL = info.NgayXuLy?.Month.ToString("D2") ?? "";
+                namXL = info.NgayXuLy?.Year.ToString() ?? "";
+                caXL = info.CaXuLy ?? "";
+                lenhSX = info.LenhSanXuat ?? "";
+            }
+            catch { /* SoPhieu không đúng format thì bỏ qua */ }
 
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
@@ -263,14 +276,11 @@ namespace dataproduct.api.Services
                 .Replace("{{InTongKL}}", inTongKhoiLuong.ToString("N0"))
                 .Replace("{{newTongST}}", newTongSoThanh.ToString("N0"))
                 .Replace("{{newTongKL}}", newTongKhoiLuong.ToString("N0"))
-                .Replace("{{sx}}", "")
-                .Replace("{{luukho}}", "")
-                .Replace("{{CaXuLy}}", "")
-                .Replace("{{KipXuLy}}", "")
-                .Replace("{{NgayXuLy}}", "")
-                .Replace("{{ThangXuLy}}", "")
-                .Replace("{{NamXuLy}}", "")
-                .Replace("{{LenhSanXuat}}", "")
+                .Replace("{{CaXuLy}}", caXL)
+                .Replace("{{NgayXuLy}}", ngayXL)
+                .Replace("{{ThangXuLy}}", thangXL)
+                .Replace("{{NamXuLy}}", namXL)
+                .Replace("{{LenhSanXuat}}", lenhSX)
                 .Replace("{{Sign_QLCL}}", signQLCL)
                 .Replace("{{Name_QLCL}}", qlcl?.HoVaTen ?? "")
                 .Replace("{{Sign_LOG}}", signLOG)
