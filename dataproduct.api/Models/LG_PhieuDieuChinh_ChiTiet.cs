@@ -9,6 +9,7 @@ namespace dataproduct.api.Models
         public Guid IDPhieu { get; set; }
         public int? IDNVL { get; set; }
         public string TenNVL { get; set; } = string.Empty;
+        public int? IDNVLChiTiet { get; set; }
         public int? IDNhomNVL { get; set; }
         public string? DVT { get; set; }
         public string? MaLo { get; set; }
@@ -30,5 +31,7 @@ namespace dataproduct.api.Models
         public string? NguoiSua { get; set; }
         public DateTime? ThoiGianSua { get; set; }
         public bool IsDelete { get; set; }
+        public int? LoaiDieuChinh { get; set; }
+        public int? LoaiSoDieuChinh { get; set; }
     }
 }

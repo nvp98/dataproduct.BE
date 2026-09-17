@@ -1,5 +1,6 @@
 using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
+using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories;
 
 namespace dataproduct.api.Services
@@ -24,7 +25,15 @@ namespace dataproduct.api.Services
                 Ca = r.Ca,
                 ThoiGianXuLyBG = r.ThoiGianXuLyBG,
                 IdXuongBG = r.ID_Xuong_BG,
+                TenXuongGiao = r.TenXuongGiao,
+                IdPhongBanGiao = r.ID_PhongBanGiao,
+                TenPhongBanGiao = r.TenPhongBanGiao,
+                TenNganPhongBanGiao = r.TenNganPhongBanGiao,
                 IdXuongBN = r.ID_Xuong_BN,
+                TenXuongNhan = r.TenXuongNhan,
+                IdPhongBanNhan = r.ID_PhongBanNhan,
+                TenPhongBanNhan = r.TenPhongBanNhan,
+                TenNganPhongBanNhan = r.TenNganPhongBanNhan,
                 IdVatTu = r.ID_VatTu,
                 TenVatTu = r.TenVatTu,
                 MaLo = r.MaLO,
@@ -48,10 +57,13 @@ namespace dataproduct.api.Services
                 IdPhieu = x.IDPhieu,
                 IdNVL = x.IDNVL,
                 TenNVL = x.TenNVL,
+                IdNVLChiTiet = x.IDNVLChiTiet,
                 IdNhomNVL = x.IDNhomNVL,
                 Dvt = x.DVT,
                 MaLo = x.MaLo,
                 ThuTu = x.ThuTu,
+                LoaiDieuChinh = x.LoaiDieuChinh,
+                LoaiSoDieuChinh = x.LoaiSoDieuChinh,
                 PhongBanXuat = x.PhongBanXuat,
                 XuongXuat = x.XuongXuat,
                 KhoiLuongXuat = x.KhoiLuongXuat,
@@ -81,10 +93,13 @@ namespace dataproduct.api.Services
                 IDPhieu = idPhieu,
                 IDNVL = i.IdNVL,
                 TenNVL = i.TenNVL,
+                IDNVLChiTiet = i.IdNVLChiTiet,
                 IDNhomNVL = i.IdNhomNVL,
                 DVT = i.Dvt,
                 MaLo = i.MaLo,
                 ThuTu = i.ThuTu,
+                LoaiDieuChinh = i.LoaiDieuChinh,
+                LoaiSoDieuChinh = i.LoaiSoDieuChinh,
                 PhongBanXuat = i.PhongBanXuat,
                 XuongXuat = i.XuongXuat,
                 KhoiLuongXuat = i.KhoiLuongXuat,
@@ -106,5 +121,41 @@ namespace dataproduct.api.Services
 
             await _repository.ReplaceChiTietAsync(idPhieu, entities);
         }
+
+        // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ──────────────────────────────
+
+        public async Task<List<LGPhieuDieuChinhNvlDto>> GetNvlListAsync(bool onlyActive)
+        {
+            var rows = await _repository.GetNvlListAsync(onlyActive);
+            return rows.Select(x => new LGPhieuDieuChinhNvlDto
+            {
+                Id = x.ID,
+                TenNVL = x.TenNVL,
+                IsActive = x.IsActive,
+            }).ToList();
+        }
+
+        public async Task<LGPhieuDieuChinhNvlDto> AddNvlAsync(CreateLGPhieuDieuChinhNvlDto dto)
+        {
+            var entity = await _repository.AddNvlAsync(new LG_PhieuDieuChinh_NVL
+            {
+                TenNVL = dto.TenNVL,
+                IsActive = true,
+            });
+            return new LGPhieuDieuChinhNvlDto { Id = entity.ID, TenNVL = entity.TenNVL, IsActive = entity.IsActive };
+        }
+
+        public async Task<LGPhieuDieuChinhNvlDto?> UpdateNvlAsync(int id, UpdateLGPhieuDieuChinhNvlDto dto)
+        {
+            var entity = await _repository.UpdateNvlAsync(id, new LG_PhieuDieuChinh_NVL
+            {
+                TenNVL = dto.TenNVL,
+                IsActive = dto.IsActive,
+            });
+            if (entity == null) return null;
+            return new LGPhieuDieuChinhNvlDto { Id = entity.ID, TenNVL = entity.TenNVL, IsActive = entity.IsActive };
+        }
+
+        public Task<bool> DeleteNvlAsync(int id) => _repository.DeleteNvlAsync(id);
     }
 }

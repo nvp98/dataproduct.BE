@@ -58,5 +58,57 @@ namespace dataproduct.api.Controllers
             }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
+
+        // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ──────────────────────────────
+
+        [HttpGet("nvl")]
+        public async Task<IActionResult> GetNvlList([FromQuery] bool onlyActive = true)
+        {
+            try
+            {
+                return Ok(await _service.GetNvlListAsync(onlyActive));
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPost("nvl")]
+        public async Task<IActionResult> CreateNvl([FromBody] CreateLGPhieuDieuChinhNvlDto dto)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dto.TenNVL))
+                    return BadRequest(new { message = "Tên NVL không được để trống." });
+
+                return Ok(await _service.AddNvlAsync(dto));
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpPut("nvl/{id}")]
+        public async Task<IActionResult> UpdateNvl(int id, [FromBody] UpdateLGPhieuDieuChinhNvlDto dto)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dto.TenNVL))
+                    return BadRequest(new { message = "Tên NVL không được để trống." });
+
+                var result = await _service.UpdateNvlAsync(id, dto);
+                if (result == null) return NotFound(new { message = "Không tìm thấy NVL." });
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        [HttpDelete("nvl/{id}")]
+        public async Task<IActionResult> DeleteNvl(int id)
+        {
+            try
+            {
+                var ok = await _service.DeleteNvlAsync(id);
+                if (!ok) return NotFound(new { message = "Không tìm thấy NVL." });
+                return Ok(new { success = true });
+            }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
     }
 }

@@ -7,8 +7,21 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? Kip { get; set; }
         public string? Ca { get; set; }
         public DateTime? ThoiGianXuLyBG { get; set; }
+
+        // Bên giao — tên Xưởng/Phòng ban tra sẵn từ SP_Get_BBGN (join Tbl_Xuong/Tbl_PhongBan)
         public int? IdXuongBG { get; set; }
+        public string? TenXuongGiao { get; set; }
+        public int? IdPhongBanGiao { get; set; }
+        public string? TenPhongBanGiao { get; set; }
+        public string? TenNganPhongBanGiao { get; set; }
+
+        // Bên nhận — tên Xưởng/Phòng ban tra sẵn từ SP_Get_BBGN
         public int? IdXuongBN { get; set; }
+        public string? TenXuongNhan { get; set; }
+        public int? IdPhongBanNhan { get; set; }
+        public string? TenPhongBanNhan { get; set; }
+        public string? TenNganPhongBanNhan { get; set; }
+
         public int? IdVatTu { get; set; }
         public string? TenVatTu { get; set; }
         public string? MaLo { get; set; }
@@ -27,10 +40,13 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public Guid IdPhieu { get; set; }
         public int? IdNVL { get; set; }
         public string TenNVL { get; set; } = string.Empty;
+        public int? IdNVLChiTiet { get; set; }
         public int? IdNhomNVL { get; set; }
         public string? Dvt { get; set; }
         public string? MaLo { get; set; }
         public int? ThuTu { get; set; }
+        public int? LoaiDieuChinh { get; set; }
+        public int? LoaiSoDieuChinh { get; set; }
         public string? PhongBanXuat { get; set; }
         public string? XuongXuat { get; set; }
         public decimal? KhoiLuongXuat { get; set; }
@@ -54,10 +70,13 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public int? IdNVL { get; set; }
         public string TenNVL { get; set; } = string.Empty;
+        public int? IdNVLChiTiet { get; set; }
         public int? IdNhomNVL { get; set; }
         public string? Dvt { get; set; }
         public string? MaLo { get; set; }
         public int? ThuTu { get; set; }
+        public int? LoaiDieuChinh { get; set; }
+        public int? LoaiSoDieuChinh { get; set; }
         public string? PhongBanXuat { get; set; }
         public string? XuongXuat { get; set; }
         public decimal? KhoiLuongXuat { get; set; }
@@ -76,5 +95,25 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public string? NguoiSua { get; set; }
         public List<SavePhieuDieuChinhChiTietDto> Items { get; set; } = new();
+    }
+
+    // ─── Danh mục NVL cho Phiếu điều chỉnh (LG_PhieuDieuChinh_NVL, PRODUCTDATA) ────
+
+    public class LGPhieuDieuChinhNvlDto
+    {
+        public int Id { get; set; }
+        public string TenNVL { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
+
+    public class CreateLGPhieuDieuChinhNvlDto
+    {
+        public string TenNVL { get; set; } = string.Empty;
+    }
+
+    public class UpdateLGPhieuDieuChinhNvlDto
+    {
+        public string TenNVL { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
     }
 }

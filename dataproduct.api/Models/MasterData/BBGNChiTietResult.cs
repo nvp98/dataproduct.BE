@@ -11,9 +11,23 @@ namespace dataproduct.api.Models.MasterData
         public int? ID_QuyTrinh { get; set; }
         public int? ID_BBGN_Cu { get; set; }
         public DateTime? ThoiGianXuLyBG { get; set; }
+
+        // ─── Xưởng/Phòng ban giao ───────────────────────────────────────────
         public int? ID_Xuong_BG { get; set; }
+        public string? TenXuongGiao { get; set; }
+        public int? ID_PhongBanGiao { get; set; }
+        public string? TenPhongBanGiao { get; set; }
+        public string? TenNganPhongBanGiao { get; set; }
+
         public string? TenVatTu { get; set; }
+
+        // ─── Xưởng/Phòng ban nhận ───────────────────────────────────────────
         public int? ID_Xuong_BN { get; set; }
+        public string? TenXuongNhan { get; set; }
+        public int? ID_PhongBanNhan { get; set; }
+        public string? TenPhongBanNhan { get; set; }
+        public string? TenNganPhongBanNhan { get; set; }
+
         public int ID_CT_BBGN { get; set; }
         public int? ID_VatTu { get; set; }
         public string? MaLO { get; set; }
