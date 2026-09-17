@@ -37,17 +37,19 @@ namespace dataproduct.api.Services
         private static readonly byte[] TatCaLoaiPhanBo = { 1, 2, 3 };
 
         // LG_PB_TyLePhanBo/LG_PB_TyLeNhom không lưu lò cao — tỷ lệ dùng chung cho NVL đó ở MỌI lò cao
-        // của (Ngày, Ca) — nên "đã chốt" ở đây phải xét bất kỳ lò cao nào của (Ngày, Ca) đã chốt (ở bất
-        // kỳ loại phân bổ nào, vì Chốt khóa cả 3 loại cùng lúc), không phải riêng 1 lò cao. Nếu Ca không
-        // xác định thì kiểm tra bất kỳ ca nào của ngày đã chốt để an toàn.
+        // của (Ngày, Ca) — nhưng vì Chốt là snapshot (dữ liệu đã chốt không tính lại/ghi đè, xem
+        // TinhChoLoaiAsync), sửa tỷ lệ sau khi MỘT lò cao khác đã chốt không ảnh hưởng tới kết quả đã
+        // chốt đó — nên chỉ cần chặn khi ĐÚNG lò cao đang thao tác đã chốt (ở bất kỳ loại phân bổ nào,
+        // vì Chốt khóa cả 3 loại cùng lúc). Nếu Ca không xác định thì kiểm tra bất kỳ ca nào của lò cao
+        // đó trong ngày đã chốt để an toàn.
         // Dùng chung cho gate sửa tỷ lệ (CreateAsync/CreateForNhomAsync) VÀ cho FE hỏi trước khi hiện UI sửa.
-        public async Task<bool> IsCaDaChotAsync(DateTime ngay, byte? ca)
+        public async Task<bool> IsCaDaChotAsync(DateTime ngay, byte? ca, int idLoCao)
         {
             foreach (var loai in TatCaLoaiPhanBo)
             {
                 var daChot = ca.HasValue
-                    ? await _ketQuaRepo.IsCaDaChotAsync(ngay.Date, loai, ca.Value)
-                    : (await _ketQuaRepo.GetChotSetAsync(ngay.Date, loai)).Count > 0;
+                    ? await _ketQuaRepo.IsNgayDaChotAsync(ngay.Date, loai, ca.Value, idLoCao)
+                    : (await _ketQuaRepo.GetChotSetAsync(ngay.Date, loai)).Any(x => x.IdLoCao == idLoCao);
                 if (daChot) return true;
             }
             return false;
@@ -59,9 +61,9 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("Tỷ lệ phải nằm trong khoảng 0 đến 1.");
 
             // Cho phép sửa % nhiều lần (ghi đè) miễn là ca đó chưa chốt — Chốt khóa cả 3 loại phân bổ cùng lúc
-            if (await IsCaDaChotAsync(dto.Ngay.Date, dto.Ca))
+            if (await IsCaDaChotAsync(dto.Ngay.Date, dto.Ca, dto.IdLoCao))
                 throw new InvalidOperationException(
-                    $"Ngày {dto.Ngay:dd/MM/yyyy}{(dto.Ca.HasValue ? $", Ca {dto.Ca}" : "")} đã chốt, không thể sửa tỷ lệ.");
+                    $"Ngày {dto.Ngay:dd/MM/yyyy}{(dto.Ca.HasValue ? $", Ca {dto.Ca}" : "")}, Lò cao {dto.IdLoCao} đã chốt, không thể sửa tỷ lệ.");
 
             var entity = new LG_PB_TyLePhanBo
             {
@@ -100,8 +102,8 @@ namespace dataproduct.api.Services
             if (dto.TyLe < 0 || dto.TyLe > 1)
                 throw new InvalidOperationException("Tỷ lệ phải nằm trong khoảng 0 đến 1.");
 
-            if (await IsCaDaChotAsync(dto.Ngay.Date, dto.Ca))
-                throw new InvalidOperationException($"Ngày {dto.Ngay:dd/MM/yyyy}, Ca {dto.Ca} đã chốt, không thể sửa tỷ lệ.");
+            if (await IsCaDaChotAsync(dto.Ngay.Date, dto.Ca, dto.IdLoCao))
+                throw new InvalidOperationException($"Ngày {dto.Ngay:dd/MM/yyyy}, Ca {dto.Ca}, Lò cao {dto.IdLoCao} đã chốt, không thể sửa tỷ lệ.");
 
             var nhom = await _nhomRepo.GetByIdAsync(dto.IdNhomPhanBo)
                 ?? throw new InvalidOperationException("Không tìm thấy nhóm phân bổ.");

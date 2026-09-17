@@ -215,12 +215,12 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        // true nếu BẤT KỲ lò cao nào của (Ngày, Ca) đã chốt — vì tỷ lệ dùng chung cho mọi lò cao,
-        // dùng để FE khóa UI sửa % đúng theo phạm vi mà backend thực sự chặn (không phải riêng 1 lò cao)
+        // true nếu ĐÚNG lò cao đang thao tác đã chốt (Ngày, Ca, Lò cao) — Chốt là snapshot nên sửa tỷ lệ
+        // dùng chung sau khi lò cao KHÁC đã chốt không ảnh hưởng tới kết quả đã chốt đó
         [HttpGet("ty-le/is-ca-da-chot")]
-        public async Task<IActionResult> IsCaDaChot([FromQuery] DateTime ngay, [FromQuery] byte ca)
+        public async Task<IActionResult> IsCaDaChot([FromQuery] DateTime ngay, [FromQuery] byte ca, [FromQuery] int idLoCao)
         {
-            try { return Ok(await _tyLePhanBoService.IsCaDaChotAsync(ngay, ca)); }
+            try { return Ok(await _tyLePhanBoService.IsCaDaChotAsync(ngay, ca, idLoCao)); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
     }

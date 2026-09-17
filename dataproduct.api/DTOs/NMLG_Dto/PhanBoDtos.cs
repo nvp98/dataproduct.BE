@@ -75,6 +75,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdNvl { get; set; }
         public DateTime Ngay { get; set; }
         public byte? Ca { get; set; }
+        public int IdLoCao { get; set; }
         public decimal TyLe { get; set; }
         public string? GhiChu { get; set; }
         public int IdNguoiNhap { get; set; }
@@ -224,6 +225,9 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdLoCao { get; set; }
         public int IdNvl { get; set; }
         public decimal KhoiLuongNapLieu { get; set; }
+        // Chưa nhân hệ số quy khô (100-DoAm)/100 — dùng để tính tỷ lệ/phân bổ cho nhóm PP1 của Than cốc,
+        // KhoiLuongNapLieu (đã quy khô) chỉ dùng hiển thị.
+        public decimal KhoiLuongNapLieuTruocQuyKho { get; set; }
     }
 
     public class TongNhanVeDto
