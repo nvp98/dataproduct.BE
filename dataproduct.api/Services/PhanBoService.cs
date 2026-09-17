@@ -152,6 +152,12 @@ namespace dataproduct.api.Services
                     var pp1Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyTrongDongDu).ToList();
 
                     var eForCa = eList.Where(x => x.Ca == ca).ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieu);
+                    // Chưa quy khô — CHỈ dùng để tính tỷ lệ/phân bổ cho nhóm PP1 của Than cốc (Cvh/ThanCoc10),
+                    // Qhlc vẫn tính tỷ lệ theo E đã quy khô như cũ.
+                    var dungERawChoTyLe = loaiPhanBo == (byte)LoaiPhanBoEnum.Cvh || loaiPhanBo == (byte)LoaiPhanBoEnum.ThanCoc10;
+                    var eRawForCa = dungERawChoTyLe
+                        ? eList.Where(x => x.Ca == ca).ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieuTruocQuyKho)
+                        : eForCa;
                     var g = bienBan.KhoiLuongNhanVe;
 
                     // Pass 1: PP2 — tỷ lệ nhập tay
@@ -184,16 +190,23 @@ namespace dataproduct.api.Services
 
                     if (pp1Nhoms.Count > 0)
                     {
+                        // quyNhom/H vẫn dùng E ĐÃ quy khô — GIỮ NGUYÊN công thức gốc, không đổi
                         var eNhomMap = pp1Nhoms.ToDictionary(
                             n => n.Nhom.ID,
                             n => n.ThanhVien.Sum(tv => eForCa.GetValueOrDefault(tv.IDNVL, 0m)));
                         var eTongPp1 = eNhomMap.Values.Sum();
+
+                        // Chỉ cột Tỷ lệ (%) hiển thị đổi nguồn sang E CHƯA quy khô (Cvh/ThanCoc10) — không ảnh hưởng quyNhom/H
+                        var eNhomRawMap = pp1Nhoms.ToDictionary(
+                            n => n.Nhom.ID,
+                            n => n.ThanhVien.Sum(tv => eRawForCa.GetValueOrDefault(tv.IDNVL, 0m)));
 
                         foreach (var (nhom, thanhVien) in pp1Nhoms)
                         {
                             if (thanhVien.Count == 0) continue;
 
                             var eNhom = eNhomMap[nhom.ID];
+                            var eNhomRaw = eNhomRawMap[nhom.ID];
                             var quyNhom = eTongPp1 > 0
                                 ? Math.Round(conLai * (eNhom / eTongPp1), 3)
                                 : Math.Round(conLai / pp1Nhoms.Count, 3);
@@ -205,20 +218,22 @@ namespace dataproduct.api.Services
                                 .First();
                             decimal tongHDongThuong = 0;
 
-                            // F (%) luôn là tỷ trọng nạp liệu E/eNhom — kể cả với dòng dư (không phải H/E),
-                            // vì đây là con số mô tả tỷ trọng nạp liệu, độc lập với cơ chế bù trừ làm tròn của H.
+                            // H vẫn tính từ E/eNhom (quy khô) như cũ. F (%) hiển thị lấy từ eRaw/eNhomRaw (chưa quy khô)
+                            // — độc lập với H, chỉ là con số mô tả tỷ trọng nạp liệu để hiển thị.
                             foreach (var tv in thanhVien.Where(t => t.ID != dongDu.ID))
                             {
                                 var e = eForCa.GetValueOrDefault(tv.IDNVL, 0m);
+                                var eRaw = eRawForCa.GetValueOrDefault(tv.IDNVL, 0m);
                                 var h = eNhom > 0 ? Math.Round(e / eNhom * quyNhom, 3) : 0m;
-                                var f = eNhom > 0 ? e / eNhom : 0m;
+                                var f = eNhomRaw > 0 ? eRaw / eNhomRaw : 0m;
                                 pp1Ket.Add((nhom, tv, e, f, h, false));
                                 tongHDongThuong += h;
                             }
 
                             var eDongDu = eForCa.GetValueOrDefault(dongDu.IDNVL, 0m);
+                            var eRawDongDu = eRawForCa.GetValueOrDefault(dongDu.IDNVL, 0m);
                             var hDongDu = quyNhom - tongHDongThuong;
-                            var fDongDu = eNhom > 0 ? eDongDu / eNhom : 0m;
+                            var fDongDu = eNhomRaw > 0 ? eRawDongDu / eNhomRaw : 0m;
                             pp1Ket.Add((nhom, dongDu, eDongDu, fDongDu, hDongDu, true));
                         }
                     }

@@ -500,9 +500,6 @@ namespace dataproduct.api.Repositories
     {
         // Chốt/kiểm tra chốt luôn theo ĐÚNG (Ngày, Ca, Lò cao, Loại phân bổ) — không ảnh hưởng ca/lò cao khác
         Task<bool> IsNgayDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao);
-        // LG_PB_TyLePhanBo không lưu Lò cao (tỷ lệ dùng chung cho NVL đó ở mọi lò cao) — kiểm tra chốt ở
-        // BẤT KỲ lò cao nào của (Ngày, Ca) này để tránh sửa tỷ lệ ảnh hưởng ngược lò cao đã chốt.
-        Task<bool> IsCaDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca);
         // Tập (Ca, Lò cao) đã chốt của 1 (Ngày, Loại phân bổ) — dùng để bỏ qua khi tính lại cả ngày
         Task<List<(byte Ca, int IdLoCao)>> GetChotSetAsync(DateTime ngay, byte loaiPhanBo);
         Task ReplaceNhapAsync(DateTime ngay, byte loaiPhanBo, List<LG_PB_KetQuaPhanBo> entities); // xóa dòng TrangThai=0 cũ rồi ghi mới, transactional

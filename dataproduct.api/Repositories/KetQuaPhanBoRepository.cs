@@ -19,12 +19,6 @@ namespace dataproduct.api.Repositories
                     && x.Ca == ca && x.IDLoCao == idLoCao && x.TrangThai == 1);
         }
 
-        public async Task<bool> IsCaDaChotAsync(DateTime ngay, byte loaiPhanBo, byte ca)
-        {
-            return await _context.LG_PB_KetQuaPhanBo
-                .AnyAsync(x => x.Ngay == ngay.Date && x.LoaiPhanBo == loaiPhanBo && x.Ca == ca && x.TrangThai == 1);
-        }
-
         public async Task<List<(byte Ca, int IdLoCao)>> GetChotSetAsync(DateTime ngay, byte loaiPhanBo)
         {
             var rows = await _context.LG_PB_KetQuaPhanBo
