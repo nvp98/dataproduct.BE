@@ -600,6 +600,16 @@ namespace dataproduct.api.Repositories
         Task<bool> ExistsByTenAsync(string tenMayDuc, byte nhaMay, int? excludeId = null);
     }
 
+    public interface IDonTrongPhoiRepository
+    {
+        Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc);
+        Task<DonTrongPhoi?> GetByIdAsync(int id);
+        Task AddAsync(DonTrongPhoi entity);
+        Task UpdateAsync(DonTrongPhoi entity);
+        Task DeleteAsync(int id);
+        Task<bool> ExistsAsync(string macPhoi, string? mac, string? kichThuoc, int? excludeId = null);
+    }
+
     public interface IHrc1PhuLieuNmRepository
     {
         Task<IEnumerable<Hrc1PhuLieuNm>> GetAllAsync(bool? dangSuDung, string? searchKey);

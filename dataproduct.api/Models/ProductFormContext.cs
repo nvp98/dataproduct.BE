@@ -79,6 +79,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MayDuc> MayDucs { get; set; }
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
     public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
+    public virtual DbSet<DonTrongPhoi> DonTrongPhois { get; set; }
 
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
@@ -854,6 +855,16 @@ public partial class ProductFormContext : DbContext
             entity.ToTable("NhomPhanLoaiMacThep");
             entity.Property(e => e.Id).HasColumnName("Id");
             entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
+        });
+
+        modelBuilder.Entity<DonTrongPhoi>(entity =>
+        {
+            entity.ToTable("DonTrongPhoi");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MacPhoi).HasMaxLength(100);
+            entity.Property(e => e.DonTrong).HasColumnType("decimal(10,3)");
+            entity.Property(e => e.Mac).HasMaxLength(100);
+            entity.Property(e => e.KichThuoc).HasMaxLength(100);
         });
 
         // --- HRC1 ---
