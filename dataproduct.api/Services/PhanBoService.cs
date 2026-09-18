@@ -190,42 +190,38 @@ namespace dataproduct.api.Services
 
                     if (pp1Nhoms.Count > 0)
                     {
-                        // quyNhom/H vẫn dùng E ĐÃ quy khô — GIỮ NGUYÊN công thức gốc, không đổi
-                        var eNhomMap = pp1Nhoms.ToDictionary(
-                            n => n.Nhom.ID,
-                            n => n.ThanhVien.Sum(tv => eForCa.GetValueOrDefault(tv.IDNVL, 0m)));
-                        var eTongPp1 = eNhomMap.Values.Sum();
-
-                        // Chỉ cột Tỷ lệ (%) hiển thị đổi nguồn sang E CHƯA quy khô (Cvh/ThanCoc10) — không ảnh hưởng quyNhom/H
+                        // quyNhom/H/dòng dư đều dùng CHUNG cơ sở với F (Tỷ lệ %) — Cvh/ThanCoc10 dùng E CHƯA quy khô
+                        // (eRawForCa), Qhlc dùng E ĐÃ quy khô (vì eRawForCa = eForCa khi không phải Cvh/ThanCoc10).
+                        // Đảm bảo H = F × quyNhom luôn đúng, không lệch giữa cột Tỷ lệ (%) và Phân bổ.
                         var eNhomRawMap = pp1Nhoms.ToDictionary(
                             n => n.Nhom.ID,
                             n => n.ThanhVien.Sum(tv => eRawForCa.GetValueOrDefault(tv.IDNVL, 0m)));
+                        var eTongPp1Raw = eNhomRawMap.Values.Sum();
 
                         foreach (var (nhom, thanhVien) in pp1Nhoms)
                         {
                             if (thanhVien.Count == 0) continue;
 
-                            var eNhom = eNhomMap[nhom.ID];
                             var eNhomRaw = eNhomRawMap[nhom.ID];
-                            var quyNhom = eTongPp1 > 0
-                                ? Math.Round(conLai * (eNhom / eTongPp1), 3)
+                            var quyNhom = eTongPp1Raw > 0
+                                ? Math.Round(conLai * (eNhomRaw / eTongPp1Raw), 3)
                                 : Math.Round(conLai / pp1Nhoms.Count, 3);
 
-                            // Dòng dư (bù trừ do làm tròn) được TỰ ĐỘNG chọn là NVL có khối lượng nạp liệu (E) lớn nhất
-                            // trong nhóm tại (ca, lò cao) này — không cần admin cấu hình tay thứ tự ưu tiên.
+                            // Dòng dư (bù trừ do làm tròn) được TỰ ĐỘNG chọn là NVL có khối lượng nạp liệu lớn nhất
+                            // (cùng cơ sở với F/H) trong nhóm tại (ca, lò cao) này — không cần cấu hình tay.
                             var dongDu = thanhVien
-                                .OrderByDescending(t => eForCa.GetValueOrDefault(t.IDNVL, 0m))
+                                .OrderByDescending(t => eRawForCa.GetValueOrDefault(t.IDNVL, 0m))
                                 .First();
                             decimal tongHDongThuong = 0;
 
-                            // H vẫn tính từ E/eNhom (quy khô) như cũ. F (%) hiển thị lấy từ eRaw/eNhomRaw (chưa quy khô)
-                            // — độc lập với H, chỉ là con số mô tả tỷ trọng nạp liệu để hiển thị.
+                            // F (%) và H dùng CHUNG 1 tỷ lệ (eRaw/eNhomRaw) — H = F × quyNhom, khớp đúng phép nhân hiển thị.
+                            // E lưu/hiển thị + "Số sau khi phân bổ" (E+H) vẫn dùng E ĐÃ quy khô (eForCa) như cũ.
                             foreach (var tv in thanhVien.Where(t => t.ID != dongDu.ID))
                             {
                                 var e = eForCa.GetValueOrDefault(tv.IDNVL, 0m);
                                 var eRaw = eRawForCa.GetValueOrDefault(tv.IDNVL, 0m);
-                                var h = eNhom > 0 ? Math.Round(e / eNhom * quyNhom, 3) : 0m;
                                 var f = eNhomRaw > 0 ? eRaw / eNhomRaw : 0m;
+                                var h = Math.Round(f * quyNhom, 3);
                                 pp1Ket.Add((nhom, tv, e, f, h, false));
                                 tongHDongThuong += h;
                             }
