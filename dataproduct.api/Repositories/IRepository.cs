@@ -604,6 +604,7 @@ namespace dataproduct.api.Repositories
     {
         Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc);
         Task<DonTrongPhoi?> GetByIdAsync(int id);
+        Task<DonTrongPhoi?> FindByKeyAsync(string macPhoi, string? mac, string? kichThuoc);
         Task AddAsync(DonTrongPhoi entity);
         Task UpdateAsync(DonTrongPhoi entity);
         Task DeleteAsync(int id);

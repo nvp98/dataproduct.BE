@@ -86,5 +86,34 @@ namespace dataproduct.api.Controllers
             var ok = await _service.DeleteAsync(id);
             return ok ? NoContent() : NotFound();
         }
+
+        [HttpGet("export-excel")]
+        public async Task<IActionResult> ExportExcel()
+        {
+            var bytes = await _service.ExportExcelAsync();
+            var fileName = $"DonTrongPhoi_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+
+        [HttpPost("import-excel")]
+        public async Task<IActionResult> ImportExcel(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Vui lòng chọn file Excel." });
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (ext != ".xlsx" && ext != ".xls")
+                return BadRequest(new { message = "Chỉ hỗ trợ file Excel (.xlsx, .xls)." });
+
+            try
+            {
+                var result = await _service.ImportExcelAsync(file);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = $"Lỗi đọc file: {ex.Message}" });
+            }
+        }
     }
 }

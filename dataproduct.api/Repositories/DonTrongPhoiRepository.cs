@@ -29,6 +29,12 @@ namespace dataproduct.api.Repositories
         public Task<DonTrongPhoi?> GetByIdAsync(int id)
             => _context.DonTrongPhois.FirstOrDefaultAsync(x => x.Id == id);
 
+        public Task<DonTrongPhoi?> FindByKeyAsync(string macPhoi, string? mac, string? kichThuoc)
+            => _context.DonTrongPhois.FirstOrDefaultAsync(x =>
+                x.MacPhoi == macPhoi &&
+                x.Mac == mac &&
+                x.KichThuoc == kichThuoc);
+
         public async Task AddAsync(DonTrongPhoi entity)
         {
             _context.DonTrongPhois.Add(entity);
