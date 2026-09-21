@@ -28,4 +28,5 @@ public partial class CtdSoTheoDoi
 
     public string? LenhSanXuat { get; set; }
     public int? LoaiPhoi { get; set; }
+    public int? IdDonTrongPhoi { get; set; }
 }

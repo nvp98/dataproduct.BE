@@ -7,4 +7,5 @@ public partial class DonTrongPhoi
     public decimal DonTrong { get; set; }
     public string? Mac { get; set; }
     public string? KichThuoc { get; set; }
+    public int? IsXacNhan { get; set; }
 }

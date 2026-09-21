@@ -20,8 +20,8 @@ namespace dataproduct.api.Services
             _repo = repo;
         }
 
-        public Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc)
-            => _repo.GetAllAsync(macPhoi, mac, kichThuoc);
+        public Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null)
+            => _repo.GetAllAsync(macPhoi, mac, kichThuoc, isXacNhan);
 
         public Task<DonTrongPhoi?> GetByIdAsync(int id)
             => _repo.GetByIdAsync(id);
@@ -43,10 +43,11 @@ namespace dataproduct.api.Services
             if (await _repo.ExistsAsync(entity.MacPhoi, entity.Mac, entity.KichThuoc, id))
                 throw new InvalidOperationException("Đã tồn tại bản ghi với Mác phôi, Mác thép và Kích thước này.");
 
-            existing.MacPhoi   = entity.MacPhoi;
-            existing.DonTrong  = entity.DonTrong;
-            existing.Mac       = entity.Mac;
-            existing.KichThuoc = entity.KichThuoc;
+            existing.MacPhoi    = entity.MacPhoi;
+            existing.DonTrong   = entity.DonTrong;
+            existing.Mac        = entity.Mac;
+            existing.KichThuoc  = entity.KichThuoc;
+            existing.IsXacNhan  = entity.IsXacNhan;
             await _repo.UpdateAsync(existing);
             return true;
         }

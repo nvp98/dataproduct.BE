@@ -12,7 +12,7 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc)
+        public async Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null)
         {
             var query = _context.DonTrongPhois.AsQueryable();
 
@@ -22,6 +22,13 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.Mac != null && x.Mac.Contains(mac));
             if (!string.IsNullOrWhiteSpace(kichThuoc))
                 query = query.Where(x => x.KichThuoc != null && x.KichThuoc.Contains(kichThuoc));
+            if (isXacNhan.HasValue)
+            {
+                if (isXacNhan.Value == 1)
+                    query = query.Where(x => x.IsXacNhan == 1);
+                else
+                    query = query.Where(x => x.IsXacNhan != 1);
+            }
 
             return await query.OrderBy(x => x.MacPhoi).ThenBy(x => x.KichThuoc).ToListAsync();
         }

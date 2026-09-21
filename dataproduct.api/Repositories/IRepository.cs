@@ -602,7 +602,7 @@ namespace dataproduct.api.Repositories
 
     public interface IDonTrongPhoiRepository
     {
-        Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc);
+        Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null);
         Task<DonTrongPhoi?> GetByIdAsync(int id);
         Task<DonTrongPhoi?> FindByKeyAsync(string macPhoi, string? mac, string? kichThuoc);
         Task AddAsync(DonTrongPhoi entity);

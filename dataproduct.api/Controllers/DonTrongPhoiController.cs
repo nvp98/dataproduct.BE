@@ -20,20 +20,20 @@ namespace dataproduct.api.Controllers
             => Ok(await _service.GetAllAsync(macPhoi, mac, kichThuoc));
 
         [HttpGet("search")]
-        public async Task<IActionResult> Search(string? searchKey, string? mac, string? kichThuoc, int page = 1, int pageSize = 30)
+        public async Task<IActionResult> Search(string? searchKey, string? mac, string? kichThuoc, int? isXacNhan, int page = 1, int pageSize = 30)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 30;
             if (pageSize > 200) pageSize = 200;
 
-            var rows = await _service.GetAllAsync(searchKey, mac, kichThuoc);
+            var rows = await _service.GetAllAsync(searchKey, mac, kichThuoc, isXacNhan);
             var ordered = rows.OrderBy(x => x.MacPhoi).ThenBy(x => x.KichThuoc).ToList();
 
             var totalCount = ordered.Count;
             var data = ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(x => new { x.Id, x.MacPhoi, x.DonTrong, x.Mac, x.KichThuoc });
+                .Select(x => new { x.Id, x.MacPhoi, x.DonTrong, x.Mac, x.KichThuoc, x.IsXacNhan });
 
             return Ok(new
             {

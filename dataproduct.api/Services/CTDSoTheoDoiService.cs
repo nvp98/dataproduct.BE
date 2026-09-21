@@ -82,7 +82,8 @@ namespace dataproduct.api.Services
                             LoaiPhoi = TryGetInt(row, "loaiPhoi", "LoaiPhoi"),
                             LoaiSp = TryGetString(row, "loaiSanPham", "loaiSp", "LoaiSP"),
                             MacThep = TryGetString(row, "macThep", "macPhoi", "MacThep"),
-                            LenhSanXuat = TryGetString(row, "lenhSanXuat", "LenhSanXuat")
+                            LenhSanXuat = TryGetString(row, "lenhSanXuat", "LenhSanXuat"),
+                            IdDonTrongPhoi = TryGetInt(row, "idDonTrongPhoi", "IdDonTrongPhoi")
                         });
 
                         index++;

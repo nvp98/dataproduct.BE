@@ -373,6 +373,7 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("MacThep");
             entity.Property(e => e.LenhSanXuat).HasMaxLength(50);
+            entity.Property(e => e.IdDonTrongPhoi).HasColumnName("ID_DonTrongPhoi");
         });
 
         modelBuilder.Entity<CtdStdDienBien>(entity =>
@@ -859,12 +860,13 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<DonTrongPhoi>(entity =>
         {
-            entity.ToTable("DonTrongPhoi");
+            entity.ToTable("DonTrongPhoi", tb => tb.HasTrigger("trg_DonTrongPhoi_Update"));
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.MacPhoi).HasMaxLength(100);
             entity.Property(e => e.DonTrong).HasColumnType("decimal(10,3)");
             entity.Property(e => e.Mac).HasMaxLength(100);
             entity.Property(e => e.KichThuoc).HasMaxLength(100);
+            entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
         });
 
         // --- HRC1 ---
