@@ -83,5 +83,43 @@ namespace dataproduct.api.Controllers.NMTKVV
                 return StatusCode(500, new { message = ex.Message });
             }
         }
+
+        // Trả về silo bị override NVL do tách liệu ca trước — dùng cho modal Thiết lập Silo Mapping.
+        [HttpGet("nvl-override")]
+        public async Task<IActionResult> GetNvlOverride(
+            [FromQuery] DateOnly ngaySX,
+            [FromQuery] int ca,
+            [FromQuery] int scope)
+        {
+            try
+            {
+                return Ok(await _service.GetNvlOverrideAsync(ngaySX, ca, scope));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        // Kéo lại dữ liệu BBGN và force-update Nhap/DoAm cho danh sách phiếu được chọn.
+        [HttpPost("refresh-bbgn-batch")]
+        public async Task<IActionResult> RefreshBbgnBatch([FromBody] RefreshBbgnBatchRequestDto request)
+        {
+            try
+            {
+                if (request.PhieuIds == null || request.PhieuIds.Count == 0)
+                    return BadRequest(new { message = "Danh sách phiếu trống." });
+
+                int totalUpdated = 0;
+                foreach (var phieuId in request.PhieuIds)
+                    totalUpdated += await _service.RefreshBbgnAsync(phieuId, request.CurrentUserId);
+
+                return Ok(new { message = $"Đã cập nhật dữ liệu BBGN cho {request.PhieuIds.Count} phiếu." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, detail = ex.InnerException?.Message });
+            }
+        }
     }
 }

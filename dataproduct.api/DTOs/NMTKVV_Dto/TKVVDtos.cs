@@ -156,6 +156,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public string? Scope { get; set; }
         public DateTime? ThoiGian { get; set; }
         public DateTime NgayTao { get; set; }
+        public string? LyDoDieuChinh { get; set; }
     }
 
     // ─── TKVV_BaoCaoSanLuongChiPhi — bảng lưu dữ liệu cân + trạng thái điều chỉnh ─
@@ -227,6 +228,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public Guid? PhieuID { get; set; }
         public int CurrentUserId { get; set; }
         public List<SaveBcSlRowDto> Rows { get; set; } = new();
+        public string? LyDoDieuChinh { get; set; }
     }
 
     // ─── Chi tiết sản lượng theo phiếu ─────────────────────────────────────────

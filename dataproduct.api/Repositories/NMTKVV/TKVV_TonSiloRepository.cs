@@ -68,8 +68,25 @@ namespace dataproduct.api.Repositories.NMTKVV
                         return g
                             .Where(t => t.NgaySX == latest.NgaySX && t.Ca == latest.Ca)
                             .OrderByDescending(t => t.ID)
-                            .First().TonCuoi; 
+                            .First().TonCuoi;
                     });
+
+            // ── 3b. Override NVL từ dòng tách liệu ca trước ─────────────────────────
+            // Nếu dòng cuối cùng (ID lớn nhất) của ca gần nhất có IsTachLieu=true,
+            // dùng NguyenVatLieuID đó thay cho mapping tĩnh — silo đã chứa NVL mới kể từ ca đó.
+            var nvlOverrideBySilo = new Dictionary<int, int>();
+            foreach (var g in tonSiloCandidates.GroupBy(t => t.SiloID))
+            {
+                var latestNgaySX = g.Max(t => t.NgaySX);
+                var rowsInLatestDay = g.Where(t => t.NgaySX == latestNgaySX).ToList();
+                var latestCa = rowsInLatestDay.Max(t => t.Ca);
+                var lastRow = rowsInLatestDay
+                    .Where(t => t.Ca == latestCa)
+                    .OrderByDescending(t => t.ID)
+                    .First();
+                if (lastRow.IsTachLieu && lastRow.NguyenVatLieuID.HasValue && lastRow.NguyenVatLieuID.Value > 0)
+                    nvlOverrideBySilo[g.Key] = lastRow.NguyenVatLieuID.Value;
+            }
 
             // ── 4. TonCuoiAuto/XuatAuto từ SP_TKVV_GetDuLieuCan (cùng 1 lần gọi, theo Silo) ──
             var tonCuoiAutoBySilo = new Dictionary<int, decimal>();
@@ -96,9 +113,15 @@ namespace dataproduct.api.Repositories.NMTKVV
             var siloIdsByNvl = new Dictionary<int, List<int>>();
             foreach (var silo in silos)
             {
-                if (!nearestMappingBySilo.TryGetValue(silo.ID, out var m) || m.NguyenVatLieuID <= 0) continue;
-                if (!siloIdsByNvl.TryGetValue(m.NguyenVatLieuID, out var list))
-                    siloIdsByNvl[m.NguyenVatLieuID] = list = new List<int>();
+                int effectiveNvlId;
+                if (nvlOverrideBySilo.TryGetValue(silo.ID, out var ov))
+                    effectiveNvlId = ov;
+                else if (nearestMappingBySilo.TryGetValue(silo.ID, out var m) && m.NguyenVatLieuID > 0)
+                    effectiveNvlId = m.NguyenVatLieuID;
+                else
+                    continue;
+                if (!siloIdsByNvl.TryGetValue(effectiveNvlId, out var list))
+                    siloIdsByNvl[effectiveNvlId] = list = new List<int>();
                 list.Add(silo.ID);
             }
 
@@ -157,6 +180,9 @@ namespace dataproduct.api.Repositories.NMTKVV
                     lastTonCuoiBySilo.TryGetValue(silo.ID, out var carryForward);
                     decimal? tonCuoiAuto = tonCuoiAutoBySilo.TryGetValue(silo.ID, out var av) ? av : null;
                     nearestMappingBySilo.TryGetValue(silo.ID, out var mapping);
+                    var effectiveNvlId = nvlOverrideBySilo.TryGetValue(silo.ID, out var ovNvl)
+                        ? (int?)ovNvl
+                        : mapping?.NguyenVatLieuID;
 
                     decimal? nhapAuto = nhapAutoBySilo.TryGetValue(silo.ID, out var na) ? na : null;
                     decimal? doAmAuto = doAmAutoBySilo.TryGetValue(silo.ID, out var da) ? da : null;
@@ -174,7 +200,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                             Ca = (byte)ca,
                             Scope = scope,
                             SiloID = silo.ID,
-                            NguyenVatLieuID = mapping?.NguyenVatLieuID,
+                            NguyenVatLieuID = effectiveNvlId,
                             ThuTu = silos.IndexOf(silo) + 1,
                             TonDau = carryForward,
                             DoAm = doAmAuto,
@@ -456,6 +482,159 @@ namespace dataproduct.api.Repositories.NMTKVV
                 r.IsDelete = true;
 
             await _context.SaveChangesAsync();
+        }
+
+        // Kéo lại dữ liệu BBGN (sp_TKVV_Get_NVL_BBGN) và force-update Nhap/DoAm cho phiếu đã tồn tại.
+        // Khác init-rows: không dùng ??= — luôn ghi đè để đồng bộ với BBGN mới nhất.
+        public async Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId)
+        {
+            var rows = await _context.TKVV_TonSilo
+                .Where(t => t.PhieuID == phieuId && !t.IsDelete)
+                .ToListAsync();
+
+            if (rows.Count == 0) return 0;
+
+            var firstRow = rows[0];
+            var ngaySX = firstRow.NgaySX;
+            var ca = (int)firstRow.Ca;
+            var scope = firstRow.Scope ?? 0;
+            var scopeStr = scope.ToString();
+
+            // ── 1. Danh sách Silo theo scope ───────────────────────────────────────
+            var silos = await _context.TKVV_Silo
+                .Where(x => x.Scope == scopeStr && x.TrangThai)
+                .ToListAsync();
+            silos = silos
+                .OrderBy(x => MaSiloSortKey(x.MaSilo))
+                .ThenBy(x => x.MaSilo)
+                .ToList();
+            var siloIds = silos.Select(s => s.ID).ToList();
+
+            // ── 2. NVL mapping gần nhất cho từng Silo ──────────────────────────────
+            var mappingCandidates = await _context.TKVV_NVL_SiloMapping
+                .Where(m => m.SiloID.HasValue && siloIds.Contains(m.SiloID.Value)
+                         && m.Ca == ca && m.NgaySX <= ngaySX && m.TrangThai)
+                .ToListAsync();
+            var nearestMappingBySilo = mappingCandidates
+                .GroupBy(m => m.SiloID!.Value)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(m => m.NgaySX).First());
+
+            // ── 3. Gom Silo theo NVL (giống bước 4b trong InitRowsAsync) ───────────
+            var siloIdsByNvl = new Dictionary<int, List<int>>();
+            foreach (var silo in silos)
+            {
+                if (!nearestMappingBySilo.TryGetValue(silo.ID, out var m) || m.NguyenVatLieuID <= 0) continue;
+                if (!siloIdsByNvl.TryGetValue(m.NguyenVatLieuID, out var list))
+                    siloIdsByNvl[m.NguyenVatLieuID] = list = new List<int>();
+                list.Add(silo.ID);
+            }
+
+            var nhapAutoBySilo = new Dictionary<int, decimal>();
+            var doAmAutoBySilo = new Dictionary<int, decimal>();
+            var doAmTextBySilo = new Dictionary<int, string>();
+            var nonFirstNvlSiloIds = new HashSet<int>();
+
+            foreach (var (nvlId, siloIdsForNvl) in siloIdsByNvl)
+            {
+                for (int i = 1; i < siloIdsForNvl.Count; i++)
+                    nonFirstNvlSiloIds.Add(siloIdsForNvl[i]);
+
+                try
+                {
+                    var ngay = new DateTime(ngaySX.Year, ngaySX.Month, ngaySX.Day);
+                    var bbgnRows = await _nvlBbgnRepo.GetNvlBbgnDataAsync(ngay, ca, nvlId, scope);
+                    if (bbgnRows.Count == 0) continue;
+
+                    var sumNhap = bbgnRows.Where(r => r.KhoiLuongBG.HasValue).Sum(r => r.KhoiLuongBG!.Value);
+                    var doAmParts = bbgnRows.Where(r => r.DoAmW.HasValue)
+                                            .Select(r => r.DoAmW!.Value.ToString("0.##"))
+                                            .ToList();
+                    var doAmText = string.Join(", ", doAmParts);
+                    var firstDoAm = bbgnRows.FirstOrDefault(r => r.DoAmW.HasValue)?.DoAmW;
+
+                    var firstSiloId = siloIdsForNvl[0];
+                    if (firstDoAm.HasValue) doAmAutoBySilo[firstSiloId] = firstDoAm.Value;
+                    if (sumNhap > 0) nhapAutoBySilo[firstSiloId] = sumNhap;
+                    if (!string.IsNullOrEmpty(doAmText)) doAmTextBySilo[firstSiloId] = doAmText;
+                }
+                catch { }
+            }
+
+            // ── 4. Force-update từng dòng ──────────────────────────────────────────
+            foreach (var row in rows)
+            {
+                if (nonFirstNvlSiloIds.Contains(row.SiloID))
+                {
+                    row.Nhap = null;
+                    row.NhapAuto = null;
+                    row.DoAm = null;
+                    row.DoAmText = null;
+                }
+                else
+                {
+                    decimal? nhapAuto = nhapAutoBySilo.TryGetValue(row.SiloID, out var na) ? na : (decimal?)null;
+                    decimal? doAmAuto = doAmAutoBySilo.TryGetValue(row.SiloID, out var da) ? da : (decimal?)null;
+                    string? doAmText = doAmTextBySilo.TryGetValue(row.SiloID, out var dt) ? dt : null;
+
+                    row.NhapAuto = nhapAuto;
+                    row.Nhap = nhapAuto;
+                    row.DoAm = doAmAuto;
+                    row.DoAmText = doAmText;
+                }
+                row.UpdatedDate = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+            return rows.Count;
+        }
+
+        // Trả về danh sách silo bị override NVL do tách liệu ca trước.
+        // Dùng cho modal "Thiết lập Silo Mapping" để hiển thị NVL thực tế đang có trong silo.
+        public async Task<List<NvlOverrideItemDto>> GetNvlOverrideAsync(DateOnly ngaySX, int ca, int scope)
+        {
+            var scopeStr = scope.ToString();
+            var siloIds = await _context.TKVV_Silo
+                .Where(x => x.Scope == scopeStr && x.TrangThai)
+                .Select(s => s.ID)
+                .ToListAsync();
+
+            var tonSiloCandidates = await _context.TKVV_TonSilo
+                .Where(t => siloIds.Contains(t.SiloID) && !t.IsDelete
+                         && (t.NgaySX < ngaySX || (t.NgaySX == ngaySX && t.Ca < ca)))
+                .ToListAsync();
+
+            var overrides = new Dictionary<int, int>();
+            foreach (var g in tonSiloCandidates.GroupBy(t => t.SiloID))
+            {
+                var latestNgaySX = g.Max(t => t.NgaySX);
+                var rowsInLatestDay = g.Where(t => t.NgaySX == latestNgaySX).ToList();
+                var latestCa = rowsInLatestDay.Max(t => t.Ca);
+                var lastRow = rowsInLatestDay
+                    .Where(t => t.Ca == latestCa)
+                    .OrderByDescending(t => t.ID)
+                    .First();
+                if (lastRow.IsTachLieu && lastRow.NguyenVatLieuID.HasValue && lastRow.NguyenVatLieuID.Value > 0)
+                    overrides[g.Key] = lastRow.NguyenVatLieuID.Value;
+            }
+
+            if (overrides.Count == 0) return new List<NvlOverrideItemDto>();
+
+            var nvlDict = await _context.TKVV_NguyenVatLieu
+                .Where(n => overrides.Values.Contains(n.ID))
+                .ToDictionaryAsync(n => n.ID);
+
+            return overrides
+                .Select(kv =>
+                {
+                    nvlDict.TryGetValue(kv.Value, out var nvl);
+                    return new NvlOverrideItemDto
+                    {
+                        SiloId = kv.Key,
+                        NvlId = kv.Value,
+                        TenNVL = nvl?.TenNVL,
+                    };
+                })
+                .ToList();
         }
     }
 }

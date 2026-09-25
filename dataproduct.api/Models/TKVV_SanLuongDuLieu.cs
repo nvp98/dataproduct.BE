@@ -17,5 +17,6 @@ namespace dataproduct.api.Models
         public string Scope { get; set; } = string.Empty;
         public DateTime? ThoiGian { get; set; }
         public DateTime NgayTao { get; set; }
+        public string? LyDoDieuChinh { get; set; }
     }
 }
