@@ -73,4 +73,17 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public int CurrentUserId { get; set; }
         public List<SaveTonSiloRowDto> Rows { get; set; } = new();
     }
+
+    public class RefreshBbgnBatchRequestDto
+    {
+        public List<Guid> PhieuIds { get; set; } = new();
+        public int? CurrentUserId { get; set; }
+    }
+
+    public class NvlOverrideItemDto
+    {
+        public int SiloId { get; set; }
+        public int NvlId { get; set; }
+        public string? TenNVL { get; set; }
+    }
 }

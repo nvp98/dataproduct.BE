@@ -233,6 +233,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                 Scope = rec.Scope,
                 ThoiGian = rec.ThoiGian,
                 NgayTao = rec.NgayTao,
+                LyDoDieuChinh = rec.LyDoDieuChinh,
             };
         }
 
@@ -753,6 +754,26 @@ namespace dataproduct.api.Repositories.NMTKVV
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Cập nhật LyDoDieuChinh vào TKVV_SanLuongDuLieu nếu có gửi lên
+                if (!string.IsNullOrWhiteSpace(request.LyDoDieuChinh))
+                {
+                    var firstRow = request.Rows.FirstOrDefault();
+                    if (firstRow != null)
+                    {
+                        var scopeStr = firstRow.Scope?.ToString();
+                        var slRec = await _context.TKVV_SanLuongDuLieu.FirstOrDefaultAsync(x =>
+                            x.Ngay == firstRow.NgaySX &&
+                            x.Ca == firstRow.Ca &&
+                            x.Scope == scopeStr);
+                        if (slRec != null)
+                        {
+                            slRec.LyDoDieuChinh = request.LyDoDieuChinh;
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                }
+
                 await tx.CommitAsync();
             }
             catch

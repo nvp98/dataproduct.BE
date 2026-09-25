@@ -48,6 +48,12 @@ namespace dataproduct.api.Services.NMTKVV
         public Task ResetPhieuAsync(DateOnly ngaySX, int ca, int scope)
             => _repo.ResetPhieuAsync(ngaySX, ca, scope);
 
+        public Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId)
+            => _repo.RefreshBbgnAsync(phieuId, currentUserId);
+
+        public Task<List<NvlOverrideItemDto>> GetNvlOverrideAsync(DateOnly ngaySX, int ca, int scope)
+            => _repo.GetNvlOverrideAsync(ngaySX, ca, scope);
+
         // ─── Export PDF Sổ theo dõi Xuất Nhập Tồn Silo (BM.05-QT.05.03) ─────────
         // Cùng cơ chế với TKVV_BBSLService.ExportBienBanPdfAsync (Biên bản sản lượng):
         // HTML template + DinkToPdf.
