@@ -108,6 +108,7 @@ namespace dataproduct.api.DTOs.NMTKVV_Dto
         public decimal GiaTri { get; set; }
         public decimal GiaTriXuat { get; set; }
         public int SoLuongSilo { get; set; }
+        public decimal? DoAm { get; set; }
     }
 
     // ─── Dữ liệu cân từ sp_TKVV_GetSanLuongTong_BBGN — đổ bảng khi tạo phiếu BC SLCP ──

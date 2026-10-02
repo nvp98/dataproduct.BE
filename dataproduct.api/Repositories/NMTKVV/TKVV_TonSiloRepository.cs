@@ -104,12 +104,8 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
             catch { /* SP lỗi hoặc chưa có dữ liệu — không block */ }
 
-            // ── 4b. NhapAuto/DoAm từ sp_TKVV_Get_NVL_BBGN (theo NVL, không theo Silo) ──
-            // SP trả N dòng (N lần giao nhận) cho 1 TKVV_NVL_ID trong kíp — gọi ĐÚNG 1 LẦN
-            // cho mỗi NVL (group trước khi gọi), không phải 1 lần / Silo. Không cộng dồn:
-            // mỗi dòng SP đổ trực tiếp (DoAm_W, KhoiLuong_BG) vào ĐÚNG 1 Silo đang giữ NVL
-            // đó, theo thứ tự — dòng SP thứ i → Silo thứ i (theo thứ tự MaSilo đã sort).
-            // Silo thừa (không đủ dòng SP) để trống; dòng SP thừa (nhiều hơn số Silo) bỏ qua.
+            // ── 4b. NhapAuto từ sp_TKVV_Get_NVL_BBGN (theo NVL, không theo Silo) ──
+            // DoAm/DoAmText không lấy từ BBGN — chỉ cho nhập tay trên giao diện.
             var siloIdsByNvl = new Dictionary<int, List<int>>();
             foreach (var silo in silos)
             {
@@ -126,13 +122,10 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
 
             var nhapAutoBySilo = new Dictionary<int, decimal>();
-            var doAmAutoBySilo = new Dictionary<int, decimal>();
-            var doAmTextBySilo = new Dictionary<int, string>();
             // Silo từ thứ 2 trở đi cùng NVL → Nhap/NhapAuto phải được xóa
             var nonFirstNvlSiloIds = new HashSet<int>();
             foreach (var (nvlId, siloIdsForNvl) in siloIdsByNvl)
             {
-                // Track các silo không phải đầu tiên (dù SP có dữ liệu hay không)
                 for (int i = 1; i < siloIdsForNvl.Count; i++)
                     nonFirstNvlSiloIds.Add(siloIdsForNvl[i]);
 
@@ -142,20 +135,8 @@ namespace dataproduct.api.Repositories.NMTKVV
                     var bbgnRows = await _nvlBbgnRepo.GetNvlBbgnDataAsync(ngay, ca, nvlId, scope);
                     if (bbgnRows.Count == 0) continue;
 
-                    // Sum toàn bộ KhoiLuongBG → 1 giá trị NhapAuto chung cho cả NVL
                     var sumNhap = bbgnRows.Where(r => r.KhoiLuongBG.HasValue).Sum(r => r.KhoiLuongBG!.Value);
-                    // Nối tất cả DoAmW → DoAmText hiển thị (vd "12.5, 13.0")
-                    var doAmParts = bbgnRows.Where(r => r.DoAmW.HasValue)
-                                            .Select(r => r.DoAmW!.Value.ToString("0.##"))
-                                            .ToList();
-                    var doAmText = string.Join(", ", doAmParts);
-                    var firstDoAm = bbgnRows.FirstOrDefault(r => r.DoAmW.HasValue)?.DoAmW;
-
-                    // DoAm, Nhap, DoAmText → chỉ silo đầu tiên của NVL
-                    var firstSiloId = siloIdsForNvl[0];
-                    if (firstDoAm.HasValue) doAmAutoBySilo[firstSiloId] = firstDoAm.Value;
-                    if (sumNhap > 0) nhapAutoBySilo[firstSiloId] = sumNhap;
-                    if (!string.IsNullOrEmpty(doAmText)) doAmTextBySilo[firstSiloId] = doAmText;
+                    if (sumNhap > 0) nhapAutoBySilo[siloIdsForNvl[0]] = sumNhap;
                 }
                 catch { /* SP lỗi hoặc chưa có mapping/dữ liệu cho NVL này — không block */ }
             }
@@ -185,13 +166,11 @@ namespace dataproduct.api.Repositories.NMTKVV
                         : mapping?.NguyenVatLieuID;
 
                     decimal? nhapAuto = nhapAutoBySilo.TryGetValue(silo.ID, out var na) ? na : null;
-                    decimal? doAmAuto = doAmAutoBySilo.TryGetValue(silo.ID, out var da) ? da : null;
-                    string? doAmText = doAmTextBySilo.TryGetValue(silo.ID, out var dt) ? dt : null;
                     decimal? xuatAuto = xuatAutoBySilo.TryGetValue(silo.ID, out var xa) ? xa : null;
 
                     if (!existingBySilo.TryGetValue(silo.ID, out var siloRecs) || siloRecs.Count == 0)
                     {
-                        // Chưa có bản ghi — INSERT với dữ liệu khởi tạo
+                        // Chưa có bản ghi — INSERT với dữ liệu khởi tạo (DoAm/DoAmText để trống, nhập tay)
                         var tonCuoi = tonCuoiAuto ?? 0m;
                         var rec = new TKVV_TonSilo
                         {
@@ -203,8 +182,6 @@ namespace dataproduct.api.Repositories.NMTKVV
                             NguyenVatLieuID = effectiveNvlId,
                             ThuTu = silos.IndexOf(silo) + 1,
                             TonDau = carryForward,
-                            DoAm = doAmAuto,
-                            DoAmText = doAmText,
                             Nhap = nhapAuto,
                             NhapAuto = nhapAuto,
                             Xuat = xuatAuto,
@@ -220,7 +197,7 @@ namespace dataproduct.api.Repositories.NMTKVV
                     }
                     else
                     {
-                        // Dòng gốc (ID nhỏ nhất) — cập nhật auto values
+                        // Dòng gốc (ID nhỏ nhất) — cập nhật auto values; DoAm/DoAmText không chạm
                         var rec = siloRecs[0];
                         var tonCuoi = rec.TonCuoi ?? tonCuoiAuto ?? 0m;
                         var isAdj = tonCuoiAuto.HasValue && tonCuoi != tonCuoiAuto.Value;
@@ -228,15 +205,11 @@ namespace dataproduct.api.Repositories.NMTKVV
                         {
                             rec.Nhap = null;
                             rec.NhapAuto = null;
-                            rec.DoAm = null;
-                            rec.DoAmText = null;
                         }
                         else
                         {
                             rec.Nhap ??= nhapAuto;
                             rec.NhapAuto = nhapAuto;
-                            rec.DoAm ??= doAmAuto;
-                            rec.DoAmText = doAmText;
                         }
                         rec.Xuat ??= xuatAuto;
                         rec.XuatAuto = xuatAuto;
@@ -530,8 +503,6 @@ namespace dataproduct.api.Repositories.NMTKVV
             }
 
             var nhapAutoBySilo = new Dictionary<int, decimal>();
-            var doAmAutoBySilo = new Dictionary<int, decimal>();
-            var doAmTextBySilo = new Dictionary<int, string>();
             var nonFirstNvlSiloIds = new HashSet<int>();
 
             foreach (var (nvlId, siloIdsForNvl) in siloIdsByNvl)
@@ -546,40 +517,25 @@ namespace dataproduct.api.Repositories.NMTKVV
                     if (bbgnRows.Count == 0) continue;
 
                     var sumNhap = bbgnRows.Where(r => r.KhoiLuongBG.HasValue).Sum(r => r.KhoiLuongBG!.Value);
-                    var doAmParts = bbgnRows.Where(r => r.DoAmW.HasValue)
-                                            .Select(r => r.DoAmW!.Value.ToString("0.##"))
-                                            .ToList();
-                    var doAmText = string.Join(", ", doAmParts);
-                    var firstDoAm = bbgnRows.FirstOrDefault(r => r.DoAmW.HasValue)?.DoAmW;
-
                     var firstSiloId = siloIdsForNvl[0];
-                    if (firstDoAm.HasValue) doAmAutoBySilo[firstSiloId] = firstDoAm.Value;
                     if (sumNhap > 0) nhapAutoBySilo[firstSiloId] = sumNhap;
-                    if (!string.IsNullOrEmpty(doAmText)) doAmTextBySilo[firstSiloId] = doAmText;
                 }
                 catch { }
             }
 
-            // ── 4. Force-update từng dòng ──────────────────────────────────────────
+            // ── 4. Force-update từng dòng (chỉ Nhap/NhapAuto; DoAm/DoAmText giữ nguyên) ──
             foreach (var row in rows)
             {
                 if (nonFirstNvlSiloIds.Contains(row.SiloID))
                 {
                     row.Nhap = null;
                     row.NhapAuto = null;
-                    row.DoAm = null;
-                    row.DoAmText = null;
                 }
                 else
                 {
                     decimal? nhapAuto = nhapAutoBySilo.TryGetValue(row.SiloID, out var na) ? na : (decimal?)null;
-                    decimal? doAmAuto = doAmAutoBySilo.TryGetValue(row.SiloID, out var da) ? da : (decimal?)null;
-                    string? doAmText = doAmTextBySilo.TryGetValue(row.SiloID, out var dt) ? dt : null;
-
                     row.NhapAuto = nhapAuto;
                     row.Nhap = nhapAuto;
-                    row.DoAm = doAmAuto;
-                    row.DoAmText = doAmText;
                 }
                 row.UpdatedDate = DateTime.Now;
             }

@@ -56,6 +56,9 @@ namespace dataproduct.api.Services.NMTKVV
         public Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request)
             => _repo.SavePhieuRowsAsync(request);
 
+        public Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId)
+            => _repo.RefreshBbgnAsync(phieuId, currentUserId);
+
         // ─── Export PDF Báo cáo sản lượng & chi phí (BM.06-QT.05.03) ────────────
         // Cùng cơ chế với TKVV_BBSLService.ExportBienBanPdfAsync (Biên bản sản lượng):
         // HTML template + DinkToPdf. 1 phiếu = 1 ngày (từ 8h00 hôm nay đến 8h00 hôm sau),

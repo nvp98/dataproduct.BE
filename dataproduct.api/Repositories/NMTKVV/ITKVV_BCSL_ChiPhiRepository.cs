@@ -24,5 +24,8 @@ namespace dataproduct.api.Repositories.NMTKVV
 
         // Lưu giá trị người dùng nhập (KLAm, DoAm, v.v.), backend tự xác định IsAdjusted
         Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request);
+
+        // Kéo lại dữ liệu BBGN (sp_TKVV_GetSanLuongTong_BBGN) và force-update vùng thành phẩm
+        Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId);
     }
 }

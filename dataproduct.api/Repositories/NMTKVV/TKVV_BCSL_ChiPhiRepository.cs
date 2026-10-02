@@ -249,27 +249,25 @@ namespace dataproduct.api.Repositories.NMTKVV
             // caSX là ca đang được chọn trên form, không load cả 2 ca cùng lúc.
             // ============================================================
 
-            // Lấy từ TKVV_TonSilo, group theo NguyenVatLieuID, tổng Xuat
-            var spCa = (await _context.TKVV_TonSilo
+            // Lấy từ TKVV_TonSilo, group theo NguyenVatLieuID — tổng Xuat + DoAm đầu tiên có giá trị
+            var tonSiloRows = await _context.TKVV_TonSilo
                 .Where(x =>
                     x.NgaySX == request.NgaySX &&
                     x.Ca == caLoad &&
                     x.Scope == request.Scope &&
                     x.NguyenVatLieuID != null &&
                     !x.IsDelete)
-                .GroupBy(x => x.NguyenVatLieuID)
-                .Select(g => new
-                {
-                    NguyenVatLieuID = g.Key!.Value,
-                    GiaTri = g.Sum(x => x.Xuat ?? 0),
-                })
-                .OrderBy(x => x.NguyenVatLieuID)
                 .AsNoTracking()
-                .ToListAsync())
+                .ToListAsync();
+
+            var spCa = tonSiloRows
+                .GroupBy(x => x.NguyenVatLieuID!.Value)
+                .OrderBy(g => g.Key)
                 .Select(g => new TKVVDuLieuCanDto
                 {
-                    NguyenVatLieuID = g.NguyenVatLieuID,
-                    GiaTri = g.GiaTri,
+                    NguyenVatLieuID = g.Key,
+                    GiaTri = g.Sum(x => x.Xuat ?? 0),
+                    DoAm = g.Where(x => x.DoAm != null).Select(x => x.DoAm).FirstOrDefault(),
                     MaSilo = null,
                 })
                 .ToList();
@@ -343,6 +341,10 @@ namespace dataproduct.api.Repositories.NMTKVV
 
                         if (rec == null)
                         {
+                            var quyKhoInsert = item.DoAm.HasValue && klAmAuto > 0
+                                ? klAmAuto * (100 - item.DoAm.Value) / 100
+                                : (decimal?)null;
+
                             rec = new TKVV_BaoCaoSanLuongChiPhi
                             {
                                 NgaySX = request.NgaySX,
@@ -362,6 +364,11 @@ namespace dataproduct.api.Repositories.NMTKVV
                                 // Rule INSERT:
                                 // KLAm = KLAmAuto
                                 KLAm = klAmAuto,
+
+                                // DoAm lấy từ TonSilo — không cho sửa trên BaoCao
+                                DoAm = item.DoAm,
+
+                                QuyKho = quyKhoInsert,
 
                                 // Rule INSERT:
                                 // IsAdjusted = 0
@@ -391,6 +398,9 @@ namespace dataproduct.api.Repositories.NMTKVV
                             // Luôn cập nhật KLAmAuto
                             rec.KLAmAuto = klAmAuto;
 
+                            // DoAm luôn đồng bộ từ TonSilo
+                            rec.DoAm = item.DoAm;
+
                             rec.UpdatedDate = DateTime.Now;
 
                             // -------------------------------------------------
@@ -405,6 +415,11 @@ namespace dataproduct.api.Repositories.NMTKVV
                             {
                                 rec.KLAm = klAmAuto;
                             }
+
+                            // Tính lại QuyKho từ KLAm hiệu lực + DoAm mới
+                            rec.QuyKho = rec.DoAm.HasValue && rec.KLAm.HasValue
+                                ? rec.KLAm.Value * (100 - rec.DoAm.Value) / 100
+                                : null;
 
                             // Giữ nguyên logic hiện tại
                             rec.Kip = item.MaSilo;
@@ -728,8 +743,10 @@ namespace dataproduct.api.Repositories.NMTKVV
 
                     rec.PhieuID = request.PhieuID;
                     rec.KLAm = row.KLAm;
-                    rec.DoAm = row.DoAm;
-                    rec.QuyKho = row.QuyKho;
+                    // DoAm không cho phép sửa từ BaoCao — luôn giữ giá trị lấy từ TonSilo
+                    rec.QuyKho = rec.DoAm.HasValue && rec.KLAm.HasValue
+                        ? rec.KLAm.Value * (100 - rec.DoAm.Value) / 100
+                        : null;
                     rec.ThanhPhamL1 = row.ThanhPhamL1;
                     rec.ThanhPhamL2 = row.ThanhPhamL2;
                     rec.ThanhPhamL3 = row.ThanhPhamL3;
@@ -781,6 +798,36 @@ namespace dataproduct.api.Repositories.NMTKVV
                 await tx.RollbackAsync();
                 throw;
             }
+        }
+
+        public async Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId)
+        {
+            var rows = await _context.TKVV_BaoCaoSanLuongChiPhi
+                .Where(r => r.PhieuID == phieuId && !r.IsDelete)
+                .OrderBy(r => r.ThuTu)
+                .ToListAsync();
+
+            if (rows.Count == 0) return 0;
+
+            var first = rows[0];
+            var ngay = first.NgaySX.ToDateTime(TimeOnly.MinValue);
+            var ca = (int)first.Ca;
+            var scope = first.Scope ?? 0;
+
+            var spBBGN = await GetDuLieuDuLieuSanLuongTongBBGNAsync(ngay, ca, scope);
+
+            for (int i = 0; i < spBBGN.Count; i++)
+            {
+                if (i >= rows.Count) break;
+                var item = spBBGN[i];
+                rows[i].ThanhPhamL1 = item.GiaTri;
+                rows[i].ThanhPham_Note = item.MaPB_BN + " - " + item.TenXuong_BN;
+                rows[i].ID_CT_BBGN = item.ID_CT_BBGN;
+                rows[i].UpdatedDate = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+            return rows.Count;
         }
     }
 }

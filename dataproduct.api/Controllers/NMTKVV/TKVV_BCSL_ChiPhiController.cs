@@ -162,5 +162,25 @@ namespace dataproduct.api.Controllers.NMTKVV
                 return StatusCode(500, new { message = ex.Message, detail = ex.InnerException?.Message });
             }
         }
+
+        [HttpPost("refresh-bbgn-batch")]
+        public async Task<IActionResult> RefreshBbgnBatch([FromBody] RefreshBbgnBatchRequestDto request)
+        {
+            try
+            {
+                if (request.PhieuIds == null || request.PhieuIds.Count == 0)
+                    return BadRequest(new { message = "Danh sách phiếu trống." });
+
+                int totalUpdated = 0;
+                foreach (var phieuId in request.PhieuIds)
+                    totalUpdated += await _service.RefreshBbgnAsync(phieuId, request.CurrentUserId);
+
+                return Ok(new { message = $"Đã làm mới dữ liệu BBGN cho {request.PhieuIds.Count} phiếu." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, detail = ex.InnerException?.Message });
+            }
+        }
     }
 }
