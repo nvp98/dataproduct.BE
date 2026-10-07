@@ -831,8 +831,8 @@ namespace dataproduct.api.Business
                 ? md.GetInt32()
                 : null;
 
-            DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var nsx) && nsx.ValueKind != JsonValueKind.Null
-                ? DateOnly.FromDateTime(nsx.GetDateTime())
+            DateOnly? NgaySX = formData.TryGetProperty("NgaySX", out var ngaySXProp) || formData.TryGetProperty("ngaySX", out ngaySXProp) && ngaySXProp.ValueKind != JsonValueKind.Null
+                ? DateOnly.FromDateTime(ngaySXProp.GetDateTime())
                 : null;
 
             if (!NgaySX.HasValue)

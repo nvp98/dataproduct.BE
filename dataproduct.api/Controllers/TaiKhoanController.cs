@@ -234,6 +234,36 @@ namespace dataproduct.api.Controllers
             return Ok(new { bmQuyenXlList, quyenTheoLo, quyenTheoScope });
         }
 
+        [HttpGet("nguoiky-by-scope")]
+        public async Task<IActionResult> GetNguoiKyByScope([FromQuery] int scope)
+        {
+            var mapping = await _formContext.TKVV_Scope_Xuong_Mapping
+                .FirstOrDefaultAsync(m => m.Scope == scope);
+
+            if (mapping?.ID_Xuong_BBGN == null)
+                return Ok(new List<object>());
+
+            var idXuong = mapping.ID_Xuong_BBGN.Value;
+
+            var list = await _context.Tbl_TaiKhoan
+                .Include(x => x.PhongBan)
+                .Where(x => x.ID_PhanXuong == idXuong)
+                .Select(x => new
+                {
+                    x.ID_TaiKhoan,
+                    x.HoVaTen,
+                    x.TenTaiKhoan,
+                    x.PhongBan_API,
+                    x.Xuong_API,
+                    x.PhongBan.TenNgan,
+                    x.ChuKy,
+                    TenPhongBan = x.PhongBan != null ? x.PhongBan.TenPhongBan : null
+                })
+                .ToListAsync();
+
+            return Ok(list);
+        }
+
         // scope optional — không truyền thì giữ nguyên hành vi cũ (không lọc theo khu vực), để không ảnh
         // hưởng các trang khác đang gọi API này mà chưa truyền scope (vd Giao nhận thép lỏng, các BM
         // không có khái niệm Lò/Scope). Khi có scope: 1 người chỉ được liệt kê nếu MaKhuVuc của họ ở

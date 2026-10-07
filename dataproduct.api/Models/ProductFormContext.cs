@@ -120,6 +120,18 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_PB_NVL_NhomPhanBo> LG_PB_NVL_NhomPhanBo { get; set; }
     public virtual DbSet<LG_PB_Map_Xuong_LoCao> LG_PB_Map_Xuong_LoCao { get; set; }
     public virtual DbSet<LG_PB_BienBanNhanQHLCCVH> LG_PB_BienBanNhanQHLCCVH { get; set; }
+
+    // NM.TKVV — Biên bản xác nhận sản lượng
+    public virtual DbSet<TKVV_NguyenVatLieu> TKVV_NguyenVatLieu { get; set; }
+    public virtual DbSet<TKVV_SanLuongDuLieu> TKVV_SanLuongDuLieu { get; set; }
+    public virtual DbSet<TKVV_SanLuongChiTiet> TKVV_SanLuongChiTiet { get; set; }
+    public virtual DbSet<TKVV_Silo> TKVV_Silo { get; set; }
+    public virtual DbSet<TKVV_NVL_SiloMapping> TKVV_NVL_SiloMapping { get; set; }
+    public virtual DbSet<TKVV_Silo_TagMapping> TKVV_Silo_TagMapping { get; set; }
+    public virtual DbSet<TKVV_BaoCaoSanLuongChiPhi> TKVV_BaoCaoSanLuongChiPhi { get; set; }
+    public virtual DbSet<TKVV_TonSilo> TKVV_TonSilo { get; set; }
+    public virtual DbSet<TKVV_NVL_BBGN_Mapping> TKVV_NVL_BBGN_Mapping { get; set; }
+    public virtual DbSet<TKVV_Scope_Xuong_Mapping> TKVV_Scope_Xuong_Mapping { get; set; }
     public virtual DbSet<LG_PB_TyLePhanBo> LG_PB_TyLePhanBo { get; set; }
     public virtual DbSet<LG_PB_TyLeNhom> LG_PB_TyLeNhom { get; set; }
     public virtual DbSet<LG_PB_KetQuaPhanBo> LG_PB_KetQuaPhanBo { get; set; }
@@ -851,12 +863,12 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NhaMay).HasColumnName("NhaMay");
             entity.Property(e => e.IsLock).HasColumnName("IsLock");
         });
-         modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
-        {
-            entity.ToTable("NhomPhanLoaiMacThep");
-            entity.Property(e => e.Id).HasColumnName("Id");
-            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
-        });
+        modelBuilder.Entity<NhomPhanLoaiMacThep>(entity =>
+       {
+           entity.ToTable("NhomPhanLoaiMacThep");
+           entity.Property(e => e.Id).HasColumnName("Id");
+           entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
+       });
 
         modelBuilder.Entity<DonTrongPhoi>(entity =>
         {
@@ -928,6 +940,73 @@ public partial class ProductFormContext : DbContext
             // nhưng SQL Server không cho phép OUTPUT trực tiếp trên bảng có trigger. Tắt để dùng
             // câu SELECT bù thay vì OUTPUT, tránh lỗi "target table has database triggers".
             entity.ToTable(tb => tb.UseSqlOutputClause(false));
+        });
+        modelBuilder.Entity<TKVV_SanLuongDuLieu>(entity =>
+        {
+            entity.ToTable("TKVV_SanLuongDuLieu");
+            entity.Property(e => e.GiaTriTuDong).HasPrecision(18, 3);
+            entity.Property(e => e.GiaTriDieuChinh).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<TKVV_SanLuongChiTiet>(entity =>
+        {
+            entity.ToTable("TKVV_SanLuongChiTiet");
+            entity.Property(e => e.Loai1).HasPrecision(18, 3);
+            entity.Property(e => e.Loai2).HasPrecision(18, 3);
+            entity.Property(e => e.Loai3).HasPrecision(18, 3);
+            entity.Property(e => e.PhePham).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<TKVV_Silo>(entity => { entity.ToTable("TKVV_Silo"); });
+        modelBuilder.Entity<TKVV_NVL_SiloMapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_SiloMapping");
+            entity.Property(e => e.MaBM).HasMaxLength(50);
+            entity.Property(e => e.Scope).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
+        });
+        modelBuilder.Entity<TKVV_Silo_TagMapping>(entity => { entity.ToTable("TKVV_Silo_TagMapping"); });
+        modelBuilder.Entity<TKVV_BaoCaoSanLuongChiPhi>(entity =>
+        {
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
+            entity.Property(e => e.Kip).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.KLAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.KLAmAuto).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.DoAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.QuyKho).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL1).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL2).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPhamL3).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.ThanhPham_Note).HasMaxLength(150);
+            entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");
+        });
+        modelBuilder.Entity<TKVV_TonSilo>(entity =>
+        {
+            entity.ToTable("TKVV_TonSilo");
+            entity.Property(e => e.Kip).HasMaxLength(10);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgaySX).HasColumnType("date");
+            entity.Property(e => e.DoAm).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonDau).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.Nhap).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.NhapAuto).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.Xuat).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.XuatAuto).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonCuoi).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.TonCuoiAuto).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.CreatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedDate).HasColumnType("datetime2");
+            entity.Property(e => e.AdjustedDate).HasColumnType("datetime2");
+        });
+        modelBuilder.Entity<TKVV_NVL_BBGN_Mapping>(entity =>
+        {
+            entity.ToTable("TKVV_NVL_BBGN_Mapping");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NgayTao).HasColumnType("datetime2");
         });
         modelBuilder.Entity<LG_PB_TyLePhanBo>(entity =>
         {
