@@ -109,11 +109,15 @@ namespace dataproduct.api.Repositories.NMTKVV
             var siloIdsByNvl = new Dictionary<int, List<int>>();
             foreach (var silo in silos)
             {
+                // Ưu tiên: (1) mapping tường minh cho ngày này > (2) override tách liệu ca trước > (3) mapping lịch sử
+                nearestMappingBySilo.TryGetValue(silo.ID, out var mapEntry4b);
                 int effectiveNvlId;
-                if (nvlOverrideBySilo.TryGetValue(silo.ID, out var ov))
+                if (mapEntry4b != null && mapEntry4b.NguyenVatLieuID > 0 && mapEntry4b.NgaySX == ngaySX)
+                    effectiveNvlId = mapEntry4b.NguyenVatLieuID;
+                else if (nvlOverrideBySilo.TryGetValue(silo.ID, out var ov))
                     effectiveNvlId = ov;
-                else if (nearestMappingBySilo.TryGetValue(silo.ID, out var m) && m.NguyenVatLieuID > 0)
-                    effectiveNvlId = m.NguyenVatLieuID;
+                else if (mapEntry4b?.NguyenVatLieuID > 0)
+                    effectiveNvlId = mapEntry4b.NguyenVatLieuID;
                 else
                     continue;
                 if (!siloIdsByNvl.TryGetValue(effectiveNvlId, out var list))
@@ -161,9 +165,14 @@ namespace dataproduct.api.Repositories.NMTKVV
                     lastTonCuoiBySilo.TryGetValue(silo.ID, out var carryForward);
                     decimal? tonCuoiAuto = tonCuoiAutoBySilo.TryGetValue(silo.ID, out var av) ? av : null;
                     nearestMappingBySilo.TryGetValue(silo.ID, out var mapping);
-                    var effectiveNvlId = nvlOverrideBySilo.TryGetValue(silo.ID, out var ovNvl)
-                        ? (int?)ovNvl
-                        : mapping?.NguyenVatLieuID;
+                    // Ưu tiên: (1) mapping tường minh cho ngày này > (2) override tách liệu ca trước > (3) mapping lịch sử
+                    int? effectiveNvlId;
+                    if (mapping != null && mapping.NguyenVatLieuID > 0 && mapping.NgaySX == ngaySX)
+                        effectiveNvlId = mapping.NguyenVatLieuID;
+                    else if (nvlOverrideBySilo.TryGetValue(silo.ID, out var ovNvl))
+                        effectiveNvlId = (int?)ovNvl;
+                    else
+                        effectiveNvlId = mapping?.NguyenVatLieuID;
 
                     decimal? nhapAuto = nhapAutoBySilo.TryGetValue(silo.ID, out var na) ? na : null;
                     decimal? xuatAuto = xuatAutoBySilo.TryGetValue(silo.ID, out var xa) ? xa : null;
@@ -199,6 +208,8 @@ namespace dataproduct.api.Repositories.NMTKVV
                     {
                         // Dòng gốc (ID nhỏ nhất) — cập nhật auto values; DoAm/DoAmText không chạm
                         var rec = siloRecs[0];
+                        // Đồng bộ NVL theo mapping/override hiện tại (có thể đã thay đổi so với ca trước)
+                        if (effectiveNvlId.HasValue) rec.NguyenVatLieuID = effectiveNvlId;
                         var tonCuoi = rec.TonCuoi ?? tonCuoiAuto ?? 0m;
                         var isAdj = tonCuoiAuto.HasValue && tonCuoi != tonCuoiAuto.Value;
                         if (nonFirstNvlSiloIds.Contains(silo.ID))

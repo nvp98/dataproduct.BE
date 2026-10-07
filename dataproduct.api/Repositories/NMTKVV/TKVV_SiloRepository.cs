@@ -220,37 +220,71 @@ namespace dataproduct.api.Repositories.NMTKVV
 
         public async Task<int> BatchCreateNvlSiloMappingAsync(BatchCreateNvlSiloMappingDto dto)
         {
-            // Kiểm tra nếu có id thì update và không có id thì insert
+            var ngaySX = dto.NgaySX;
+            var scope = dto.Scope;
+            var cas = dto.Rows.Select(r => r.Ca).Distinct().ToList();
 
-            var entities = dto.Rows.Where(r => r.Id == null || r.Id == 0).Select((r, i) => new TKVV_NVL_SiloMapping
+            var existing = await _context.TKVV_NVL_SiloMapping
+                .Where(m => m.Scope == scope && m.NgaySX == ngaySX && cas.Contains(m.Ca))
+                .ToListAsync();
+
+            var submittedSiloIds = dto.Rows
+                .Where(r => r.SiloID.HasValue)
+                .Select(r => r.SiloID!.Value)
+                .ToHashSet();
+
+            // Phân loại từng group: SiloID còn trong submit → giữ primary (ID nhỏ nhất), xóa duplicate
+            //                        SiloID user đã xóa    → xóa hết
+            var primaryBySilo = new Dictionary<int, TKVV_NVL_SiloMapping>();
+            var toRemove = new List<TKVV_NVL_SiloMapping>();
+            foreach (var grp in existing.Where(m => m.SiloID.HasValue).GroupBy(m => m.SiloID!.Value))
             {
-                MaBM = dto.MaBM,
-                Scope = dto.Scope,
-                NgaySX = dto.NgaySX,
-                NguyenVatLieuID = r.NguyenVatLieuID,
-                SiloID = r.SiloID,
-                Ca = r.Ca,
-                ThuTu = r.ThuTu ?? (i + 1),
-                TrangThai = true,
-                NgayCapNhat = DateTime.Now,
-            }).ToList();
-            _context.TKVV_NVL_SiloMapping.AddRange(entities);
-            // update existing records
-            var updateEntities = dto.Rows.Where(r => r.Id != null && r.Id != 0).Select(r => new TKVV_NVL_SiloMapping
+                var sorted = grp.OrderBy(m => m.ID).ToList();
+                if (submittedSiloIds.Contains(grp.Key))
+                {
+                    primaryBySilo[grp.Key] = sorted[0];
+                    toRemove.AddRange(sorted.Skip(1));
+                }
+                else
+                {
+                    toRemove.AddRange(sorted);
+                }
+            }
+            if (toRemove.Count > 0)
+                _context.TKVV_NVL_SiloMapping.RemoveRange(toRemove);
+
+            int inserted = 0;
+            for (int i = 0; i < dto.Rows.Count; i++)
             {
-                MaBM = dto.MaBM,
-                Scope = dto.Scope,
-                NgaySX = dto.NgaySX,
-                NguyenVatLieuID = r.NguyenVatLieuID,
-                SiloID = r.SiloID,
-                Ca = r.Ca,
-                ThuTu = r.ThuTu ?? 0,
-                TrangThai = true,
-                NgayCapNhat = DateTime.Now,
-            }).ToList();
+                var r = dto.Rows[i];
+                if (r.SiloID.HasValue && primaryBySilo.TryGetValue(r.SiloID.Value, out var rec))
+                {
+                    rec.NguyenVatLieuID = r.NguyenVatLieuID;
+                    rec.ThuTu = r.ThuTu ?? (i + 1);
+                    rec.MaBM = dto.MaBM;
+                    rec.TrangThai = true;
+                    rec.NgayCapNhat = DateTime.Now;
+                }
+                else
+                {
+                    _context.TKVV_NVL_SiloMapping.Add(new TKVV_NVL_SiloMapping
+                    {
+                        MaBM = dto.MaBM,
+                        Scope = scope,
+                        NgaySX = ngaySX,
+                        NguyenVatLieuID = r.NguyenVatLieuID,
+                        SiloID = r.SiloID,
+                        Ca = r.Ca,
+                        ThuTu = r.ThuTu ?? (i + 1),
+                        TrangThai = true,
+                        NgayCapNhat = DateTime.Now,
+                    });
+                    inserted++;
+                }
+            }
 
             await _context.SaveChangesAsync();
-            return entities.Count;
+            return inserted;
         }
 
         public async Task<TKVV_NVL_SiloMapping?> GetNvlSiloMappingByIdAsync(int id)
