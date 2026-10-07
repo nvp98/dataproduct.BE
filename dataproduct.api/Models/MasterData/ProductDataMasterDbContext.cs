@@ -30,7 +30,6 @@ public partial class ProductDataMasterDbContext : DbContext
     public DbSet<Tbl_Xuong> Tbl_Xuong { get; set; }
     public DbSet<TongNhanVeBbgnResult> TongNhanVeBbgnResults { get; set; }
     public DbSet<BBGNChiTietResult> BBGNChiTietResults { get; set; }
-    public DbSet<LG_PhieuDieuChinh_NVL> LG_PhieuDieuChinh_NVL { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         //modelBuilder.Entity<TaiKhoan>(entity =>

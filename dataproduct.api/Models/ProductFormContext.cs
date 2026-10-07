@@ -113,6 +113,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_TSL_SiLo_Mapping> LG_TSL_SiLo_Mapping { get; set; }
     public virtual DbSet<LG_TSL_ChiTiet> LG_TSL_ChiTiet { get; set; }
     public virtual DbSet<LG_PhieuDieuChinh_ChiTiet> LG_PhieuDieuChinh_ChiTiet { get; set; }
+    public virtual DbSet<LG_PhieuDieuChinh_NVL> LG_PhieuDieuChinh_NVL { get; set; }
     public virtual DbSet<SiLoTon> SiLoTon { get; set; }
     public virtual DbSet<LG_NKVHPT_DuLieu> LG_NKVHPT_DuLieu { get; set; }
     public virtual DbSet<LG_NKVHPT_ChiTiet> LG_NKVHPT_ChiTiet { get; set; }

@@ -1,9 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
-namespace dataproduct.api.Models.MasterData
+namespace dataproduct.api.Models
 {
-    [Table("LG_PhieuDieuChinh_NVL")]
     public class LG_PhieuDieuChinh_NVL
     {
         [Key]

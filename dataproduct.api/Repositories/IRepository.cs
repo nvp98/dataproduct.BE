@@ -617,4 +617,25 @@ namespace dataproduct.api.Repositories
         /// (2) Sổ Xuất-Nhập-Tồn (STD_XUAT_NHAP_TON_HRC1/STD_NXT_TOTAL_HRC1 — chi tiết + tổng hợp).</summary>
         Task<string?> GetInUseReasonAsync(int id);
     }
+    public interface ILG_PhieuDieuChinhRepository
+    {
+        Task<List<BBGNChiTietResult>> GetBBGNAsync(DateTime ngay, int? ca, string? kip);
+        // Nguồn "Nội bộ - Xuất SX" (LG_NL_ChiTiet, dbo.Sp_GetNVLNapLieuLoCao) — xem NapLieuLoCaoDieuChinhResult.
+        Task<List<NapLieuLoCaoDieuChinhResult>> GetNapLieuLoCaoAsync(DateTime ngay, int? ca, string? kip);
+        Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
+
+        Task<List<LG_PhieuDieuChinh_ChiTiet>> GetChiTietByPhieuAsync(Guid idPhieu);
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities);
+        Task<LG_PhieuDieuChinh_ChiTiet?> UpdateXacNhanGiaoAsync(long id, int? nguoiDieuChinhGiao, DateTime? thoiGianDieuChinhGiao, int trangThai);
+        Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromBBGNAsync(Guid idPhieu, List<BBGNChiTietResult> bbgnData, string? nguoiThucHien);
+        Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromNapLieuLoCaoAsync(Guid idPhieu, List<NapLieuLoCaoDieuChinhResult> rows, string? nguoiThucHien);
+
+        // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ─────────────────────────────
+        Task<List<LG_PhieuDieuChinh_NVL>> GetNvlListAsync(bool onlyActive);
+        Task<LG_PhieuDieuChinh_NVL?> GetNvlByIdAsync(int id);
+        Task<LG_PhieuDieuChinh_NVL> AddNvlAsync(LG_PhieuDieuChinh_NVL entity);
+        Task<LG_PhieuDieuChinh_NVL?> UpdateNvlAsync(int id, LG_PhieuDieuChinh_NVL entity);
+        Task<bool> DeleteNvlAsync(int id);
+
+    }
 }
