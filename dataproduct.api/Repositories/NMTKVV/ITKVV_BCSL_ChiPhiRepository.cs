@@ -1,0 +1,31 @@
+using dataproduct.api.DTOs.NMTKVV_Dto;
+
+namespace dataproduct.api.Repositories.NMTKVV
+{
+    public interface ITKVV_BCSL_ChiPhiRepository
+    {
+        // Giá trị NVL tự động từ EMS — gọi SP_TKVV_GetGiaTriNVL_Auto
+        Task<List<TKVVGiaTriNVLAutoDto>> GetGiaTriNVLAutoAsync(
+            DateTime ngay, int ca, string scopeCode, string maBM);
+
+        // Dữ liệu cân từ EMS — gọi SP_TKVV_GetDuLieuCan (theo Silo)
+        Task<List<TKVVDuLieuCanDto>> GetDuLieuCanAsync(
+            DateTime ngay, int ca, string maBM, string loaiDuLieu, int scope);
+
+        // Tải dữ liệu cân từ EMS, upsert vào TKVV_BaoCaoSanLuongChiPhi với rule IsAdjusted,
+        // trả về dữ liệu đã lưu (table1=Ca ngày, table2=Ca đêm)
+        Task<LoadDuLieuCanResultDto> LoadAndSaveAsync(LoadDuLieuCanRequestDto request);
+
+        // Lấy dữ liệu đã lưu theo ngày, scope (int 1-6) và ca sx
+        Task<LoadDuLieuCanResultDto> GetBaoCaoDataAsync(DateOnly ngaySX, string maBM, int scope, int? caSX = null);
+
+        // Lấy dữ liệu đã lưu theo IDPhieu (dùng cho export PDF/Excel)
+        Task<LoadDuLieuCanResultDto> GetByPhieuIdAsync(Guid phieuId);
+
+        // Lưu giá trị người dùng nhập (KLAm, DoAm, v.v.), backend tự xác định IsAdjusted
+        Task SavePhieuRowsAsync(SaveBcSlPhieuRequestDto request);
+
+        // Kéo lại dữ liệu BBGN (sp_TKVV_GetSanLuongTong_BBGN) và force-update vùng thành phẩm
+        Task<int> RefreshBbgnAsync(Guid phieuId, int? currentUserId);
+    }
+}
