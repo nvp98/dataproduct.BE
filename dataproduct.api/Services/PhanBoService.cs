@@ -98,17 +98,14 @@ namespace dataproduct.api.Services
         {
             ngay = ngay.Date;
 
-            foreach (var loai in TatCaLoaiPhanBo)
-            {
-                if (await _ketQuaRepo.IsNgayDaChotAsync(ngay, loai))
-                    throw new InvalidOperationException($"Ngày {ngay:dd/MM/yyyy} đã chốt, không thể tính lại.");
-            }
-
             await DongBoBienBanNhanAsync(ngay, idNguoiThucThi);
 
             foreach (var loai in TatCaLoaiPhanBo)
             {
-                var rows = await TinhChoLoaiAsync(ngay, loai, idNguoiThucThi);
+                // (Ca, Lò cao) nào đã chốt thì giữ nguyên, không tính lại/ghi đè — các ca/lò cao khác
+                // trong cùng ngày vẫn tính lại bình thường.
+                var daChotSet = (await _ketQuaRepo.GetChotSetAsync(ngay, loai)).ToHashSet();
+                var rows = await TinhChoLoaiAsync(ngay, loai, idNguoiThucThi, daChotSet);
                 await _ketQuaRepo.ReplaceNhapAsync(ngay, loai, rows);
             }
         }
@@ -118,7 +115,8 @@ namespace dataproduct.api.Services
         private static byte LoaiPhanBoChoNhom(byte loaiPhanBo) =>
             loaiPhanBo == (byte)LoaiPhanBoEnum.ThanCoc10 ? (byte)LoaiPhanBoEnum.Cvh : loaiPhanBo;
 
-        private async Task<List<LG_PB_KetQuaPhanBo>> TinhChoLoaiAsync(DateTime ngay, byte loaiPhanBo, int idNguoiTao)
+        private async Task<List<LG_PB_KetQuaPhanBo>> TinhChoLoaiAsync(
+            DateTime ngay, byte loaiPhanBo, int idNguoiTao, HashSet<(byte Ca, int IdLoCao)> daChotSet)
         {
             var bienBans = await _bienBanRepo.GetByNgayAsync(ngay, loaiPhanBo);
             if (bienBans.Count == 0) return new List<LG_PB_KetQuaPhanBo>();
@@ -143,6 +141,9 @@ namespace dataproduct.api.Services
                     if (bienBan.Ca == null) continue; // không xác định được ca thì không tra được cấu hình nhóm/NVL
                     var ca = bienBan.Ca.Value;
 
+                    // (Ca, Lò cao) này đã chốt riêng — giữ nguyên kết quả đã chốt, không tính lại/ghi đè
+                    if (daChotSet.Contains((ca, idLoCao))) continue;
+
                     // NVL thuộc nhóm là cấu hình RIÊNG cho đúng (ngày, ca, lò cao) này — không kế thừa từ ca/ngày khác
                     var nhomVaThanhVien = await _nhomRepo.GetNhomVaThanhVienAsync(loaiPhanBoChoNhom, ngay, ca, idLoCao);
                     if (nhomVaThanhVien.Count == 0) continue;
@@ -151,6 +152,12 @@ namespace dataproduct.api.Services
                     var pp1Nhoms = nhomVaThanhVien.Where(n => n.Nhom.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyTrongDongDu).ToList();
 
                     var eForCa = eList.Where(x => x.Ca == ca).ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieu);
+                    // Chưa quy khô — CHỈ dùng để tính tỷ lệ/phân bổ cho nhóm PP1 của Than cốc (Cvh/ThanCoc10),
+                    // Qhlc vẫn tính tỷ lệ theo E đã quy khô như cũ.
+                    var dungERawChoTyLe = loaiPhanBo == (byte)LoaiPhanBoEnum.Cvh || loaiPhanBo == (byte)LoaiPhanBoEnum.ThanCoc10;
+                    var eRawForCa = dungERawChoTyLe
+                        ? eList.Where(x => x.Ca == ca).ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieuTruocQuyKho)
+                        : eForCa;
                     var g = bienBan.KhoiLuongNhanVe;
 
                     // Pass 1: PP2 — tỷ lệ nhập tay
@@ -183,41 +190,46 @@ namespace dataproduct.api.Services
 
                     if (pp1Nhoms.Count > 0)
                     {
-                        var eNhomMap = pp1Nhoms.ToDictionary(
+                        // quyNhom/H/dòng dư đều dùng CHUNG cơ sở với F (Tỷ lệ %) — Cvh/ThanCoc10 dùng E CHƯA quy khô
+                        // (eRawForCa), Qhlc dùng E ĐÃ quy khô (vì eRawForCa = eForCa khi không phải Cvh/ThanCoc10).
+                        // Đảm bảo H = F × quyNhom luôn đúng, không lệch giữa cột Tỷ lệ (%) và Phân bổ.
+                        var eNhomRawMap = pp1Nhoms.ToDictionary(
                             n => n.Nhom.ID,
-                            n => n.ThanhVien.Sum(tv => eForCa.GetValueOrDefault(tv.IDNVL, 0m)));
-                        var eTongPp1 = eNhomMap.Values.Sum();
+                            n => n.ThanhVien.Sum(tv => eRawForCa.GetValueOrDefault(tv.IDNVL, 0m)));
+                        var eTongPp1Raw = eNhomRawMap.Values.Sum();
 
                         foreach (var (nhom, thanhVien) in pp1Nhoms)
                         {
                             if (thanhVien.Count == 0) continue;
 
-                            var eNhom = eNhomMap[nhom.ID];
-                            var quyNhom = eTongPp1 > 0
-                                ? Math.Round(conLai * (eNhom / eTongPp1), 3)
+                            var eNhomRaw = eNhomRawMap[nhom.ID];
+                            var quyNhom = eTongPp1Raw > 0
+                                ? Math.Round(conLai * (eNhomRaw / eTongPp1Raw), 3)
                                 : Math.Round(conLai / pp1Nhoms.Count, 3);
 
-                            // Dòng dư (bù trừ do làm tròn) được TỰ ĐỘNG chọn là NVL có khối lượng nạp liệu (E) lớn nhất
-                            // trong nhóm tại (ca, lò cao) này — không cần admin cấu hình tay thứ tự ưu tiên.
+                            // Dòng dư (bù trừ do làm tròn) được TỰ ĐỘNG chọn là NVL có khối lượng nạp liệu lớn nhất
+                            // (cùng cơ sở với F/H) trong nhóm tại (ca, lò cao) này — không cần cấu hình tay.
                             var dongDu = thanhVien
-                                .OrderByDescending(t => eForCa.GetValueOrDefault(t.IDNVL, 0m))
+                                .OrderByDescending(t => eRawForCa.GetValueOrDefault(t.IDNVL, 0m))
                                 .First();
                             decimal tongHDongThuong = 0;
 
-                            // F (%) luôn là tỷ trọng nạp liệu E/eNhom — kể cả với dòng dư (không phải H/E),
-                            // vì đây là con số mô tả tỷ trọng nạp liệu, độc lập với cơ chế bù trừ làm tròn của H.
+                            // F (%) và H dùng CHUNG 1 tỷ lệ (eRaw/eNhomRaw) — H = F × quyNhom, khớp đúng phép nhân hiển thị.
+                            // E lưu/hiển thị + "Số sau khi phân bổ" (E+H) vẫn dùng E ĐÃ quy khô (eForCa) như cũ.
                             foreach (var tv in thanhVien.Where(t => t.ID != dongDu.ID))
                             {
                                 var e = eForCa.GetValueOrDefault(tv.IDNVL, 0m);
-                                var h = eNhom > 0 ? Math.Round(e / eNhom * quyNhom, 3) : 0m;
-                                var f = eNhom > 0 ? e / eNhom : 0m;
+                                var eRaw = eRawForCa.GetValueOrDefault(tv.IDNVL, 0m);
+                                var f = eNhomRaw > 0 ? eRaw / eNhomRaw : 0m;
+                                var h = Math.Round(f * quyNhom, 3);
                                 pp1Ket.Add((nhom, tv, e, f, h, false));
                                 tongHDongThuong += h;
                             }
 
                             var eDongDu = eForCa.GetValueOrDefault(dongDu.IDNVL, 0m);
+                            var eRawDongDu = eRawForCa.GetValueOrDefault(dongDu.IDNVL, 0m);
                             var hDongDu = quyNhom - tongHDongThuong;
-                            var fDongDu = eNhom > 0 ? eDongDu / eNhom : 0m;
+                            var fDongDu = eNhomRaw > 0 ? eRawDongDu / eNhomRaw : 0m;
                             pp1Ket.Add((nhom, dongDu, eDongDu, fDongDu, hDongDu, true));
                         }
                     }
@@ -404,49 +416,46 @@ namespace dataproduct.api.Services
                 throw new InvalidOperationException("Không tìm thấy dòng kết quả phân bổ để cập nhật (có thể ngày đã chốt hoặc NVL chưa có kết quả).");
         }
 
-        // ─── Chốt (khóa toàn bộ 3 loại phân bổ của 1 ngày) ─────────────────────────────
+        // ─── Chốt (khóa cả 3 loại phân bổ của 1 (Ngày, Ca, Lò cao)) ────────────────────
 
-        public async Task ChotPhanBoAsync(DateTime ngay, int idNguoiXacNhan)
+        public async Task ChotPhanBoAsync(DateTime ngay, byte ca, int idLoCao, int idNguoiXacNhan)
         {
             ngay = ngay.Date;
 
             // Validate trước cho cả 3 loại — chỉ chốt khi tất cả đều khớp tổng
             foreach (var loai in TatCaLoaiPhanBo)
-                await ValidateTruocKhiChotAsync(ngay, loai);
+                await ValidateTruocKhiChotAsync(ngay, loai, ca, idLoCao);
 
             foreach (var loai in TatCaLoaiPhanBo)
             {
-                if (await _ketQuaRepo.IsNgayDaChotAsync(ngay, loai)) continue;
-                await _ketQuaRepo.ChotAsync(ngay, loai, idNguoiXacNhan);
+                if (await _ketQuaRepo.IsNgayDaChotAsync(ngay, loai, ca, idLoCao)) continue;
+                await _ketQuaRepo.ChotAsync(ngay, loai, ca, idLoCao, idNguoiXacNhan);
             }
         }
 
-        // ─── Hủy chốt (mở khóa lại toàn bộ 3 loại phân bổ của 1 ngày để sửa/tính lại) ───
+        // ─── Hủy chốt (mở khóa lại cả 3 loại phân bổ của 1 (Ngày, Ca, Lò cao) để sửa/tính lại) ─
 
-        public async Task HuyChotPhanBoAsync(DateTime ngay, int idNguoiThucHien)
+        public async Task HuyChotPhanBoAsync(DateTime ngay, byte ca, int idLoCao, int idNguoiThucHien)
         {
             ngay = ngay.Date;
 
             foreach (var loai in TatCaLoaiPhanBo)
-                await _ketQuaRepo.HuyChotAsync(ngay, loai);
+                await _ketQuaRepo.HuyChotAsync(ngay, loai, ca, idLoCao);
         }
 
-        private async Task ValidateTruocKhiChotAsync(DateTime ngay, byte loaiPhanBo)
+        private async Task ValidateTruocKhiChotAsync(DateTime ngay, byte loaiPhanBo, byte ca, int idLoCao)
         {
-            var rows = await _ketQuaRepo.GetByNgayAsync(ngay, loaiPhanBo, null);
+            var rows = await _ketQuaRepo.GetByNgayAsync(ngay, loaiPhanBo, idLoCao, ca);
             if (rows.Count == 0) return;
 
             var bienBans = await _bienBanRepo.GetByNgayAsync(ngay, loaiPhanBo);
-            foreach (var locaoGroup in rows.GroupBy(r => new { r.IDLoCao, r.Ca }))
-            {
-                var tongPhanBo = locaoGroup.Sum(r => r.KhoiLuongPhanBo);
-                var tongNhanVe = bienBans
-                    .Where(b => b.IDLoCao == locaoGroup.Key.IDLoCao && b.Ca == locaoGroup.Key.Ca)
-                    .Sum(b => b.KhoiLuongNhanVe);
-                if (Math.Abs(tongNhanVe - tongPhanBo) >= 0.001m)
-                    throw new InvalidOperationException(
-                        $"Chưa thể chốt: lệch tổng phân bổ tại lò cao {locaoGroup.Key.IDLoCao}, ca {locaoGroup.Key.Ca} (loại phân bổ {loaiPhanBo}).");
-            }
+            var tongPhanBo = rows.Sum(r => r.KhoiLuongPhanBo);
+            var tongNhanVe = bienBans
+                .Where(b => b.IDLoCao == idLoCao && b.Ca == ca)
+                .Sum(b => b.KhoiLuongNhanVe);
+            if (Math.Abs(tongNhanVe - tongPhanBo) >= 0.001m)
+                throw new InvalidOperationException(
+                    $"Chưa thể chốt: lệch tổng phân bổ tại lò cao {idLoCao}, ca {ca} (loại phân bổ {loaiPhanBo}).");
         }
 
         public async Task<List<KetQuaPhanBoDto>> LayBaoCaoAsync(DateTime tuNgay, DateTime denNgay, int? idLoCao, byte? loaiPhanBo)

@@ -229,7 +229,7 @@ namespace dataproduct.api.Services
                         if (nguoiLap != null)
                         {
                             nguoiLapPhieu = nguoiLap.HoVaTen ?? "";
-                            chuKyNguoiLapPhieu = FormatChuKy(nguoiLap.ChuKy);
+                            chuKyNguoiLapPhieu = FormatChuKy(nguoiLap.ChuKy ?? "Đã ký");
                             phongBanNguoiLap = nguoiLap.TenPhongBan ?? "";
                             chucVuNguoiLap = nguoiLap.TenViTri ?? "";
                         }
@@ -239,7 +239,7 @@ namespace dataproduct.api.Services
                         if (nguoiCTD != null)
                         {
                             nguoiNhanCTD = nguoiCTD.HoVaTen ?? "";
-                            chuKyNguoiCTD = FormatChuKy(nguoiCTD.ChuKy);
+                            chuKyNguoiCTD = FormatChuKy(nguoiCTD.ChuKy ?? "Đã ký");
                             phongBanNguoiCTD = nguoiCTD.TenPhongBan ?? "";
                             chucVuNguoiCTD = nguoiCTD.TenViTri ?? "";
                         }
@@ -249,7 +249,7 @@ namespace dataproduct.api.Services
                         if (nguoiQLCL != null)
                         {
                             nguoiNhanQLCL = nguoiQLCL.HoVaTen ?? "";
-                            chuKyNguoiNhanQLCL = FormatChuKy(nguoiQLCL.ChuKy);
+                            chuKyNguoiNhanQLCL = FormatChuKy(nguoiQLCL.ChuKy ?? "Đã ký");
                             phongBanNguoiQLCL = nguoiQLCL.TenPhongBan ?? "";
                             chucVuNguoiQLCL = nguoiQLCL.TenViTri ?? "";
                         }

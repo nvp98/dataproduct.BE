@@ -512,7 +512,27 @@ namespace dataproduct.api.Controllers
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
-            }   
+            }
+        }
+
+        /// <summary>
+        /// Ép đồng bộ dữ liệu từ NM ngay lập tức cho Sổ Xuất-Nhập-Tồn (STD_NXT), bỏ qua cooldown.
+        /// Dùng cho nút "Đồng bộ lại từ NM" ở FE — tách riêng khỏi "Làm mới" (chỉ đọc DB).
+        /// </summary>
+        [HttpPost("force-sync-std-nxt")]
+        public async Task<IActionResult> ForceSyncStdNxt([FromBody] FilterSTD_NXTRequest request)
+        {
+            try
+            {
+                if (request == null)
+                    return BadRequest("Thiếu dữ liệu bộ lọc.");
+                await _service.ForceSyncStdNxtAsync(request);
+                return Ok(new { message = "Đồng bộ thành công." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            }
         }
     }
 

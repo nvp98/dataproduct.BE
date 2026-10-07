@@ -80,9 +80,24 @@ namespace dataproduct.api.Services
 
         public async Task<bool> DeleteAsync(int id) => await _repo.DeleteAsync(id);
 
-        // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngày, Ca), không kế thừa từ ngày/ca trước
+        // NVL thành viên của nhóm — cấu hình RIÊNG cho từng (Ngày, Ca), không kế thừa từ ngày/ca trước.
+        // Với nhóm PP2 (tỷ lệ nhập tay), đính kèm % hiệu lực riêng của từng NVL — để UI cho phép sửa %
+        // trực tiếp từng NVL, không bắt buộc phải dùng "Áp dụng % cho cả nhóm" trước (mỗi NVL có thể có % khác nhau).
         public async Task<List<NvlNhomPhanBoDto>> GetNvlByNhomAsync(int idNhomPhanBo, DateTime ngay, byte ca)
-            => await _repo.GetNvlByNhomAsync(idNhomPhanBo, ngay, ca);
+        {
+            var list = await _repo.GetNvlByNhomAsync(idNhomPhanBo, ngay, ca);
+            if (list.Count == 0) return list;
+
+            var nhom = await _repo.GetByIdAsync(idNhomPhanBo);
+            if (nhom?.PhuongThucPhanBo == (byte)PhuongThucPhanBoEnum.TyLeNhapTay)
+            {
+                var tyLeMap = await _tyLeRepo.GetHieuLucMapAsync(list.Select(x => x.IdNvl), ngay, ca);
+                foreach (var item in list)
+                    item.TyLe = tyLeMap.GetValueOrDefault(item.IdNvl);
+            }
+
+            return list;
+        }
 
         // Với nhóm PP1 (tỷ trọng + dòng dư), "dòng dư" (NVL nhận phần bù trừ do làm tròn) được
         // PhanBoService TỰ ĐỘNG chọn theo khối lượng nạp liệu (E) lớn nhất tại thời điểm tính —
@@ -127,12 +142,12 @@ namespace dataproduct.api.Services
 
         public async Task<SaoChepNhomPhanBoResultDto> SaoChepAsync(SaoChepNhomPhanBoRequestDto dto)
         {
-            // Kiểm tra ngày đích đã chốt
+            // Kiểm tra đúng (Ngày, Ca, Lò cao) đích đã chốt — không bị chặn bởi ca/lò cao khác đã chốt
             foreach (var loai in TatCaLoaiPhanBo)
             {
-                if (await _ketQuaRepo.IsNgayDaChotAsync(dto.NgayDich.Date, loai))
+                if (await _ketQuaRepo.IsNgayDaChotAsync(dto.NgayDich.Date, loai, dto.CaDich, dto.IdLoCaoDich))
                     throw new InvalidOperationException(
-                        $"Ngày đích {dto.NgayDich:dd/MM/yyyy} đã chốt, không thể sao chép vào.");
+                        $"Ngày {dto.NgayDich:dd/MM/yyyy}, Ca {dto.CaDich}, Lò cao {dto.IdLoCaoDich} đã chốt, không thể sao chép vào.");
             }
 
             // Tìm ca có cấu hình gần nhất

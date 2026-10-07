@@ -16,6 +16,7 @@ namespace dataproduct.api.Services
         private readonly ProductDataMasterDbContext _contextMaster;
         private readonly IPhieuRepository _phieuRepo;
         private readonly BBGN_ThepLongService _bbgnThepLongService;
+        private readonly DLNMHRC1Service _dlnmHrc1Service;
 
         // Các maBm dùng bảng BBGN_ThepLong làm dữ liệu con theo IdPhieu (xem BBGN_ThepLongService/
         // HRC2BBGNThepLongInitializer). Khi phiếu clone ("Đề nghị hiệu chỉnh") của các BM này bị
@@ -24,17 +25,24 @@ namespace dataproduct.api.Services
         {
             "HRC1_BBGN_ThepLong", "HRC2_BBGN_ThepLong", "BBGN_ThepLong"
         };
+        private static readonly HashSet<string> Hrc1TieuHaoClonePhysicalMaBms = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "HRC1_BB_TieuHao_BOF",
+            "HRC1_BB_TieuHao_LF",
+        };
 
         public BmPheDuyetService(
             IBMPheDuyetRepository repo,
             ProductDataMasterDbContext Mastercontext,
             IPhieuRepository phieuRepo,
-            BBGN_ThepLongService bbgnThepLongService)
+            BBGN_ThepLongService bbgnThepLongService,
+            DLNMHRC1Service dlnmHrc1Service)
         {
             _repo = repo;
             _contextMaster = Mastercontext;
             _phieuRepo = phieuRepo;
             _bbgnThepLongService = bbgnThepLongService;
+            _dlnmHrc1Service = dlnmHrc1Service;
         }
 
         public async Task<IEnumerable<BM_PheDuyetDto>> GetAllAsync(int? NguoiDuyetID,int? isCheckDuyet)
@@ -163,6 +171,16 @@ namespace dataproduct.api.Services
                     {
                         phieuCha.IsLock = 0;
                         await _phieuRepo.UpdateAsync(phieuCha);
+
+                        // Riêng HRC1 Tiêu hao BOF/LF: mọi dòng (kể cả IsNM=true, qua IDNM=NULL/SourceIDNM —
+                        // xem DLNMHRC1Service.DuplicateHrc1RowsForCloneAsync) đều đã được nhân bản riêng cho
+                        // clone lúc tạo, nên Reject chỉ cần xóa thẳng dòng sở hữu bởi clone theo IDPhieu —
+                        // dòng canonical của phiếu cha chưa từng bị đụng nên không cần revert gì thêm.
+                        // Chỉ xử lý cho 2 BM này — các BM khác chưa dùng cơ chế nhân bản riêng cho clone.
+                        if (Hrc1TieuHaoClonePhysicalMaBms.Contains(phieuCha.MaBm ?? string.Empty))
+                        {
+                            await _dlnmHrc1Service.DeleteHrc1RowsByPhieuAsync(phieu.Idphieu);
+                        }
                     }
 
                     // Dọn dữ liệu con đã sinh theo phiếu clone bị từ chối, tránh mồ côi record
@@ -217,6 +235,14 @@ namespace dataproduct.api.Services
                 // Tất cả đều xác nhận → chuyển sang Hoàn thành (2)
                 PhieuStatusHelper.CheckAllowStatusChange(phieu.TinhTrang ?? 0, 2);
                 newPhieuStatus = 2;
+
+                // Riêng HRC1 Tiêu hao BOF/LF, nếu phiếu vừa Duyệt là 1 bản clone: merge dòng NM đã sửa về
+                // canonical + dọn rác dữ liệu mồ côi của các tầng clone trung gian trong chuỗi — xem
+                // DLNMHRC1Service.MergeAndCleanupHrc1CloneChainOnApproveAsync.
+                if (phieu.ID_PhieuGoc != null && Hrc1TieuHaoClonePhysicalMaBms.Contains(phieu.MaBm ?? string.Empty))
+                {
+                    await _dlnmHrc1Service.MergeAndCleanupHrc1CloneChainOnApproveAsync(phieu, nguoiDuyetId);
+                }
             }
             else if (allRejected)
             {

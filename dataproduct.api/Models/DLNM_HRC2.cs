@@ -15,6 +15,9 @@ public partial class DLNM_HRC2
     public int? Scope { get; set; }
     public string? MeThoi { get; set; }
     public string? MacThep { get; set; }
+    /// <summary>Giá trị Mác thép user sửa tay trên dòng NM (null = chưa sửa) — MacThep giữ nguyên giá trị gốc từ NM, không bị ghi đè. Giá trị hiệu lực = MacThep_Manual ?? MacThep.</summary>
+    public string? MacThep_Manual { get; set; }
+    public bool? IsManualMacThep { get; set; }
     public double? O2 { get; set; }
     public double? AR_RH { get; set; }
     public double? N2 { get; set; }

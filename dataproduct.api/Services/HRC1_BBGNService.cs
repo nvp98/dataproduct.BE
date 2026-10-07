@@ -24,6 +24,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _config;
         private readonly ProductDataMasterDbContext _masterCtx;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public HRC1_BBGNService(
             IHRC1_BBGNRepository repo,
@@ -33,7 +34,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConfiguration config,
             ProductDataMasterDbContext masterCtx,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _bbgnSvc = bbgnSvc;
@@ -43,6 +45,7 @@ namespace dataproduct.api.Services
             _config = config;
             _masterCtx = masterCtx;
             _httpClientFactory = httpClientFactory;
+            _bmConfig = bmConfig;
         }
 
         // -------------------------------------------------------
@@ -198,6 +201,7 @@ namespace dataproduct.api.Services
                 MaBm = phieu.MaBm,
                 CongDoan = congDoan,
                 Scope = phieu.Scope,
+                TenScope = phieu.TenScope,
                 NgaySX = phieu.NgaySX,
                 Ca = phieu.Ca,
                 Kip = phieu.Kip,
@@ -266,11 +270,21 @@ namespace dataproduct.api.Services
             if (req.DichChuyen == "len_thang" && (me.TrangThaiTL ?? 0) >= 1)
                 throw new InvalidOperationException("Tinh luyện đã nhận mẻ này. Chỉ có thể chọn tinh luyện để tham khảo, không thể chuyển sang lên thẳng.");
 
+            // Ngược lại: nếu Đúc đã xác nhận mẻ lên thẳng thì không được chuyển sang tinh luyện nữa.
+            // Nhánh previouslyLenThang bên dưới sẽ reset IdMayDucDich (thuộc về TL) — nếu vẫn cho đổi
+            // trong khi TrangThaiDuc = 1, mẻ mất hẳn liên kết với máy đúc đã xác nhận (Đúc xác định mẻ
+            // của mình bằng IdMayDucDich, không qua bảng phân công) nhưng vẫn mang trạng thái "đã xác
+            // nhận" — kẹt vĩnh viễn: không máy đúc nào còn thấy để Bỏ xác nhận, TL cũng không sửa được
+            // (UpdateMePhanCongAsync chặn khi TrangThaiDuc >= 1). Phải Bỏ xác nhận đúc trước.
+            if (req.DichChuyen == "tinh_luyen" && me.DichChuyen == "len_thang" && (me.TrangThaiDuc ?? 0) >= 1)
+                throw new InvalidOperationException("Máy đúc đã xác nhận mẻ này. Cần Bỏ xác nhận đúc trước khi chuyển sang tinh luyện.");
+
             // Đã có xác nhận/không xác nhận PCN ở máy đúc — phải Reset xác nhận PCN về null trước khi đổi Thử nghiệm
             if (req.IsThuNghiem.HasValue && req.IsThuNghiem != me.IsThuNghiem && me.TrangThaiPCN != null)
                 throw new InvalidOperationException("Mẻ đã có xác nhận/không xác nhận PCN. Cần Reset xác nhận PCN trước khi đổi Thử nghiệm.");
 
             var oldDich = me.DichChuyen;
+            var oldIdMayDucDich = me.IdMayDucDich;
             var old = Snapshot(me);
             var loThoiPc = await _repo.GetLoThoiMePhanCongByMeIdAsync(meId);
 
@@ -327,6 +341,7 @@ namespace dataproduct.api.Services
                 if (loThoiPc != null)
                     loThoiPc.ChuyenVeMeId = req.ChuyenVeMeId;
             }
+            await EnsureMayDucChuaKhoaAsync(oldIdMayDucDich, me.IdMayDucDich);
             me.IsThuNghiem = P("isThuNghiem") ? req.IsThuNghiem : me.IsThuNghiem;
             me.IsTrungMeThoi = P("isTrungMeThoi") ? req.IsTrungMeThoi : me.IsTrungMeThoi;
             me.GhiChuLo = P("ghiChuLo") ? req.GhiChuLo : me.GhiChuLo;
@@ -542,6 +557,12 @@ namespace dataproduct.api.Services
             if (me.DichChuyen == "len_thang")
                 throw new InvalidOperationException("Lò thổi đã chỉ định mẻ này lên thẳng máy đúc, không thể nhận vào tinh luyện.");
 
+            // Phòng hờ mẻ vừa được lò thổi chuyển len_thang → tinh_luyen trong khi Đúc đã xác nhận
+            // (đáng lẽ đã bị chặn ở UpdateMeAsync) — không cho TL nhận đè lên trạng thái Đúc còn treo,
+            // tránh lặp lại đúng lỗi "mẻ vô định" (TrangThaiDuc=1 nhưng mất IdMayDucDich).
+            if ((me.TrangThaiDuc ?? 0) >= 1)
+                throw new InvalidOperationException("Máy đúc đã xác nhận mẻ này, không thể nhận vào tinh luyện.");
+
             // Mẻ chưa được lò thổi chọn đích (DichChuyen = null) → tự động gán tinh_luyen khi TL nhận
             if (string.IsNullOrEmpty(me.DichChuyen))
                 me.DichChuyen = "tinh_luyen";
@@ -580,8 +601,112 @@ namespace dataproduct.api.Services
             });
             await _repo.SaveChangesAsync();
 
+            // Liên kết sang Tiêu hao LF: 1 mẻ TL nhận = 1 dòng Hrc1TieuHao(BieuMau=LF), cùng
+            // Ngày/Ca (đúng công đoạn tinh luyện, KHÔNG phải Ca đúc đã chuyển) + Scope=TL số.
+            if (phieuTL?.NgaySX.HasValue == true && phieuTL.Ca.HasValue)
+                await _repo.UpsertLfTieuHaoFromMeAsync(me, req.ScopePhieu, phieuTL.NgaySX, phieuTL.Ca);
+
             // Recalc trùng: mẻ vừa được TL nhận có thể conflict với len_thang hoặc TL khác
             await RecalcTrungMeByMaMeAsync(me.MaMe);
+            await _repo.SaveChangesAsync();
+        }
+
+        // -------------------------------------------------------
+        // TINH LUYỆN — Chuyển ca Đúc (routing sang phiếu Đúc ca trước/sau, không đổi Ca của chính TL)
+        // Ví dụ: TL luyện xong mẻ lúc 19:59 vẫn thuộc ca đầu (đúng cho TL/Tiêu hao LF), nhưng đem
+        // đúc thì thực tế đã rơi vào ca sau (hoặc ngược lại: luyện đầu ca sau nhưng đúc kịp từ cuối
+        // ca trước). Bấm "Chuyển ca" chỉ đẩy routing sang phiếu Đúc ca trước/sau, NgayNhanTL/CaTinhLuyen
+        // (và dòng Tiêu hao LF liên kết) giữ nguyên không đổi.
+        // huong: "truoc" | "sau"
+        // -------------------------------------------------------
+        public async Task ChuyenCaDucAsync(int meId, string huong, int userId)
+        {
+            if (huong != "truoc" && huong != "sau")
+                throw new InvalidOperationException("Hướng chuyển ca không hợp lệ.");
+
+            var me = await _repo.GetMeByIdAsync(meId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy mẻ {meId}");
+
+            if ((me.TrangThaiTL ?? 0) < 1)
+                throw new InvalidOperationException("Mẻ chưa được nhận vào tinh luyện.");
+            if ((me.TrangThaiDuc ?? 0) >= 1)
+                throw new InvalidOperationException("Máy đúc đã xác nhận mẻ này, không thể chuyển ca.");
+            if (!me.IdMayDucDich.HasValue)
+                throw new InvalidOperationException("Chưa chọn máy đúc đích, không thể chuyển ca.");
+            if (!me.NgayNhanTL.HasValue || !me.CaTinhLuyen.HasValue)
+                throw new InvalidOperationException("Mẻ chưa xác định được ngày/ca tinh luyện.");
+
+            var ngayHienTai = me.NgaySXDucChuyen ?? DateOnly.FromDateTime(me.NgayNhanTL.Value);
+            var caHienTai = me.CaDucChuyen ?? me.CaTinhLuyen.Value;
+
+            DateOnly ngayMoi; int caMoi;
+            if (huong == "truoc")
+                (ngayMoi, caMoi) = caHienTai == 1
+                    ? (ngayHienTai.AddDays(-1), 2)
+                    : (ngayHienTai, 1);
+            else
+                (ngayMoi, caMoi) = caHienTai == 2
+                    ? (ngayHienTai.AddDays(1), 1)
+                    : (ngayHienTai, 2);
+
+            // Nếu phiếu đúc ca đích đã tồn tại và đã chốt (TinhTrang=5) thì không cho chuyển vào nữa
+            var phieuDich = await _repo.GetPhieuDucAsync(ngayMoi, caMoi, me.IdMayDucDich.Value);
+            if (phieuDich?.TinhTrang == 5)
+                throw new InvalidOperationException("Phiếu đúc ca đích đã chốt, không thể chuyển mẻ sang ca đó.");
+
+            // Kíp trực của ca đích — khác kíp TL đã nhận mẻ (KipTinhLuyen) vì đây là ca/ngày Đúc thực tế
+            var kipMoi = await _masterCtx.Tbl_Kip.AsNoTracking()
+                .Where(k => k.NgayLamViec == ngayMoi && k.TenCa == caMoi.ToString())
+                .Select(k => k.TenKip)
+                .FirstOrDefaultAsync();
+
+            var old = Snapshot(me);
+            me.NgaySXDucChuyen = ngayMoi;
+            me.CaDucChuyen = caMoi;
+            me.KipDucChuyen = kipMoi;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
+            me.CapNhatBoiTL = userId;
+
+            _repo.AddLichSu(new HRC1_LichSu
+            {
+                MeId = me.Id,
+                TaiKhoanId = userId,
+                HanhDong = "chuyen_ca_duc",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
+            });
+            await _repo.SaveChangesAsync();
+        }
+
+        public async Task HuyChuyenCaDucAsync(int meId, int userId)
+        {
+            var me = await _repo.GetMeByIdAsync(meId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy mẻ {meId}");
+
+            if (!me.NgaySXDucChuyen.HasValue && !me.CaDucChuyen.HasValue)
+                throw new InvalidOperationException("Mẻ này chưa được chuyển ca.");
+            if ((me.TrangThaiDuc ?? 0) >= 1)
+                throw new InvalidOperationException("Máy đúc đã xác nhận mẻ này, không thể hủy chuyển ca.");
+
+            var old = Snapshot(me);
+            me.NgaySXDucChuyen = null;
+            me.CaDucChuyen = null;
+            me.KipDucChuyen = null;
+            me.CapNhatBoi = userId;
+            me.CapNhatLuc = DateTime.Now;
+            me.CapNhatBoiTL = userId;
+
+            _repo.AddLichSu(new HRC1_LichSu
+            {
+                MeId = me.Id,
+                TaiKhoanId = userId,
+                HanhDong = "huy_chuyen_ca_duc",
+                DuLieuCu = old,
+                DuLieuMoi = Snapshot(me),
+                Luc = DateTime.Now
+            });
             await _repo.SaveChangesAsync();
         }
 
@@ -608,7 +733,9 @@ namespace dataproduct.api.Services
             me.KlLan2 = P("klLan2") ? req.KlLan2 : me.KlLan2;
             me.KlLan3 = P("klLan3") ? req.KlLan3 : me.KlLan3;
             me.KlThepLong = P("klThepLong") ? req.KlThepLong : me.KlThepLong;
+            var oldIdMayDucDich = me.IdMayDucDich;
             me.IdMayDucDich = P("idMayDucDich") ? req.IdMayDucDich : me.IdMayDucDich;
+            await EnsureMayDucChuaKhoaAsync(oldIdMayDucDich, me.IdMayDucDich);
             me.PhanLoai = P("phanLoai") ? req.PhanLoai : me.PhanLoai;
             me.MacThep = P("macThep") ? req.MacThep : me.MacThep;
             me.MacThepBKMIS = P("macThepBKMIS") ? req.MacThepBKMIS : me.MacThepBKMIS;
@@ -636,6 +763,11 @@ namespace dataproduct.api.Services
                 Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
+
+            // Đồng bộ MacThep/KlThepLong mới nhất sang dòng Tiêu hao LF liên kết (Ngày/Ca giữ theo
+            // đúng công đoạn tinh luyện — NgayNhanTL/CaTinhLuyen, không phải Ca đúc đã chuyển).
+            if (me.NgayNhanTL.HasValue && me.CaTinhLuyen.HasValue)
+                await _repo.UpsertLfTieuHaoFromMeAsync(me, pc.ScopePhieu, DateOnly.FromDateTime(me.NgayNhanTL.Value), me.CaTinhLuyen);
         }
 
         public async Task ThemDongAsync(HRC1_ThemDongTLRequest req, int userId)
@@ -706,6 +838,9 @@ namespace dataproduct.api.Services
             me.IsTrungMeThoi = null;   // mẻ này rời khỏi TL — không còn là bên trùng
                                        // if (me.DichChuyen == "tinh_luyen")
             me.IdMayDucDich = null;
+            me.NgaySXDucChuyen = null; // hủy nhận thì override routing đúc (nếu có) cũng không còn ý nghĩa
+            me.CaDucChuyen = null;
+            me.CapNhatBoi = userId;
             me.CapNhatLuc = DateTime.Now;
             me.CapNhatBoiTL = userId;
 
@@ -719,6 +854,10 @@ namespace dataproduct.api.Services
                 Luc = DateTime.Now
             });
             await _repo.SaveChangesAsync();
+
+            // Mẻ rời khỏi TL — xóa mềm dòng Tiêu hao LF liên kết vô điều kiện (kể cả đã sửa tay);
+            // nhận lại mẻ sẽ tự tạo lại dòng mới nên không cần giữ lại
+            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(me.Id, me.MaMe);
 
             // Recalc trùng cho các mẻ cùng MaMe còn lại (bao gồm cả len_thang)
             await RecalcTrungMeByMaMeAsync(me.MaMe);
@@ -1124,6 +1263,10 @@ namespace dataproduct.api.Services
             });
             await _repo.SaveChangesAsync();
 
+            // Liên kết sang Tiêu hao LF giống nhận mẻ bình thường
+            if (phieu.NgaySX.HasValue && phieu.Ca.HasValue)
+                await _repo.UpsertLfTieuHaoFromMeAsync(newMe, req.ScopePhieu, phieu.NgaySX, phieu.Ca);
+
             // Recalc IsTrungMeThoi cho tất cả mẻ có cùng MaMe (TL + len_thang)
             await RecalcTrungMeByMaMeAsync(source.MaMe);
             await _repo.SaveChangesAsync();
@@ -1152,6 +1295,9 @@ namespace dataproduct.api.Services
             _repo.RemoveMePhanCongs(allPcs);
             _repo.RemoveMeThep(me);
             await _repo.SaveChangesAsync();
+
+            // Xóa dòng Tiêu hao LF liên kết vô điều kiện (kể cả đã sửa tay)
+            await _repo.SoftDeleteLfTieuHaoByMeThoiAsync(me.Id, maMe);
 
             // Recalc trùng cho các mẻ cùng MaMe còn lại (bao gồm cả len_thang)
             await RecalcTrungMeByMaMeAsync(maMe);
@@ -1495,13 +1641,22 @@ namespace dataproduct.api.Services
                     var scopeSet = new HashSet<int>(activeScopes);
                     return mayDucs
                         .Where(md => scopeSet.Contains(md.Id))
-                        .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty })
+                        .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty, IsLock = md.IsLock == true })
                         .ToList();
                 }
             }
             return mayDucs
-                .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty })
+                .Select(md => new HRC1_MayDucOptionVm { Id = md.Id, TenMayDuc = md.TenMayDuc ?? string.Empty, IsLock = md.IsLock == true })
                 .ToList();
+        }
+
+        // Máy đúc đã khóa (IsLock) vẫn giữ trên mẻ cũ, nhưng không được chọn mới làm máy đúc đích.
+        private async Task EnsureMayDucChuaKhoaAsync(int? oldId, int? newId)
+        {
+            if (!newId.HasValue || newId == oldId) return;
+            var md = (await _repo.GetMayDucsHRC1Async()).FirstOrDefault(m => m.Id == newId.Value);
+            if (md?.IsLock == true)
+                throw new InvalidOperationException($"Máy đúc {md.TenMayDuc} đã ngừng sử dụng, không thể chọn.");
         }
 
         // -------------------------------------------------------
@@ -1586,6 +1741,9 @@ namespace dataproduct.api.Services
                 ChuyenVeMeId = pc.ChuyenVeMeId,
                 ChuyenVeMaMe = chuyenVeMaMe,
                 TenMayDucChuyen = tenMayDucChuyen,
+                IsChuyenCaDuc = m.CaDucChuyen.HasValue || m.NgaySXDucChuyen.HasValue,
+                NgayDuc = m.NgaySXDucChuyen ?? (m.NgayNhanTL.HasValue ? DateOnly.FromDateTime(m.NgayNhanTL.Value) : null),
+                CaDuc = m.CaDucChuyen ?? m.CaTinhLuyen,
             };
         }
 
@@ -2040,9 +2198,10 @@ namespace dataproduct.api.Services
             int row = DATA_START, stt = 1;
             foreach (var item in data)
             {
-                // Ngày đúc hiệu lực (TL: NgayNhanTL; lên thẳng: NgayTao)
-                var ngayDucHieuLuc = item.NgayNhanTL.HasValue
-                    ? item.NgayNhanTL.Value.ToString("dd/MM/yyyy")
+                // Ngày đúc hiệu lực — ưu tiên NgaySXDucChuyen (đã bấm "Chuyển ca"), rồi mới đến
+                // mặc định TL: NgayNhanTL; lên thẳng: NgayTao (đã tính sẵn trong item.NgayDuc).
+                var ngayDucHieuLuc = item.NgayDuc.HasValue
+                    ? item.NgayDuc.Value.ToString("dd/MM/yyyy")
                     : item.NgayTao.ToString("dd/MM/yyyy");
                 var caDucHieuLuc = FmtCa(item.CaDuc ?? item.CaTinhLuyen ?? item.Ca);
                 var kipDuc = item.KipTinhLuyen ?? item.Kip ?? "";
@@ -2146,8 +2305,8 @@ namespace dataproduct.api.Services
             var ngay = phieu.NgaySX.Value;
 
             string tuGio, denGio, tuNgay, denNgay;
-            if (ca == 1) { tuGio = "08:00"; denGio = "20:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = tuNgay; }
-            else { tuGio = "20:00"; denGio = "08:00"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
+            if (ca == 1) { tuGio = "08"; denGio = "20"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = tuNgay; }
+            else { tuGio = "20"; denGio = "08"; tuNgay = ngay.ToString("dd/MM/yyyy"); denNgay = ngay.AddDays(1).ToString("dd/MM/yyyy"); }
 
             var phieuData = await GetPhieuAsync(phieuId);
             var rows = phieuData.DanhSachMe
@@ -2212,7 +2371,7 @@ namespace dataproduct.api.Services
                     var chucVu = System.Net.WebUtility.HtmlEncode(u.ViTri?.TenViTri ?? "");
                     var info = $"Ông/bà: <strong>{name}</strong>";
                     if (!string.IsNullOrEmpty(chucVu))
-                        info += $" - Chức vụ: <strong>{chucVu}</strong>";
+                        info += $"&nbsp;&nbsp;&nbsp;&nbsp;Chức vụ: <strong>{chucVu}</strong>";
                     lines.Add(info);
                 }
                 return string.Join("<br/>", lines);
@@ -2246,10 +2405,11 @@ namespace dataproduct.api.Services
             var templatePath = Path.Combine(_env.WebRootPath, "template_html", "HRC1_BBGN_ThepLong.html");
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
             var html = await File.ReadAllTextAsync(templatePath);
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("HRC1_BBGN_ThepLong");
 
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
-                .Replace("{{BmCode}}", "BM.16/QT.05.10<br/>Ngày hiệu lực: 01/09/2023")
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{Kip}}", kip)
                 .Replace("{{TuGio}}", tuGio)
                 .Replace("{{TuNgay}}", tuNgay)

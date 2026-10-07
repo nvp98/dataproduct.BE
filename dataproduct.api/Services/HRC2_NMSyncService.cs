@@ -296,7 +296,7 @@ namespace dataproduct.api.Services
             }
 
             // 1) Sync dữ liệu mới nhất từ NM về DB hiện tại
-            await SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
+            // await SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, request.LoaiBM, request.Scope);
 
             // 2) Bổ sung GangLong metrics (DB khác) khi cần
             await EnsureGangLongMetricsAsync(request);

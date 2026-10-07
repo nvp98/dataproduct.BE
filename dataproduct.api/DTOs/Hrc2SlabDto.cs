@@ -4,6 +4,8 @@ namespace dataproduct.api.DTOs
     {
         public string? TuNgay { get; set; }
         public string? DenNgay { get; set; }
+        public string? TuNgayXL { get; set; }
+        public string? DenNgayXL { get; set; }
         public string? CaSanXuat { get; set; }
         public string? Kip { get; set; }
         public int? MayDuc { get; set; }
@@ -14,6 +16,8 @@ namespace dataproduct.api.DTOs
         public bool? IsTrungIDSlab { get; set; }
         public bool? IsDiffMacThep { get; set; }
         public bool? IsSaiLotName { get; set; }
+        // true = chỉ lấy slab đã sửa tay KL (KhoiLuong_Manual != null)
+        public bool? IsSuaKL { get; set; }
         public int? TrangThaiKCS { get; set; }
         public int? TrangThaiDuc { get; set; }
         public int? TrangThaiKho { get; set; }
@@ -37,7 +41,16 @@ namespace dataproduct.api.DTOs
         public decimal? ChieuDay { get; set; }
         public decimal? ChieuRong { get; set; }
         public decimal? ChieuDai { get; set; }
+        // KL hiệu lực = KhoiLuong_Manual ?? KhoiLuong gốc — mọi chỗ cộng tổng/hiển thị dùng field này
         public decimal? KhoiLuong { get; set; }
+        // KL gốc từ nhà máy (BKMIS), để so sánh với KL sửa tay
+        public decimal? KhoiLuongGoc { get; set; }
+        // KL KCS sửa tay (null = chưa sửa)
+        public decimal? KhoiLuongManual { get; set; }
+        public string? LyDoSua { get; set; }
+        public string? SoBBSV { get; set; }
+        public string? NguoiSuaKL { get; set; }
+        public DateTime? ThoiDiemSuaKL { get; set; }
         public decimal? KhoiLuongTinhToan { get; set; }
         public string? ChatLuongTPHH { get; set; }
         public string? ThongTinPhoi { get; set; }
@@ -68,11 +81,15 @@ namespace dataproduct.api.DTOs
         public int TrangThaiDuc { get; set; }
         public int TrangThaiKho { get; set; }
         public int TrangThaiPKH { get; set; }
+        // Thời điểm FE bắt được lúc người dùng xác nhận chuyển lên BBSL (khác NgayChuyenKCS — giờ server ghi nhận)
+        public DateTime? ThoiDiemThaoTac { get; set; }
         // Người xử lý từng bước (HoVaTen, resolve từ NguoiChuyenKCS/NguoiXacNhanDuc/NguoiXacNhanKho/NguoiChotPKH)
         public string? NguoiChuyenBBSL { get; set; }
         public string? NguoiXacNhanDuc { get; set; }
         public string? NguoiXacNhanKho { get; set; }
         public string? NguoiXacNhanPKH { get; set; }
+        // Đánh dấu "đã check" của RIÊNG user đang đăng nhập (BkHrc2Slab_UserCheck) — độc lập với workflow xác nhận.
+        public bool DaCheck { get; set; }
     }
 
     public class Hrc2SlabTongHopItem
@@ -122,6 +139,30 @@ namespace dataproduct.api.DTOs
         public List<int> IdSlabs { get; set; } = [];
         public Guid IdPhieu { get; set; }
         public int NguoiThucHien { get; set; }
+        // Thời điểm FE bắt được lúc người dùng bấm xác nhận trong popup chọn phiếu (không phải giờ server nhận request)
+        public DateTime? ThoiDiemThaoTac { get; set; }
+    }
+
+    public class Hrc2SlabCheckRequest
+    {
+        public List<int> IdSlabs { get; set; } = [];
+        public int NguoiThucHien { get; set; }
+    }
+
+    public class Hrc2SuaKhoiLuongRequest
+    {
+        public int IdSlab { get; set; }
+        public decimal? KhoiLuong { get; set; }
+        public string? LyDoSua { get; set; }
+        public string? SoBBSV { get; set; }
+        public int NguoiThucHien { get; set; }
+    }
+
+    public class Hrc2SuaKhoiLuongResult
+    {
+        // true = KL nhập bằng KL gốc → đã khôi phục về KL nhà máy (KhoiLuong_Manual = null)
+        public bool IsReset { get; set; }
+        public string Message { get; set; } = "";
     }
 
 }

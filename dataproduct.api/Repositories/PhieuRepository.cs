@@ -5,6 +5,7 @@ using dataproduct.api.Models.MasterData;
 using dataproduct.api.Repositories.PhieuSearchFilters;
 using dataproduct.api.ResponseModels;
 using dataproduct.api.Services;
+using dataproduct.api.Services.PhieuEnrichers;
 using dataproduct.api.Utils;
 using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.AspNetCore.Mvc;
@@ -21,19 +22,22 @@ namespace dataproduct.api.Repositories
         private readonly IPheDuyetRepository _pheDuyetRepo;
         private readonly ProductDataMasterDbContext _mastercontext;
         private readonly IEnumerable<IPhieuSearchFilterProvider> _searchFilterProviders;
+        private readonly Dictionary<string, IPhieuTinhTrangFilterEnricher> _tinhTrangFilterMap;
 
         public PhieuRepository(
             ProductFormContext context,
             PheDuyetService pdservice,
             IPheDuyetRepository pheDuyetRepo,
             ProductDataMasterDbContext mastercontext,
-            IEnumerable<IPhieuSearchFilterProvider> searchFilterProviders)
+            IEnumerable<IPhieuSearchFilterProvider> searchFilterProviders,
+            IEnumerable<IPhieuTinhTrangFilterEnricher> tinhTrangFilterEnrichers)
         {
             _context = context;
             _pdservice = pdservice;
             _pheDuyetRepo = pheDuyetRepo;
             _mastercontext = mastercontext;
             _searchFilterProviders = searchFilterProviders;
+            _tinhTrangFilterMap = tinhTrangFilterEnrichers.ToDictionary(e => e.MaBm);
         }
 
         public async Task<IEnumerable<BmPhieu>> GetAllAsync(string? MaBM, int? NguoiTaoID)
@@ -493,7 +497,7 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.SoPhieu.Contains(request.searchText));
 
             if (request.TinhTrang.HasValue)
-                query = query.Where(x => x.TinhTrang == request.TinhTrang.Value);
+                query = await ApplyTinhTrangFilterAsync(query, request.TinhTrang.Value);
 
             query = query.OrderByDescending(x => x.NgaySX).ThenByDescending(x => x.Ca);
             // ===== BƯỚC 5: Paging + Assemble (giống hàm cũ) =====
@@ -538,6 +542,35 @@ namespace dataproduct.api.Repositories
             }
 
             return (result, totalCount);
+        }
+
+        /// <summary>
+        /// Lọc TinhTrang cho SearchWithPagingByUserAsync. Với MaBm có trạng thái tổng hợp tính
+        /// runtime (VD HRC1_BBSL_PhoiTam/HRC2_BBSL_PhoiTam — xem IPhieuTinhTrangFilterEnricher),
+        /// cột BM_Phieu.TinhTrang thật không bao giờ chứa giá trị tổng hợp (11/12) nên không thể
+        /// so sánh trực tiếp; phải lấy các phiếu ứng viên của MaBm đó ra rồi nhờ enricher tương
+        /// ứng tính lại (batch) xem phiếu nào khớp, trước khi áp Skip/Take.
+        /// </summary>
+        private async Task<IQueryable<BmPhieu>> ApplyTinhTrangFilterAsync(IQueryable<BmPhieu> query, int tinhTrang)
+        {
+            if (_tinhTrangFilterMap.Count == 0)
+                return query.Where(x => x.TinhTrang == tinhTrang);
+
+            var specialMaBms = _tinhTrangFilterMap.Keys.ToList();
+            var specialCandidates = await query
+                .Where(x => x.MaBm != null && specialMaBms.Contains(x.MaBm))
+                .ToListAsync();
+
+            var matchedIds = new List<Guid>();
+            foreach (var group in specialCandidates.GroupBy(x => x.MaBm!))
+            {
+                if (_tinhTrangFilterMap.TryGetValue(group.Key, out var enricher))
+                    matchedIds.AddRange(await enricher.FilterByTinhTrangAsync(group.ToList(), tinhTrang));
+            }
+
+            return query.Where(x =>
+                (x.MaBm != null && specialMaBms.Contains(x.MaBm) && matchedIds.Contains(x.Idphieu))
+                || (!(x.MaBm != null && specialMaBms.Contains(x.MaBm)) && x.TinhTrang == tinhTrang));
         }
 
         public async Task<IEnumerable<Tbl_LoCao>> GetAllLoCaoAsync()

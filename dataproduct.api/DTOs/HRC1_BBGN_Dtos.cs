@@ -102,6 +102,15 @@ namespace dataproduct.api.DTOs
     }
 
     // -------------------------------------------------------
+    // Tinh luyện — chuyển routing mẻ sang phiếu Đúc ca trước/sau (không đổi Ca của chính TL)
+    // -------------------------------------------------------
+    public class HRC1_ChuyenCaDucRequest
+    {
+        public int MeId { get; set; }
+        public string Huong { get; set; } = "sau";  // "truoc" | "sau"
+    }
+
+    // -------------------------------------------------------
     // Máy đúc — xác nhận theo danh sách MeId
     // -------------------------------------------------------
     public class HRC1_DucXacNhanRequest

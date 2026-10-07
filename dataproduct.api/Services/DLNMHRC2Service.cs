@@ -32,6 +32,22 @@ namespace dataproduct.api.Services
             _lastSyncTimes[key] = now;
             return true;
         }
+
+        // Debounce riêng cho STD_NXT: sync này gộp toàn bộ BOF/LF/RH + mọi Scope cho 1 Ngày/Ca
+        // (nặng hơn sync theo từng BM/Scope) nên dùng cooldown dài hơn: tối đa 1 lần / 5 phút.
+        private static readonly ConcurrentDictionary<string, DateTime> _lastStdNxtSyncTimes = new();
+        private static readonly TimeSpan StdNxtSyncCooldown = TimeSpan.FromMinutes(5);
+
+        private static bool ShouldSyncStdNxt(DateTime ngaySX, int ca)
+        {
+            var key = $"{ngaySX:yyyy-MM-dd}_{ca}";
+            var now = DateTime.UtcNow;
+            if (_lastStdNxtSyncTimes.TryGetValue(key, out var last) && now - last < StdNxtSyncCooldown)
+                return false;
+            _lastStdNxtSyncTimes[key] = now;
+            return true;
+        }
+
         public DLNMHRC2Service(
             IDLNMHRC2Repository repo,
             HRC2_NMSyncService hrc2NMSyncService,
@@ -165,8 +181,19 @@ namespace dataproduct.api.Services
                     var nmKlThepPhe = TryGetDouble(row, "klThepPhe");
                     var nmGhiChu = row.TryGetProperty("ghiChu", out var nmGcProp) && nmGcProp.ValueKind == JsonValueKind.String
                         ? nmGcProp.GetString() : null;
+                    var nmMacThep = row.TryGetProperty("macThep", out var mct) ? mct.GetString() : null;
 
-                    if (!phuLieus.Any() && nmKlThepPhe == null && nmGhiChu == null) continue;
+                    // macThep__IsManual do FE tự set (CustomTableHRC.applyAndEmitCellChange) mỗi khi user
+                    // sửa ô macThep trên dòng NM — true/false = so sánh thật với baseline, không có nghĩa
+                    // là "chưa từng sửa". Field vắng mặt hoàn toàn (null) mới là "FE không gửi thông tin gì"
+                    // (BM chưa bật allowEditMacThepOnNMRow, hoặc FE cũ) → không đụng override đã lưu.
+                    bool? isManualMacThep = row.TryGetProperty("macThep__IsManual", out var macThepFlagProp)
+                        ? macThepFlagProp.ValueKind == JsonValueKind.True
+                        : (bool?)null;
+
+                    // nmMacThep hầu như luôn có giá trị (map sẵn từ NM) nên điều kiện này gần như
+                    // không bao giờ skip trong thực tế — chỉ để không âm thầm bỏ mất 1 dòng có sửa tay.
+                    if (!phuLieus.Any() && nmKlThepPhe == null && nmGhiChu == null && nmMacThep == null) continue;
 
                     result.Add(new HRC2InsertModel
                     {
@@ -176,7 +203,8 @@ namespace dataproduct.api.Services
                         BieuMau = loaiBM,
                         Scope = scope,
                         MeThoi = meThoi,
-                        MacThep = row.TryGetProperty("macThep", out var mct) ? mct.GetString() : null,
+                        MacThep = nmMacThep,
+                        IsManualMacThep = isManualMacThep,
                         IsNM = true,
                         IsChuyenCa = false,
                         KLThepPhe = nmKlThepPhe,
@@ -465,14 +493,34 @@ namespace dataproduct.api.Services
                     ? existingDLNMs.FirstOrDefault(x => x.ID == model.Id)
                     : null;
 
-                // IsNM=true: chỉ cho phép sửa KLThepPhe và GhiChu, không sửa các field NM khác
+                // IsNM=true: chỉ cho phép sửa KLThepPhe, GhiChu và MacThep (qua override), không sửa
+                // các field NM khác.
+                // MacThep: FE (TaoPhieuLF/TaoPhieuBOF, allowEditMacThepOnNMRow) cho sửa tay trên dòng
+                // NM. KHÔNG ghi đè thẳng existing.MacThep (đó là giá trị GỐC đồng bộ từ NM, cần giữ để
+                // so sánh/audit) — lưu riêng vào MacThep_Manual + IsManualMacThep, mirror pattern
+                // KLPhuGia/KLPhuGia_Manual/IsManual của PhuLieu_HRC2. Các chỗ đọc để hiển thị
+                // (PhieuDetailExcelService export Excel/PDF, DLNMHRC2Repository search-thongke) đọc
+                // giá trị hiệu lực = MacThep_Manual ?? MacThep.
                 if (existing?.IsNM == true)
                 {
                     if (model.KLThepPhe.HasValue)
                         existing.KLThepPhe = model.KLThepPhe;
                     if (model.GhiChu != null)
                         existing.GhiChu = model.GhiChu;
-                    if (model.KLThepPhe.HasValue || model.GhiChu != null)
+                    if (model.IsManualMacThep == true)
+                    {
+                        existing.MacThep_Manual = model.MacThep;
+                        existing.IsManualMacThep = true;
+                    }
+                    else if (model.IsManualMacThep == false)
+                    {
+                        // User sửa lại đúng bằng giá trị gốc → bỏ override, không còn lệch gốc/sửa.
+                        existing.MacThep_Manual = null;
+                        existing.IsManualMacThep = false;
+                    }
+                    // model.IsManualMacThep == null: FE không gửi flag (BM chưa bật sửa macThep, hoặc
+                    // FE cũ) → giữ nguyên override đã lưu trước đó, không đụng vào.
+                    if (model.KLThepPhe.HasValue || model.GhiChu != null || model.IsManualMacThep.HasValue)
                         _context.DLNM_HRC2s.Update(existing);
                     dlnmMap[model.RowKey] = existing;
                     continue;
@@ -892,6 +940,19 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
+        /// Force sync NM cho Sổ Xuất-Nhập-Tồn (STD_NXT), bỏ qua cooldown. Dùng cho nút
+        /// "Đồng bộ lại từ NM" riêng ở FE — khác với "Làm mới" (chỉ đọc DB, xem FilterSTD_NXTAsync).
+        /// </summary>
+        public async Task ForceSyncStdNxtAsync(FilterSTD_NXTRequest request)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            // Reset cooldown để FilterSTD_NXTAsync gọi tiếp theo (nếu rỗng) cũng không bị chặn
+            var key = $"{request.NgaySX:yyyy-MM-dd}_{request.Ca}";
+            _lastStdNxtSyncTimes[key] = DateTime.MinValue;
+            await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
+        }
+
+        /// <summary>
         /// Làm mới KLGangLongCCT và KLThepPheGang cho các phiếu BOF được chọn.
         /// Từ idPhieu → tìm slot (Ngay/Ca/Scope) → load DLNM_HRC2 rows → gọi RefreshGangMetricsForRowsAsync.
         /// </summary>
@@ -1051,10 +1112,22 @@ namespace dataproduct.api.Services
 
         public async Task<IEnumerable<FilterSTD_NXTResponse>> FilterSTD_NXTAsync(FilterSTD_NXTRequest request)
         {
-            // Sync dữ liệu HRC2 mới nhất từ NM về DB hiện tại trước khi group/sum
-            // LoaiBM/Scope = null: gộp toàn bộ BOF/LF/RH + mọi Scope cho đúng Ngày/Ca này
-            await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
+            // Không còn sync NM ngay từ đầu (nặng, làm nút "Làm mới" chậm mỗi lần bấm).
+            // Dữ liệu bình thường được giữ tươi bởi job đồng bộ chạy định kỳ ngoài app
+            // (xem sp_Sync_HRC2_FromNM_Now trong hrc2_syncTieuHao_now.sql) — ở đây chỉ đọc thẳng DB.
             var result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
+
+            // Fallback: chỉ khi DB hoàn toàn chưa có dữ liệu cho đúng Ngày/Ca này (job chưa từng
+            // chạm tới slot này — job downtime, NM trễ, hoặc slot quá cũ từ trước khi bật job) mới
+            // đồng bộ trực tiếp từ NM (nặng) rồi đọc lại — trường hợp hiếm nên chấp nhận chậm 1 lần.
+            // Vẫn debounce (5 phút/lần cho cùng Ngày/Ca) để tránh spam SP nếu slot thực sự không có
+            // dữ liệu (vd chọn nhầm ngày tương lai) hoặc nhiều tab cùng bấm "Làm mới" một lúc.
+            if (result.Count == 0 && ShouldSyncStdNxt(request.NgaySX, request.Ca))
+            {
+                await _hrc2NMSyncService.SyncFromNmStoredProcAsync(request.NgaySX, request.Ca, null, null);
+                result = (await _repo.GetHRC2GroupedByMaterialAsync(request.NgaySX, request.Ca)).ToList();
+            }
+
             if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
             {
                 // Ưu tiên dùng danh sách HeaderKeyIds từ FE (phản ánh đúng bảng đang hiển thị, kể cả dòng mới chưa lưu)
