@@ -54,8 +54,13 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC2_NM> HRC2_NMs { get; set; }
     public virtual DbSet<PhuLieu_NM> PhuLieu_NMs { get; set; }
     public virtual DbSet<PhuLieu_HRC2> PhuLieu_HRC2s { get; set; }
+    public virtual DbSet<Hrc1TieuHao> Hrc1TieuHaos { get; set; }
+    public virtual DbSet<Hrc1PhuLieu> Hrc1PhuLieus { get; set; }
+    public virtual DbSet<Hrc1PhuLieuNm> Hrc1PhuLieuNms { get; set; }
     public virtual DbSet<STD_XUAT_NHAP_TON_HRC2> STD_XUAT_NHAP_TON_HRC2s { get; set; }
     public virtual DbSet<STD_NXT_TOTAL_HRC2> STD_NXT_TOTAL_HRC2s { get; set; }
+    public virtual DbSet<STD_XUAT_NHAP_TON_HRC1> STD_XUAT_NHAP_TON_HRC1s { get; set; }
+    public virtual DbSet<STD_NXT_TOTAL_HRC1> STD_NXT_TOTAL_HRC1s { get; set; }
     public virtual DbSet<STD_NXT_Filter> STD_NXT_Filters { get; set; }
     public virtual DbSet<STD_NXT_Filter_Init> STD_NXT_Filter_Inits { get; set; }
 
@@ -73,12 +78,14 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<MacThep> MacTheps { get; set; }
     public virtual DbSet<MayDuc> MayDucs { get; set; }
     public virtual DbSet<MacThep_MayDuc> MacThep_MayDucs { get; set; }
-    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps { get; set; }
+    public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps {get; set;}
+    public virtual DbSet<DonTrongPhoi> DonTrongPhois { get; set; }
 
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
     public virtual DbSet<BkHrc2SlabTrangThai> BkHrc2SlabTrangThais { get; set; }
     public virtual DbSet<BkSyncHrc2SlabControl> BkSyncHrc2SlabControls { get; set; }
+    public virtual DbSet<BkHrc2Slab_UserCheck> BkHrc2Slab_UserChecks { get; set; }
 
     // HRC1
     public virtual DbSet<HRC1_MeThep> HRC1_MeTheps { get; set; }
@@ -88,6 +95,7 @@ public partial class ProductFormContext : DbContext
     // HRC1 Slab
     public virtual DbSet<Hrc1Slab> Hrc1Slabs { get; set; }
     public virtual DbSet<Hrc1SlabTrangThai> Hrc1SlabTrangThais { get; set; }
+    public virtual DbSet<Hrc1SlabEdit> Hrc1SlabEdits { get; set; }
     public virtual DbSet<MaVatTu> MaVatTus { get; set; }
     public virtual DbSet<Hrc1MaVatTu> Hrc1MaVatTus { get; set; }
     public virtual DbSet<Hrc1BbslTongHopGhiChu> Hrc1BbslTongHopGhiChus { get; set; }
@@ -377,6 +385,7 @@ public partial class ProductFormContext : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("MacThep");
             entity.Property(e => e.LenhSanXuat).HasMaxLength(50);
+            entity.Property(e => e.IdDonTrongPhoi).HasColumnName("ID_DonTrongPhoi");
         });
 
         modelBuilder.Entity<CtdStdDienBien>(entity =>
@@ -428,6 +437,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Scope).HasColumnName("Scope");
             entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
             entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.MacThep_Manual).HasColumnName("MacThep_Manual");
+            entity.Property(e => e.IsManualMacThep).HasColumnName("IsManualMacThep");
             entity.Property(e => e.O2).HasColumnName("O2");
             entity.Property(e => e.AR_RH).HasColumnName("AR_RH");
             entity.Property(e => e.N2).HasColumnName("N2");
@@ -526,6 +537,96 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.IsManual).HasColumnName("IsManual");
             entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual");
         });
+
+        modelBuilder.Entity<Hrc1TieuHao>(entity =>
+        {
+            entity.ToTable("HRC1_TieuHao", tb =>
+            {
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_SoftDelete");
+                tb.HasTrigger("trg_HRC1_TieuHao_ChiPhi_GangLong");
+            });
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.IDNM).HasColumnName("IDNM");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.MeThoi).HasColumnName("MeThoi");
+            entity.Property(e => e.MacThep).HasColumnName("MacThep");
+            entity.Property(e => e.MacThepOrig).HasColumnName("MacThepOrig");
+            entity.Property(e => e.MacThepIsManual).HasColumnName("MacThepIsManual");
+            entity.Property(e => e.O2).HasColumnName("O2");
+            entity.Property(e => e.N2).HasColumnName("N2");
+            entity.Property(e => e.AR).HasColumnName("AR");
+            entity.Property(e => e.IsChuyenCa).HasColumnName("IsChuyenCa");
+            entity.Property(e => e.CaChuyen).HasColumnName("CaChuyen");
+            entity.Property(e => e.IsTrungMeThoi).HasColumnName("IsTrungMeThoi");
+            entity.Property(e => e.QueLayMau).HasColumnName("QueLayMau");
+            entity.Property(e => e.QueDoNhiet).HasColumnName("QueDoNhiet");
+            entity.Property(e => e.GhiChu).HasColumnName("GhiChu");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NgayXoa).HasColumnName("NgayXoa");
+            entity.Property(e => e.NguoiXoa).HasColumnName("NguoiXoa");
+            entity.Property(e => e.ThoiDiemKetThuc).HasColumnName("ThoiDiemKetThuc");
+            entity.Property(e => e.KLGang).HasColumnName("KLGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLGangLongCCT).HasColumnName("KLGangLongCCT").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPhe).HasColumnName("KLThepPhe").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheOrig).HasColumnName("KLThepPheOrig").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepPheIsManual).HasColumnName("KLThepPheIsManual");
+            entity.Property(e => e.KLThepPheGang).HasColumnName("KLThepPheGang").HasPrecision(18, 3);
+            entity.Property(e => e.KLThepLong).HasColumnName("KLThepLong").HasPrecision(18, 3);
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
+            entity.Property(e => e.ThoiDiemBatDau).HasColumnName("ThoiDiemBatDau");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+            entity.Property(e => e.IDPhieu).HasColumnName("IDPhieu");
+            entity.Property(e => e.SourceIDNM).HasColumnName("SourceIDNM");
+            entity.Property(e => e.IDMeThep).HasColumnName("IDMeThep");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieu>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieu", tb => tb.HasTrigger("trg_HRC1_PhuLieu_ChiPhi"));
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.MeID).HasColumnName("MeID");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.KLPhuGia).HasColumnName("KLPhuGia").HasPrecision(18, 3);
+            entity.Property(e => e.KLPhanBo).HasColumnName("KLPhanBo").HasPrecision(18, 3);
+            entity.Property(e => e.ID_HeaderKey).HasColumnName("ID_HeaderKey");
+            entity.Property(e => e.IsManual).HasColumnName("IsManual");
+            entity.Property(e => e.KLPhuGia_Manual).HasColumnName("KLPhuGia_Manual").HasPrecision(18, 3);
+            entity.Property(e => e.IsAddManual).HasColumnName("IsAddManual");
+            entity.Property(e => e.IsPhanBo).HasColumnName("IsPhanBo");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsEdited).HasColumnName("IsEdited");
+            entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NgayCapNhat).HasColumnName("NgayCapNhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("NguoiCapNhat");
+        });
+
+        modelBuilder.Entity<Hrc1PhuLieuNm>(entity =>
+        {
+            entity.ToTable("HRC1_PhuLieuNM");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.ID).HasColumnName("ID");
+            entity.Property(e => e.TenPhuLieu).HasColumnName("TenPhuLieu");
+            entity.Property(e => e.TenPhuLieuNM).HasColumnName("TenPhuLieuNM");
+            entity.Property(e => e.DangSuDung).HasColumnName("DangSuDung");
+            entity.Property(e => e.IsNM).HasColumnName("IsNM");
+            entity.Property(e => e.IsUsedNXT).HasColumnName("IsUsedNXT");
+            entity.Property(e => e.MaVatTuChiPhi).HasColumnName("MaVatTuChiPhi");
+            entity.Property(e => e.NgayTao).HasColumnName("NgayTao");
+            entity.Property(e => e.NguoiTao).HasColumnName("NguoiTao");
+        });
+
         modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC2>(entity =>
         {
             entity.ToTable("STD_XUAT_NHAP_TON_HRC2");
@@ -557,6 +658,43 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Ca).HasColumnName("Ca");
             entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
             entity.Property(e => e.Id_HeaderKey).HasColumnName("Id_HeaderKey");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
+            entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
+            entity.Property(e => e.TongTonCuoiCa).HasColumnName("TongTonCuoiCa");
+            entity.Property(e => e.TongSuDung).HasColumnName("TongSuDung");
+            entity.Property(e => e.TongSDTrenSoSach).HasColumnName("TongSDTrenSoSach");
+            entity.Property(e => e.ChenhLech).HasColumnName("ChenhLech");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.HasPhanBo).HasColumnName("HasPhanBo");
+        });
+        modelBuilder.Entity<STD_XUAT_NHAP_TON_HRC1>(entity =>
+        {
+            entity.ToTable("STD_XUAT_NHAP_TON_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.Scope).HasColumnName("Scope");
+            entity.Property(e => e.BieuMau).HasColumnName("BieuMau");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
+            entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
+            entity.Property(e => e.ViTri).HasColumnName("ViTri");
+            entity.Property(e => e.TonDauCa).HasColumnName("TonDauCa");
+            entity.Property(e => e.TuongQuanDauCa).HasColumnName("TuongQuanDauCa");
+            entity.Property(e => e.NhapVaoTrongCa).HasColumnName("NhapVaoTrongCa");
+            entity.Property(e => e.TonCuoiCa).HasColumnName("TonCuoiCa");
+            entity.Property(e => e.TuongQuanCuoiCa).HasColumnName("TuongQuanCuoiCa");
+            entity.Property(e => e.TongThucTe).HasColumnName("TongThucTe");
+            entity.Property(e => e.Id_Phieu).HasColumnName("Id_Phieu");
+            entity.Property(e => e.IDSilo).HasColumnName("IDSilo");
+        });
+        modelBuilder.Entity<STD_NXT_TOTAL_HRC1>(entity =>
+        {
+            entity.ToTable("STD_NXT_TOTAL_HRC1");
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.Ca).HasColumnName("Ca");
+            entity.Property(e => e.NgaySX).HasColumnName("NgaySX");
+            entity.Property(e => e.PhuLieuID).HasColumnName("PhuLieuID");
             entity.Property(e => e.TenNguyenLieu).HasColumnName("TenNguyenLieu");
             entity.Property(e => e.TongTonDauCa).HasColumnName("TongTonDauCa");
             entity.Property(e => e.TongTonNhapTrongCa).HasColumnName("TongTonNhapTrongCa");
@@ -732,10 +870,21 @@ public partial class ProductFormContext : DbContext
            entity.Property(e => e.TenNhom).HasColumnName("TenNhom");
        });
 
+        modelBuilder.Entity<DonTrongPhoi>(entity =>
+        {
+            entity.ToTable("DonTrongPhoi", tb => tb.HasTrigger("trg_DonTrongPhoi_Update"));
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MacPhoi).HasMaxLength(100);
+            entity.Property(e => e.DonTrong).HasColumnType("decimal(10,3)");
+            entity.Property(e => e.Mac).HasMaxLength(100);
+            entity.Property(e => e.KichThuoc).HasMaxLength(100);
+            entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
+        });
+
         // --- HRC1 ---
         modelBuilder.Entity<HRC1_MeThep>(entity =>
         {
-            entity.ToTable("HRC1_MeThep");
+            entity.ToTable("HRC1_MeThep", tb => tb.HasTrigger("trg_HRC1_MeThep_ChiPhi"));
             entity.Property(e => e.MaMe).HasMaxLength(30);
             entity.Property(e => e.ThungSo).HasMaxLength(20);
             entity.Property(e => e.ThoiGian).HasMaxLength(5);
@@ -787,6 +936,10 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<LG_PB_BienBanNhanQHLCCVH>(entity =>
         {
             entity.Property(e => e.KhoiLuongNhanVe).HasPrecision(18, 3);
+            // Bảng có trigger DB — EF Core mặc định dùng OUTPUT clause để lấy giá trị sinh tự động,
+            // nhưng SQL Server không cho phép OUTPUT trực tiếp trên bảng có trigger. Tắt để dùng
+            // câu SELECT bù thay vì OUTPUT, tránh lỗi "target table has database triggers".
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<TKVV_SanLuongDuLieu>(entity =>
         {
@@ -858,10 +1011,12 @@ public partial class ProductFormContext : DbContext
         modelBuilder.Entity<LG_PB_TyLePhanBo>(entity =>
         {
             entity.Property(e => e.TyLe).HasPrecision(9, 6);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<LG_PB_TyLeNhom>(entity =>
         {
             entity.Property(e => e.TyLe).HasPrecision(9, 6);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<LG_PB_KetQuaPhanBo>(entity =>
         {
@@ -869,10 +1024,13 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TyLePhanBo).HasPrecision(9, 6);
             entity.Property(e => e.KhoiLuongPhanBo).HasPrecision(18, 3);
             entity.Property(e => e.KhoiLuongChotCuoi).HasPrecision(18, 3);
+            entity.ToTable(tb => tb.UseSqlOutputClause(false));
         });
         modelBuilder.Entity<BkHrc2Slab>(entity =>
         {
-            entity.ToTable("BK_HRC2_Slab");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_BkHrc2Slab_SanLuong) —
+            // báo cho EF Core biết bảng có trigger để KHÔNG dùng OUTPUT clause khi INSERT/UPDATE.
+            entity.ToTable("BK_HRC2_Slab", tb => tb.HasTrigger("trg_BkHrc2Slab_SanLuong"));
 
             entity.Property(e => e.BkmisId).HasColumnName("BkmisID");
             entity.Property(e => e.NgaySanXuat).HasColumnName("NgaySanXuat");
@@ -898,9 +1056,17 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.ChieuDay).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ChieuRong).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ChieuDai).HasColumnType("decimal(18, 2)");
-            entity.Property(e => e.KhoiLuong).HasColumnType("decimal(18, 2)");
+            // KhoiLuong + KhoiLuong_Manual cùng decimal(18,3) để so sánh "sửa về bằng KL gốc = reset" chính xác 3 số lẻ
+            // (xem .claude/migrations/hrc2_slab_khoiluong_manual.sql).
+            entity.Property(e => e.KhoiLuong).HasColumnType("decimal(18, 3)");
+            entity.Property(e => e.KhoiLuong_Manual).HasColumnName("KhoiLuong_Manual").HasColumnType("decimal(18, 3)");
+            entity.Property(e => e.LyDoSua).HasMaxLength(500);
+            entity.Property(e => e.SoBBSV).HasColumnName("SoBBSV").HasMaxLength(50);
+            entity.Property(e => e.NguoiSuaKL).HasColumnName("NguoiSuaKL");
+            entity.Property(e => e.ThoiDiemSuaKL).HasColumnName("ThoiDiemSuaKL").HasColumnType("datetime");
             entity.Property(e => e.KhoiLuongTinhToan).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.NgayTao).HasColumnType("datetime");
+            entity.Property(e => e.ThoiDiemThaoTac).HasColumnType("datetime");
             entity.Property(e => e.IsChot).HasDefaultValue(false);
             entity.Property(e => e.MayDuc).HasColumnName("MayDuc");
             entity.Property(e => e.IsTrungIDSlab).HasColumnName("IsTrungIDSlab");
@@ -916,7 +1082,8 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<BkHrc2SlabTrangThai>(entity =>
         {
-            entity.ToTable("BK_HRC2_Slab_TrangThai");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_BkHrc2SlabTrangThai_SanLuong).
+            entity.ToTable("BK_HRC2_Slab_TrangThai", tb => tb.HasTrigger("trg_BkHrc2SlabTrangThai_SanLuong"));
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.NgayChuyenKCS).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanDuc).HasColumnType("datetime");
@@ -939,10 +1106,19 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KetThucLuc).HasColumnType("datetime");
         });
 
+        // Marker "đã check" độc lập theo user — không FK, chỉ liên kết theo quy ước tên cột.
+        modelBuilder.Entity<BkHrc2Slab_UserCheck>(entity =>
+        {
+            entity.ToTable("BK_HRC2_Slab_UserCheck");
+            entity.HasKey(e => new { e.IdUser, e.IdSlab });
+            entity.Property(e => e.NgayCheck).HasColumnType("datetime2(0)").HasDefaultValueSql("SYSDATETIME()");
+        });
+
         // --- HRC1 Slab ---
         modelBuilder.Entity<Hrc1Slab>(entity =>
         {
-            entity.ToTable("HRC1_Slab");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_Hrc1Slab_SanLuong).
+            entity.ToTable("HRC1_Slab", tb => tb.HasTrigger("trg_Hrc1Slab_SanLuong"));
             entity.Property(e => e.IDSlab).HasColumnName("IDSlab").HasMaxLength(50).IsRequired();
             entity.Property(e => e.IDPiece).HasColumnName("IDPiece").HasMaxLength(50);
             entity.Property(e => e.MaMe).HasMaxLength(50);
@@ -962,6 +1138,8 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
             entity.Property(e => e.GhiChu).HasMaxLength(500);
             entity.Property(e => e.MaVatTu).HasMaxLength(100);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.NgayXoa).HasColumnType("datetime");
 
         });
 
@@ -1012,7 +1190,8 @@ public partial class ProductFormContext : DbContext
 
         modelBuilder.Entity<Hrc1SlabTrangThai>(entity =>
         {
-            entity.ToTable("HRC1_Slab_TrangThai");
+            // HasTrigger: xem .claude/migrations/sanluong_phoitam_dq1_dq2.sql (trg_Hrc1SlabTrangThai_SanLuong_ChuyenCa).
+            entity.ToTable("HRC1_Slab_TrangThai", tb => tb.HasTrigger("trg_Hrc1SlabTrangThai_SanLuong_ChuyenCa"));
             entity.HasIndex(e => e.IdSlab).IsUnique();
             entity.Property(e => e.NgayTao).HasColumnType("datetime").HasDefaultValueSql("GETDATE()");
             entity.Property(e => e.NgayChuyen).HasColumnType("datetime");
@@ -1020,6 +1199,17 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NgayXacNhanCan).HasColumnType("datetime");
             entity.Property(e => e.NgayXacNhanC4).HasColumnType("datetime");
             entity.Property(e => e.NgayChotPKH).HasColumnType("datetime");
+        });
+
+        // Bảng phụ lưu IDSlab đã sửa tay — xem comment trên Hrc1SlabEdit.
+        modelBuilder.Entity<Hrc1SlabEdit>(entity =>
+        {
+            entity.ToTable("HRC1_Slab_Edit");
+            entity.HasIndex(e => e.IdSlab).IsUnique();
+            // Cột DB đặt tên IDSlabMoi (khác IdSlab) vì SQL Server mặc định collation không phân
+            // biệt hoa/thường — "IdSlab" và "IDSlab" bị coi là trùng tên cột (xem hrc1_slab_edit.sql).
+            entity.Property(e => e.IDSlab).HasColumnName("IDSlabMoi").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.NgayCapNhat).HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);

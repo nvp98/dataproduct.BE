@@ -56,7 +56,10 @@ namespace dataproduct.api.DTOs
         public int Scope { get; set; }
 
         public string MeThoi { get; set; }
+        /// <summary>Giá trị macThep hiện đang hiển thị trên dòng (gốc hoặc đã sửa tay — phân biệt qua IsManualMacThep).</summary>
         public string MacThep { get; set; }
+        /// <summary>null: FE không gửi flag (vd RH chưa bật allowEditMacThepOnNMRow) → không đụng tới override đã lưu. true/false: có gửi flag rõ ràng → set/xoá override tương ứng. Chỉ áp dụng cho dòng NM.</summary>
+        public bool? IsManualMacThep { get; set; }
 
         public double? O2 { get; set; }
         public double? AR_RH { get; set; }

@@ -60,7 +60,6 @@ namespace dataproduct.api.Services
             var maMesCoData = phanLoaiMap.Keys.ToList();
             var rows = await _context.BBGN_ThepLongs
                 .Where(x => maMesCoData.Contains(x.Me!)
-                         && (x.PhanLoai == null || x.MacThepBKMIS == null)
                          && x.BieuMau == request.BieuMau
                          && x.IsGhost != true)
                 .ToListAsync();

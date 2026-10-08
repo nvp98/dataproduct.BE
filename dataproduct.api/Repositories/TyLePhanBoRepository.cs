@@ -44,6 +44,15 @@ namespace dataproduct.api.Repositories
             return result;
         }
 
+        public async Task<Dictionary<int, decimal>> GetExactMapAsync(IEnumerable<int> idNvlList, DateTime ngay, byte ca)
+        {
+            var ids = idNvlList.ToList();
+            return await _context.LG_PB_TyLePhanBo
+                .Where(x => !x.IsDelete && ids.Contains(x.IDNVL) && x.Ngay == ngay.Date && x.Ca == ca)
+                .AsNoTracking()
+                .ToDictionaryAsync(x => x.IDNVL, x => x.TyLe);
+        }
+
         public async Task<LG_PB_TyLePhanBo> UpsertAsync(LG_PB_TyLePhanBo entity)
         {
             var existing = await _context.LG_PB_TyLePhanBo.FirstOrDefaultAsync(x =>

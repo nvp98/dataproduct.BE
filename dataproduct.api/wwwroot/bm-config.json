@@ -76,17 +76,27 @@
   },
   "HRC2_BB_NauLuyen_BOF": {
     "MaBM": "BM.08/QT.05.15",
-    "NgayHieuLuc": "10/01/2025",
-    "LanSuaDoi": "00"
+    "NgayHieuLuc": "05/07/2025",
+    "LanSuaDoi": "01"
   },
   "HRC2_BB_NauLuyen_LF": {
     "MaBM": "BM.14/QT.05.15",
-    "NgayHieuLuc": "10/01/2025",
-    "LanSuaDoi": "00"
+    "NgayHieuLuc": "15/08/2026",
+    "LanSuaDoi": "03"
   },
   "HRC2_BB_NauLuyen_RH": {
     "MaBM": "BM.16/QT.05.15",
-    "NgayHieuLuc": "10/01/2025",
+    "NgayHieuLuc": "15/08/2026",
+    "LanSuaDoi": "04"
+  },
+  "HRC2_BBSL_PhoiTam": {
+    "MaBM": "BM.36/QT.05.15",
+    "NgayHieuLuc": "10/10/2025",
+    "LanSuaDoi": "02"
+  },
+  "HRC1_BBSL_PhoiTam": {
+    "MaBM": "BM.30/QT.05.15",
+    "NgayHieuLuc": "10/11/2025",
     "LanSuaDoi": "00"
   }
 }

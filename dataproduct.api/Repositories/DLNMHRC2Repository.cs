@@ -156,7 +156,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         O2 = FormatNumber(baseRecord.O2),
                         AR_RH = FormatNumber(baseRecord.AR_RH),
                         N2 = FormatNumber(baseRecord.N2),
@@ -446,7 +448,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         IsNM = baseRecord.IsNM,
                         IsChuyenCa = baseRecord.IsChuyenCa,
                         O2 = FormatNumber(baseRecord.O2),
@@ -738,7 +742,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         O2 = FormatNumber(baseRecord.O2),
                         AR_RH = FormatNumber(baseRecord.AR_RH),
                         N2 = FormatNumber(baseRecord.N2),
@@ -1034,7 +1040,9 @@ namespace dataproduct.api.Repositories
                         BieuMau = baseRecord.BieuMau,
                         Scope = baseRecord.Scope,
                         MeThoi = baseRecord.MeThoi,
-                        MacThep = baseRecord.MacThep,
+                        MacThep = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc = baseRecord.MacThep,
                         IsNM = baseRecord.IsNM,
                         IsChuyenCa = baseRecord.IsChuyenCa,
                         O2 = FormatNumber(baseRecord.O2),
@@ -1310,7 +1318,9 @@ namespace dataproduct.api.Repositories
                         BieuMau         = baseRecord.BieuMau,
                         Scope           = baseRecord.Scope,
                         MeThoi          = baseRecord.MeThoi,
-                        MacThep         = baseRecord.MacThep,
+                        MacThep         = baseRecord.MacThep_Manual ?? baseRecord.MacThep,
+                        IsManualMacThep = baseRecord.IsManualMacThep,
+                        MacThepGoc      = baseRecord.MacThep,
                         IsNM            = baseRecord.IsNM,
                         IsChuyenCa      = baseRecord.IsChuyenCa,
                         O2              = FormatNumber(baseRecord.O2),
@@ -1445,7 +1455,7 @@ namespace dataproduct.api.Repositories
                 else
                 {
                     query = query.Where(x =>
-                        (x.MacThep ?? string.Empty).Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? string.Empty).Contains(search) ||
                         (x.MeThoi ?? string.Empty).Contains(search));
                 }
             }
@@ -1629,13 +1639,65 @@ namespace dataproduct.api.Repositories
             if (!raw.Any())
                 return Enumerable.Empty<FilterSTD_NXTResponse>();
 
-            // SP đã trả về ID_HeaderKey, TenPhuLieu (fallback TenHienThi), TotalKLPhuGia
-            // Group theo BieuMau + Scope + ID_HeaderKey
-            var grouped = raw.GroupBy(x => new
+            // KHÔNG tin ID_HeaderKey do SP trả về — cột đó là snapshot lấy từ PhuLieu_HRC2.ID_HeaderKey,
+            // được ghi 1 lần lúc PhuLieu_HRC2 được tạo và KHÔNG bao giờ cập nhật lại khi Header_Mapping
+            // đổi sau đó (vd tách phụ liệu A/B từ chung 1 Header_Key A1 ra 2 Header_Key A1/B1 riêng —
+            // "Làm mới" vẫn sum A+B vào A1 nếu tin thẳng cột này). Re-map lại theo ID_PhuLieu, LUÔN đọc
+            // Header_Mapping HIỆN TẠI mỗi lần gọi để phản ánh đúng mapping mới nhất — mirror đúng cách
+            // làm cũ (xem block code comment phía trên, trước khi đổi sang tin thẳng SP).
+            var phuLieuIds = raw.Where(x => (x.ID_PhuLieu ?? 0) > 0)
+                .Select(x => x.ID_PhuLieu!.Value)
+                .Distinct()
+                .ToList();
+
+            var mappings = phuLieuIds.Count > 0
+                ? await _context.Header_Mappings.Where(m => phuLieuIds.Contains(m.ID_PhuLieu)).ToListAsync()
+                : new List<Header_Mapping>();
+            // GroupBy + First thay vì ToDictionary trực tiếp: phòng trường hợp 1 ID_PhuLieu lỡ có
+            // 2 mapping cùng lúc (ExistsAsync chỉ check trùng đúng cặp PhuLieu+HeaderKey, không chặn
+            // 1 phụ liệu trỏ nhiều HeaderKey), tránh crash duplicate-key.
+            var mappingByPhuLieu = mappings
+                .GroupBy(m => m.ID_PhuLieu)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // Dòng thêm tay (manual_col_*, IsAddManual) KHÔNG có ID_PhuLieu nên không re-map được qua
+            // Header_Mapping — HeaderKey của chúng chính là PhuLieu_HRC2.ID_HeaderKey do FE lưu (vd cột
+            // điều chỉnh tay ở TaoPhieuRH), nên với các dòng này phải dùng thẳng ID_HeaderKey SP trả về.
+            var manualHeaderKeyIds = raw
+                .Where(x => (x.ID_PhuLieu ?? 0) <= 0 && (x.ID_HeaderKey ?? 0) > 0)
+                .Select(x => x.ID_HeaderKey!.Value);
+
+            var headerKeyIds = mappings.Select(m => m.ID_HeaderKey).Concat(manualHeaderKeyIds).Distinct().ToList();
+            var headerKeys = headerKeyIds.Count > 0
+                ? await _context.Header_Keys.Where(k => headerKeyIds.Contains(k.Id)).ToDictionaryAsync(k => k.Id)
+                : new Dictionary<int, Header_Key>();
+
+            var resolved = raw.Select(x =>
             {
-                x.BieuMau,
-                x.Scope,
-                x.ID_HeaderKey
+                int? headerKeyId = null;
+                var headerKeyName = x.TenPhuLieu;
+                if ((x.ID_PhuLieu ?? 0) > 0)
+                {
+                    if (mappingByPhuLieu.TryGetValue(x.ID_PhuLieu!.Value, out var map))
+                        headerKeyId = map.ID_HeaderKey;
+                }
+                else if ((x.ID_HeaderKey ?? 0) > 0)
+                {
+                    headerKeyId = x.ID_HeaderKey;
+                }
+
+                if (headerKeyId.HasValue && headerKeys.TryGetValue(headerKeyId.Value, out var hk))
+                    headerKeyName = hk.TenHienThi;
+                return new { Raw = x, ID_HeaderKey = headerKeyId, TenPhuLieu = headerKeyName };
+            }).ToList();
+
+            // Group theo BieuMau + Scope + ID_HeaderKey — phụ liệu chưa mapping (null) tách riêng
+            // theo ID_PhuLieu để không gộp nhầm nhiều phụ liệu chưa map khác nhau vào chung 1 nhóm.
+            var grouped = resolved.GroupBy(x => new
+            {
+                x.Raw.BieuMau,
+                x.Raw.Scope,
+                Key = x.ID_HeaderKey.HasValue ? $"HK_{x.ID_HeaderKey}" : $"PL_{x.Raw.ID_PhuLieu}"
             });
 
             //var result = grouped.Select(g =>
@@ -1666,18 +1728,18 @@ namespace dataproduct.api.Repositories
 
                 return new FilterSTD_NXTResponse
                 {
-                    BieuMau = first.BieuMau ?? "",
-                    Scope = first.Scope ?? 0,
+                    BieuMau = first.Raw.BieuMau ?? "",
+                    Scope = first.Raw.Scope ?? 0,
                     HeaderKeyId = first.ID_HeaderKey,
                     HeaderKeyName = first.TenPhuLieu ?? "",
-                    TotalKLPhuGia = g.Sum(x => x.TotalKLPhuGia ?? 0),
+                    TotalKLPhuGia = g.Sum(x => x.Raw.TotalKLPhuGia ?? 0),
                     PhuLieus = g
-                        .Where(x => (x.ID_PhuLieu ?? 0) > 0)
-                        .GroupBy(x => x.ID_PhuLieu ?? 0)
+                        .Where(x => (x.Raw.ID_PhuLieu ?? 0) > 0)
+                        .GroupBy(x => x.Raw.ID_PhuLieu ?? 0)
                         .Select(pl => new PhuLieuNM
                         {
                             ID_PhuLieu = pl.Key,
-                            TenPhuLieu = pl.First().TenPhuLieu ?? ""
+                            TenPhuLieu = pl.First().Raw.TenPhuLieu ?? ""
                         })
                         .ToList()
                 };
@@ -1917,7 +1979,7 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.REPORT_NO == searchReportNo);
                 else
                     query = query.Where(x =>
-                        (x.MacThep ?? "").Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
             if (dto.IsTrungMeThoi.HasValue && dto.IsTrungMeThoi.Value)
@@ -2359,7 +2421,7 @@ namespace dataproduct.api.Repositories
                         BieuMau = x.BieuMau,
                         Scope = x.Scope,
                         MeThoi = x.MeThoi,
-                        MacThep = x.MacThep,
+                        MacThep = x.MacThep_Manual ?? x.MacThep,
                         O2 = FormatNumber(x.O2),
                         AR_RH = FormatNumber(x.AR_RH),
                         N2 = FormatNumber(x.N2),
@@ -2502,7 +2564,7 @@ namespace dataproduct.api.Repositories
                     query = query.Where(x => x.REPORT_NO == searchReportNo);
                 else
                     query = query.Where(x =>
-                        (x.MacThep ?? "").Contains(search) ||
+                        ((x.MacThep_Manual ?? x.MacThep) ?? "").Contains(search) ||
                         (x.MeThoi ?? "").Contains(search));
             }
 

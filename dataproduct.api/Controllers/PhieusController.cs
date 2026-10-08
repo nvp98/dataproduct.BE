@@ -31,27 +31,41 @@ namespace dataproduct.api.Controllers
         [HttpPost]
         public async Task<ActionResult<BmPhieu>> Create([FromBody] JsonElement formData)
         {
-            var created = await _service.CreateAsync(formData);
-            if (created == null)
+            try
             {
-                return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+                var created = await _service.CreateAsync(formData);
+                if (created == null)
+                {
+                    return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+                }
+                return CreatedAtAction(nameof(GetById), new { id = created.Idphieu }, created);
             }
-            return CreatedAtAction(nameof(GetById), new { id = created.Idphieu }, created);
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPost("auto-create-phieu")]
         public async Task<ActionResult<BmPhieu>> AutoCreatePhieu([FromBody] JsonElement formData)
         {
-            var created = await _service.CreateAsync(formData);
-            if (created == null)
+            try
             {
-                return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+                var created = await _service.CreateAsync(formData);
+                if (created == null)
+                {
+                    return BadRequest(new { message = "Tạo phiếu thất bại (CreateAsync trả về null)" });
+                }
+                return Ok(new
+                {
+                    success = true,
+                    id = created.Idphieu
+                });
             }
-            return Ok(new
+            catch (InvalidOperationException ex)
             {
-                success = true,
-                id = created.Idphieu
-            });
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]

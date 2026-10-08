@@ -16,21 +16,32 @@ namespace dataproduct.api.Repositories
         // Dùng GiaTri (giá trị từng dòng chi tiết, không lặp lại) — KHÔNG dùng QuyKho vì QuyKho được
         // tính 1 lần cho cả phiếu rồi lưu LẶP LẠI trên mọi dòng cùng (IDPhieu, IDNVL), SUM trực tiếp
         // sẽ nhân giá trị thật lên theo số dòng chi tiết trong phiếu.
-        public async Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao)
+        // apDungQuyKho = false: KhoiLuongNapLieu trả về cũng là giá trị chưa quy khô (giữ để dùng sau này).
+        // Luôn trả kèm KhoiLuongNapLieuTruocQuyKho (chưa quy khô) dùng cho tính tỷ lệ nhóm PP1 Than cốc.
+        public async Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao, bool apDungQuyKho = true)
         {
-            return await _context.LG_NL_ChiTiet
+            var raw = await _context.LG_NL_ChiTiet
                 .Where(x => x.Ngay == ngay.Date && x.IDLoCao == idLoCao)
                 .GroupBy(x => new { x.IDCa, x.IDNVL })
-                .Select(g => new NapLieuTheoNvlDto
+                .Select(g => new
                 {
-                    Ngay = ngay.Date,
-                    Ca = (byte?)g.Key.IDCa,
-                    IdLoCao = idLoCao,
-                    IdNvl = g.Key.IDNVL,
-                    KhoiLuongNapLieu = g.Sum(x =>(x.ManualGiaTri? (x.GiaTri ?? 0m): (x.GiaTri_Goc ?? x.GiaTri ?? 0m))* (100m - (x.DoAm ?? 0m))/ 100m)
+                    g.Key.IDCa,
+                    g.Key.IDNVL,
+                    KhoiLuongQuyKho = g.Sum(x => (x.ManualGiaTri ? (x.GiaTri ?? 0m) : (x.GiaTri_Goc ?? x.GiaTri ?? 0m)) * (100m - (x.DoAm ?? 0m)) / 100m),
+                    KhoiLuongChuaQuyKho = g.Sum(x => x.ManualGiaTri ? (x.GiaTri ?? 0m) : (x.GiaTri_Goc ?? x.GiaTri ?? 0m))
                 })
                 .AsNoTracking()
                 .ToListAsync();
+
+            return raw.Select(g => new NapLieuTheoNvlDto
+            {
+                Ngay = ngay.Date,
+                Ca = (byte?)g.IDCa,
+                IdLoCao = idLoCao,
+                IdNvl = g.IDNVL,
+                KhoiLuongNapLieu = apDungQuyKho ? g.KhoiLuongQuyKho : g.KhoiLuongChuaQuyKho,
+                KhoiLuongNapLieuTruocQuyKho = g.KhoiLuongChuaQuyKho
+            }).ToList();
         }
 
         public async Task<List<TongNhanVeDto>> GetNapLieuTheoNvlListAsync(DateTime ngay, IEnumerable<int> idNvlList)

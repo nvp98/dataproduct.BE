@@ -21,14 +21,16 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
         private readonly PheDuyetService _pheDuyetService;
+        private readonly BmConfigService _bmConfig;
 
-        public PhieuDetailExcelService(ProductFormContext context, PheDuyetService pheDuyetService, IConverter pdfConverter, IConfiguration configuration, IWebHostEnvironment env)
+        public PhieuDetailExcelService(ProductFormContext context, PheDuyetService pheDuyetService, IConverter pdfConverter, IConfiguration configuration, IWebHostEnvironment env, BmConfigService bmConfig)
         {
             _context       = context;
             _pdfConverter  = pdfConverter;
             _configuration = configuration;
             _env           = env;
             _pheDuyetService = pheDuyetService;
+            _bmConfig      = bmConfig;
         }
 
         public async Task<BmPhieu> GetBmPhieuByIdOrThrowAsync(Guid idPhieu)
@@ -101,7 +103,62 @@ namespace dataproduct.api.Services
                 else headersLF = chotSnapshotHeaders;
             }
 
+            // LF có 2 nhóm phụ liệu riêng (Chất hợp kim hóa=KL, Phụ gia và chất khử oxy=PG) render
+            // thành 2 khối cột liền nhau trong PDF/Excel (PdfThead_LF/RenderColumnHeaders_LF) — cần
+            // đảm bảo thứ tự cột ở đây đã gộp liền khối theo nhóm (áp dụng cho cả header live lẫn
+            // snapshot đã chốt), nếu không colspan merge theo nhóm sẽ sai khi ThuTu_Excel_LF xen kẽ.
+            headersLF = headersLF
+                .OrderBy(h => h.LoaiPhieu == "KL" ? 0 : h.LoaiPhieu == "PG" ? 1 : 2)
+                .ToList();
+
             var headers = isBofExcel ? headersBOF : (isRhExcel ? headersRH : headersLF);
+
+            // Phiếu Chốt dùng snapshot cột Excel chụp ĐÚNG lúc chốt (TryGetChotSnapshotHeadersAsync).
+            // Nếu user cấu hình Excel cho Header_Key (IsUsed_Excel/LoaiExcel/LoaiPhieu/ThuTu_Excel_*)
+            // SAU KHI phiếu đã chốt, snapshot cũ không có header đó dù phiếu vẫn tham chiếu đúng
+            // headerKeyId trong table1DynamicColumns.adjust (cột "Thêm cột điều chỉnh") → cột biến
+            // mất khỏi Excel dù cấu hình hiện tại đã đúng. Bổ sung các headerKeyId này (đọc trực
+            // tiếp từ DataJson của CHÍNH phiếu, không phụ thuộc snapshot/config Excel) vào headers
+            // nếu còn thiếu, lấy tên/loại phiếu HIỆN TẠI từ Header_Keys (lúc lưu, table1DynamicColumns
+            // .adjust[] không lưu loaiPhieu — xem LoadDataJsonOverridesAsync). Chạy cả khi phiếu CHƯA
+            // chốt để làm lưới an toàn chung (no-op nếu header đã có sẵn trong headers).
+            var manualAdjustHeaderIds = await GetManualAdjustHeaderKeyIdsAsync(idPhieu);
+            if (manualAdjustHeaderIds.Count > 0)
+            {
+                var existingIds = headers.Select(h => h.IDHeaderKey).ToHashSet();
+                var missingIds = manualAdjustHeaderIds.Where(id => !existingIds.Contains(id)).ToList();
+                if (missingIds.Count > 0)
+                {
+                    var missingHeaderKeys = await _context.Header_Keys
+                        .Where(h => missingIds.Contains(h.Id))
+                        .Select(h => new { h.Id, h.TenHienThi, h.LoaiPhieu })
+                        .ToListAsync();
+
+                    foreach (var hk in missingHeaderKeys)
+                    {
+                        // LF render theo 2 khối KL/PG liền nhau (RenderColumnHeaders_LF) — header không
+                        // thuộc 1 trong 2 nhóm này thì bỏ qua để tránh vỡ colspan merge, giống ràng
+                        // buộc của headers cấu hình sẵn (GetLiveExcelHeadersAsync).
+                        if (!isBofExcel && !isRhExcel && hk.LoaiPhieu != "KL" && hk.LoaiPhieu != "PG")
+                            continue;
+
+                        headers.Add(new PhuLieuHeaderTable
+                        {
+                            IDHeaderKey = hk.Id,
+                            TenPhuLieu = hk.TenHienThi,
+                            LoaiPhieu = hk.LoaiPhieu
+                        });
+                    }
+
+                    if (!isBofExcel && !isRhExcel)
+                    {
+                        headersLF = headersLF
+                            .OrderBy(h => h.LoaiPhieu == "KL" ? 0 : h.LoaiPhieu == "PG" ? 1 : 2)
+                            .ToList();
+                        headers = headersLF;
+                    }
+                }
+            }
 
             if (!headersBOF.Any() && !headersLF.Any() && !headersRH.Any())
                 return (headersBOF, headersLF, headersRH, new List<HRC2ThongKeRow>());
@@ -145,7 +202,13 @@ namespace dataproduct.api.Services
 
             // Lấy DataJson overrides từ phiếu (nếu có idPhieu) để ưu tiên giá trị user đã sửa tay.
             // DataJson là nguồn sự thật cho manual overrides trên UI.
-            var dataJsonOverrides = await LoadDataJsonOverridesAsync(idPhieu);
+            // Khóa chính là "id" (DLNM_HRC2.ID trong table1 row) — GIỐNG applyManualOverrides bên FE
+            // (rowIdField:"id", fallbackKeyField:"meThoi") — vì MeThoi có thể TRÙNG giữa 2 mẻ khác
+            // nhau (IsTrungMeThoi). Nếu chỉ khoá theo MeThoi, 2 mẻ trùng tên sẽ ghi đè lẫn nhau trong
+            // dictionary và export sẽ lấy nhầm override của mẻ này gán cho mẻ kia dù UI vẫn render
+            // đúng (UI khoá theo id trước). Chỉ fallback về MeThoi khi row JSON không có "id" (dữ liệu
+            // cũ trước khi field này tồn tại).
+            var (dataJsonOverridesById, dataJsonOverridesByMeThoi) = await LoadDataJsonOverridesAsync(idPhieu);
 
             // Map: mọi DLNM_HRC2.ID trong cùng REPORT_NO group → display item ID (max ID đã chọn).
             // Mục đích: bắt cả phụ liệu được lưu theo ID khác (không phải max) trong cùng REPORT_NO.
@@ -321,10 +384,16 @@ namespace dataproduct.api.Services
                         var effectiveKL = klPhuGia_Manual ?? klPhuGia;
 
                         // Ưu tiên DataJson: giá trị user đã sửa tay trên UI (nguồn sự thật cao nhất).
-                        // Dùng meThoi để match vì id trong DataJson có thể khác id export pick.
-                        if (!string.IsNullOrEmpty(x.MeThoi) &&
-                            dataJsonOverrides.TryGetValue(x.MeThoi, out var meThOiOverrides) &&
-                            meThOiOverrides.TryGetValue(h.IDHeaderKey, out var jsonOverrideVal))
+                        // Match theo ID trước (giống FE) để không bị lẫn khi 2 mẻ trùng MeThoi;
+                        // chỉ fallback về MeThoi khi row JSON không có "id" (dữ liệu cũ).
+                        Dictionary<int, double?>? rowOverrides = null;
+                        if (!dataJsonOverridesById.TryGetValue(x.ID, out rowOverrides) &&
+                            !string.IsNullOrEmpty(x.MeThoi))
+                        {
+                            dataJsonOverridesByMeThoi.TryGetValue(x.MeThoi, out rowOverrides);
+                        }
+
+                        if (rowOverrides != null && rowOverrides.TryGetValue(h.IDHeaderKey, out var jsonOverrideVal))
                         {
                             effectiveKL = jsonOverrideVal;
                             klPhuGia_Manual = jsonOverrideVal;
@@ -368,7 +437,7 @@ namespace dataproduct.api.Services
                             BieuMau = x.BieuMau,
                             Scope = x.Scope,
                             MeThoi = x.MeThoi,
-                            MacThep = x.MacThep,
+                            MacThep = x.MacThep_Manual ?? x.MacThep,
                             O2 = RoundNumber(x.O2),
                             AR_RH = RoundNumber(x.AR_RH),
                             N2 = RoundNumber(x.N2),
@@ -412,7 +481,7 @@ namespace dataproduct.api.Services
         {
             var allExcelHeaders = await _context.Header_Keys
                 .Where(h => h.IsUsed_Excel == true)
-                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LF, h.ThuTu_Excel_RH })
+                .Select(h => new { h.Id, h.TenHienThi, h.LoaiExcel, h.ThuTu_Excel_BOF, h.ThuTu_Excel_LF, h.ThuTu_Excel_RH, h.LoaiPhieu })
                 .ToListAsync();
 
             var headersBOF = allExcelHeaders
@@ -423,19 +492,27 @@ namespace dataproduct.api.Services
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
+            // LF: chỉ render cột phụ liệu nào có ĐỦ CẢ 2 — ThuTu_Excel_LF (để xác định thứ tự) VÀ
+            // LoaiPhieu = "KL"/"PG" (để xác định thuộc nhóm nào) — thiếu 1 trong 2 thì không hiện
+            // (tránh vỡ khớp cột giữa header nhóm KL/PG và dữ liệu thân bảng ở PdfThead_LF/
+            // RenderColumnHeaders_LF, vốn chỉ render đúng 2 nhóm này, không còn nhóm dự phòng).
             var headersLF = allExcelHeaders
-                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 2) != 0)
-                .OrderBy(h => h.ThuTu_Excel_LF ?? int.MaxValue)
+                .Where(h => ((byte)(h.LoaiExcel ?? 0) & 2) != 0
+                         && h.ThuTu_Excel_LF.HasValue
+                         && (h.LoaiPhieu == "KL" || h.LoaiPhieu == "PG"))
+                .OrderBy(h => h.ThuTu_Excel_LF!.Value)
                 .ThenBy(h => h.Id)
                 .Select(h => new PhuLieuHeaderTable
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
@@ -447,7 +524,8 @@ namespace dataproduct.api.Services
                 {
                     IDHeaderKey = h.Id,
                     TenPhuLieu = h.TenHienThi,
-                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0)
+                    LoaiThongKe = (byte)(h.LoaiExcel ?? 0),
+                    LoaiPhieu = h.LoaiPhieu
                 })
                 .ToList();
 
@@ -499,10 +577,18 @@ namespace dataproduct.api.Services
                         ? lblProp.GetString() ?? ""
                         : "";
 
+                    // loaiPhieu: chỉ có ở snapshot chụp SAU khi có cơ chế gộp nhóm cột KL/PG cho LF/RH;
+                    // snapshot cũ hơn không có field này → null → cột rơi vào nhóm "khác" khi render.
+                    var loaiPhieu = col.TryGetProperty("loaiPhieu", out var lpProp) &&
+                                 lpProp.ValueKind == JsonValueKind.String
+                        ? lpProp.GetString()
+                        : null;
+
                     headers.Add(new PhuLieuHeaderTable
                     {
                         IDHeaderKey = hkProp.GetInt32(),
-                        TenPhuLieu = label
+                        TenPhuLieu = label,
+                        LoaiPhieu = loaiPhieu
                     });
                 }
 
@@ -516,12 +602,15 @@ namespace dataproduct.api.Services
         }
 
         /// <summary>
-        /// Đọc DataJson của phiếu và trích xuất manual overrides:
-        /// meThoi → headerKeyId → giá trị user đã sửa.
+        /// Đọc DataJson.table1DynamicColumns.adjust[].headerKeyId của phiếu — danh sách headerKeyId
+        /// của các cột "Thêm cột điều chỉnh" do user thêm tay (isManuallyAdded), bất kể Header_Key đó
+        /// có được cấu hình dùng cho Excel hay không / có nằm trong snapshot lúc Chốt hay không. Dùng
+        /// để đảm bảo cột này luôn có mặt trên Excel một khi phiếu đã lưu dữ liệu cho nó (xem
+        /// GetExportDataAsync).
         /// </summary>
-        private async Task<Dictionary<string, Dictionary<int, double?>>> LoadDataJsonOverridesAsync(Guid? idPhieu)
+        private async Task<HashSet<int>> GetManualAdjustHeaderKeyIdsAsync(Guid? idPhieu)
         {
-            var result = new Dictionary<string, Dictionary<int, double?>>(StringComparer.OrdinalIgnoreCase);
+            var result = new HashSet<int>();
             if (!idPhieu.HasValue) return result;
 
             var dataJson = await _context.BmPhieus
@@ -537,43 +626,184 @@ namespace dataproduct.api.Services
                 using var doc = JsonDocument.Parse(dataJson);
                 var root = doc.RootElement;
 
-                if (!root.TryGetProperty("table1", out var table1) || table1.ValueKind != JsonValueKind.Array)
-                    return result;
-
-                foreach (var row in table1.EnumerateArray())
+                if (root.TryGetProperty("table1DynamicColumns", out var dynCols) &&
+                    dynCols.ValueKind == JsonValueKind.Object &&
+                    dynCols.TryGetProperty("adjust", out var adjustArr) &&
+                    adjustArr.ValueKind == JsonValueKind.Array)
                 {
-                    if (!row.TryGetProperty("meThoi", out var meProp) || meProp.ValueKind != JsonValueKind.String)
-                        continue;
-                    var meThoi = meProp.GetString();
-                    if (string.IsNullOrWhiteSpace(meThoi)) continue;
-
-                    var rowOverrides = new Dictionary<int, double?>();
-
-                    foreach (var prop in row.EnumerateObject())
+                    foreach (var meta in adjustArr.EnumerateArray())
                     {
-                        if (!prop.Name.EndsWith("__IsManual", StringComparison.Ordinal)) continue;
-                        if (prop.Value.ValueKind != JsonValueKind.True) continue;
-
-                        var baseKey = prop.Name[..^"__IsManual".Length]; // e.g. "phuLieu_5"
-                        if (!baseKey.StartsWith("phuLieu_", StringComparison.Ordinal)) continue;
-                        if (!int.TryParse(baseKey["phuLieu_".Length..], out var headerKeyId)) continue;
-
-                        double? val = null;
-                        if (row.TryGetProperty(baseKey, out var valProp))
+                        if (meta.TryGetProperty("headerKeyId", out var hkProp) &&
+                            hkProp.ValueKind == JsonValueKind.Number)
                         {
-                            if (valProp.ValueKind == JsonValueKind.Number)
-                                val = valProp.GetDouble();
-                            else if (valProp.ValueKind == JsonValueKind.String &&
-                                     double.TryParse(valProp.GetString(),
-                                         System.Globalization.NumberStyles.Any,
-                                         System.Globalization.CultureInfo.InvariantCulture, out var d))
-                                val = d;
+                            result.Add(hkProp.GetInt32());
                         }
-                        rowOverrides[headerKeyId] = val;
                     }
+                }
+            }
+            catch
+            {
+                // DataJson parse lỗi → bỏ qua, không chặn export
+            }
 
-                    if (rowOverrides.Count > 0)
-                        result[meThoi] = rowOverrides;
+            return result;
+        }
+
+        /// <summary>
+        /// Đọc DataJson của phiếu và trích xuất manual overrides: headerKeyId → giá trị user đã sửa,
+        /// cho từng row của table1. Trả về 2 dictionary tra cứu, GIỐNG cách FE khoá row
+        /// (HRC2TableService.applyManualOverrides: rowIdField="id", fallbackKeyField="meThoi"):
+        /// - ById: khoá theo "id" (= DLNM_HRC2.ID) của row — dùng khi row JSON có field "id".
+        /// - ByMeThoi: khoá theo "meThoi" — CHỈ dùng cho row JSON không có "id" (dữ liệu cũ trước khi
+        ///   field này tồn tại). Nếu khoá luôn theo meThoi thì 2 mẻ TRÙNG MeThoi (IsTrungMeThoi) sẽ
+        ///   ghi đè lẫn nhau trong dictionary → export lấy nhầm override của mẻ này gán cho mẻ kia,
+        ///   dù UI vẫn render đúng vì UI khoá theo id trước.
+        /// </summary>
+        private async Task<(Dictionary<long, Dictionary<int, double?>> ById, Dictionary<string, Dictionary<int, double?>> ByMeThoi)> LoadDataJsonOverridesAsync(Guid? idPhieu)
+        {
+            var resultById = new Dictionary<long, Dictionary<int, double?>>();
+            var resultByMeThoi = new Dictionary<string, Dictionary<int, double?>>(StringComparer.OrdinalIgnoreCase);
+            if (!idPhieu.HasValue) return (resultById, resultByMeThoi);
+
+            var dataJson = await _context.BmPhieus
+                .AsNoTracking()
+                .Where(p => p.Idphieu == idPhieu.Value)
+                .Select(p => p.DataJson)
+                .FirstOrDefaultAsync();
+
+            if (string.IsNullOrWhiteSpace(dataJson)) return (resultById, resultByMeThoi);
+
+            try
+            {
+                using var doc = JsonDocument.Parse(dataJson);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("table1", out var table1) && table1.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var row in table1.EnumerateArray())
+                    {
+                        string? meThoi = row.TryGetProperty("meThoi", out var meProp) && meProp.ValueKind == JsonValueKind.String
+                            ? meProp.GetString()
+                            : null;
+
+                        long? rowId = null;
+                        if (row.TryGetProperty("id", out var idProp))
+                        {
+                            if (idProp.ValueKind == JsonValueKind.Number && idProp.TryGetInt64(out var idNum))
+                                rowId = idNum;
+                            else if (idProp.ValueKind == JsonValueKind.String &&
+                                     long.TryParse(idProp.GetString(), out var idParsed))
+                                rowId = idParsed;
+                        }
+
+                        if (rowId == null && string.IsNullOrWhiteSpace(meThoi)) continue;
+
+                        var rowOverrides = new Dictionary<int, double?>();
+
+                        foreach (var prop in row.EnumerateObject())
+                        {
+                            if (!prop.Name.EndsWith("__IsManual", StringComparison.Ordinal)) continue;
+                            if (prop.Value.ValueKind != JsonValueKind.True) continue;
+
+                            var baseKey = prop.Name[..^"__IsManual".Length]; // e.g. "phuLieu_5"
+                            if (!baseKey.StartsWith("phuLieu_", StringComparison.Ordinal)) continue;
+                            if (!int.TryParse(baseKey["phuLieu_".Length..], out var headerKeyId)) continue;
+
+                            double? val = null;
+                            if (row.TryGetProperty(baseKey, out var valProp))
+                            {
+                                if (valProp.ValueKind == JsonValueKind.Number)
+                                    val = valProp.GetDouble();
+                                else if (valProp.ValueKind == JsonValueKind.String &&
+                                         double.TryParse(valProp.GetString(),
+                                             System.Globalization.NumberStyles.Any,
+                                             System.Globalization.CultureInfo.InvariantCulture, out var d))
+                                    val = d;
+                            }
+                            rowOverrides[headerKeyId] = val;
+                        }
+
+                        if (rowOverrides.Count == 0) continue;
+
+                        // Khoá theo id khi có (giống FE); chỉ fallback về meThoi khi row không có id.
+                        if (rowId.HasValue)
+                            resultById[rowId.Value] = rowOverrides;
+                        else if (!string.IsNullOrWhiteSpace(meThoi))
+                            resultByMeThoi[meThoi] = rowOverrides;
+                    }
+                }
+
+                // table1DynamicColumns.adjust: giá trị của các cột "Thêm cột điều chỉnh" (nút thêm tay
+                // trong màn Tạo/Chi tiết phiếu, dataIndex "manual_col_{headerKeyId}"). FE xoá hết field
+                // manual_col_* khỏi table1[] trước khi lưu (HRC2PhuLieuService.sanitizeRowsBeforeSubmit)
+                // và chỉ lưu giá trị ở đây (table1DynamicColumns.adjust[].values[], build bởi
+                // buildAdjustDynamicWithValues) — nên PHẢI đọc riêng, không nằm trong vòng lặp table1[]
+                // ở trên. Thiếu đoạn này thì cột "điều chỉnh" luôn trống khi export dù UI hiển thị đủ.
+                if (root.TryGetProperty("table1DynamicColumns", out var dynCols) &&
+                    dynCols.ValueKind == JsonValueKind.Object &&
+                    dynCols.TryGetProperty("adjust", out var adjustArr) &&
+                    adjustArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var meta in adjustArr.EnumerateArray())
+                    {
+                        if (!meta.TryGetProperty("headerKeyId", out var hkProp) ||
+                            hkProp.ValueKind != JsonValueKind.Number)
+                            continue;
+                        var headerKeyId = hkProp.GetInt32();
+
+                        if (!meta.TryGetProperty("values", out var valuesArr) ||
+                            valuesArr.ValueKind != JsonValueKind.Array)
+                            continue;
+
+                        foreach (var v in valuesArr.EnumerateArray())
+                        {
+                            long? rowId = null;
+                            if (v.TryGetProperty("rowId", out var rowIdProp) &&
+                                rowIdProp.ValueKind == JsonValueKind.Number &&
+                                rowIdProp.TryGetInt64(out var rid))
+                                rowId = rid;
+
+                            string? meThoi = v.TryGetProperty("meThoi", out var meThoiProp) &&
+                                             meThoiProp.ValueKind == JsonValueKind.String
+                                ? meThoiProp.GetString()
+                                : null;
+
+                            if (rowId == null && string.IsNullOrWhiteSpace(meThoi)) continue;
+
+                            double? val = null;
+                            if (v.TryGetProperty("value", out var valProp))
+                            {
+                                if (valProp.ValueKind == JsonValueKind.Number)
+                                    val = valProp.GetDouble();
+                                else if (valProp.ValueKind == JsonValueKind.String &&
+                                         double.TryParse(valProp.GetString(),
+                                             System.Globalization.NumberStyles.Any,
+                                             System.Globalization.CultureInfo.InvariantCulture, out var d))
+                                    val = d;
+                            }
+
+                            // Khoá theo id khi có (giống FE); chỉ fallback về meThoi khi không có id.
+                            // Merge vào dict đã có (không ghi đè) để không mất override phuLieu_ ở trên.
+                            if (rowId.HasValue)
+                            {
+                                if (!resultById.TryGetValue(rowId.Value, out var dict))
+                                {
+                                    dict = new Dictionary<int, double?>();
+                                    resultById[rowId.Value] = dict;
+                                }
+                                dict[headerKeyId] = val;
+                            }
+                            else if (!string.IsNullOrWhiteSpace(meThoi))
+                            {
+                                if (!resultByMeThoi.TryGetValue(meThoi, out var dict))
+                                {
+                                    dict = new Dictionary<int, double?>();
+                                    resultByMeThoi[meThoi] = dict;
+                                }
+                                dict[headerKeyId] = val;
+                            }
+                        }
+                    }
                 }
             }
             catch
@@ -581,7 +811,7 @@ namespace dataproduct.api.Services
                 // DataJson parse failure → trả về empty, không ảnh hưởng export
             }
 
-            return result;
+            return (resultById, resultByMeThoi);
         }
 
         private static double? RoundNumber(double? value)
@@ -731,21 +961,21 @@ namespace dataproduct.api.Services
                     RenderDataRows_BOF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_BOF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, BofFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, BofFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_LF":
                     RenderColumnHeaders_LF(ws, headers, phanBoHeaders);
                     RenderDataRows_LF(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_LF(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 case "HRC2_BB_NauLuyen_RH":
                     RenderColumnHeaders_RH(ws, headers, phanBoHeaders);
                     RenderDataRows_RH(ws, headers, phanBoHeaders, rows, dataStartRow, lastCol);
                     RenderTotalRow_RH(ws, totalRow, lastCol, headers, phanBoHeaders, rows);
                     tableLastRow = RenderFooter(ws, totalRow + 2, lastCol, RhFooterConfig, footerData);
-                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, truongKipName, nguoiLapName);
+                    RenderSignatureRow(ws, tableLastRow + 1, lastCol, RhFooterConfig, bieuMau, truongKipName, nguoiLapName);
                     break;
                 default:
                     tableLastRow = totalRow;
@@ -1132,10 +1362,11 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("BOF"); // 6
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL gang lỏng\n(tấn)");
-            MergeVertCell(ws, 5, "KL thép phế\n(tấn)");
+            MergeHorizCell(ws, HeaderParentRow, 4, 5, "Nguyên liệu đầu vào (tấn)");
+            HeaderCell(ws, HeaderChildRow, 4, "Gang lỏng");
+            HeaderCell(ws, HeaderChildRow, 5, "Thép phế");
 
             if (headers.Count > 0)
             {
@@ -1145,7 +1376,7 @@ namespace dataproduct.api.Services
             }
 
             int a = s + headers.Count;
-            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Nhiên liệu");
+            MergeHorizCell(ws, HeaderParentRow, a, a + 1, "Nhiên liệu (m³)");
             HeaderCell(ws, HeaderChildRow, a,     "Oxy");
             HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
             MergeVertCell(ws, a + 2, "Ghi chú");
@@ -1160,15 +1391,27 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("LF"); // 5
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL thép lỏng\n(tấn)");
+            MergeVertCell(ws, 4, "Khối lượng thép lỏng (tấn)\n(Tính cả thùng thép)");
 
             if (headers.Count > 0)
             {
-                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Phụ gia công nghệ (Kg)");
-                for (int i = 0; i < headers.Count; i++)
-                    HeaderCell(ws, HeaderChildRow, s + i, headers[i].TenPhuLieu);
+                var (klList, pgList) = SplitByLoaiPhieuGroup(headers);
+                int col = s;
+                if (klList.Count > 0)
+                {
+                    MergeHorizCell(ws, HeaderParentRow, col, col + klList.Count - 1, "Chất hợp kim hóa");
+                    for (int i = 0; i < klList.Count; i++)
+                        HeaderCell(ws, HeaderChildRow, col + i, klList[i].TenPhuLieu);
+                    col += klList.Count;
+                }
+                if (pgList.Count > 0)
+                {
+                    MergeHorizCell(ws, HeaderParentRow, col, col + pgList.Count - 1, "Phụ gia & chất khử oxy");
+                    for (int i = 0; i < pgList.Count; i++)
+                        HeaderCell(ws, HeaderChildRow, col + i, pgList[i].TenPhuLieu);
+                }
             }
 
             int a = s + headers.Count;
@@ -1188,24 +1431,24 @@ namespace dataproduct.api.Services
             int s = GetPhuLieuStartCol("RH"); // 5
 
             MergeVertCell(ws, 1, "STT");
-            MergeVertCell(ws, 2, "Mẻ thổi");
+            MergeVertCell(ws, 2, "Mẻ nấu số");
             MergeVertCell(ws, 3, "Mác thép");
-            MergeVertCell(ws, 4, "KL thép lỏng\n(tấn)");
+            MergeVertCell(ws, 4, "Khối lượng thép lỏng (tấn)\n(Tính cả thùng thép)");
 
             if (headers.Count > 0)
             {
-                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Phụ gia công nghệ (Kg)");
+                MergeHorizCell(ws, HeaderParentRow, s, s + headers.Count - 1, "Chất hợp kim hóa");
                 for (int i = 0; i < headers.Count; i++)
                     HeaderCell(ws, HeaderChildRow, s + i, headers[i].TenPhuLieu);
             }
 
             int a = s + headers.Count;
-            MergeHorizCell(ws, HeaderParentRow, a, a + 2, "Khí");
+            MergeHorizCell(ws, HeaderParentRow, a, a + 2, "Khí (m³)");
             HeaderCell(ws, HeaderChildRow, a,     "Argon");
             HeaderCell(ws, HeaderChildRow, a + 1, "Nito");
             HeaderCell(ws, HeaderChildRow, a + 2, "Oxi");
-            MergeVertCell(ws, a + 3, "Que lấy mẫu");
-            MergeVertCell(ws, a + 4, "Que đo nhiệt");
+            MergeVertCell(ws, a + 3, "Que lấy mẫu (cái)");
+            MergeVertCell(ws, a + 4, "Que đo nhiệt (cái)");
             MergeVertCell(ws, a + 5, "Ghi chú");
 
             RenderPhanBoHeaders(ws, a + 6, phanBoHeaders);
@@ -1345,6 +1588,8 @@ namespace dataproduct.api.Services
         {
             int s = GetPhuLieuStartCol("BOF"); // 6
 
+            ws.Range(r, 1, r, lastCol).Style.Font.Bold = true;
+
             ws.Range(r, 1, r, 3).Merge();
             ws.Cell(r, 1).Value                      = "Tổng cộng";
             ws.Cell(r, 1).Style.Font.Bold            = true;
@@ -1380,6 +1625,8 @@ namespace dataproduct.api.Services
         {
             int s = GetPhuLieuStartCol("LF"); // 5
 
+            ws.Range(r, 1, r, lastCol).Style.Font.Bold = true;
+
             ws.Range(r, 1, r, 3).Merge();
             ws.Cell(r, 1).Value                      = "Tổng cộng";
             ws.Cell(r, 1).Style.Font.Bold            = true;
@@ -1413,6 +1660,8 @@ namespace dataproduct.api.Services
             List<HRC2ThongKeRow> rows)
         {
             int s = GetPhuLieuStartCol("RH"); // 5
+
+            ws.Range(r, 1, r, lastCol).Style.Font.Bold = true;
 
             ws.Range(r, 1, r, 3).Merge();
             ws.Cell(r, 1).Value                      = "Tổng cộng";
@@ -1579,18 +1828,18 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Render dòng chữ ký ở ngoài khối footer bảng (không nằm trong range apply border chung).
         /// </summary>
-        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config,
+        private static void RenderSignatureRow(IXLWorksheet ws, int signRow, int lastCol, FooterConfig config, string key,
             string? truongKipName = null, string? nguoiLapName = null)
         {
             int N = lastCol;
             int g3s = N - 3; // Tồn cuối kíp: start
             int g3e = N;     // Tồn cuối kíp: end
             int leftEnd = g3s - 1;
-
+            string leftLabel = key.Contains("BOF") ? config.LabelTruongKip : "Trưởng/Phó kíp";
             if (leftEnd >= 1)
             {
                 ws.Range(signRow, 1, signRow, leftEnd).Merge();
-                ws.Cell(signRow, 1).Value = config.LabelTruongKip;
+                ws.Cell(signRow, 1).Value = leftLabel;
                 ws.Cell(signRow, 1).Style.Font.Bold = true;
                 ws.Cell(signRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 ws.Cell(signRow, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
@@ -1779,9 +2028,10 @@ namespace dataproduct.api.Services
 
             string infoKip = $"Kíp {caStr}: Từ {gioBatDauLocal} ngày {ngayStr} đến {gioKetThucLocal} ngày {ngayKetThuc}";
 
-            string bmCode = key.Contains("BOF") ? "BM.08/QT.05.15 <br /> Ngày hiệu lực: 05/07/2025 <br /> Lần sửa đổi: 01"
-                          : key.Contains("LF")  ? "BM.14/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 02"
-                          :                       "BM.16/QT.05.15 <br /> Ngày hiệu lực: 12/06/2026 <br /> Lần sửa đổi: 03";
+            string bmConfigKey = key.Contains("BOF") ? "HRC2_BB_NauLuyen_BOF"
+                               : key.Contains("LF")  ? "HRC2_BB_NauLuyen_LF"
+                               :                       "HRC2_BB_NauLuyen_RH";
+            string bmCode = await _bmConfig.GetBmCodeHtmlAsync(bmConfigKey);
 
             string thead = key.Contains("BOF") ? PdfThead_BOF(headers, phanBoHeaders)
                          : key.Contains("LF")  ? PdfThead_LF(headers, phanBoHeaders)
@@ -1804,6 +2054,7 @@ namespace dataproduct.api.Services
                     chuKyTruongKipHtml,
                     chuKyNguoiLapHtml,
                     footerData,
+                    key,
                     truongKipName,
                     nguoiLapName)
                 : "";
@@ -1830,10 +2081,10 @@ namespace dataproduct.api.Services
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL gang lỏng<br/>(tấn)</th>");
-            r1.Append("<th rowspan=\"2\">KL thép phế<br/>(tấn)</th>");
+            r1.Append("<th colspan=\"2\">Nguyên liệu đầu vào (tấn)</th>");
+            r2.Append("<th>Gang lỏng</th><th>Thép phế</th>");
 
             if (h.Count > 0)
             {
@@ -1841,8 +2092,8 @@ namespace dataproduct.api.Services
                 foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
             }
 
-            r1.Append("<th colspan=\"2\">Nhiên liệu</th>");
-            r2.Append("<th>Oxy</th><th>Nito</th>");
+            r1.Append("<th colspan=\"2\">Nhiên liệu (m³)</th>");
+            r2.Append("<th>Oxy</th><th>Nitơ</th>");
             r1.Append("<th rowspan=\"2\">Ghi chú</th>");
 
             if (pb.Count > 0)
@@ -1854,20 +2105,41 @@ namespace dataproduct.api.Services
             return $"<thead><tr>{r1}</tr><tr>{r2}</tr></thead>";
         }
 
+        /// <summary>Gộp danh sách cột phụ liệu thành 2 khối liền nhau theo Header_Key.LoaiPhieu:
+        /// KL (Chất hợp kim hóa) → PG (Phụ gia và chất khử oxy). LF/RH luôn gán đủ KL/PG cho mọi
+        /// phụ liệu (không có giá trị khác/NULL trong thực tế) nên không cần bucket dự phòng.
+        /// Thứ tự tương đối trong từng khối giữ nguyên theo ThuTu_Excel_*.</summary>
+        private static (List<PhuLieuHeaderTable> Kl, List<PhuLieuHeaderTable> Pg) SplitByLoaiPhieuGroup(
+            List<PhuLieuHeaderTable> headers)
+        {
+            var kl = headers.Where(h => h.LoaiPhieu == "KL").ToList();
+            var pg = headers.Where(h => h.LoaiPhieu == "PG").ToList();
+            return (kl, pg);
+        }
+
         private static string PdfThead_LF(List<PhuLieuHeaderTable> h, List<PhuLieuHeaderTable> pb)
         {
             var r1 = new StringBuilder();
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL thép lỏng<br/>(tấn)</th>");
+            r1.Append("<th rowspan=\"2\">Khối lượng thép lỏng (tấn)(Tính cả thùng thép)</th>");
 
             if (h.Count > 0)
             {
-                r1.Append($"<th colspan=\"{h.Count}\">Phụ gia công nghệ (Kg)</th>");
-                foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                var (klList, pgList) = SplitByLoaiPhieuGroup(h);
+                if (klList.Count > 0)
+                {
+                    r1.Append($"<th colspan=\"{klList.Count}\">Chất hợp kim hóa</th>");
+                    foreach (var x in klList) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                }
+                if (pgList.Count > 0)
+                {
+                    r1.Append($"<th colspan=\"{pgList.Count}\">Phụ gia và chất khử oxy</th>");
+                    foreach (var x in pgList) r2.Append($"<th>{x.TenPhuLieu}</th>");
+                }
             }
 
             r1.Append("<th>Khí</th>");
@@ -1891,13 +2163,13 @@ namespace dataproduct.api.Services
             var r2 = new StringBuilder();
 
             r1.Append("<th rowspan=\"2\">STT</th>");
-            r1.Append("<th rowspan=\"2\">Mẻ thổi</th>");
+            r1.Append("<th rowspan=\"2\">Mẻ nấu số</th>");
             r1.Append("<th rowspan=\"2\">Mác thép</th>");
-            r1.Append("<th rowspan=\"2\">KL thép lỏng<br/>(tấn)</th>");
+            r1.Append("<th rowspan=\"2\">Khối lượng thép lỏng (tấn)(Tính cả thùng thép)</th>");
 
             if (h.Count > 0)
             {
-                r1.Append($"<th colspan=\"{h.Count}\">Phụ gia công nghệ (Kg)</th>");
+                r1.Append($"<th colspan=\"{h.Count}\">Chất hợp kim hóa </th>");
                 foreach (var x in h) r2.Append($"<th>{x.TenPhuLieu}</th>");
             }
 
@@ -2033,6 +2305,7 @@ namespace dataproduct.api.Services
             string chuKyTruongKipHtml,
             string chuKyNguoiLapHtml,
             List<STD_XUAT_NHAP_TON_HRC2>? footerData = null,
+            string key = "",
             string? truongKipName = null,
             string? nguoiLapName = null)
         {
@@ -2058,7 +2331,7 @@ namespace dataproduct.api.Services
                 foreach (var item in footerData)
                 {
                     sb.Append("<tr>");
-                    sb.Append($"<td colspan=\"{siloSpan}\" class=\"td-left\">{System.Net.WebUtility.HtmlEncode(item.TenNguyenLieu ?? "")}</td>");
+                    sb.Append($"<td colspan=\"{siloSpan}\" class=\"td-left\">Lượng {System.Net.WebUtility.HtmlEncode(item.TenNguyenLieu ?? "")}</td>");
                     sb.Append($"<td colspan=\"{g1Span}\">{PFmt(item.TonDauCa)}</td>");
                     sb.Append($"<td colspan=\"{g2Span}\">{PFmt(item.NhapVaoTrongCa)}</td>");
                     sb.Append($"<td colspan=\"{g3Span}\">{PFmt(item.TonCuoiCa)}</td>");
@@ -2080,14 +2353,14 @@ namespace dataproduct.api.Services
 
             // Close footer table: sign row render tách riêng để không chịu border ngoài (outer medium) của footer.
             sb.Append("</table>");
-
+            string labelTPChuKy = key.Contains("BOF") ? config.LabelTruongKip : "Trưởng/Phó kíp";
             // Sign row (outside footer table)
             int truongKipSpan = siloSpan + g1Span + g2Span; // col 1 → N-4
             sb.Append($"<table style=\"width:100%;margin-top:20px; border:none; border-collapse:collapse;\">");
             sb.Append("<tr>");
             sb.Append(
                 $"<td colspan=\"{truongKipSpan}\" style=\"text-align:center;font-weight:bold;border:none;vertical-align:middle;\">"
-                + $"<div style=\"text-align:center;font-weight:bold;\">{config.LabelTruongKip}</div>"
+                + $"<div style=\"text-align:center;font-weight:bold;\">{labelTPChuKy}</div>"
                 + $"{(string.IsNullOrWhiteSpace(chuKyTruongKipHtml) ? "" : chuKyTruongKipHtml)}"
                 + $"{(string.IsNullOrWhiteSpace(truongKipName) ? "" : $"<div style=\"text-align:center;\">{truongKipName}</div>")}"
                 + $"</td>");

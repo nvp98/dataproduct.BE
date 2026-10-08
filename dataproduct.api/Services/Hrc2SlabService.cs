@@ -22,6 +22,7 @@ namespace dataproduct.api.Services
         private readonly IConverter _pdfConverter;
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly BmConfigService _bmConfig;
 
         public Hrc2SlabService(
             IHrc2SlabRepository repo,
@@ -30,7 +31,8 @@ namespace dataproduct.api.Services
             IWebHostEnvironment env,
             IConverter pdfConverter,
             IConfiguration config,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _context = context;
@@ -39,6 +41,7 @@ namespace dataproduct.api.Services
             _pdfConverter = pdfConverter;
             _config = config;
             _httpClientFactory = httpClientFactory;
+            _bmConfig = bmConfig;
         }
 
         public Task<(IEnumerable<Hrc2SlabItem> Data, int TotalCount)> SearchAsync(Hrc2SlabSearchRequest req)
@@ -48,14 +51,20 @@ namespace dataproduct.api.Services
             string? tuNgay, string? denNgay, string? ca, string? kip)
             => _repo.GetTongHopAsync(tuNgay, denNgay, ca, kip);
 
-        public Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca)
-            => _repo.GetPhieuBBSLAsync(kip, ca);
+        public Task<IEnumerable<Hrc2PhieuBBSLItem>> GetPhieuBBSLAsync(string? kip, int? ca, string? tuNgay = null, string? denNgay = null)
+            => _repo.GetPhieuBBSLAsync(kip, ca, tuNgay, denNgay);
 
         public Task<IEnumerable<Hrc2SlabTongHopItem>> GetRuotPhieuAsync(Guid idPhieu)
             => _repo.GetRuotPhieuAsync(idPhieu);
 
-        public Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu)
-            => _repo.GetSlabsByPhieuAsync(idPhieu);
+        public Task<IEnumerable<Hrc2SlabItem>> GetSlabsByPhieuAsync(Guid idPhieu, int? currentUserId = null)
+            => _repo.GetSlabsByPhieuAsync(idPhieu, currentUserId);
+
+        public Task CheckAsync(Hrc2SlabCheckRequest req)
+            => _repo.CheckAsync(req.IdSlabs, req.NguoiThucHien);
+
+        public Task UnCheckAsync(Hrc2SlabCheckRequest req)
+            => _repo.UnCheckAsync(req.IdSlabs, req.NguoiThucHien);
 
         public Task XacNhanAsync(Hrc2XacNhanRequest req)
             => _repo.XacNhanAsync(req.IdSlabs, req.LoaiXacNhan, req.NguoiThucHien);
@@ -70,10 +79,13 @@ namespace dataproduct.api.Services
             => _repo.HuyChotPhieuAsync(req.IdPhieu, req.NguoiThucHien);
 
         public async Task<int> ChuyenBbslAsync(Hrc2ChuyenBbslRequest req)
-            => await _repo.ChuyenBbslAsync(req.IdSlabs, req.IdPhieu, req.NguoiThucHien);
+            => await _repo.ChuyenBbslAsync(req.IdSlabs, req.IdPhieu, req.NguoiThucHien, req.ThoiDiemThaoTac);
 
         public async Task<int> ThuHoiAsync(Hrc2ChuyenBbslRequest req)
             => await _repo.ThuHoiAsync(req.IdSlabs, req.NguoiThucHien);
+
+        public Task<Hrc2SuaKhoiLuongResult> SuaKhoiLuongAsync(Hrc2SuaKhoiLuongRequest req)
+            => _repo.SuaKhoiLuongAsync(req);
 
         // Sync status từ BK_SyncHRC2SlabControl
         public async Task<object?> GetSyncStatusAsync()
@@ -99,12 +111,30 @@ namespace dataproduct.api.Services
 
         // ── Chi tiết Excel (BBGN phôi tấm HRC2) ─────────────────────────────
 
-        public async Task<ExportFileResult> ExportChiTietExcelAsync(Guid idPhieu)
+        public async Task<ExportFileResult> ExportChiTietExcelAsync(Guid idPhieu, int? currentUserId = null)
         {
             var phieu = await GetPhieuAsync(idPhieu);
             var (soPhieu, ngaySX, _, _) = ExtractPhieuInfo(phieu);
 
+            // "Ca BBSL" = Ca + Ngày SX của chính phiếu BBSL đang chứa các slab này (khác "Ca SX" của slab).
+            var caBbsl = phieu?.Ca.HasValue == true && phieu.NgaySX.HasValue
+                ? $"Ca {phieu.Ca}{phieu.Kip} - {phieu.NgaySX:dd/MM/yyyy}"
+                : "";
+
             var trangThais = await GetTrangThaisAsync(idPhieu);
+
+            // "Đã check" chỉ tính riêng cho user hiện tại — độc lập với workflow xác nhận ở trên.
+            HashSet<int> checkedSlabIds = [];
+            if (currentUserId.HasValue && trangThais.Count > 0)
+            {
+                var slabIds = trangThais.Select(t => t.IdSlab).ToList();
+                checkedSlabIds = (await _context.BkHrc2Slab_UserChecks
+                    .AsNoTracking()
+                    .Where(c => c.IdUser == currentUserId.Value && slabIds.Contains(c.IdSlab))
+                    .Select(c => c.IdSlab)
+                    .ToListAsync())
+                    .ToHashSet();
+            }
 
             var templatePath = Path.Combine(_env.WebRootPath, "templates", "HRC2_BBSL_PhoiTam.xlsx");
             if (!File.Exists(templatePath))
@@ -114,6 +144,7 @@ namespace dataproduct.api.Services
             var ws = workbook.Worksheet(1);
 
             const int startRow = 6;
+            const int checkCol = 18;
             var rowIndex = startRow;
             var stt = 1;
 
@@ -126,36 +157,62 @@ namespace dataproduct.api.Services
                     : XLColor.FromHtml("#D9D9D9");
             }
 
+            void SetCheckCell(int r, int c, bool daCheck)
+            {
+                var cell = ws.Cell(r, c);
+                cell.Value = daCheck ? "Đã check" : "";
+                if (daCheck)
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFC000");
+            }
+
+            // Header cột mới — copy style từ header "TT PKH" (cột 17) để đồng bộ giao diện với template có sẵn.
+            var headerRow = startRow - 1;
+            var checkHeaderCell = ws.Cell(headerRow, checkCol);
+            checkHeaderCell.Value = "Đã check";
+            checkHeaderCell.Style = ws.Cell(headerRow, 17).Style;
+            ws.Column(checkCol).Width = 14;
+
             foreach (var tt in trangThais)
             {
                 var slab = tt.Slab;
                 var kt = (slab.ChieuDay != null && slab.ChieuRong != null && slab.ChieuDai != null)
-                    ? $"{slab.ChieuDay}x{slab.ChieuRong}x{slab.ChieuDai}"
+                    ? $"{FmtKichThuoc(slab.ChieuDay.Value)}x{FmtKichThuoc(slab.ChieuRong.Value)}x{FmtKichThuoc(slab.ChieuDai.Value)}"
                     : "";
+
+                // Phôi nguội/nóng xác định theo tiền tố OrderId ("203" = nguội, khác = nóng) — quy ước riêng
+                // cho 2 cột này, khác GetPivotKeys() vốn dựa trên LoaiPhoi cho báo cáo tổng hợp.
+                var klHieuLuc = slab.KhoiLuong_Manual ?? slab.KhoiLuong;
+                var kl = klHieuLuc.HasValue ? (double)klHieuLuc.Value : 0;
+                var laPhoiNguoi = (slab.OrderId ?? "").StartsWith("203");
 
                 if (rowIndex > startRow)
                     ws.Row(startRow).CopyTo(ws.Row(rowIndex));
 
                 ws.Cell(rowIndex, 1).Value = stt;
-                ws.Cell(rowIndex, 2).Value = slab.ShiftName ?? "";
-                ws.Cell(rowIndex, 3).Value = slab.IdSlab ?? "";
-                ws.Cell(rowIndex, 4).Value = slab.OrderId ?? "";
-                ws.Cell(rowIndex, 5).Value = slab.MeThep ?? "";
-                ws.Cell(rowIndex, 6).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
-                ws.Cell(rowIndex, 7).Value = kt;
-                ws.Cell(rowIndex, 8).Value = slab.MacThep ?? "";
-                ws.Cell(rowIndex, 9).Value = slab.KhoiLuong.HasValue ? (double)slab.KhoiLuong.Value : 0;
-                ws.Cell(rowIndex, 10).Value = slab.ChatLuong ?? "";
-                SetTrangThaiCell(rowIndex, 11, tt.TrangThaiDuc);
-                SetTrangThaiCell(rowIndex, 12, tt.TrangThaiKho);
-                SetTrangThaiCell(rowIndex, 13, tt.TrangThaiPKH);
+                ws.Cell(rowIndex, 2).Value = caBbsl;
+                ws.Cell(rowIndex, 3).Value = slab.ShiftName ?? "";
+                ws.Cell(rowIndex, 4).Value = laPhoiNguoi ? kl : 0;
+                ws.Cell(rowIndex, 5).Value = laPhoiNguoi ? 0 : kl;
+                ws.Cell(rowIndex, 6).Value = slab.IdSlab ?? "";
+                ws.Cell(rowIndex, 7).Value = slab.OrderId ?? "";
+                ws.Cell(rowIndex, 8).Value = slab.MeThep ?? "";
+                ws.Cell(rowIndex, 9).Value = slab.MayDuc.HasValue ? $"Máy {slab.MayDuc}" : "";
+                ws.Cell(rowIndex, 10).Value = kt;
+                ws.Cell(rowIndex, 11).Value = slab.MacThep ?? "";
+                ws.Cell(rowIndex, 12).Value = kl;
+                ws.Cell(rowIndex, 13).Value = slab.ChatLuong ?? "";
+                ws.Cell(rowIndex, 14).Value = GetPhanLoaiLabel(slab.PhanLoai);
+                SetTrangThaiCell(rowIndex, 15, tt.TrangThaiDuc);
+                SetTrangThaiCell(rowIndex, 16, tt.TrangThaiKho);
+                SetTrangThaiCell(rowIndex, 17, tt.TrangThaiPKH);
+                SetCheckCell(rowIndex, checkCol, checkedSlabIds.Contains(tt.IdSlab));
 
                 rowIndex++;
                 stt++;
             }
 
             if (rowIndex > startRow)
-                SetThinBorders(ws, startRow, rowIndex - 1, 13);
+                SetThinBorders(ws, startRow, rowIndex - 1, checkCol);
 
             using var ms = new MemoryStream();
             workbook.SaveAs(ms);
@@ -170,7 +227,10 @@ namespace dataproduct.api.Services
         }
 
         // ── Tổng hợp Excel (BBXNSL phôi tấm HRC2) ───────────────────────────
-        // Cột khớp JSON config HRC2_BBGN_PhoiTam.layout[0].columns (27 cột leaf):
+        // Layout ISO cố định của biểu mẫu BM.36/QT.05.15 (27 cột leaf), KHÔNG được đổi cấu trúc dù
+        // dữ liệu "Phôi nóng" hiện chưa có (LoaiPhoi trong DB hiện luôn là "Phôi nguội") — các cột
+        // nóng vẫn phải tồn tại và chỉ render trống/0 khi không có dữ liệu (SetSo/SetKl tự Clear khi
+        // v<=0), không được bỏ cột. Xem GetPivotKeys() để biết cách phân loại nguội/nóng × loại.
         // 1=STT, 2=shiftName, 3=macThep, 4=meThep, 5=kichThuoc,
         // 6-17=phôi nguội (loại I/II/IItp/III/IIItp/ngắndài × so/kl),
         // 18-25=phôi nóng (loại I/II/IItp/IIItp × so/kl),
@@ -179,7 +239,7 @@ namespace dataproduct.api.Services
         public async Task<ExportFileResult> ExportTongHopExcelAsync(Guid idPhieu)
         {
             var phieu = await GetPhieuAsync(idPhieu);
-            var (soPhieu, ngaySX, _, _) = ExtractPhieuInfo(phieu);
+            var (soPhieu, ngaySX, ca, kip) = ExtractPhieuInfo(phieu);
 
             var trangThais = await GetTrangThaisAsync(idPhieu);
             var pivotRows = BuildPivotRows(trangThais);
@@ -191,8 +251,22 @@ namespace dataproduct.api.Services
             using var workbook = new XLWorkbook(templatePath);
             var ws = workbook.Worksheet(1);
 
-            const int startRow = 6;
             const int lastCol = 27;
+
+            // Template: dòng 1 = logo/mã BM, dòng 2 = tiêu đề, dòng 3-5 = header bảng. Chèn sub-title
+            // + khối "Thành phần" giữa tiêu đề và header bảng — cùng vị trí .sub-title/{{ThanhPhanHtml}}
+            // trong HRC2_BBXNSL_PhoiTam.html, cùng thứ tự người (QLCL/Đúc/Kho) với ExportTongHopPdfAsync.
+            var (ducUserId, khoUserId, qlclUserId, userMap) = await GetPhieuSignerUsersAsync(idPhieu);
+            var thanhPhan = new[]
+            {
+                FindUser(qlclUserId, userMap),
+                FindUser(ducUserId, userMap),
+                FindUser(khoUserId, userMap),
+            };
+            var insertedRows = InsertInfoRows(ws, 3, $"{ca}{kip}", ngaySX, thanhPhan, lastCol);
+
+            var startRow = 6 + insertedRows;
+            ws.SheetView.FreezeRows(startRow - 1);
             var rowIndex = startRow;
             var stt = 1;
 
@@ -258,6 +332,8 @@ namespace dataproduct.api.Services
             var lastRow = pivotRows.Count > 0 ? rowIndex : rowIndex - 1;
             if (lastRow >= startRow)
                 SetThinBorders(ws, startRow, lastRow, lastCol);
+
+            AddSignatureBlock(ws, lastRow + 2, lastCol);
 
             using var ms = new MemoryStream();
             workbook.SaveAs(ms);
@@ -338,16 +414,7 @@ namespace dataproduct.api.Services
             rowsHtml.Append($"<td class=\"num\"><strong>{NKl(pivotRows.Sum(r => r.TongKhoiLuong), vi)}</strong></td>");
             rowsHtml.Append("</tr>");
 
-            var (ducUserId, khoUserId, qlclUserId) = await GetPhieuSignersAsync(idPhieu);
-            var signerIds = new[] { ducUserId, khoUserId, qlclUserId }
-                .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
-            var userMap = signerIds.Count > 0
-                ? await _masterCtx.Tbl_TaiKhoan
-                    .Include(t => t.ViTri)
-                    .Include(t => t.PhongBan)
-                    .Where(t => signerIds.Contains(t.ID_TaiKhoan))
-                    .ToDictionaryAsync(t => t.ID_TaiKhoan)
-                : new Dictionary<int, TaiKhoan>();
+            var (ducUserId, khoUserId, qlclUserId, userMap) = await GetPhieuSignerUsersAsync(idPhieu);
 
             var (ducSigImg, ducSigTen) = await BuildSigPartsAsync(ducUserId, userMap);
             var (khoSigImg, khoSigTen) = await BuildSigPartsAsync(khoUserId, userMap);
@@ -364,9 +431,11 @@ namespace dataproduct.api.Services
 
             var html = await File.ReadAllTextAsync(templatePath);
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("HRC2_BBSL_PhoiTam");
 
             html = html
                 .Replace("{{LogoUrl}}",       logoUrl)
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{soPhieu}}", soPhieu)
                 .Replace("{{ngaySX}}", ngaySX)
                 .Replace("{{mayduc}}", phieu?.MayDuc.HasValue == true ? $"Máy {phieu.MayDuc}" : "")
@@ -438,7 +507,7 @@ namespace dataproduct.api.Services
         {
             var soPhieu = phieu?.SoPhieu ?? "";
             string ngaySX = "", ca = "", kip = "";
-
+            kip = phieu?.Kip ?? "";
             if (phieu?.DataJson != null)
             {
                 try
@@ -465,9 +534,7 @@ namespace dataproduct.api.Services
                         // Ca ngày = 1, Ca đêm = 2 — giữ nguyên số để ghép "Kíp: {ca}{kip}" (vd "1A")
                         ca = caVal > 0 ? caVal.ToString() : "";
                     }
-
-                    if (root.TryGetProperty("kip", out var kipProp) && kipProp.ValueKind != JsonValueKind.Null)
-                        kip = kipProp.GetString() ?? "";
+                    
                 }
                 catch { /* ignore parse errors */ }
             }
@@ -512,6 +579,125 @@ namespace dataproduct.api.Services
                 .FirstOrDefault();
 
             return (ducUserId, khoUserId, qlclUserId);
+        }
+
+        // Người ký (Duc/Kho/Qlcl) + thông tin tài khoản — dùng chung cho biên bản PDF và Excel.
+        private async Task<(int? Duc, int? Kho, int? Qlcl, Dictionary<int, TaiKhoan> UserMap)> GetPhieuSignerUsersAsync(Guid idPhieu)
+        {
+            var (ducUserId, khoUserId, qlclUserId) = await GetPhieuSignersAsync(idPhieu);
+            var signerIds = new[] { ducUserId, khoUserId, qlclUserId }
+                .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
+            var userMap = signerIds.Count > 0
+                ? await _masterCtx.Tbl_TaiKhoan
+                    .Include(t => t.ViTri)
+                    .Include(t => t.PhongBan)
+                    .Where(t => signerIds.Contains(t.ID_TaiKhoan))
+                    .ToDictionaryAsync(t => t.ID_TaiKhoan)
+                : new Dictionary<int, TaiKhoan>();
+
+            return (ducUserId, khoUserId, qlclUserId, userMap);
+        }
+
+        private static TaiKhoan? FindUser(int? userId, Dictionary<int, TaiKhoan> userMap)
+            => userId != null && userMap.TryGetValue(userId.Value, out var u) ? u : null;
+
+        private static void StyleTextRange(IXLRange range, bool bold = false, bool italic = false,
+            XLAlignmentHorizontalValues horizontal = XLAlignmentHorizontalValues.Left, double fontSize = 11)
+        {
+            if (range.ColumnCount() > 1) range.Merge();
+            range.Style.Font.FontName = "Times New Roman";
+            range.Style.Font.FontSize = fontSize;
+            range.Style.Font.Bold = bold;
+            range.Style.Font.Italic = italic;
+            range.Style.Alignment.Horizontal = horizontal;
+            range.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        }
+
+        // Chèn từ fromRow (đẩy header bảng xuống), tương ứng .sub-title + .info-wrap trong HTML:
+        //   - sub-title "Máy đúc 1 và 2  Kíp: ..  Ngày: .." (merge A..lastCol, căn giữa)
+        //   - "Chúng tôi gồm:"
+        //   - mỗi thành viên 1 dòng, chia 4 khối cột cố định để Ông/Bà | Chức vụ | BP thẳng hàng dọc
+        //     giữa các dòng (như .info-idx/.info-name/.info-chucvu có độ rộng cố định trong HTML)
+        //   - câu "Cùng nhau thống nhất..." (in nghiêng)
+        // Trả về số dòng đã chèn.
+        private static int InsertInfoRows(IXLWorksheet ws, int fromRow, string kipCa, string ngaySX,
+            IReadOnlyList<TaiKhoan?> thanhPhan, int lastCol)
+        {
+            // Khối cột theo độ rộng template: A = STT, B..D = Ông/Bà, E..H = Chức vụ, I..lastCol = BP
+            const int idxCol = 1, nameCol = 2, nameToCol = 4, chucVuCol = 5, chucVuToCol = 8, bpCol = 9;
+
+            var count = 3 + thanhPhan.Count;
+            ws.Row(fromRow - 1).InsertRowsBelow(count);
+            for (var r = fromRow; r < fromRow + count; r++)
+            {
+                ws.Row(r).Clear();            // bỏ style (font 28pt, border) kế thừa từ dòng tiêu đề
+                ws.Row(r).Height = 18;
+            }
+
+            // Sub-title: căn giữa, phần giá trị Kíp/Ngày in đậm như <strong> trong HTML
+            StyleTextRange(ws.Range(fromRow, 1, fromRow, lastCol), horizontal: XLAlignmentHorizontalValues.Center, fontSize: 12);
+            var sub = ws.Cell(fromRow, 1).CreateRichText();
+            void Run(string text, bool bold) => sub.AddText(text).SetFontName("Times New Roman").SetFontSize(12).SetBold(bold);
+            Run("Máy đúc 1 và 2     Kíp: ", false);
+            Run(kipCa, true);
+            Run("     Ngày: ", false);
+            Run(ngaySX, true);
+
+            var row = fromRow + 1;
+            ws.Cell(row, 1).Value = "Chúng tôi gồm:";
+            StyleTextRange(ws.Range(row, 1, row, lastCol));
+
+            for (var i = 0; i < thanhPhan.Count; i++)
+            {
+                row++;
+                var u = thanhPhan[i];
+
+                ws.Cell(row, idxCol).Value = $"{i + 1}.";
+                StyleTextRange(ws.Range(row, idxCol, row, idxCol), horizontal: XLAlignmentHorizontalValues.Right);
+
+                StyleTextRange(ws.Range(row, nameCol, row, nameToCol));
+                var name = ws.Cell(row, nameCol).CreateRichText();
+                name.AddText("Ông/Bà: ").SetFontName("Times New Roman").SetFontSize(11);
+                name.AddText(u?.HoVaTen ?? "-").SetFontName("Times New Roman").SetFontSize(11).SetBold(u != null);
+
+                ws.Cell(row, chucVuCol).Value = u != null ? $"Chức vụ: {u.ViTri?.TenViTri}" : "";
+                StyleTextRange(ws.Range(row, chucVuCol, row, chucVuToCol));
+
+                ws.Cell(row, bpCol).Value = u != null ? $"BP: {u.PhongBan?.TenNgan}" : "";
+                StyleTextRange(ws.Range(row, bpCol, row, lastCol));
+            }
+
+            row++;
+            ws.Cell(row, 1).Value = "Cùng nhau thống nhất lập Biên bản xác nhận sản lượng phôi tấm chi tiết như sau:";
+            StyleTextRange(ws.Range(row, 1, row, lastCol), italic: true);
+
+            return count;
+        }
+
+        // Khung ký cuối biên bản — 2 khu vực NM.HRC2 | P.QLCL như .signatures trong
+        // HRC2_BBXNSL_PhoiTam.html, nhưng để trống chữ ký/họ tên để nhà máy in ra ký tay.
+        private static void AddSignatureBlock(IXLWorksheet ws, int row, int lastCol)
+        {
+            // Chia đôi theo tổng độ rộng cột (các cột B..H trong template rộng hơn) để 2 khu vực cân nhau
+            var totalWidth = Enumerable.Range(1, lastCol).Sum(c => ws.Column(c).Width);
+            var splitCol = 1;
+            for (double acc = ws.Column(1).Width; acc < totalWidth / 2 && splitCol < lastCol - 1; acc += ws.Column(splitCol).Width)
+                splitCol++;
+
+            void Area(int fromCol, int toCol, string title)
+            {
+                ws.Cell(row, fromCol).Value = title;
+                StyleTextRange(ws.Range(row, fromCol, row, toCol), bold: true, horizontal: XLAlignmentHorizontalValues.Center);
+
+                ws.Cell(row + 1, fromCol).Value = "(Ký, ghi rõ họ tên)";
+                var note = ws.Range(row + 1, fromCol, row + 1, toCol);
+                StyleTextRange(note, italic: true, horizontal: XLAlignmentHorizontalValues.Center);
+                note.Style.Font.FontColor = XLColor.FromHtml("#555555");
+            }
+
+            Area(1, splitCol, "NM.HRC2");
+            Area(splitCol + 1, lastCol, "P.QLCL");
+            ws.Row(row + 2).Height = 60;      // chừa chỗ ký tay
         }
 
         // Dòng "Thành phần" trong biên bản PDF — cùng nguồn dữ liệu với chữ ký (Duc/Kho/Qlcl),
@@ -568,27 +754,54 @@ namespace dataproduct.api.Services
             catch { return ""; }
         }
 
-        // Dịch getColKeys() của FE sang C# — xác định cột pivot từ loaiPhoi + chatLuongTPHH
-        private static (string? SoKey, string? KlKey) GetPivotKeys(string? loaiPhoi, string? chatLuong)
+        // Nhãn hiển thị của PhanLoai (L1/L2/L2TP/L3/L3TP/ND/PP) — đồng bộ với HRC2_PHAN_LOAI_LABEL
+        // ở dataproduct.UI/src/utils/enums/Hrc2PhanLoaiEnum.ts, phải sửa cả hai nơi khi đổi nhãn.
+        private static readonly Dictionary<string, string> Hrc2PhanLoaiLabel = new()
+        {
+            ["L1"]   = "Loại 1",
+            ["L2"]   = "Loại 2",
+            ["L2TP"] = "Loại 2 TP",
+            ["L3"]   = "Loại 3",
+            ["L3TP"] = "Loại 3 TP",
+            ["ND"]   = "Ngắn dài",
+            ["PP"]   = "Phế phẩm",
+        };
+
+        private static string GetPhanLoaiLabel(string? phanLoai)
+            => string.IsNullOrEmpty(phanLoai) ? "" : Hrc2PhanLoaiLabel.GetValueOrDefault(phanLoai, phanLoai);
+
+        // Xác định cột pivot (nguội/nóng × loại) cho biểu mẫu ISO cố định (BM.36/QT.05.15 — layout
+        // 10 nhóm, KHÔNG được đổi: nguội có 6 nhóm loại1/2/2TP/3/3TP/ngắn-dài, nóng chỉ có 4 nhóm
+        // loại1/2/2TP/3TP, không có "loại 3" hay "ngắn dài" riêng cho nóng).
+        // nguội/nóng lấy từ LoaiPhoi (field thô từ BKMIS, đáng tin cho việc này). Nhóm con (loại
+        // mấy) lấy từ PhanLoai (L1/L2/L2TP/L3/L3TP/ND/PP — field đã tính đúng, đồng bộ qua
+        // usp_SyncBK_HRC2_Slab) thay vì ChatLuongTPHH cũ (chỉ có text "Loại 1/2/3", không đủ chi
+        // tiết để tách L2TP/L3TP/ND). PP (phế phẩm) không có cột trong biểu mẫu ISO → không match,
+        // vẫn được cộng vào TongSoPhoi/TongKhoiLuong nhưng không lên cột phân loại nào.
+        private static (string? SoKey, string? KlKey) GetPivotKeys(string? loaiPhoi, string? phanLoai)
         {
             var lp = loaiPhoi ?? "";
-            var cl = chatLuong ?? "";
             var isNguoi = Regex.IsMatch(lp, "nguội|nguoi", RegexOptions.IgnoreCase);
             var isNong  = Regex.IsMatch(lp, "nóng|nong",   RegexOptions.IgnoreCase);
             if (!isNguoi && !isNong) return (null, null);
             var p = isNguoi ? "nguoi" : "nong";
-            string? mid = null;
-            if      (Regex.IsMatch(cl, @"iii.*th[àa]nh|3.*th[àa]nh", RegexOptions.IgnoreCase)) mid = "loai3tp";
-            else if (Regex.IsMatch(cl, @"\biii\b|\b3\b",              RegexOptions.IgnoreCase)) mid = isNguoi ? "loai3" : null;
-            else if (Regex.IsMatch(cl, @"ii.*th[àa]nh|2.*th[àa]nh",  RegexOptions.IgnoreCase)) mid = "loai2tp";
-            else if (Regex.IsMatch(cl, @"\bii\b|\b2\b",               RegexOptions.IgnoreCase)) mid = "loai2";
-            else if (Regex.IsMatch(cl, @"\bi\b|\b1\b",                RegexOptions.IgnoreCase)) mid = "loai1";
-            else if (isNguoi && Regex.IsMatch(cl, @"ng[aắ]n",         RegexOptions.IgnoreCase)) mid = "nganDai";
+
+            string? mid = phanLoai switch
+            {
+                "L1"   => "loai1",
+                "L2"   => "loai2",
+                "L2TP" => "loai2tp",
+                "L3"   => isNguoi ? "loai3" : null,   // nóng không có cột "Loại III" riêng
+                "L3TP" => "loai3tp",
+                "ND"   => isNguoi ? "nganDai" : null, // nóng không có cột "Ngắn dài"
+                _      => null,                       // PP hoặc PhanLoai chưa xác định
+            };
             if (mid == null) return (null, null);
             return ($"{p}_{mid}_so", $"{p}_{mid}_kl");
         }
 
-        // Pivot row — nhóm theo (meThep, macThep, kichThuoc), phân loại theo loaiPhoi + chatLuongTPHH
+        // Pivot row — nhóm theo (meThep, macThep, kichThuoc), phân loại theo nguội/nóng (LoaiPhoi) ×
+        // loại 1/2/2TP/3/3TP/ngắn dài (PhanLoai) — đúng layout ISO cố định của biểu mẫu.
         private class TongHopPivotRow
         {
             public string ShiftName = "";
@@ -637,8 +850,8 @@ namespace dataproduct.api.Services
                 if (!string.IsNullOrEmpty(slab.ShiftName))
                     row._shiftNames.Add(slab.ShiftName);
 
-                var kl = slab.KhoiLuong ?? 0;
-                var (soKey, _) = GetPivotKeys(slab.LoaiPhoi, slab.ChatLuongTPHH);
+                var kl = slab.KhoiLuong_Manual ?? slab.KhoiLuong ?? 0;
+                var (soKey, _) = GetPivotKeys(slab.LoaiPhoi, slab.PhanLoai);
 
                 switch (soKey)
                 {

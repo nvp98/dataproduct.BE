@@ -634,7 +634,7 @@ namespace dataproduct.api.Services
             html = html
                 .Replace("{{LogoUrl}}", logoBase64)
                 .Replace("{{LoCao}}", loCao)
-                .Replace("{{CaLabel}}", $"{caLabel} {kip}")
+                .Replace("{{CaLabel}}", $"{caLabel}{kip}")
                 .Replace("{{NgaySX}}", ngayDisplay)
                 .Replace("{{Rows}}", rows.ToString())
                 .Replace("{{TongKhoiLuong}}", tongKL.ToString("N3"))

@@ -27,6 +27,7 @@ namespace dataproduct.api.Services
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
         private readonly string _gangLongConnStr;
+        private readonly BmConfigService _bmConfig;
 
         public BBGN_ThepLongService(
             IBBGN_ThepLongRepository repo,
@@ -36,7 +37,8 @@ namespace dataproduct.api.Services
             SyncPhanLoaiService syncPhanLoaiService,
             PheDuyetService pheDuyetService,
             IConverter pdfConverter,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            BmConfigService bmConfig)
         {
             _repo = repo;
             _context = context;
@@ -50,6 +52,7 @@ namespace dataproduct.api.Services
                 config.GetConnectionString("GangLongDbConnection")
                 ?? config.GetConnectionString("MasterDbConnection")
                 ?? throw new InvalidOperationException("GangLongDbConnection/MasterDbConnection connection string is not configured");
+            _bmConfig = bmConfig;
         }
 
         public async Task<List<string>> SaveHRC2BBGNThepLongAsync(JsonElement formData, Guid idPhieu)
@@ -965,8 +968,10 @@ namespace dataproduct.api.Services
             var html = await File.ReadAllTextAsync(templatePath);
 
             var logoUrl = $"data:image/png;base64,{Convert.ToBase64String(await File.ReadAllBytesAsync(Path.Combine(_env.WebRootPath, "imgs", "LogoPDF.png")))}";
+            var bmCode = await _bmConfig.GetBmCodeHtmlAsync("BBGN_ThepLong");
             html = html
                 .Replace("{{LogoUrl}}", logoUrl)
+                .Replace("{{BmCode}}", bmCode)
                 .Replace("{{Ca}}", ca.ToString())
                 .Replace("{{Kip}}", kip)
                 .Replace("{{TuGio}}", tuGio)

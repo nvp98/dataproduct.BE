@@ -50,9 +50,11 @@ namespace dataproduct.api.Controllers
         [HttpGet("phieu-bbsl")]
         public async Task<IActionResult> GetPhieuBBSL(
             [FromQuery] string? kip,
-            [FromQuery] int? ca)
+            [FromQuery] int? ca,
+            [FromQuery] string? tuNgay,
+            [FromQuery] string? denNgay)
         {
-            var data = await _svc.GetPhieuBBSLAsync(kip, ca);
+            var data = await _svc.GetPhieuBBSLAsync(kip, ca, tuNgay, denNgay);
             return Ok(data);
         }
 
@@ -66,9 +68,9 @@ namespace dataproduct.api.Controllers
 
         /// <summary>Danh sách slab cá nhân thuộc phiếu (đã chuyển KCS)</summary>
         [HttpGet("slabs-by-phieu/{idPhieu:guid}")]
-        public async Task<IActionResult> GetSlabsByPhieu(Guid idPhieu)
+        public async Task<IActionResult> GetSlabsByPhieu(Guid idPhieu, [FromQuery] int? currentUserId = null)
         {
-            var data = await _svc.GetSlabsByPhieuAsync(idPhieu);
+            var data = await _svc.GetSlabsByPhieuAsync(idPhieu, currentUserId);
             return Ok(data);
         }
 
@@ -104,6 +106,21 @@ namespace dataproduct.api.Controllers
             });
         }
 
+        /// <summary>KCS sửa tay khối lượng 1 slab (chưa lên BBSL). Nhập bằng KL gốc = khôi phục KL nhà máy.</summary>
+        [HttpPost("sua-khoi-luong")]
+        public async Task<IActionResult> SuaKhoiLuong([FromBody] Hrc2SuaKhoiLuongRequest request)
+        {
+            try
+            {
+                var result = await _svc.SuaKhoiLuongAsync(request);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // ── Đúc/Kho Workflow ─────────────────────────────────────────────────
 
         [HttpPost("xac-nhan")]
@@ -136,6 +153,38 @@ namespace dataproduct.api.Controllers
             {
                 Success = true,
                 Message = $"Đã hủy xác nhận ({request.LoaiXacNhan}) {request.IdSlabs.Count} slab.",
+                AffectedRows = request.IdSlabs.Count
+            });
+        }
+
+        // ── Đánh dấu "đã check" (độc lập theo user, không thuộc workflow xác nhận) ──
+
+        [HttpPost("check")]
+        public async Task<IActionResult> Check([FromBody] Hrc2SlabCheckRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            await _svc.CheckAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã đánh dấu check {request.IdSlabs.Count} slab.",
+                AffectedRows = request.IdSlabs.Count
+            });
+        }
+
+        [HttpPost("un-check")]
+        public async Task<IActionResult> UnCheck([FromBody] Hrc2SlabCheckRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            await _svc.UnCheckAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã bỏ check {request.IdSlabs.Count} slab.",
                 AffectedRows = request.IdSlabs.Count
             });
         }
@@ -196,11 +245,12 @@ namespace dataproduct.api.Controllers
         // ── Export ────────────────────────────────────────────────────────────
 
         [HttpGet("export/excel")]
-        public async Task<IActionResult> ExportExcel([FromQuery] Guid idPhieu, [FromQuery] string tab = "chitiet")
+        public async Task<IActionResult> ExportExcel(
+            [FromQuery] Guid idPhieu, [FromQuery] string tab = "chitiet", [FromQuery] int? currentUserId = null)
         {
             var result = tab == "tonghop"
                 ? await _svc.ExportTongHopExcelAsync(idPhieu)
-                : await _svc.ExportChiTietExcelAsync(idPhieu);
+                : await _svc.ExportChiTietExcelAsync(idPhieu, currentUserId);
             return File(result.Content, result.ContentType, result.FileName);
         }
 

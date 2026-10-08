@@ -100,7 +100,14 @@ namespace dataproduct.api.Controllers
             if (request.LoaiXacNhan != "Duc" && request.LoaiXacNhan != "Can" && request.LoaiXacNhan != "C4")
                 return BadRequest("LoaiXacNhan phải là 'Duc', 'Can' hoặc 'C4'.");
 
-            await _svc.XacNhanAsync(request);
+            try
+            {
+                await _svc.XacNhanAsync(request);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             return Ok(new WorkflowResult
             {
                 Success = true,
@@ -198,6 +205,77 @@ namespace dataproduct.api.Controllers
             {
                 return NotFound(new { message = ex.Message });
             }
+        }
+
+        // ── Thêm mới slab thủ công ────────────────────────────────────────────
+
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateSlab([FromBody] Hrc1SlabCreateRequest req)
+        {
+            try
+            {
+                var item = await _svc.CreateSlabAsync(req);
+                return Ok(item);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // ── Sửa slab thủ công ──────────────────────────────────────────────
+
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> EditSlab(int id, [FromBody] Hrc1SlabEditRequest req)
+        {
+            try
+            {
+                await _svc.EditSlabAsync(id, req);
+                return Ok(new WorkflowResult { Success = true, Message = "Đã cập nhật slab.", AffectedRows = 1 });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // ── Xóa mềm / Khôi phục slab ─────────────────────────────────────────
+
+        [HttpPost("xoa")]
+        public async Task<IActionResult> DeleteSlabs([FromBody] Hrc1SlabDeleteRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            try
+            {
+                var affected = await _svc.DeleteSlabsAsync(request);
+                return Ok(new WorkflowResult
+                {
+                    Success = true,
+                    Message = $"Đã xóa {affected} slab.",
+                    AffectedRows = affected
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("khoi-phuc")]
+        public async Task<IActionResult> RestoreSlabs([FromBody] Hrc1SlabDeleteRequest request)
+        {
+            if (request.IdSlabs.Count == 0)
+                return BadRequest("Danh sách slab không được rỗng.");
+
+            var affected = await _svc.RestoreSlabsAsync(request);
+            return Ok(new WorkflowResult
+            {
+                Success = true,
+                Message = $"Đã khôi phục {affected} slab.",
+                AffectedRows = affected
+            });
         }
 
         // ── Tổng hợp ghi chú ─────────────────────────────────────────────────
