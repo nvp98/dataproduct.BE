@@ -879,6 +879,10 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.Mac).HasMaxLength(100);
             entity.Property(e => e.KichThuoc).HasMaxLength(100);
             entity.Property(e => e.IsXacNhan).HasColumnName("IsXacNhan");
+            entity.Property(e => e.MaVatTu).HasMaxLength(50);
+            entity.Property(e => e.TenVatTu).HasMaxLength(200);
+            entity.Property(e => e.IsSync).HasColumnName("isSync");
+            entity.Property(e => e.IsLock).HasColumnName("isLock");
         });
 
         // --- HRC1 ---
