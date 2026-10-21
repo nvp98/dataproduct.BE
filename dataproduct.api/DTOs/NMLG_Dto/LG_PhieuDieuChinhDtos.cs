@@ -84,6 +84,10 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     // Dùng khi lưu (ghi đè toàn bộ) danh sách chi tiết của 1 phiếu
     public class SaveLG_PhieuDieuChinhChiTietDto
     {
+        // null/0 = dòng mới; có giá trị = dòng đã lưu (cập nhật tại chỗ, không xóa-ghi lại)
+        public long? Id { get; set; }
+        // ThoiGianSua của dòng lúc FE tải — dùng phát hiện người khác đã sửa dòng này
+        public DateTime? ThoiGianSua { get; set; }
         public int? IdNVL { get; set; }
         public string TenNVL { get; set; } = string.Empty;
         public int? IdNVLChiTiet { get; set; }
@@ -117,6 +121,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         public string? NguoiSua { get; set; }
         public List<SaveLG_PhieuDieuChinhChiTietDto> Items { get; set; } = new();
+        // ID các dòng người dùng đã xóa trên giao diện (xóa mềm ở BE)
+        public List<long> DeletedIds { get; set; } = new();
     }
 
     public class SyncLG_PhieuDieuChinhTuBBGNRequest

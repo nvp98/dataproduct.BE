@@ -1,4 +1,5 @@
 using dataproduct.api.DTOs.NMLG_Dto;
+using dataproduct.api.Models;
 using dataproduct.api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +21,7 @@ namespace dataproduct.api.Controllers
         }
 
         // Danh sách chi tiết BBGN (gồm Tên NVL) theo Ngày/Ca/Kíp — nguồn dữ liệu cho Phiếu điều chỉnh.
-        [HttpGet("get-bbgn")]
+        [HttpGet("nguondulieu/bbgn")]
         public async Task<IActionResult> GetBBGN(
             [FromQuery] DateTime ngay,
             [FromQuery] int? ca,
@@ -38,7 +39,7 @@ namespace dataproduct.api.Controllers
 
         // Danh sách chi tiết Nạp liệu lò cao (gồm Tên NVL) theo Ngày/Ca/Kíp — nguồn "Nội bộ -
         // Xuất SX" cho Phiếu điều chỉnh.
-        [HttpGet("get-naplieulocao")]
+        [HttpGet("nguondulieu/nap-lieu-lo-cao")]
         public async Task<IActionResult> GetNapLieuLoCao(
             [FromQuery] DateTime ngay,
             [FromQuery] int? ca,
@@ -56,7 +57,7 @@ namespace dataproduct.api.Controllers
 
         // Gộp cả 2 nguồn (SP_Get_BBGN + Sp_GetNVLNapLieuLoCao) theo Ngày/Ca/Kíp — dùng cho phiếu
         // MỚI (chưa lưu): 1 lần gọi nạp dữ liệu cho cả 2 Tab (Nhập - Xuất / Nội bộ - Xuất SX).
-        [HttpGet("get-nguon")]
+        [HttpGet("nguondulieu")]
         public async Task<IActionResult> GetNguon(
             [FromQuery] DateTime ngay,
             [FromQuery] int? ca,
@@ -73,7 +74,7 @@ namespace dataproduct.api.Controllers
         }
 
         // Danh sách chi tiết đã lưu của 1 Phiếu điều chỉnh (LG_PhieuDieuChinh_ChiTiet)
-        [HttpGet("{idPhieu}/chi-tiet")]
+        [HttpGet("{idPhieu:guid}/chi-tiet")]
         public async Task<IActionResult> GetChiTiet(Guid idPhieu)
         {
             try
@@ -84,20 +85,21 @@ namespace dataproduct.api.Controllers
         }
 
         // Ghi đè toàn bộ chi tiết của phiếu (xóa cũ, ghi lại theo danh sách mới) — gọi mỗi lần Lưu
-        [HttpPut("{idPhieu}/chi-tiet")]
+        [HttpPut("{idPhieu:guid}/chi-tiet")]
         public async Task<IActionResult> ReplaceChiTiet(Guid idPhieu, [FromBody] ReplaceLG_PhieuDieuChinhChiTietRequest request)
         {
             try
             {
-                await _service.ReplaceChiTietAsync(idPhieu, request.Items, request.NguoiSua);
+                await _service.ReplaceChiTietAsync(idPhieu, request.Items, request.DeletedIds, request.NguoiSua);
                 return Ok(await _service.GetChiTietByPhieuAsync(idPhieu));
             }
+            catch (ChiTietConflictException ex) { return Conflict(new { message = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
         // Tải dữ liệu nguồn từ BBGN và insert thẳng vào LG_PhieuDieuChinh_ChiTiet cho phiếu ĐÃ LƯU
         // (giống luồng "Tải dữ liệu" của Nạp liệu lò cao — xem SyncChiTietFromBBGNAsync).
-        [HttpPost("{idPhieu}/sync-tu-bbgn")]
+        [HttpPost("{idPhieu:guid}/dong-bo/bbgn")]
         public async Task<IActionResult> SyncTuBBGN(Guid idPhieu, [FromBody] SyncLG_PhieuDieuChinhTuBBGNRequest? request)
         {
             try
@@ -110,8 +112,8 @@ namespace dataproduct.api.Controllers
         }
 
         // Tải dữ liệu nguồn từ Nạp liệu lò cao và insert thẳng vào LG_PhieuDieuChinh_ChiTiet cho
-        // phiếu ĐÃ LƯU (LoaiDieuChinh = 2, "Nội bộ - Xuất SX") — song song với sync-tu-bbgn.
-        [HttpPost("{idPhieu}/sync-tu-naplieulocao")]
+        // phiếu ĐÃ LƯU (LoaiDieuChinh = 2, "Nội bộ - Xuất SX") — song song với dong-bo/bbgn.
+        [HttpPost("{idPhieu:guid}/dong-bo/nap-lieu-lo-cao")]
         public async Task<IActionResult> SyncTuNapLieuLoCao(Guid idPhieu, [FromBody] SyncLG_PhieuDieuChinhTuBBGNRequest? request)
         {
             try
@@ -125,7 +127,7 @@ namespace dataproduct.api.Controllers
 
         // Gộp cả 2 nguồn cho phiếu ĐÃ LƯU — 1 lần bấm "Tải dữ liệu nguồn" đồng bộ cả BBGN lẫn
         // Nạp liệu lò cao vào LG_PhieuDieuChinh_ChiTiet (mỗi nguồn chỉ chạm đúng dòng của nó).
-        [HttpPost("{idPhieu}/sync-tu-nguon")]
+        [HttpPost("{idPhieu:guid}/dong-bo")]
         public async Task<IActionResult> SyncTuNguon(Guid idPhieu, [FromBody] SyncLG_PhieuDieuChinhTuBBGNRequest? request)
         {
             try
@@ -139,7 +141,7 @@ namespace dataproduct.api.Controllers
 
         // Tích/hủy tích xác nhận "Người điều chỉnh giao" cho 1 dòng chi tiết — lưu ngay, không
         // cần chờ Lưu cả phiếu. Chỉ gọi được với dòng đã có Id thật (đã Lưu hoặc đã sync BBGN).
-        [HttpPut("chi-tiet/xac-nhan-giao/{id}")]
+        [HttpPut("chi-tiet/{id:long}/xac-nhan-giao")]
         public async Task<IActionResult> XacNhanGiao(long id, [FromBody] XacNhanChiTietDto dto)
         {
             try
@@ -148,12 +150,13 @@ namespace dataproduct.api.Controllers
                 if (result == null) return NotFound(new { message = "Không tìm thấy dòng chi tiết." });
                 return Ok(result);
             }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
         // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ──────────────────────────────
 
-        [HttpGet("nvl")]
+        [HttpGet("danh-muc-nvl")]
         public async Task<IActionResult> GetNvlList([FromQuery] bool onlyActive = true)
         {
             try
@@ -163,7 +166,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPost("nvl")]
+        [HttpPost("danh-muc-nvl")]
         public async Task<IActionResult> CreateNvl([FromBody] CreateLGPhieuDieuChinhNvlDto dto)
         {
             try
@@ -176,7 +179,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpPut("nvl/{id}")]
+        [HttpPut("danh-muc-nvl/{id:int}")]
         public async Task<IActionResult> UpdateNvl(int id, [FromBody] UpdateLGPhieuDieuChinhNvlDto dto)
         {
             try
@@ -191,7 +194,7 @@ namespace dataproduct.api.Controllers
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 
-        [HttpDelete("nvl/{id}")]
+        [HttpDelete("danh-muc-nvl/{id:int}")]
         public async Task<IActionResult> DeleteNvl(int id)
         {
             try

@@ -625,7 +625,8 @@ namespace dataproduct.api.Repositories
         Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
 
         Task<List<LG_PhieuDieuChinh_ChiTiet>> GetChiTietByPhieuAsync(Guid idPhieu);
-        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities);
+        // Upsert theo ID (không xóa-ghi lại cả bảng) + xóa mềm các ID trong deletedIds.
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds, string? nguoiSua);
         Task<LG_PhieuDieuChinh_ChiTiet?> UpdateXacNhanGiaoAsync(long id, int? nguoiDieuChinhGiao, DateTime? thoiGianDieuChinhGiao, int trangThai);
         Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromBBGNAsync(Guid idPhieu, List<BBGNChiTietResult> bbgnData, string? nguoiThucHien);
         Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromNapLieuLoCaoAsync(Guid idPhieu, List<NapLieuLoCaoDieuChinhResult> rows, string? nguoiThucHien);

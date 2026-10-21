@@ -217,11 +217,15 @@ namespace dataproduct.api.Services
 
         // Ghi đè toàn bộ chi tiết của 1 phiếu (xóa cũ, ghi lại theo danh sách mới) —
         // dùng mỗi lần người dùng bấm Lưu trên trang Tạo/Sửa phiếu điều chỉnh.
-        public async Task ReplaceChiTietAsync(Guid idPhieu, List<SaveLG_PhieuDieuChinhChiTietDto> items, string? nguoiSua)
+        public async Task ReplaceChiTietAsync(
+            Guid idPhieu, List<SaveLG_PhieuDieuChinhChiTietDto> items, List<long>? deletedIds, string? nguoiSua)
         {
             var now = DateTime.Now;
             var entities = items.Select(i => new LG_PhieuDieuChinh_ChiTiet
             {
+                // Dòng đã lưu mang ID thật; ThoiGianSua của dòng đã lưu ở đây là "phiên bản FE đã
+                // tải" để repository so với DB (khóa lạc quan), không phải thời điểm sửa mới.
+                ID = i.Id ?? 0,
                 IDPhieu = idPhieu,
                 IDNVL = i.IdNVL,
                 // Tách rõ theo đúng không gian ID nguồn dựa trên LoaiDieuChinh — xem comment ở
@@ -252,7 +256,7 @@ namespace dataproduct.api.Services
                 NguoiTao = nguoiSua,
                 ThoiGianTao = now,
                 NguoiSua = nguoiSua,
-                ThoiGianSua = now,
+                ThoiGianSua = (i.Id ?? 0) > 0 ? i.ThoiGianSua : now,
                 IsDelete = false,
                 NguoiDieuChinhGiao = i.NguoiDieuChinhGiao,
                 ThoiGianDieuChinhGiao = i.ThoiGianDieuChinhGiao,
@@ -262,7 +266,7 @@ namespace dataproduct.api.Services
                 ID_CT_BBGN = i.IdCtBBGN,
             }).ToList();
 
-            await _repository.ReplaceChiTietAsync(idPhieu, entities);
+            await _repository.ReplaceChiTietAsync(idPhieu, entities, deletedIds ?? new List<long>(), nguoiSua);
         }
 
         // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ──────────────────────────────
