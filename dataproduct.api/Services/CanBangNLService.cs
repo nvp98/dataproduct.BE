@@ -23,7 +23,8 @@ namespace dataproduct.api.Services
 
         public Task<CanBangNLConfig> GetConfigAsync() => _configHelper.GetAsync();
 
-        public async Task<List<CanBangNLMaterialBalanceDto>> GetCanBangAsync(DateTime ngay, int? ca, bool coAm, int? idLoCao)
+        public async Task<List<CanBangNLMaterialBalanceDto>> GetCanBangAsync(
+            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao)
         {
             var cfg = await _configHelper.GetAsync();
             var result = new List<CanBangNLMaterialBalanceDto>();
@@ -40,8 +41,8 @@ namespace dataproduct.api.Services
                     StandardOperator = rule.Standard.LossRate.Operator,
                     StandardAbsolute = rule.Standard.LossRate.Absolute
                 };
-                dto.Generators = await BuildItemsAsync(cfg, rule.Generator.Items, ngay, ca, coAm, idLoCao, dto.Notes);
-                dto.Consumers = await BuildItemsAsync(cfg, rule.Consumer.Items, ngay, ca, coAm, idLoCao, dto.Notes);
+                dto.Generators = await BuildItemsAsync(cfg, rule.Generator.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes);
+                dto.Consumers = await BuildItemsAsync(cfg, rule.Consumer.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes);
                 result.Add(dto);
             }
             return result;
@@ -86,7 +87,7 @@ namespace dataproduct.api.Services
                         Ca = c,
                         Generator = gen,
                         Consumer = cons,
-                        LossRate = gen == 0 ? null : Math.Round((gen - cons) / gen * 100, 2)
+                        LossRate = gen == 0 ? null : Math.Round((cons - gen) / gen * 100, 2)
                     });
                 }
             }
@@ -95,12 +96,12 @@ namespace dataproduct.api.Services
 
         private async Task<List<CanBangNLBalanceItemDto>> BuildItemsAsync(
             CanBangNLConfig cfg, List<CanBangNLItemConfig> items,
-            DateTime ngay, int? ca, bool coAm, int? idLoCao, List<string> notes)
+            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao, List<string> notes)
         {
             var result = new List<CanBangNLBalanceItemDto>();
             foreach (var item in items)
             {
-                var (rows, note) = await LoadItemAsync(cfg, item, ngay, ngay, idLoCao, ca);
+                var (rows, note) = await LoadItemAsync(cfg, item, tuNgay, denNgay, idLoCao, ca);
                 if (note != null) notes.Add(note);
                 if (ca.HasValue) rows = rows.Where(r => r.Ca == ca).ToList();
 

@@ -14,15 +14,16 @@ namespace dataproduct.api.Controllers
             _service = service;
         }
 
-        // GET api/CanBangNL?ngay=2026-09-20&ca=1&coAm=true&idLoCao=1
+        // GET api/CanBangNL?tuNgay=2026-09-01&denNgay=2026-09-20&ca=1&coAm=true&idLoCao=1
         [HttpGet]
         public async Task<IActionResult> Get(
-            [FromQuery] DateTime ngay,
+            [FromQuery] DateTime tuNgay,
+            [FromQuery] DateTime denNgay,
             [FromQuery] int? ca,
             [FromQuery] bool coAm = true,
             [FromQuery] int? idLoCao = null)
         {
-            try { return Ok(await _service.GetCanBangAsync(ngay, ca, coAm, idLoCao)); }
+            try { return Ok(await _service.GetCanBangAsync(tuNgay, denNgay, ca, coAm, idLoCao)); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.GetBaseException().Message }); }
             catch (Exception ex) { return StatusCode(500, new { message = ex.GetBaseException().Message }); }
         }
