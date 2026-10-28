@@ -111,6 +111,93 @@ namespace dataproduct.api.Repositories
                 .ToList();
         }
 
+        // ─── LGTSL_TONCUOI ────────────────────────────────────────────────────────
+
+        public async Task<List<CanBangNLSourceRow>> ExecLgtslTonCuoiAsync(
+            DateTime tuNgay, DateTime denNgay, int? ca, int? idLoCao,
+            CanBangNLSourceConfig src, List<string> tenSiLoList, string mode)
+        {
+            var caList = ca.HasValue ? new[] { ca.Value } : new[] { 1, 2 };
+            var loCaoList = idLoCao.HasValue ? new[] { idLoCao.Value } : src.LoCaoList.ToArray();
+            var rows = new List<CanBangNLSourceRow>();
+
+            foreach (var caVal in caList)
+            {
+                if (mode.Equals("DELTA", StringComparison.OrdinalIgnoreCase))
+                {
+                    // DELTA = TonCuoiKy - TonDauKy trong 1 call
+                    var endNgay = denNgay.Date;
+                    var beginNgay = caVal == 1 ? tuNgay.Date.AddDays(-1) : tuNgay.Date;
+                    var beginCa = caVal == 1 ? 2 : 1;
+
+                    decimal tonEnd = 0m, tonBegin = 0m;
+                    foreach (var lc in loCaoList)
+                    {
+                        await _siloSem.WaitAsync();
+                        try
+                        {
+                            await using var scope = _scopeFactory.CreateAsyncScope();
+                            var tslRepo = scope.ServiceProvider.GetRequiredService<ILGTSLRepository>();
+                            tonEnd += await tslRepo.GetTonCuoiSumAsync(endNgay, caVal, lc, tenSiLoList);
+                            tonBegin += await tslRepo.GetTonCuoiSumAsync(beginNgay, beginCa, lc, tenSiLoList);
+                        }
+                        finally { _siloSem.Release(); }
+                    }
+
+                    rows.Add(new CanBangNLSourceRow
+                    {
+                        Ngay = endNgay,
+                        Ca = caVal,
+                        BreakdownKey = 0,
+                        BreakdownName = null,
+                        BreakdownOrder = 0,
+                        KhoiLuongAm = tonEnd - tonBegin,
+                        KhoiLuongKho = tonEnd - tonBegin,
+                    });
+                    continue;
+                }
+
+                DateTime queryNgay;
+                int queryCa;
+                if (mode.Equals("BEGIN", StringComparison.OrdinalIgnoreCase))
+                {
+                    queryNgay = caVal == 1 ? tuNgay.Date.AddDays(-1) : tuNgay.Date;
+                    queryCa = caVal == 1 ? 2 : 1;
+                }
+                else // END
+                {
+                    queryNgay = denNgay.Date;
+                    queryCa = caVal;
+                }
+
+                decimal total = 0m;
+                foreach (var lc in loCaoList)
+                {
+                    await _siloSem.WaitAsync();
+                    try
+                    {
+                        await using var scope = _scopeFactory.CreateAsyncScope();
+                        var tslRepo = scope.ServiceProvider.GetRequiredService<ILGTSLRepository>();
+                        total += await tslRepo.GetTonCuoiSumAsync(queryNgay, queryCa, lc, tenSiLoList);
+                    }
+                    finally { _siloSem.Release(); }
+                }
+
+                rows.Add(new CanBangNLSourceRow
+                {
+                    Ngay = queryNgay,
+                    Ca = caVal,
+                    BreakdownKey = 0,
+                    BreakdownName = null,
+                    BreakdownOrder = 0,
+                    KhoiLuongAm = total,
+                    KhoiLuongKho = total,
+                });
+            }
+
+            return rows;
+        }
+
         private async Task<List<CanBangNLSourceRow>> FetchSingleAsync(
             DateTime ngay, int ca, int idLoCao, IReadOnlyList<int> nhomNVLIds)
         {
@@ -126,6 +213,13 @@ namespace dataproduct.api.Repositories
                 if (nvlIds.Count == 0) return [];
 
                 var pivot = await lgnlRepo.GetDuLieuSiloPivotAsync(ngay, ca, idLoCao);
+
+                // Lấy khối lượng quy khô từ LG_NL_ChiTiet (aggregate DoAm trên từng dòng GiaTri)
+                var napLieuRepo = scope.ServiceProvider.GetRequiredService<INapLieuPhanBoRepository>();
+                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao);
+                var quyKhoByNvl = napLieu
+                    .Where(x => x.Ca == (byte)ca)
+                    .ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieu);
 
                 // Build name + order lookup from flattened columns
                 var nameMap = new Dictionary<string, string>();
@@ -151,7 +245,7 @@ namespace dataproduct.api.Repositories
                         BreakdownName = nameMap.GetValueOrDefault(key, key),
                         BreakdownOrder = orderMap.GetValueOrDefault(key, 999),
                         KhoiLuongAm = sum,
-                        KhoiLuongKho = sum,  // SCADA không có độ ẩm, KhôLượng = Ẩm
+                        KhoiLuongKho = quyKhoByNvl.TryGetValue(nvlId, out var kk) ? kk : sum,
                     };
                 }).ToList();
             }

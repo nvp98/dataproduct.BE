@@ -24,7 +24,7 @@ namespace dataproduct.api.Services
         public Task<CanBangNLConfig> GetConfigAsync() => _configHelper.GetAsync();
 
         public async Task<List<CanBangNLMaterialBalanceDto>> GetCanBangAsync(
-            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao)
+            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao, bool includeTonSilo = false)
         {
             var cfg = await _configHelper.GetAsync();
             var result = new List<CanBangNLMaterialBalanceDto>();
@@ -41,8 +41,8 @@ namespace dataproduct.api.Services
                     StandardOperator = rule.Standard.LossRate.Operator,
                     StandardAbsolute = rule.Standard.LossRate.Absolute
                 };
-                dto.Generators = await BuildItemsAsync(cfg, rule.Generator.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes);
-                dto.Consumers = await BuildItemsAsync(cfg, rule.Consumer.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes);
+                dto.Generators = await BuildItemsAsync(cfg, rule.Generator.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes, includeTonSilo);
+                dto.Consumers = await BuildItemsAsync(cfg, rule.Consumer.Items, tuNgay, denNgay, ca, coAm, idLoCao, dto.Notes, includeTonSilo);
                 result.Add(dto);
             }
             return result;
@@ -96,10 +96,11 @@ namespace dataproduct.api.Services
 
         private async Task<List<CanBangNLBalanceItemDto>> BuildItemsAsync(
             CanBangNLConfig cfg, List<CanBangNLItemConfig> items,
-            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao, List<string> notes)
+            DateTime tuNgay, DateTime denNgay, int? ca, bool coAm, int? idLoCao, List<string> notes,
+            bool includeTonSilo = false)
         {
             var result = new List<CanBangNLBalanceItemDto>();
-            foreach (var item in items)
+            foreach (var item in items.Where(i => !i.RequiresTonSiloFilter || includeTonSilo))
             {
                 var (rows, note) = await LoadItemAsync(cfg, item, tuNgay, denNgay, idLoCao, ca);
                 if (note != null) notes.Add(note);
@@ -165,6 +166,18 @@ namespace dataproduct.api.Services
                     var results = await Task.WhenAll(
                         days.Select(d => _sourceRepo.ExecLgnlSiloAsync(d, null, idLoCao, src, nvlIds)));
                     return (results.SelectMany(r => r).ToList(), note);
+                }
+                case "LGTSL_TONCUOI":
+                {
+                    var tenSiLoList = item.Params.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                        && item.Params.TryGetProperty("tenSiLoList", out var arr)
+                        && arr.ValueKind == System.Text.Json.JsonValueKind.Array
+                        ? arr.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => s.Length > 0).ToList()
+                        : new List<string>();
+                    var modeVal = item.Params.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                        && item.Params.TryGetProperty("mode", out var m) ? m.GetString() ?? "END" : "END";
+                    var rows = await _sourceRepo.ExecLgtslTonCuoiAsync(tuNgay, denNgay, ca, idLoCao, src, tenSiLoList, modeVal);
+                    return (rows, note);
                 }
                 default:
                     throw new InvalidOperationException($"Loại nguồn '{src.Type}' chưa được hỗ trợ.");

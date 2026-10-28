@@ -507,5 +507,12 @@ namespace dataproduct.api.Repositories
         }
         public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
             => await _context.BmPhieus.AsNoTracking().FirstOrDefaultAsync(p => p.Idphieu == idPhieu);
+
+        public async Task<decimal> GetTonCuoiSumAsync(DateTime ngay, int ca, int idLoCao, IReadOnlyList<string> tenSiLoList)
+            => await _context.LG_TSL_ChiTiet
+                .AsNoTracking()
+                .Where(x => x.Ngay.Date == ngay.Date && x.Ca == ca && x.IDLoCao == idLoCao
+                            && tenSiLoList.Contains(x.TenSiLo))
+                .SumAsync(x => x.KLTonCuoiKip ?? 0m);
     }
 }

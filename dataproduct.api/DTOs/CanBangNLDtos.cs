@@ -76,6 +76,8 @@ namespace dataproduct.api.DTOs
         public JsonElement Params { get; set; }
         /// <summary>Chỉ dùng khi source.loCaoMode = MAP — ghi đè 1 param theo lò cao đang chọn</summary>
         public CanBangNLLoCaoMapConfig? LoCaoMap { get; set; }
+        /// <summary>true: item chỉ được tính khi API includeTonSilo=true</summary>
+        public bool RequiresTonSiloFilter { get; set; } = false;
     }
 
     public class CanBangNLLoCaoMapConfig

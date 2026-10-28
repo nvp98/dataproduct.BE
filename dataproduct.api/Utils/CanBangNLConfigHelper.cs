@@ -10,7 +10,7 @@ namespace dataproduct.api.Utils
     public class CanBangNLConfigHelper
     {
         private static readonly HashSet<string> ValidTypes = new(StringComparer.OrdinalIgnoreCase)
-            { "HTTP_BBGN", "LGNL_SILO" };
+            { "HTTP_BBGN", "LGNL_SILO", "LGTSL_TONCUOI" };
         private static readonly HashSet<string> LoCaoModes = new(StringComparer.OrdinalIgnoreCase)
             { "DIRECT", "MAP", "NONE" };
         private static readonly HashSet<string> Breakdowns = new(StringComparer.OrdinalIgnoreCase)

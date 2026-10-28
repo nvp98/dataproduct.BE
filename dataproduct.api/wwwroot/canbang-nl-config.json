@@ -20,6 +20,12 @@
       "description": "Nạp liệu lò cao — GetDuLieuSiloPivotAsync, tổng hợp theo nvlIds trong params.",
       "loCaoList": [1, 2, 3, 4, 5, 6],
       "loCaoMode": "DIRECT"
+    },
+    "LGTSL_TONCUOI": {
+      "type": "LGTSL_TONCUOI",
+      "description": "Tồn cuối silo lò cao — LG_TSL_ChiTiet.KLTonCuoiKip, tổng hợp theo tenSiLoList trong params.",
+      "loCaoList": [1, 2, 3, 4, 5, 6],
+      "loCaoMode": "DIRECT"
     }
   },
 
@@ -42,7 +48,8 @@
               "maVatTu": "1240020201264",
               "ID_PhongBanBG": 62,
               "ID_PhongBanBN": 63,
-              "ID_XuongBN": null
+              "ID_XuongBN": null,
+              "trangThaiList": "0,1"
             },
             "loCaoMap": {
               "param": "ID_XuongBN",
@@ -79,7 +86,8 @@
               "ID_VatTu": 484,
               "ID_PhongBanBG": 63,
               "ID_XuongBG": null,
-              "ID_PhongBanBN": 66
+              "ID_PhongBanBN": 66,
+              "trangThaiList": "0,1"
             },
             "loCaoMap": {
               "param": "ID_XuongBG",
@@ -92,12 +100,28 @@
                 "6": 185
               }
             }
+          },
+          {
+            "label": "Biến động tồn silo (Tồn cuối kỳ − Tồn đầu kỳ)",
+            "source": "LGTSL_TONCUOI",
+            "sourceText": "LG_TSL_ChiTiet (TonCuoiKy − TonDauKy, silo C1-C4+CVH)",
+            "breakdown": "NONE",
+            "requiresTonSiloFilter": true,
+            "params": {
+              "tenSiLoList": ["C1", "C2", "C3", "C4", "CVH"],
+              "mode": "DELTA"
+            }
           }
         ]
       },
 
       "standard": {
-        "lossRate": { "operator": "<=", "value": 2, "unit": "%", "absolute": true }
+        "lossRate": {
+          "operator": "<=",
+          "value": 2,
+          "unit": "%",
+          "absolute": true
+        }
       }
     }
   ]

@@ -346,6 +346,9 @@ namespace dataproduct.api.Repositories
 
         // Lấy thông tin phiếu (để export PDF)
         Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
+
+        // Tổng hợp KLTonCuoiKip theo (ngay, ca, idLoCao, tenSiLoList) — dùng cho CanBangNL
+        Task<decimal> GetTonCuoiSumAsync(DateTime ngay, int ca, int idLoCao, IReadOnlyList<string> tenSiLoList);
     }
 
     public interface ILGPTLCRepository
@@ -646,5 +649,11 @@ namespace dataproduct.api.Repositories
         // ca=null: gọi cả ca1+ca2; idLoCao=null: gọi tất cả lò trong src.LoCaoList
         Task<List<CanBangNLSourceRow>> ExecLgnlSiloAsync(
             DateTime ngay, int? ca, int? idLoCao, CanBangNLSourceConfig src, List<int> nhomNVLIds);
+
+        // LG_TSL_ChiTiet.KLTonCuoiKip — tồn cuối silo theo (ngay, ca, idLoCao, tenSiLoList)
+        // mode="BEGIN": lấy ca-trước(tuNgay); mode="END": lấy ca(denNgay)
+        Task<List<CanBangNLSourceRow>> ExecLgtslTonCuoiAsync(
+            DateTime tuNgay, DateTime denNgay, int? ca, int? idLoCao,
+            CanBangNLSourceConfig src, List<string> tenSiLoList, string mode);
     }
 }
