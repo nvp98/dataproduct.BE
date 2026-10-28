@@ -39,7 +39,7 @@
             "sourceText": "BBGN",
             "breakdown": "NONE",
             "params": {
-              "ID_VatTu": 486,
+              "maVatTu": "1240020201264",
               "ID_PhongBanBG": 62,
               "ID_PhongBanBN": 63,
               "ID_XuongBN": null
