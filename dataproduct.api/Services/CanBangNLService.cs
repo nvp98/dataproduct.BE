@@ -167,6 +167,15 @@ namespace dataproduct.api.Services
                         days.Select(d => _sourceRepo.ExecLgnlSiloAsync(d, null, idLoCao, src, nvlIds)));
                     return (results.SelectMany(r => r).ToList(), note);
                 }
+                case "LGNL_CHITIET":
+                {
+                    var nvlIds = ExtractNhomNVLIds(item.Params);
+                    var days = Enumerable.Range(0, (int)(denNgay.Date - tuNgay.Date).TotalDays + 1)
+                                        .Select(i => tuNgay.Date.AddDays(i));
+                    var results = await Task.WhenAll(
+                        days.Select(d => _sourceRepo.ExecLgnlChiTietAsync(d, null, idLoCao, src, nvlIds)));
+                    return (results.SelectMany(r => r).ToList(), note);
+                }
                 case "LGTSL_TONCUOI":
                 {
                     var tenSiLoList = item.Params.ValueKind != System.Text.Json.JsonValueKind.Undefined

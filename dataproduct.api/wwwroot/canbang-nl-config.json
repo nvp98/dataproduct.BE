@@ -21,6 +21,12 @@
       "loCaoList": [1, 2, 3, 4, 5, 6],
       "loCaoMode": "DIRECT"
     },
+    "LGNL_CHITIET": {
+      "type": "LGNL_CHITIET",
+      "description": "Nạp liệu lò cao — LG_NL_ChiTiet.GiaTri trực tiếp, tổng hợp theo nhomNVLIds.",
+      "loCaoList": [1, 2, 3, 4, 5, 6],
+      "loCaoMode": "DIRECT"
+    },
     "LGTSL_TONCUOI": {
       "type": "LGTSL_TONCUOI",
       "description": "Tồn cuối silo lò cao — LG_TSL_ChiTiet.KLTonCuoiKip, tổng hợp theo tenSiLoList trong params.",
@@ -70,8 +76,8 @@
         "items": [
           {
             "label": "Nạp liệu lò cao",
-            "source": "LGNL_SILO",
-            "sourceText": "SUM tất cả mẻ xuất vào lò",
+            "source": "LGNL_CHITIET",
+            "sourceText": "LG_NL_ChiTiet (GiaTri trực tiếp)",
             "breakdown": "MATERIAL_NAME",
             "params": {
               "idNhomNVLs": [4, 5]

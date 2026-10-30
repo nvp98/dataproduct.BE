@@ -655,5 +655,9 @@ namespace dataproduct.api.Repositories
         Task<List<CanBangNLSourceRow>> ExecLgtslTonCuoiAsync(
             DateTime tuNgay, DateTime denNgay, int? ca, int? idLoCao,
             CanBangNLSourceConfig src, List<string> tenSiLoList, string mode);
+
+        // LG_NL_ChiTiet.GiaTri trực tiếp — bỏ qua pivot SCADA, vẫn resolve nhomNVLIds → nvlIds per lò cao
+        Task<List<CanBangNLSourceRow>> ExecLgnlChiTietAsync(
+            DateTime ngay, int? ca, int? idLoCao, CanBangNLSourceConfig src, List<int> nhomNVLIds);
     }
 }

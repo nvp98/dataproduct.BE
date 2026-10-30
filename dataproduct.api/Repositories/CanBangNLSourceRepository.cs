@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using dataproduct.api.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 namespace dataproduct.api.Repositories
 {
@@ -109,6 +110,88 @@ namespace dataproduct.api.Repositories
                 .OrderBy(r => r.BreakdownOrder)
                 .ThenBy(r => r.BreakdownKey)
                 .ToList();
+        }
+
+        // ─── LGNL_CHITIET ─────────────────────────────────────────────────────────
+
+        public async Task<List<CanBangNLSourceRow>> ExecLgnlChiTietAsync(
+            DateTime ngay, int? ca, int? idLoCao, CanBangNLSourceConfig src, List<int> nhomNVLIds)
+        {
+            var caList = ca.HasValue ? [ca.Value] : new[] { 1, 2 };
+            var loCaoList = idLoCao.HasValue ? [idLoCao.Value] : src.LoCaoList.ToArray();
+
+            var tasks = (
+                from c in caList
+                from lc in loCaoList
+                select FetchChiTietSingleAsync(ngay, c, lc, nhomNVLIds)
+            ).ToList();
+
+            var allRows = (await Task.WhenAll(tasks)).SelectMany(r => r).ToList();
+
+            return allRows
+                .GroupBy(r => (r.Ca, r.BreakdownKey))
+                .Select(g => new CanBangNLSourceRow
+                {
+                    Ngay = ngay,
+                    Ca = g.Key.Ca,
+                    BreakdownKey = g.Key.BreakdownKey,
+                    BreakdownName = g.First().BreakdownName,
+                    BreakdownOrder = g.First().BreakdownOrder,
+                    KhoiLuongAm = g.Sum(r => r.KhoiLuongAm),
+                    KhoiLuongKho = g.Sum(r => r.KhoiLuongKho),
+                })
+                .OrderBy(r => r.BreakdownOrder)
+                .ThenBy(r => r.BreakdownKey)
+                .ToList();
+        }
+
+        private async Task<List<CanBangNLSourceRow>> FetchChiTietSingleAsync(
+            DateTime ngay, int ca, int idLoCao, IReadOnlyList<int> nhomNVLIds)
+        {
+            await _siloSem.WaitAsync();
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var context = scope.ServiceProvider.GetRequiredService<Models.ProductFormContext>();
+                var nhomIds = nhomNVLIds.ToList();
+                var nvlRows = await context.LG_NL_NVL
+                    .Where(n => n.IDNhomNVL != null
+                             && nhomIds.Contains(n.IDNhomNVL.Value)
+                             && n.IDLoCao == idLoCao
+                             && n.IsDelete != true)
+                    .OrderBy(n => n.ThuTu)
+                    .AsNoTracking()
+                    .Select(n => new { n.ID, n.TenNVL_NM, n.TenNVL_TK, n.XacNhan, ThuTu = n.ThuTu ?? 999 })
+                    .ToListAsync();
+                if (nvlRows.Count == 0) return [];
+
+                var nvlIds = nvlRows.Select(n => n.ID).ToHashSet();
+                var napLieuRepo = scope.ServiceProvider.GetRequiredService<INapLieuPhanBoRepository>();
+                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao);
+
+                var byNvl = napLieu
+                    .Where(x => x.Ca == (byte)ca && nvlIds.Contains(x.IdNvl))
+                    .ToDictionary(x => x.IdNvl);
+
+                return nvlRows.Select(nvl =>
+                {
+                    byNvl.TryGetValue(nvl.ID, out var dto);
+                    // Ưu tiên TenNVL_TK (xác nhận) như logic pivot SCADA, fallback TenNVL_NM
+                    var tenNvl = nvl.XacNhan == true && nvl.TenNVL_TK != null
+                        ? nvl.TenNVL_TK : (nvl.TenNVL_NM ?? nvl.ID.ToString());
+                    return new CanBangNLSourceRow
+                    {
+                        Ngay = ngay,
+                        Ca = ca,
+                        BreakdownKey = nvl.ID,
+                        BreakdownName = tenNvl,
+                        BreakdownOrder = nvl.ThuTu,
+                        KhoiLuongAm = dto?.KhoiLuongNapLieuTruocQuyKho ?? 0m,
+                        KhoiLuongKho = dto?.KhoiLuongNapLieu ?? 0m,
+                    };
+                }).ToList();
+            }
+            finally { _siloSem.Release(); }
         }
 
         // ─── LGTSL_TONCUOI ────────────────────────────────────────────────────────
