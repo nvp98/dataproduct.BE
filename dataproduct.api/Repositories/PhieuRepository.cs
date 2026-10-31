@@ -102,7 +102,10 @@ namespace dataproduct.api.Repositories
                     NguoiTaoId = formData.TryGetProperty("nguoiTaoId", out var nguoitao) ? nguoitao.GetInt32() : null,
                     Scope = Scope,
                     //XuongId = formData.TryGetProperty("xuongId", out var xuongId) ? xuongId.GetInt32() : null,
-                    //IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) ? idphongBan.GetInt32() : null,
+                    IdphongBan = formData.TryGetProperty("idphongBan", out var idphongBan) &&
+                                 idphongBan.ValueKind == JsonValueKind.Number
+                        ? idphongBan.GetInt32()
+                        : null,
                     TenScope = tenScope,
                     DataJson = formData.GetRawText(),
                     NgayTao = DateTime.Now,

@@ -113,7 +113,7 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<LG_TSL_SiLo_Mapping> LG_TSL_SiLo_Mapping { get; set; }
     public virtual DbSet<LG_TSL_ChiTiet> LG_TSL_ChiTiet { get; set; }
     public virtual DbSet<LG_PhieuDieuChinh_ChiTiet> LG_PhieuDieuChinh_ChiTiet { get; set; }
-    public virtual DbSet<LG_PhieuDieuChinh_NVL> LG_PhieuDieuChinh_NVL { get; set; }
+    public virtual DbSet<LG_PDC_Scope_PhongBan> LG_PDC_Scope_PhongBan { get; set; }
     public virtual DbSet<SiLoTon> SiLoTon { get; set; }
     public virtual DbSet<LG_NKVHPT_DuLieu> LG_NKVHPT_DuLieu { get; set; }
     public virtual DbSet<LG_NKVHPT_ChiTiet> LG_NKVHPT_ChiTiet { get; set; }
@@ -918,6 +918,11 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.KhoiLuongNhap).HasPrecision(18, 3);
             entity.Property(e => e.KhoiLuongQuyKhoNhap).HasPrecision(18, 3);
             entity.Property(e => e.DoAm).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<LG_PDC_Scope_PhongBan>(entity =>
+        {
+            entity.ToTable("LG_PDC_Scope_PhongBan");
+            entity.HasKey(e => e.ID);
         });
         modelBuilder.Entity<LG_PB_BienBanNhanQHLCCVH>(entity =>
         {

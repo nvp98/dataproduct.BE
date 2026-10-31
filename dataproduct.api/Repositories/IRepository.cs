@@ -619,24 +619,34 @@ namespace dataproduct.api.Repositories
     }
     public interface ILG_PhieuDieuChinhRepository
     {
-        Task<List<BBGNChiTietResult>> GetBBGNAsync(DateTime ngay, int? ca, string? kip);
+        // Phần Nhập (xưởng nhận thuộc lò cao) / Xuất (xưởng giao thuộc lò cao) từ BBGN
+        Task<List<BBGNChiTietResult>> GetBBGNXuatAsync(DateTime ngay, IReadOnlyCollection<int> idXuong, int? ca = null);
+        // Phần Nhập theo danh sách xưởng (phiếu theo phòng ban) và các xưởng của 1 phòng ban
+        Task<List<BBGNChiTietResult>> GetBBGNNhanTheoDanhSachXuongAsync(DateTime ngay, IReadOnlyCollection<int> idXuong, int? ca = null);
+        Task<List<Tbl_Xuong>> GetXuongTheoPhongBanAsync(int idPhongBan);
+        // Số điều chỉnh Nhập/Xuất lưu trong LG_PhieuDieuChinh_ChiTiet (LoaiDieuChinh 1 = Nhập, 3 = Xuất; mỗi dòng thuộc 1 phiếu
+        // và 1 bên); đọc dòng của cả 2 bên theo ID_CT_BBGN, lưu số của 1 bên và kiểm tra 2 bên bằng nhau
+        Task<DieuChinhBBGNDaLuu> GetDieuChinhBBGNAsync(IReadOnlyCollection<int> idCtBbgn);
+        Task SaveDieuChinhBBGNAsync(Guid idPhieu, bool laBenNhan, int? nguoiThucHien, List<SaveLG_PhieuDieuChinhBBGNDto> items, int? idPhongBan);
+        // Xóa số điều chỉnh của BÊN KIA (laBenNhan = bên đang reset) cho 1 dòng BBGN, ghi lý do vào ghi chú dòng bên kia
+        Task ResetBenKiaBBGNAsync(Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien);
+        // Dòng Nhập/Xuất mà 1 phiếu đang giữ (bản chụp ghi lúc "Tải dữ liệu nguồn")
+        Task<List<LG_PhieuDieuChinh_ChiTiet>> GetDieuChinhTheoPhieuAsync(Guid idPhieu, bool laBenNhan);
+        // Ghi các dòng BBGN nguồn vào bản ghi dùng chung và gán cho phiếu; trả (số dòng Nhập, Xuất, bỏ qua)
+        Task<(int nhap, int xuat, int boQua)> DongBoBBGNAsync(
+            Guid idPhieu,
+            IReadOnlyCollection<BBGNChiTietResult> rowsNhap,
+            IReadOnlyCollection<BBGNChiTietResult> rowsXuat,
+            int? nguoiThucHien,
+            int idPhongBan);
         // Nguồn "Nội bộ - Xuất SX" (LG_NL_ChiTiet, dbo.Sp_GetNVLNapLieuLoCao) — xem NapLieuLoCaoDieuChinhResult.
-        Task<List<NapLieuLoCaoDieuChinhResult>> GetNapLieuLoCaoAsync(DateTime ngay, int? ca, string? kip);
+        Task<List<NapLieuLoCaoDieuChinhResult>> GetNapLieuLoCaoAsync(DateTime ngay, int? ca = null);
         Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu);
 
         Task<List<LG_PhieuDieuChinh_ChiTiet>> GetChiTietByPhieuAsync(Guid idPhieu);
         // Upsert theo ID (không xóa-ghi lại cả bảng) + xóa mềm các ID trong deletedIds.
         Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds, string? nguoiSua);
-        Task<LG_PhieuDieuChinh_ChiTiet?> UpdateXacNhanGiaoAsync(long id, int? nguoiDieuChinhGiao, DateTime? thoiGianDieuChinhGiao, int trangThai);
-        Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromBBGNAsync(Guid idPhieu, List<BBGNChiTietResult> bbgnData, string? nguoiThucHien);
-        Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromNapLieuLoCaoAsync(Guid idPhieu, List<NapLieuLoCaoDieuChinhResult> rows, string? nguoiThucHien);
-
-        // ─── Danh mục NVL (LG_PhieuDieuChinh_NVL) ─────────────────────────────
-        Task<List<LG_PhieuDieuChinh_NVL>> GetNvlListAsync(bool onlyActive);
-        Task<LG_PhieuDieuChinh_NVL?> GetNvlByIdAsync(int id);
-        Task<LG_PhieuDieuChinh_NVL> AddNvlAsync(LG_PhieuDieuChinh_NVL entity);
-        Task<LG_PhieuDieuChinh_NVL?> UpdateNvlAsync(int id, LG_PhieuDieuChinh_NVL entity);
-        Task<bool> DeleteNvlAsync(int id);
+        Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromNapLieuLoCaoAsync(Guid idPhieu, int idLoCao, List<NapLieuLoCaoDieuChinhResult> rows, string? nguoiThucHien, int? idPhongBan);
 
     }
 }

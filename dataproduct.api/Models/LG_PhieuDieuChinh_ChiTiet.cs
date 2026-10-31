@@ -41,15 +41,20 @@ namespace dataproduct.api.Models
         public bool IsDelete { get; set; }
         public int? LoaiDieuChinh { get; set; }
         public int? LoaiSoDieuChinh { get; set; }
-        // Người vừa sửa Khối lượng/Độ ẩm (bên giao) — FE tự gán, không chọn tay.
         public int? NguoiDieuChinhGiao { get; set; }
         public DateTime? ThoiGianDieuChinhGiao { get; set; }
-        // Người tích xác nhận (bên nhận) cho dòng này.
         public int? NguoiDieuChinhNhan { get; set; }
         public DateTime? ThoiGianDieuChinhNhan { get; set; }
-        // 0 = chưa xác nhận (còn sửa được), 1 = đã xác nhận (khóa dòng) — gán cùng lúc với
-        // NguoiDieuChinhNhan khi người dùng tích/hủy tích xác nhận ở FE.
         public int TrangThai { get; set; }
         public int? ID_CT_BBGN { get; set; }
+        public int? IDLoCao { get; set; }
+        public int? IDCa { get; set; }
+        // Phòng ban của phiếu (từ file cấu hình biểu mẫu, bảng LG_PDC_Scope_PhongBan) — mọi loại dòng (Nhập, Nội bộ, Xuất)
+        public int? ID_PhongBan { get; set; }
+        // Chỉ cho dòng Nhập (LoaiDieuChinh = 1) / Xuất (= 3): xưởng giao / nhận (Tbl_Xuong.ID_Xuong) và giờ giao của dòng
+        // BBGN — để dựng lại dòng và chia tab theo xưởng khi đọc từ bảng này
+        public int? ID_Xuong_BG { get; set; }
+        public int? ID_Xuong_BN { get; set; }
+        public DateTime? ThoiGianXuLyBG { get; set; }
     }
 }
