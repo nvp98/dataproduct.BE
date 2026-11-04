@@ -30,17 +30,38 @@ namespace dataproduct.api.Services
         private static void GanSoDieuChinh(
             LG_PhieuDieuChinhBBGNLineDto dto, LG_PhieuDieuChinh_ChiTiet? nhap, LG_PhieuDieuChinh_ChiTiet? xuat, bool laBenNhan)
         {
-            dto.LoaiSoDieuChinh = (laBenNhan ? nhap : xuat)?.LoaiSoDieuChinh;
+            var cuaMinh = laBenNhan ? nhap : xuat;
+            var benKia = laBenNhan ? xuat : nhap;
+            dto.LoaiSoBenKia = benKia?.LoaiSoDieuChinh;
+            dto.LoaiSoDieuChinh = cuaMinh?.LoaiSoDieuChinh ?? benKia?.LoaiSoDieuChinh;
             dto.KhoiLuongXuat = xuat?.KhoiLuongXuat;
             dto.KLQuyKhoXuat = xuat?.KhoiLuongQuyKhoXuat;
-            dto.GhiChuXuat = xuat?.GhiChu;
+            dto.GhiChuXuat = xuat?.GhiChuXuat;
             dto.NguoiXuat = xuat?.NguoiDieuChinhGiao;
             dto.ThoiGianXuat = xuat?.ThoiGianDieuChinhGiao;
             dto.KhoiLuongNhap = nhap?.KhoiLuongNhap;
             dto.KLQuyKhoNhap = nhap?.KhoiLuongQuyKhoNhap;
-            dto.GhiChuNhap = nhap?.GhiChu;
+            dto.GhiChuNhap = nhap?.GhiChuNhap;
             dto.NguoiNhap = nhap?.NguoiDieuChinhNhan;
             dto.ThoiGianNhap = nhap?.ThoiGianDieuChinhNhan;
+        }
+
+        // Đánh dấu dòng mà phiếu của bên kia đã gửi/khóa (kèm số phiếu) để giao diện vô hiệu nút Reset
+        private async Task<List<LG_PhieuDieuChinhBBGNLineDto>> GanTrangThaiBenKiaAsync(
+            List<LG_PhieuDieuChinhBBGNLineDto> dong, DieuChinhBBGNDaLuu daLuu, bool laBenNhan)
+        {
+            var benKia = laBenNhan ? daLuu.Xuat : daLuu.Nhap;
+            var khoa = await _repository.PhieuDangKhoaAsync(benKia.Values.Select(x => x.IDPhieu));
+            if (khoa.Count == 0) return dong;
+            foreach (var d in dong)
+            {
+                if (benKia.TryGetValue(d.IdCtBBGN, out var rec) && khoa.TryGetValue(rec.IDPhieu, out var so))
+                {
+                    d.PhieuBenKiaKhoa = true;
+                    d.SoPhieuBenKia = so;
+                }
+            }
+            return dong;
         }
 
         // idPhieu có giá trị (phiếu đã lưu): đọc các dòng (LoaiDieuChinh 1 hoặc 3) của phiếu đã ghi lúc "Tải dữ liệu nguồn"
@@ -55,7 +76,7 @@ namespace dataproduct.api.Services
             {
                 var cuaPhieu = await _repository.GetDieuChinhTheoPhieuAsync(idPhieu.Value, laBenNhan);
                 var daLuuDb = await _repository.GetDieuChinhBBGNAsync(cuaPhieu.Select(x => x.ID_CT_BBGN!.Value).ToList());
-                return cuaPhieu.Select(rec =>
+                var dongCuaPhieu = cuaPhieu.Select(rec =>
                 {
                     var ct = rec.ID_CT_BBGN!.Value;
                     // Bên đang xem lấy từ dòng của chính phiếu này; số của bên kia lấy từ dòng loại ngược lại
@@ -65,6 +86,7 @@ namespace dataproduct.api.Services
                     {
                         IdCtBBGN = ct,
                         IdVatTu = rec.IDNVL_BBGN,
+                        TenNhomNVL = rec.TenNhomNVL,
                         TenVatTu = rec.TenNVL,
                         MaLo = rec.MaLo,
                         ThoiGianXuLyBG = rec.ThoiGianXuLyBG,
@@ -77,10 +99,12 @@ namespace dataproduct.api.Services
                         IdTab = laBenNhan ? rec.ID_Xuong_BN : rec.ID_Xuong_BG,
                         IdCa = rec.IDCa,
                         DoAm = rec.DoAm.HasValue ? (double)rec.DoAm.Value : null,
+                        ThoiGianPhienBan = laBenNhan ? rec.ThoiGianDieuChinhNhan : rec.ThoiGianDieuChinhGiao,
                     };
                     GanSoDieuChinh(dongDb, nhap, xuat, laBenNhan);
                     return dongDb;
                 }).ToList();
+                return await GanTrangThaiBenKiaAsync(dongCuaPhieu, daLuuDb, laBenNhan);
             }
 
         
@@ -96,7 +120,7 @@ namespace dataproduct.api.Services
 
             var daLuu = await _repository.GetDieuChinhBBGNAsync(rows.Select(r => r.ID_CT_BBGN).ToList());
 
-            return rows.Select(r =>
+            var dongXemTruoc = rows.Select(r =>
             {
                 // Xem trước (phiếu mới chưa lưu): chỉ hiện số của BÊN KIA nếu đã có ở phiếu khác; bên mình chưa có gì
                 var nhap = laBenNhan ? null : daLuu.Nhap.GetValueOrDefault(r.ID_CT_BBGN);
@@ -105,6 +129,7 @@ namespace dataproduct.api.Services
                 {
                     IdCtBBGN = r.ID_CT_BBGN,
                     IdVatTu = r.ID_VatTu,
+                    TenNhomNVL = r.TenNhomVatTu,
                     TenVatTu = r.TenVatTu,
                     MaLo = r.MaLO,
                     ThoiGianXuLyBG = r.ThoiGianXuLyBG,
@@ -123,6 +148,7 @@ namespace dataproduct.api.Services
                 GanSoDieuChinh(dong, nhap, xuat, laBenNhan);
                 return dong;
             }).ToList();
+            return await GanTrangThaiBenKiaAsync(dongXemTruoc, daLuu, laBenNhan);
         }
 
         public async Task<LG_PhieuDieuChinhDongBoBBGNResult> DongBoBBGNAsync(
@@ -159,8 +185,20 @@ namespace dataproduct.api.Services
         }
 
         // Lưu số điều chỉnh của 1 bên vào phiếu. 2 bên đã cùng nhập mà khác nhau → InvalidOperationException (xem repository).
-        public Task SaveBBGNAsync(int loai, Guid idPhieu, SaveLG_PhieuDieuChinhBBGNRequest request)
+        public Task<Dictionary<int, DateTime?>> SaveBBGNAsync(int loai, Guid idPhieu, SaveLG_PhieuDieuChinhBBGNRequest request)
             => _repository.SaveDieuChinhBBGNAsync(idPhieu, LaBenNhan(loai), request.IdNguoiThucHien, request.Items, request.IdPhongBan);
+
+        // Reset Loại số điều chỉnh của cả 2 bên cho 1 dòng — bắt buộc có ghi chú (lý do)
+        public Task ResetLoaiSoBBGNAsync(int loai, Guid idPhieu, ResetLG_PhieuDieuChinhBBGNRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.GhiChu))
+                throw new InvalidOperationException("Phải nhập ghi chú (lý do) khi reset Loại số điều chỉnh.");
+            return _repository.ResetLoaiSoBBGNAsync(
+                idPhieu, LaBenNhan(loai), request.IdCtBBGN, request.GhiChu, request.IdNguoiThucHien, request.LoaiSoBenKiaDangThay);
+        }
+
+        // Các dòng chưa được bên kia nhập khớp — còn dòng nào thì chưa được gửi phiếu
+        public Task<List<string>> KiemTraDieuKienGuiAsync(Guid idPhieu) => _repository.KiemTraDieuKienGuiAsync(idPhieu);
 
         // Reset số điều chỉnh của bên kia — bắt buộc có ghi chú (lý do)
         public Task ResetBBGNAsync(int loai, Guid idPhieu, ResetLG_PhieuDieuChinhBBGNRequest request)
@@ -168,7 +206,7 @@ namespace dataproduct.api.Services
             if (string.IsNullOrWhiteSpace(request.GhiChu))
                 throw new InvalidOperationException("Phải nhập ghi chú (lý do) khi reset số của bên kia.");
             return _repository.ResetBenKiaBBGNAsync(
-                idPhieu, LaBenNhan(loai), request.IdCtBBGN, request.GhiChu, request.IdNguoiThucHien);
+                idPhieu, LaBenNhan(loai), request.IdCtBBGN, request.GhiChu, request.IdNguoiThucHien, request.KlBenKiaDangThay);
         }
 
         // ─── Nội bộ - Xuất vào sản xuất, chia theo xưởng nhận (cùng danh sách xưởng với Nhập / Xuất) ─────
@@ -238,6 +276,7 @@ namespace dataproduct.api.Services
             TenNVL = x.TenNVL,
             IdNVLChiTiet = x.IDNVLChiTiet,
             IdNhomNVL = x.IDNhomNVL,
+            TenNhomNVL = x.TenNhomNVL,
             Dvt = x.DVT,
             MaLo = x.MaLo,
             ThuTu = x.ThuTu,
@@ -257,8 +296,6 @@ namespace dataproduct.api.Services
             GhiChu = x.GhiChu,
             NguoiTao = x.NguoiTao,
             ThoiGianTao = x.ThoiGianTao,
-            NguoiSua = x.NguoiSua,
-            ThoiGianSua = x.ThoiGianSua,
             NguoiDieuChinhNhan = x.NguoiDieuChinhNhan,
             ThoiGianDieuChinhNhan = x.ThoiGianDieuChinhNhan,
             IdCtBBGN = x.ID_CT_BBGN,
@@ -322,8 +359,6 @@ namespace dataproduct.api.Services
             var now = DateTime.Now;
             var entities = items.Select(i => new LG_PhieuDieuChinh_ChiTiet
             {
-                // Dòng đã lưu mang ID thật; ThoiGianSua của dòng đã lưu ở đây là "phiên bản FE đã
-                // tải" để repository so với DB (khóa lạc quan), không phải thời điểm sửa mới.
                 ID = i.Id ?? 0,
                 IDPhieu = idPhieu,
                 IDNVL = i.IdNVL,
@@ -335,6 +370,7 @@ namespace dataproduct.api.Services
                 TenNVL = i.TenNVL,
                 IDNVLChiTiet = i.IdNVLChiTiet,
                 IDNhomNVL = i.IdNhomNVL,
+                TenNhomNVL = i.TenNhomNVL,
                 DVT = "Tấn",
                 MaLo = i.MaLo,
                 ThuTu = i.ThuTu,
@@ -354,8 +390,6 @@ namespace dataproduct.api.Services
                 GhiChu = i.GhiChu,
                 NguoiTao = nguoiSua,
                 ThoiGianTao = now,
-                NguoiSua = nguoiSua,
-                ThoiGianSua = (i.Id ?? 0) > 0 ? i.ThoiGianSua : now,
                 IsDelete = false,
                 NguoiDieuChinhNhan = i.NguoiDieuChinhNhan,
                 ThoiGianDieuChinhNhan = i.ThoiGianDieuChinhNhan,
@@ -365,7 +399,7 @@ namespace dataproduct.api.Services
                 ID_PhongBan = i.IdPhongBan,
             }).ToList();
 
-            await _repository.ReplaceChiTietAsync(idPhieu, entities, deletedIds ?? new List<long>(), nguoiSua);
+            await _repository.ReplaceChiTietAsync(idPhieu, entities, deletedIds ?? new List<long>());
         }
 
     }

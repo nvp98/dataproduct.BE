@@ -19,7 +19,7 @@ namespace dataproduct.api.Controllers
 
         // ─── Danh mục ────────────────────────────────────────────────────────
 
-        // Các xưởng của 1 phòng ban — mỗi xưởng 1 tab trong phiếu theo phòng ban (vd NMTKVV)
+
         [HttpGet("danh-muc-xuong")]
         public async Task<IActionResult> GetDanhMucXuong([FromQuery] int idPhongBan)
         {
@@ -49,7 +49,7 @@ namespace dataproduct.api.Controllers
         }
 
         // "Tải dữ liệu nguồn" của phiếu ĐÃ LƯU: ghi các dòng BBGN Nhập/Xuất vào database cho phiếu (chưa có số điều chỉnh);
-        // người dùng điều chỉnh rồi Lưu để cập nhật. Chạy lại thì thêm dòng mới và làm mới mô tả, giữ nguyên số đã điều chỉnh.
+
         [HttpPost("bbgn/dong-bo/{idPhieu:guid}")]
         public async Task<IActionResult> DongBoBBGN(Guid idPhieu, [FromBody] DongBoLG_PhieuDieuChinhBBGNRequest request)
         {
@@ -67,10 +67,35 @@ namespace dataproduct.api.Controllers
         {
             try
             {
-                await _service.SaveBBGNAsync(loai, idPhieu, request);
+                // phienBan: thời gian điều chỉnh mới của bên mình theo từng dòng (idCtBBGN) — gửi lại ở lần Lưu sau để phát hiện người khác sửa chen
+                var phienBan = await _service.SaveBBGNAsync(loai, idPhieu, request);
+                return Ok(new { success = true, phienBan });
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // Reset Loại số điều chỉnh (Trước ẩm / Sau ẩm) của cả 2 bên cho 1 dòng BBGN để chọn lại (bắt buộc có ghi chú).
+        [HttpPost("bbgn/{loai:int}/{idPhieu:guid}/reset-loai-so")]
+        public async Task<IActionResult> ResetLoaiSoBBGN(int loai, Guid idPhieu, [FromBody] ResetLG_PhieuDieuChinhBBGNRequest request)
+        {
+            try
+            {
+                await _service.ResetLoaiSoBBGNAsync(loai, idPhieu, request);
                 return Ok(new { success = true });
             }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
+        }
+
+        // Kiểm tra trước khi gửi phiếu: danh sách dòng chưa được bên kia nhập khớp (rỗng = được gửi)
+        [HttpGet("bbgn/kiem-tra-gui/{idPhieu:guid}")]
+        public async Task<IActionResult> KiemTraGui(Guid idPhieu)
+        {
+            try
+            {
+                return Ok(await _service.KiemTraDieuKienGuiAsync(idPhieu));
+            }
             catch (Exception ex) { return StatusCode(500, new { message = ex.Message }); }
         }
 

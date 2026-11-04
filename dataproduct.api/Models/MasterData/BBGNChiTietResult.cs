@@ -20,6 +20,8 @@ namespace dataproduct.api.Models.MasterData
         public string? TenNganPhongBanGiao { get; set; }
 
         public string? TenVatTu { get; set; }
+        public int? ID_NhomVatTu { get; set; }
+        public string? TenNhomVatTu { get; set; }
 
         // ─── Xưởng/Phòng ban nhận ───────────────────────────────────────────
         public int? ID_Xuong_BN { get; set; }

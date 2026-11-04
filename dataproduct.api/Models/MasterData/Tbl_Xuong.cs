@@ -9,5 +9,10 @@ namespace dataproduct.api.Models.MasterData
         [Key]
         public int ID_Xuong { get; set; }
         public string? TenXuong { get; set; }
+        public int? ID_PhongBan { get; set; }
+        public int? ID_TrangThai { get; set; }
+
+        public int? IsPhieuDungSX { get; set; }
+
     }
 }

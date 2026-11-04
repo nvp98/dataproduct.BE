@@ -19,6 +19,8 @@ namespace dataproduct.api.Models
         public string TenNVL { get; set; } = string.Empty;
         public int? IDNVLChiTiet { get; set; }
         public int? IDNhomNVL { get; set; }
+        // Nhóm vật tư: ID + tên lấy từ Tbl_NhomVatTu (PRODUCTDATA)
+        public string? TenNhomNVL { get; set; }
         public string? DVT { get; set; }
         public string? MaLo { get; set; }
         public int? ThuTu { get; set; }
@@ -34,10 +36,11 @@ namespace dataproduct.api.Models
         public string? ViTri { get; set; }
         public string? PhanLoai { get; set; }
         public string? GhiChu { get; set; }
+        // Ghi chú riêng của từng bên cho dòng Nhập/Xuất (Nội bộ vẫn dùng GhiChu): dòng Nhập ghi GhiChuNhap, dòng Xuất ghi GhiChuXuat
+        public string? GhiChuNhap { get; set; }
+        public string? GhiChuXuat { get; set; }
         public string? NguoiTao { get; set; }
         public DateTime ThoiGianTao { get; set; }
-        public string? NguoiSua { get; set; }
-        public DateTime? ThoiGianSua { get; set; }
         public bool IsDelete { get; set; }
         public int? LoaiDieuChinh { get; set; }
         public int? LoaiSoDieuChinh { get; set; }

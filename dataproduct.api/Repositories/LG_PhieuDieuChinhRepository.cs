@@ -84,6 +84,52 @@ namespace dataproduct.api.Repositories
                 .ToHashSet();
         }
 
+        // Phiếu còn sửa được: đang lưu (0), đã thu hồi (3), hiệu chỉnh (7) — cùng quy tắc với FE (TrangThaiPhieuConst).
+        // Các trạng thái khác (đã gửi / đang phê duyệt / hoàn thành / đã chốt) là phiếu khóa.
+        private static bool ChoPhepSua(int? tinhTrang) => tinhTrang is null or 0 or 3 or 7;
+
+        // Trong tập phiếu đã cho, các phiếu đang khóa → số phiếu (để báo lỗi / hiển thị)
+        public async Task<Dictionary<Guid, string?>> PhieuDangKhoaAsync(IEnumerable<Guid> idPhieus)
+        {
+            var ds = idPhieus.Distinct().ToList();
+            if (ds.Count == 0) return new Dictionary<Guid, string?>();
+            var list = await _formContext.BmPhieus
+                .AsNoTracking()
+                .Where(p => ds.Contains(p.Idphieu) && (p.IsDelete == null || p.IsDelete == 0))
+                .Select(p => new { p.Idphieu, p.SoPhieu, p.TinhTrang })
+                .ToListAsync();
+            return list.Where(p => !ChoPhepSua(p.TinhTrang)).ToDictionary(p => p.Idphieu, p => p.SoPhieu);
+        }
+
+        private static string TenPhieu(Guid id, string? so) => string.IsNullOrWhiteSpace(so) ? id.ToString() : so;
+
+        // Khóa theo từng dòng BBGN (sp_getapplock, giữ tới hết transaction): 2 người lưu/reset cùng 1 dòng BBGN — dù ở cùng
+        // phiếu hay 2 phiếu của 2 bên — phải lần lượt từng người, người sau đọc lại dữ liệu người trước vừa ghi rồi mới
+        // đối chiếu. Không khóa thì 2 bên cùng lúc lưu số khác nhau sẽ cùng qua bước đối chiếu và để lại dữ liệu lệch.
+        // Khóa theo thứ tự id tăng dần để 2 request nhiều dòng không khóa chéo nhau (deadlock).
+        private async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> KhoaDongBBGNAsync(IEnumerable<int> idCtBbgn)
+        {
+            var tx = await _formContext.Database.BeginTransactionAsync();
+            try
+            {
+                foreach (var id in idCtBbgn.Distinct().OrderBy(x => x))
+                {
+                    var ketQua = new SqlParameter("@kq", System.Data.SqlDbType.Int) { Direction = System.Data.ParameterDirection.Output };
+                    await _formContext.Database.ExecuteSqlRawAsync(
+                        "EXEC @kq = sp_getapplock @Resource = @tenKhoa, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000",
+                        ketQua, new SqlParameter("@tenKhoa", $"PDC_BBGN_{id}"));
+                    if (ketQua.Value is int kq && kq < 0)
+                        throw new InvalidOperationException("Dòng này đang được người khác lưu, vui lòng thử lại sau giây lát.");
+                }
+                return tx;
+            }
+            catch
+            {
+                await tx.DisposeAsync();
+                throw;
+            }
+        }
+
         // Dòng Nhập/Xuất đã lưu của các dòng BBGN (ở bất kỳ phiếu còn hiệu lực nào) — để hiển thị và đối chiếu 2 bên
         public async Task<DieuChinhBBGNDaLuu> GetDieuChinhBBGNAsync(IReadOnlyCollection<int> idCtBbgn)
         {
@@ -108,12 +154,28 @@ namespace dataproduct.api.Repositories
             return kq;
         }
 
-        public async Task SaveDieuChinhBBGNAsync(
+        // Cùng "phiên bản" dòng: thời gian điều chỉnh của bên mình mà người dùng đang giữ == trong database (sai số 10ms vì cột có
+        // thể làm tròn mili-giây). Cùng rỗng (dòng chưa ai nhập KL từ lúc tải) cũng là cùng phiên bản.
+        private static bool CungPhienBan(DateTime? dangGiu, DateTime? trongDb)
+            => dangGiu.HasValue && trongDb.HasValue
+                ? Math.Abs((dangGiu.Value - trongDb.Value).TotalMilliseconds) <= 10
+                : !dangGiu.HasValue && !trongDb.HasValue;
+
+        // Trả về "phiên bản" (thời gian điều chỉnh của bên mình) mới của các dòng vừa ghi — người dùng giữ lại để lần Lưu sau không bị báo xung đột với chính mình
+        public async Task<Dictionary<int, DateTime?>> SaveDieuChinhBBGNAsync(
             Guid idPhieu, bool laBenNhan, int? nguoiThucHien, List<SaveLG_PhieuDieuChinhBBGNDto> items, int? idPhongBan)
         {
             var loai = laBenNhan ? LoaiNhap : LoaiXuat;
             var loaiKia = laBenNhan ? LoaiXuat : LoaiNhap;
             var ids = items.Select(i => i.IdCtBBGN).Distinct().ToList();
+            var phienBanMoi = new Dictionary<int, DateTime?>();
+
+            // Từ đây mọi thứ đọc/ghi trong 1 transaction có khóa các dòng BBGN, tránh 2 người ghi chồng nhau
+            await using var tx = await KhoaDongBBGNAsync(ids);
+
+            var khoaMinh = await PhieuDangKhoaAsync(new[] { idPhieu });
+            if (khoaMinh.Count > 0)
+                throw new InvalidOperationException("Phiếu đã gửi/đang khóa nên không sửa được — cần thu hồi phiếu trước.");
 
             // Dòng của chính phiếu này (đúng bên)
             var own = (await _formContext.LG_PhieuDieuChinh_ChiTiet
@@ -145,6 +207,9 @@ namespace dataproduct.api.Repositories
                 .GroupBy(x => x.ID_CT_BBGN!.Value)
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ID).First());
 
+            // Phiếu của bên kia đã gửi/khóa (số phiếu) — KL của họ là số chốt, bên mình không được xóa KL đã khớp với số đó
+            var phieuBenKiaKhoa = await PhieuDangKhoaAsync(doiTac.Values.Select(x => x.IDPhieu));
+
             var nguoi = nguoiThucHien?.ToString();
             var now = DateTime.Now;
             var loi = new List<string>();
@@ -171,6 +236,12 @@ namespace dataproduct.api.Repositories
                         continue;
                     }
                 }
+                else if (item.LoaiSoDieuChinh == 2 && !item.DoAm.HasValue)
+                {
+                    // Mới chọn Loại số (chưa nhập KL) vẫn được lưu để bên kia thấy và chọn theo
+                    loi.Add($"{MoTaDong(item)}: dòng BBGN không có độ ẩm nên không chọn được Sau ẩm.");
+                    continue;
+                }
 
                 if (!own.TryGetValue(item.IdCtBBGN, out var rec))
                 {
@@ -182,7 +253,7 @@ namespace dataproduct.api.Repositories
                     }
 
                     // Phiếu chưa có dòng này mà bên này cũng chưa nhập gì → không tạo dòng rỗng
-                    if (!item.KhoiLuong.HasValue && string.IsNullOrWhiteSpace(item.GhiChu)) continue;
+                    if (!item.KhoiLuong.HasValue && !item.LoaiSoDieuChinh.HasValue && string.IsNullOrWhiteSpace(item.GhiChu)) continue;
 
                     rec = new LG_PhieuDieuChinh_ChiTiet
                     {
@@ -204,6 +275,41 @@ namespace dataproduct.api.Repositories
                     _formContext.LG_PhieuDieuChinh_ChiTiet.Add(rec);
                     own[item.IdCtBBGN] = rec;
                 }
+                else if (!CungPhienBan(item.ThoiGianPhienBan, laBenNhan ? rec.ThoiGianDieuChinhNhan : rec.ThoiGianDieuChinhGiao))
+                {
+                    // Người khác (cùng bên, hoặc bên kia reset) đã điều chỉnh dòng này sau khi người dùng tải màn hình
+                    var ai = laBenNhan ? rec.NguoiDieuChinhNhan : rec.NguoiDieuChinhGiao;
+                    var luc = laBenNhan ? rec.ThoiGianDieuChinhNhan : rec.ThoiGianDieuChinhGiao;
+                    loi.Add($"{MoTaDong(item)}: dòng này vừa được " +
+                            (ai.HasValue ? $"người dùng {ai} " : "") + "thay đổi" +
+                            (luc.HasValue ? $" lúc {luc:dd/MM/yyyy HH:mm}" : "") +
+                            " — hãy tải lại trang để xem số mới rồi chỉnh lại.");
+                    continue;
+                }
+
+                // Loại số là của cả cặp dòng: bên nào chọn trước thì bên kia phải chọn giống (muốn đổi thì Reset loại số)
+                if (item.LoaiSoDieuChinh.HasValue && doiTac.TryGetValue(item.IdCtBBGN, out var kiaLoai)
+                    && kiaLoai.LoaiSoDieuChinh.HasValue && kiaLoai.LoaiSoDieuChinh != item.LoaiSoDieuChinh)
+                {
+                    loi.Add($"{MoTaDong(item)}: bên {(laBenNhan ? "xuất" : "nhận")} đã chọn " +
+                            $"{(kiaLoai.LoaiSoDieuChinh == 1 ? "Trước ẩm" : "Sau ẩm")} — phải chọn giống, " +
+                            "hoặc Reset loại số điều chỉnh để chọn lại.");
+                    continue;
+                }
+
+                // Bên kia đã gửi phiếu với KL chốt: bên mình đã nhập KL thì không được xóa (để trống) — làm vậy cặp dòng sẽ
+                // lệch dù phiếu bên kia đã khóa. Đổi sang số khác thì đã bị chặn ở bước đối chiếu bên dưới.
+                var klHienCo = laBenNhan ? rec.KhoiLuongNhap : rec.KhoiLuongXuat;
+                if (!item.KhoiLuong.HasValue && klHienCo.HasValue
+                    && doiTac.TryGetValue(item.IdCtBBGN, out var kiaDaGui)
+                    && phieuBenKiaKhoa.TryGetValue(kiaDaGui.IDPhieu, out var soKiaDaGui)
+                    && (laBenNhan ? kiaDaGui.KhoiLuongXuat : kiaDaGui.KhoiLuongNhap).HasValue)
+                {
+                    loi.Add($"{MoTaDong(item)}: phiếu {TenPhieu(kiaDaGui.IDPhieu, soKiaDaGui)} của bên " +
+                            $"{(laBenNhan ? "xuất" : "nhận")} đã gửi nên không được xóa KL đã nhập — " +
+                            "cần thu hồi phiếu đó nếu muốn thay đổi.");
+                    continue;
+                }
 
                 // Đối chiếu với bên kia (nếu bên kia đã nhập khối lượng)
                 if (item.KhoiLuong.HasValue && doiTac.TryGetValue(item.IdCtBBGN, out var kia))
@@ -224,7 +330,7 @@ namespace dataproduct.api.Repositories
                 if (idPhongBan.HasValue) rec.ID_PhongBan = idPhongBan;
                 rec.DoAm = item.DoAm.HasValue ? (decimal)item.DoAm.Value : null;
                 rec.LoaiSoDieuChinh = item.LoaiSoDieuChinh;
-                rec.GhiChu = item.GhiChu;
+                if (laBenNhan) rec.GhiChuNhap = item.GhiChu; else rec.GhiChuXuat = item.GhiChu;
                 if (laBenNhan)
                 {
                     rec.KhoiLuongNhap = item.KhoiLuong;
@@ -239,8 +345,7 @@ namespace dataproduct.api.Repositories
                     rec.NguoiDieuChinhGiao = item.KhoiLuong.HasValue ? nguoiThucHien : null;
                     rec.ThoiGianDieuChinhGiao = item.KhoiLuong.HasValue ? now : null;
                 }
-                rec.NguoiSua = nguoi;
-                rec.ThoiGianSua = now;
+                phienBanMoi[item.IdCtBBGN] = item.KhoiLuong.HasValue ? now : null;
             }
 
             // Có dòng vi phạm thì không SaveChanges — các thay đổi đang theo dõi bị bỏ khi request kết thúc.
@@ -248,16 +353,148 @@ namespace dataproduct.api.Repositories
                 throw new InvalidOperationException(string.Join("\n", loi));
 
             await _formContext.SaveChangesAsync();
+            await tx.CommitAsync();
+            return phienBanMoi;
         }
 
-        public async Task ResetBenKiaBBGNAsync(Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien)
+        // Trước khi gửi phiếu: mọi dòng Nhập/Xuất mà phiếu này đã điều chỉnh KL phải được bên kia nhập KHỚP (cùng KL, cùng
+        // loại số). Trả về các dòng chưa khớp (rỗng = được gửi). Bên kia nằm ngoài các xưởng của LG_PDC_Scope_PhongBan
+        // (không có phiếu điều chỉnh) thì không đòi.
+        public async Task<List<string>> KiemTraDieuKienGuiAsync(Guid idPhieu)
+        {
+            var cuaPhieu = await _formContext.LG_PhieuDieuChinh_ChiTiet
+                .AsNoTracking()
+                .Where(x => x.IDPhieu == idPhieu && !x.IsDelete && x.ID_CT_BBGN != null
+                            && (x.LoaiDieuChinh == LoaiNhap || x.LoaiDieuChinh == LoaiXuat))
+                .ToListAsync();
+            cuaPhieu = cuaPhieu
+                .Where(x => x.LoaiDieuChinh == LoaiNhap ? x.KhoiLuongNhap.HasValue : x.KhoiLuongXuat.HasValue)
+                .ToList();
+            if (cuaPhieu.Count == 0) return new List<string>();
+
+            var daLuu = await GetDieuChinhBBGNAsync(cuaPhieu.Select(x => x.ID_CT_BBGN!.Value).ToList());
+            var xuongTrongPhamVi = (await _formContext.LG_PDC_Scope_PhongBan
+                    .AsNoTracking()
+                    .Where(x => !x.IsDelete && x.ID_Xuong != null)
+                    .Select(x => x.ID_Xuong!.Value)
+                    .Distinct()
+                    .ToListAsync())
+                .ToHashSet();
+
+            var loi = new List<string>();
+            foreach (var rec in cuaPhieu)
+            {
+                var laNhap = rec.LoaiDieuChinh == LoaiNhap;
+                var xuongKia = laNhap ? rec.ID_Xuong_BG : rec.ID_Xuong_BN;
+                if (xuongKia.HasValue && !xuongTrongPhamVi.Contains(xuongKia.Value)) continue;
+
+                var ct = rec.ID_CT_BBGN!.Value;
+                var kia = laNhap ? daLuu.Xuat.GetValueOrDefault(ct) : daLuu.Nhap.GetValueOrDefault(ct);
+                var klKia = kia == null ? null : (laNhap ? kia.KhoiLuongXuat : kia.KhoiLuongNhap);
+                var tenBenKia = laNhap ? "xuất" : "nhận";
+                var mo = $"{rec.TenNVL}{(string.IsNullOrWhiteSpace(rec.MaLo) ? "" : " - " + rec.MaLo)}";
+
+                if (!klKia.HasValue)
+                    loi.Add($"{mo}: bên {tenBenKia} chưa nhập số điều chỉnh.");
+                else if (klKia.Value != (laNhap ? rec.KhoiLuongNhap : rec.KhoiLuongXuat))
+                    loi.Add($"{mo}: KL hai bên chưa khớp (nhập {(laNhap ? rec.KhoiLuongNhap : klKia):0.###}, " +
+                            $"xuất {(laNhap ? klKia : rec.KhoiLuongXuat):0.###}).");
+                else if (!rec.LoaiSoDieuChinh.HasValue || !kia!.LoaiSoDieuChinh.HasValue)
+                    loi.Add($"{mo}: chưa chọn Loại số điều chỉnh (Trước ẩm / Sau ẩm) — cần chọn lại sau khi Reset loại số.");
+                else if (kia.LoaiSoDieuChinh != rec.LoaiSoDieuChinh)
+                    loi.Add($"{mo}: hai bên chọn Loại số khác nhau (Trước ẩm / Sau ẩm).");
+            }
+            return loi;
+        }
+
+        // Nối dòng "[Reset ...]" vào ghi chú của bên đang reset. Ghi chú hiện tại chính là lý do người dùng vừa gõ thì thay luôn
+        // (lý do đã nằm trong dòng reset), tránh hiện lặp.
+        private static string NoiGhiChuReset(string? cu, string lyDo, string dong)
+            => string.IsNullOrWhiteSpace(cu) || cu.Trim() == lyDo.Trim() ? dong : $"{cu}\n{dong}";
+
+        // Reset Loại số điều chỉnh của CẢ 2 bên cho 1 dòng BBGN (bên nào cũng bấm được, bắt buộc có lý do). KL của 2 bên giữ
+        // nguyên, KL quy khô bị xóa (vì phụ thuộc loại số) — 2 bên chọn lại loại số rồi lưu lại. Cần cả 2 phiếu còn sửa được.
+        public async Task ResetLoaiSoBBGNAsync(
+            Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien, int? loaiSoBenKiaDangThay = null)
         {
             var loai = laBenNhan ? LoaiNhap : LoaiXuat;
             var loaiKia = laBenNhan ? LoaiXuat : LoaiNhap;
 
-            var coDongCuaMinh = await _formContext.LG_PhieuDieuChinh_ChiTiet.AnyAsync(x =>
-                x.IDPhieu == idPhieu && x.LoaiDieuChinh == loai && !x.IsDelete && x.ID_CT_BBGN == idCtBBGN);
-            if (!coDongCuaMinh)
+            await using var tx = await KhoaDongBBGNAsync(new[] { idCtBBGN });
+
+            if ((await PhieuDangKhoaAsync(new[] { idPhieu })).Count > 0)
+                throw new InvalidOperationException("Phiếu đã gửi/đang khóa nên không reset được — cần thu hồi phiếu trước.");
+
+            var own =(await _formContext.LG_PhieuDieuChinh_ChiTiet
+                    .Where(x => x.IDPhieu == idPhieu && x.LoaiDieuChinh == loai && !x.IsDelete && x.ID_CT_BBGN == idCtBBGN)
+                    .ToListAsync())
+                .OrderByDescending(x => x.ID)
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("Phiếu này chưa có dòng BBGN này — hãy Tải dữ liệu nguồn trước.");
+
+            var kiaList = (await _formContext.LG_PhieuDieuChinh_ChiTiet
+                    .Where(x => !x.IsDelete && x.LoaiDieuChinh == loaiKia && x.ID_CT_BBGN == idCtBBGN)
+                    .ToListAsync())
+                .OrderByDescending(x => x.ID)
+                .ToList();
+            var conSong = await PhieuConSongAsync(kiaList.Select(x => x.IDPhieu));
+            var kia = kiaList.FirstOrDefault(x => conSong.Contains(x.IDPhieu));
+
+            if (!own.LoaiSoDieuChinh.HasValue && !(kia?.LoaiSoDieuChinh).HasValue)
+                throw new InvalidOperationException("Dòng này chưa chọn Loại số điều chỉnh nên không có gì để reset.");
+
+            // Màn hình đang hiện loại số cũ (bên kia vừa đổi hoặc vừa reset) → không reset nhầm, để người dùng xem lại
+            if (loaiSoBenKiaDangThay.HasValue && kia?.LoaiSoDieuChinh != loaiSoBenKiaDangThay)
+                throw new InvalidOperationException(
+                    "Loại số điều chỉnh của bên kia đã thay đổi so với màn hình của bạn — hãy tải lại trang để xem số mới, " +
+                    "rồi reset lại nếu vẫn cần.");
+
+            if (kia != null)
+            {
+                var khoaKia = await PhieuDangKhoaAsync(new[] { kia.IDPhieu });
+                if (khoaKia.TryGetValue(kia.IDPhieu, out var soKia))
+                    throw new InvalidOperationException(
+                        $"Phiếu {TenPhieu(kia.IDPhieu, soKia)} của bên {(laBenNhan ? "xuất" : "nhận")} đã gửi nên không reset được — " +
+                        "cần thu hồi phiếu đó trước.");
+            }
+
+            var now = DateTime.Now;
+            var loaiCu = own.LoaiSoDieuChinh ?? kia?.LoaiSoDieuChinh;
+
+            own.LoaiSoDieuChinh = null;
+            if (laBenNhan) own.KhoiLuongQuyKhoNhap = null; else own.KhoiLuongQuyKhoXuat = null;
+
+            if (kia != null)
+            {
+                kia.LoaiSoDieuChinh = null;
+                if (laBenNhan) kia.KhoiLuongQuyKhoXuat = null; else kia.KhoiLuongQuyKhoNhap = null;
+                var dong = $"[Reset loại số bởi bên {(laBenNhan ? "nhận" : "xuất")} {now:dd/MM/yyyy HH:mm} " +
+                           $"(loại cũ {(loaiCu == 1 ? "Trước ẩm" : "Sau ẩm")}): {lyDo.Trim()}]";
+                // Dòng reset ghi vào ghi chú của chính bên đang reset
+                if (laBenNhan) own.GhiChuNhap = NoiGhiChuReset(own.GhiChuNhap, lyDo, dong);
+                else own.GhiChuXuat = NoiGhiChuReset(own.GhiChuXuat, lyDo, dong);
+            }
+            await _formContext.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        public async Task ResetBenKiaBBGNAsync(
+            Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien, decimal? klBenKiaDangThay = null)
+        {
+            var loai = laBenNhan ? LoaiNhap : LoaiXuat;
+            var loaiKia = laBenNhan ? LoaiXuat : LoaiNhap;
+
+            await using var tx = await KhoaDongBBGNAsync(new[] { idCtBBGN });
+
+            if ((await PhieuDangKhoaAsync(new[] { idPhieu })).Count > 0)
+                throw new InvalidOperationException("Phiếu đã gửi/đang khóa nên không reset được — cần thu hồi phiếu trước.");
+
+            var dongCuaMinh = (await _formContext.LG_PhieuDieuChinh_ChiTiet
+                    .Where(x => x.IDPhieu == idPhieu && x.LoaiDieuChinh == loai && !x.IsDelete && x.ID_CT_BBGN == idCtBBGN)
+                    .ToListAsync())
+                .OrderByDescending(x => x.ID)
+                .FirstOrDefault();
+            if (dongCuaMinh == null)
                 throw new InvalidOperationException("Phiếu này chưa có dòng BBGN này — hãy Tải dữ liệu nguồn trước.");
 
             var kia = (await _formContext.LG_PhieuDieuChinh_ChiTiet
@@ -271,8 +508,20 @@ namespace dataproduct.api.Repositories
             if (rec == null || !klKia.HasValue)
                 throw new InvalidOperationException($"Bên {(laBenNhan ? "xuất" : "nhận")} chưa điều chỉnh khối lượng nên không có gì để reset.");
 
+            // Màn hình đang hiện KL cũ (bên kia vừa sửa lại) → không reset nhầm số mới, để người dùng xem lại
+            if (klBenKiaDangThay.HasValue && Math.Abs(klBenKiaDangThay.Value - klKia!.Value) > 0.0005m)
+                throw new InvalidOperationException(
+                    $"Bên {(laBenNhan ? "xuất" : "nhận")} vừa điều chỉnh KL thành {klKia:0.###} " +
+                    $"(màn hình bạn đang hiện {klBenKiaDangThay:0.###}) — hãy tải lại trang để xem số mới, " +
+                    "rồi reset lại nếu vẫn cần.");
+
+            var khoaKia = await PhieuDangKhoaAsync(new[] { rec.IDPhieu });
+            if (khoaKia.TryGetValue(rec.IDPhieu, out var soKia))
+                throw new InvalidOperationException(
+                    $"Phiếu {TenPhieu(rec.IDPhieu, soKia)} của bên {(laBenNhan ? "xuất" : "nhận")} đã gửi nên không reset được — " +
+                    "cần thu hồi phiếu đó trước.");
+
             var now = DateTime.Now;
-            var nguoi = nguoiThucHien?.ToString();
             if (laBenNhan)
             {
                 rec.KhoiLuongXuat = null;
@@ -289,10 +538,11 @@ namespace dataproduct.api.Repositories
             }
 
             var dong = $"[Reset bởi bên {(laBenNhan ? "nhận" : "xuất")} {now:dd/MM/yyyy HH:mm} (KL cũ {klKia:0.###}): {lyDo.Trim()}]";
-            rec.GhiChu = string.IsNullOrWhiteSpace(rec.GhiChu) ? dong : $"{rec.GhiChu}\n{dong}";
-            rec.NguoiSua = nguoi;
-            rec.ThoiGianSua = now;
+            // Dòng reset ghi vào ghi chú của chính bên đang reset
+            if (laBenNhan) dongCuaMinh.GhiChuNhap = NoiGhiChuReset(dongCuaMinh.GhiChuNhap, lyDo, dong);
+            else dongCuaMinh.GhiChuXuat = NoiGhiChuReset(dongCuaMinh.GhiChuXuat, lyDo, dong);
             await _formContext.SaveChangesAsync();
+            await tx.CommitAsync();
         }
 
         // Các dòng Nhập (laBenNhan) hoặc Xuất mà phiếu này đang giữ — bản chụp đã ghi lúc "Tải dữ liệu nguồn"
@@ -364,6 +614,8 @@ namespace dataproduct.api.Repositories
                 // Mô tả dòng BBGN. Độ ẩm chỉ làm mới khi chưa điều chỉnh, vì KL quy khô đã tính theo độ ẩm lúc nhập.
                 rec.IDNVL_BBGN = r.ID_VatTu;
                 rec.TenNVL = r.TenVatTu ?? "";
+                rec.IDNhomNVL = r.ID_NhomVatTu;
+                rec.TenNhomNVL = r.TenNhomVatTu;
                 rec.MaLo = r.MaLO;
                 rec.PhongBanXuat = r.TenPhongBanGiao;
                 rec.XuongXuat = r.TenXuongGiao;
@@ -379,8 +631,6 @@ namespace dataproduct.api.Repositories
                     rec.DoAm = r.DoAm_W.HasValue ? (decimal)r.DoAm_W.Value : null;
 
                 if (loai == LoaiNhap) nhap++; else xuat++;
-                rec.NguoiSua = nguoi;
-                rec.ThoiGianSua = now;
             }
 
             foreach (var r in rowsNhap) XuLy(r, LoaiNhap);
@@ -438,7 +688,7 @@ namespace dataproduct.api.Repositories
         // IDLoCao/thông tin tạo (do nguồn dữ liệu quyết định) và các cột xác nhận cũ (đã bỏ chức năng xác nhận).
         private static bool HasEditableChanges(LG_PhieuDieuChinh_ChiTiet db, LG_PhieuDieuChinh_ChiTiet inc) =>
             db.IDNVL != inc.IDNVL || db.IDNVL_BBGN != inc.IDNVL_BBGN || db.IDNVL_NapLieu != inc.IDNVL_NapLieu
-            || db.TenNVL != inc.TenNVL || db.IDNVLChiTiet != inc.IDNVLChiTiet || db.IDNhomNVL != inc.IDNhomNVL
+            || db.TenNVL != inc.TenNVL || db.IDNVLChiTiet != inc.IDNVLChiTiet || db.IDNhomNVL != inc.IDNhomNVL || db.TenNhomNVL != inc.TenNhomNVL
             || db.MaLo != inc.MaLo || db.LoaiSoDieuChinh != inc.LoaiSoDieuChinh
             || db.PhongBanXuat != inc.PhongBanXuat || db.XuongXuat != inc.XuongXuat
             || db.KhoiLuongXuat != inc.KhoiLuongXuat || db.KhoiLuongQuyKhoXuat != inc.KhoiLuongQuyKhoXuat
@@ -455,6 +705,7 @@ namespace dataproduct.api.Repositories
             db.TenNVL = inc.TenNVL;
             db.IDNVLChiTiet = inc.IDNVLChiTiet;
             db.IDNhomNVL = inc.IDNhomNVL;
+            db.TenNhomNVL = inc.TenNhomNVL;
             db.MaLo = inc.MaLo;
             db.LoaiSoDieuChinh = inc.LoaiSoDieuChinh;
             db.PhongBanXuat = inc.PhongBanXuat;
@@ -474,7 +725,7 @@ namespace dataproduct.api.Repositories
         }
 
         public async Task ReplaceChiTietAsync(
-            Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds, string? nguoiSua)
+            Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds)
         {
             await using var transaction = await _formContext.Database.BeginTransactionAsync();
             try
@@ -506,11 +757,6 @@ namespace dataproduct.api.Repositories
                     }
 
                     var changed = HasEditableChanges(db, inc);
-                    if (changed && db.ThoiGianSua != inc.ThoiGianSua)
-                    {
-                        conflicts.Add(inc.ThuTu ?? 0);
-                        continue;
-                    }
                     updates.Add((db, inc, changed));
                 }
 
@@ -525,8 +771,6 @@ namespace dataproduct.api.Repositories
                     db.ThuTu = inc.ThuTu; // đánh lại số thứ tự không tính là "sửa số liệu"
                     if (!changed) continue;
                     CopyEditable(db, inc);
-                    db.NguoiSua = nguoiSua;
-                    db.ThoiGianSua = now;
                 }
 
                 foreach (var id in deletedIds.Distinct())
@@ -534,8 +778,6 @@ namespace dataproduct.api.Repositories
                     if (byId.TryGetValue(id, out var db) && !db.IsDelete)
                     {
                         db.IsDelete = true;
-                        db.NguoiSua = nguoiSua;
-                        db.ThoiGianSua = now;
                     }
                 }
 
@@ -604,8 +846,6 @@ namespace dataproduct.api.Repositories
 
                     // Ghi chú KHÔNG lấy từ nguồn — để trống cho người dùng tự nhập tại Phiếu điều
                     // chỉnh, và không ghi đè ghi chú người dùng đã gõ mỗi lần tải lại dữ liệu.
-
-                    // Không đổi NguoiSua/ThoiGianSua: đó là "phiên bản" số liệu dùng phát hiện xung đột khi Lưu phiếu.
                 }
                 else
                 {
@@ -636,8 +876,6 @@ namespace dataproduct.api.Repositories
 
                         NguoiTao = nguoiThucHien,
                         ThoiGianTao = now,
-                        NguoiSua = nguoiThucHien,
-                        ThoiGianSua = now,
 
                         IsDelete = false,
                         TrangThai = 0

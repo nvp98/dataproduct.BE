@@ -627,9 +627,12 @@ namespace dataproduct.api.Repositories
         // Số điều chỉnh Nhập/Xuất lưu trong LG_PhieuDieuChinh_ChiTiet (LoaiDieuChinh 1 = Nhập, 3 = Xuất; mỗi dòng thuộc 1 phiếu
         // và 1 bên); đọc dòng của cả 2 bên theo ID_CT_BBGN, lưu số của 1 bên và kiểm tra 2 bên bằng nhau
         Task<DieuChinhBBGNDaLuu> GetDieuChinhBBGNAsync(IReadOnlyCollection<int> idCtBbgn);
-        Task SaveDieuChinhBBGNAsync(Guid idPhieu, bool laBenNhan, int? nguoiThucHien, List<SaveLG_PhieuDieuChinhBBGNDto> items, int? idPhongBan);
+        Task<Dictionary<Guid, string?>> PhieuDangKhoaAsync(IEnumerable<Guid> idPhieus);
+        Task<List<string>> KiemTraDieuKienGuiAsync(Guid idPhieu);
+        Task<Dictionary<int, DateTime?>> SaveDieuChinhBBGNAsync(Guid idPhieu, bool laBenNhan, int? nguoiThucHien, List<SaveLG_PhieuDieuChinhBBGNDto> items, int? idPhongBan);
         // Xóa số điều chỉnh của BÊN KIA (laBenNhan = bên đang reset) cho 1 dòng BBGN, ghi lý do vào ghi chú dòng bên kia
-        Task ResetBenKiaBBGNAsync(Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien);
+        Task ResetLoaiSoBBGNAsync(Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien, int? loaiSoBenKiaDangThay = null);
+        Task ResetBenKiaBBGNAsync(Guid idPhieu, bool laBenNhan, int idCtBBGN, string lyDo, int? nguoiThucHien, decimal? klBenKiaDangThay = null);
         // Dòng Nhập/Xuất mà 1 phiếu đang giữ (bản chụp ghi lúc "Tải dữ liệu nguồn")
         Task<List<LG_PhieuDieuChinh_ChiTiet>> GetDieuChinhTheoPhieuAsync(Guid idPhieu, bool laBenNhan);
         // Ghi các dòng BBGN nguồn vào bản ghi dùng chung và gán cho phiếu; trả (số dòng Nhập, Xuất, bỏ qua)
@@ -645,7 +648,7 @@ namespace dataproduct.api.Repositories
 
         Task<List<LG_PhieuDieuChinh_ChiTiet>> GetChiTietByPhieuAsync(Guid idPhieu);
         // Upsert theo ID (không xóa-ghi lại cả bảng) + xóa mềm các ID trong deletedIds.
-        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds, string? nguoiSua);
+        Task ReplaceChiTietAsync(Guid idPhieu, List<LG_PhieuDieuChinh_ChiTiet> entities, List<long> deletedIds);
         Task<List<LG_PhieuDieuChinh_ChiTiet>> SyncChiTietFromNapLieuLoCaoAsync(Guid idPhieu, int idLoCao, List<NapLieuLoCaoDieuChinhResult> rows, string? nguoiThucHien, int? idPhongBan);
 
     }

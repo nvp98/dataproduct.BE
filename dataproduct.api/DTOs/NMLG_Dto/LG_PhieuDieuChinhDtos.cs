@@ -51,6 +51,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdCtBBGN { get; set; }
         public int? IdCa { get; set; }
         public int? IdVatTu { get; set; }
+        public string? TenNhomNVL { get; set; }
         public string? TenVatTu { get; set; }
         public string? MaLo { get; set; }
         public DateTime? ThoiGianXuLyBG { get; set; }
@@ -65,7 +66,12 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         // Độ ẩm của dòng trong BBGN (DoAm_W)
         public double? DoAm { get; set; }
 
+        /// <summary>Loại số của dòng: bên mình đã chọn, chưa chọn thì lấy theo bên kia (bên nào chọn trước thì bên kia theo).</summary>
         public int? LoaiSoDieuChinh { get; set; }
+        /// <summary>Loại số bên kia đã lưu — có giá trị thì bên mình bị khóa theo, muốn đổi phải Reset loại số.</summary>
+        public int? LoaiSoBenKia { get; set; }
+        /// <summary>Thời gian điều chỉnh của bên đang xem lúc tải — gửi lại khi Lưu để phát hiện người khác sửa chen.</summary>
+        public DateTime? ThoiGianPhienBan { get; set; }
         public decimal? KhoiLuongXuat { get; set; }
         public decimal? KLQuyKhoXuat { get; set; }
         public string? GhiChuXuat { get; set; }
@@ -76,6 +82,10 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? GhiChuNhap { get; set; }
         public int? NguoiNhap { get; set; }
         public DateTime? ThoiGianNhap { get; set; }
+        /// <summary>Số phiếu của bên kia khi phiếu đó đang khóa (chỉ có giá trị khi PhieuBenKiaKhoa = true).</summary>
+        public string? SoPhieuBenKia { get; set; }
+        /// <summary>Phiếu của bên kia đã gửi/khóa — không reset được số của bên kia cho tới khi phiếu đó được thu hồi.</summary>
+        public bool PhieuBenKiaKhoa { get; set; }
     }
 
     // Lưu số điều chỉnh của 1 bên (chiều "nhan" hoặc "xuat") cho 1 dòng BBGN. Mỗi phiếu có dòng riêng trong
@@ -95,6 +105,8 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         // Độ ẩm của dòng (lấy từ BBGN) — để BE tự tính KL quy khô của bên mình khi loại số = Sau ẩm
         public double? DoAm { get; set; }
         public string? GhiChu { get; set; }
+        /// <summary>Thời gian điều chỉnh của bên mình lúc người dùng tải màn hình; khác database = người khác đã sửa chen → không lưu.</summary>
+        public DateTime? ThoiGianPhienBan { get; set; }
         // Chỉ để ghi vào thông báo lỗi cho dễ nhận ra dòng (vd tên vật tư - mã lô)
         public string? MoTa { get; set; }
     }
@@ -131,6 +143,10 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public int IdCtBBGN { get; set; }
         public string? GhiChu { get; set; }
         public int? IdNguoiThucHien { get; set; }
+        /// <summary>KL của bên kia mà người dùng đang thấy trên màn hình — khác số hiện tại trong DB (bên kia vừa sửa) thì không reset, báo tải lại.</summary>
+        public decimal? KlBenKiaDangThay { get; set; }
+        /// <summary>Loại số của bên kia mà người dùng đang thấy — dùng cho Reset loại số, kiểm tra tương tự KlBenKiaDangThay.</summary>
+        public int? LoaiSoBenKiaDangThay { get; set; }
     }
 
     // Lò cao hiển thị thành tab trên Phiếu điều chỉnh
@@ -152,6 +168,7 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string TenNVL { get; set; } = string.Empty;
         public int? IdNVLChiTiet { get; set; }
         public int? IdNhomNVL { get; set; }
+        public string? TenNhomNVL { get; set; }
         public string? Dvt { get; set; }
         public string? MaLo { get; set; }
         public int? ThuTu { get; set; }
@@ -171,8 +188,6 @@ namespace dataproduct.api.DTOs.NMLG_Dto
         public string? GhiChu { get; set; }
         public string? NguoiTao { get; set; }
         public DateTime ThoiGianTao { get; set; }
-        public string? NguoiSua { get; set; }
-        public DateTime? ThoiGianSua { get; set; }
         // Người điều chỉnh nhận (FE tự gán khi người đó sửa Khối lượng/Độ ẩm của dòng).
         public int? NguoiDieuChinhNhan { get; set; }
         public DateTime? ThoiGianDieuChinhNhan { get; set; }
@@ -190,12 +205,11 @@ namespace dataproduct.api.DTOs.NMLG_Dto
     {
         // null/0 = dòng mới; có giá trị = dòng đã lưu (cập nhật tại chỗ, không xóa-ghi lại)
         public long? Id { get; set; }
-        // ThoiGianSua của dòng lúc FE tải — dùng phát hiện người khác đã sửa dòng này
-        public DateTime? ThoiGianSua { get; set; }
         public int? IdNVL { get; set; }
         public string TenNVL { get; set; } = string.Empty;
         public int? IdNVLChiTiet { get; set; }
         public int? IdNhomNVL { get; set; }
+        public string? TenNhomNVL { get; set; }
         public string? Dvt { get; set; }
         public string? MaLo { get; set; }
         public int? ThuTu { get; set; }

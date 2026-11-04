@@ -544,6 +544,7 @@ namespace dataproduct.api.Business
             if (existing == null) return false;
             EnsurePhieuOperable(existing);
             await CheckAllowPheDuyetAsync(existing.TinhTrang ?? 0, status);
+
             if (status == 1)
             {
                 // Khi "Đã gửi" thì cập nhật NguoiTaoId = người thực hiện gửi.
