@@ -45,18 +45,65 @@ namespace dataproduct.api.Repositories
         }
 
         /// <summary>
+        /// STD_XUAT_NHAP_TON_HRC2.Scope lưu giá trị enum ToHopSTDNXT (1-5) — một chỉ số khu vực tổng
+        /// quát của riêng Sổ Xuất-Nhập-Tồn, KHÔNG phải (BieuMau, Scope) vật lý của DLNM_HRC2, và
+        /// BieuMau trên dòng này luôn là mã biểu mẫu "HRC2_STD_NXT" chứ không phải "BOF"/"LF"/"RH".
+        /// Bảng dưới đây mirror đúng khuVucList trong BM_config/HRC2_STD_NXT.json (và trùng khớp
+        /// ValidPlants của sp_GetHRC2GroupedByMaterial) để quy đổi sang (BieuMau, Scope) thật.
+        /// </summary>
+        private static readonly Dictionary<int, (string BieuMau, int Scope)> ToHopSTDNXTMap = new()
+        {
+            { (int)ToHopSTDNXT.BOF6, ("BOF", 6) },
+            { (int)ToHopSTDNXT.BOF7, ("BOF", 7) },
+            { (int)ToHopSTDNXT.LF, ("LF", 6) },
+            { (int)ToHopSTDNXT.RH1, ("RH", 1) },
+            { (int)ToHopSTDNXT.RH2, ("RH", 2) },
+        };
+
+        /// <summary>
+        /// Lấy tập (BieuMau, Scope) THẬT (quy đổi qua ToHopSTDNXTMap) mà user đã khai báo thống kê cho
+        /// Id_HeaderKey này trong đúng phiếu Sổ Xuất-Nhập-Tồn (bảng STD_XUAT_NHAP_TON_HRC2, key
+        /// Id_Phieu+Id_HeaderKey). Một phụ liệu có thể thực tế được dùng ở nhiều công đoạn trong ca (VD
+        /// Huỳnh Thạch dùng cả ở LF và RH), nhưng nếu user chỉ thêm dòng theo dõi nó ở khu vực LF-6
+        /// (không thêm ở RH-1/RH-2) thì RH không được tính vào tổng — tránh Compute*Async cộng nhầm cả
+        /// phần công đoạn mà phiếu này không hề theo dõi.
+        /// </summary>
+        private async Task<HashSet<(string? BieuMau, int Scope)>> GetDeclaredKhuVucAsync(Guid idPhieu, int idHeaderKey)
+        {
+            var scopes = await _context.STD_XUAT_NHAP_TON_HRC2s
+                .Where(d => d.Id_Phieu == idPhieu && d.Id_HeaderKey == idHeaderKey)
+                .Select(d => d.Scope)
+                .Distinct()
+                .ToListAsync();
+
+            return scopes
+                .Where(s => ToHopSTDNXTMap.ContainsKey(s))
+                .Select(s => ((string?)ToHopSTDNXTMap[s].BieuMau, ToHopSTDNXTMap[s].Scope))
+                .ToHashSet();
+        }
+
+        /// <summary>
         /// Tính KLTK_BOF/KLTK_LF/KLTK_RH cho 1 Id_HeaderKey trong đúng Ngày/Ca — mirror
         /// STD_XNT_HRC1Repository.ComputeKLTKAsync: gộp TẤT CẢ mẻ đang dùng HeaderKey này (kể cả dòng
         /// phân bổ IsPhanBo=true, cùng cách nhận diện qua Header_Mappings/ID_HeaderKey trực tiếp như
         /// BƯỚC 3 của PhanBoAsync), nhóm theo BieuMau (BOF/LF/RH) của mẻ. Không áp dụng quy đổi đơn vị
         /// đặc biệt cho ID_HeaderKey==5 (khác GetThongKeSumAsync) vì PhanBoAsync cũng không áp dụng.
+        /// Chỉ tính các mẻ thuộc khu vực (BieuMau, Scope) đã được khai báo cho phiếu này — xem
+        /// GetDeclaredKhuVucAsync.
         /// </summary>
-        private async Task<(decimal? Bof, decimal? Lf, decimal? Rh)> ComputeKLTKAsync(DateTime ngaySX, int ca, int idHeaderKey)
+        private async Task<(decimal? Bof, decimal? Lf, decimal? Rh)> ComputeKLTKAsync(Guid idPhieu, DateTime ngaySX, int ca, int idHeaderKey)
         {
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, idHeaderKey);
+            if (declaredKhuVuc.Count == 0) return (null, null, null);
+
             var dlnmRows = await _context.DLNM_HRC2s
                 .Where(x => x.Ngay == ngaySX && x.Ca == ca && x.IsDelete != true)
-                .Select(x => new { x.ID, x.BieuMau })
+                .Select(x => new { x.ID, x.BieuMau, x.Scope })
                 .ToListAsync();
+
+            dlnmRows = dlnmRows
+                .Where(x => declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0)))
+                .ToList();
 
             if (dlnmRows.Count == 0) return (null, null, null);
 
@@ -68,20 +115,55 @@ namespace dataproduct.api.Repositories
                 .Select(hm => hm.ID_PhuLieu)
                 .ToListAsync();
 
+            // Nhận diện mirror GetHRC2GroupedByMaterialAsync: nếu dòng có ID_PhuLieu thật, quyết định
+            // CHỈ theo Header_Mapping hiện tại (bỏ qua cột ID_HeaderKey trên dòng — đó là snapshot lúc
+            // tạo, không cập nhật lại khi Header_Mapping đổi sau đó). Chỉ dùng ID_HeaderKey trực tiếp
+            // cho dòng thêm tay (không có ID_PhuLieu). Tránh 1 dòng bị tính trùng vào 2 HeaderKey khác
+            // nhau (HeaderKey mapping hiện tại + HeaderKey cũ còn snapshot trên cột ID_HeaderKey).
             var plRows = await _context.PhuLieu_HRC2s
                 .Where(pl => meIds.Contains(pl.ID_MeThoi) &&
-                    ((pl.ID_PhuLieu.HasValue && mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)) ||
-                     pl.ID_HeaderKey == idHeaderKey))
+                    (pl.ID_PhuLieu.HasValue
+                        ? mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)
+                        : pl.ID_HeaderKey == idHeaderKey))
+                .Select(pl => new { pl.ID_MeThoi, pl.IsPhanBo, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual })
                 .ToListAsync();
 
             decimal? bofTotal = null, lfTotal = null, rhTotal = null;
-            foreach (var pl in plRows)
-            {
-                var effective = pl.IsManual == true ? pl.KLPhuGia_Manual : pl.KLPhuGia;
-                if (!effective.HasValue) continue;
-                if (!bieuMauByMeId.TryGetValue(pl.ID_MeThoi, out var bieuMau) || bieuMau == null) continue;
 
-                var value = (decimal)effective.Value;
+            // Gom theo mẻ — mirror sp_GetHRC2GroupedByMaterial (HasManual/ManualValue): nếu mẻ có dòng
+            // đo thật (IsPhanBo != true) bị Manual, dùng giá trị Manual đó thay cho cả mẻ, không cộng
+            // thêm các dòng Auto khác cùng mẻ. Dòng phân bổ (IsPhanBo = true) cộng thẳng riêng, không áp
+            // quy tắc Manual override (mỗi mẻ chỉ có 1 dòng phân bổ, không có khái niệm ghi đè).
+            foreach (var group in plRows.GroupBy(x => x.ID_MeThoi))
+            {
+                if (!bieuMauByMeId.TryGetValue(group.Key, out var bieuMau) || bieuMau == null) continue;
+
+                var doThatRows = group.Where(x => x.IsPhanBo != true).ToList();
+                var phanBoRows = group.Where(x => x.IsPhanBo == true).ToList();
+
+                decimal value = 0;
+                var hasValue = false;
+
+                if (doThatRows.Count > 0)
+                {
+                    var manualValues = doThatRows
+                        .Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue)
+                        .Select(x => x.KLPhuGia_Manual!.Value);
+
+                    value += manualValues.Any()
+                        ? (decimal)manualValues.Max()
+                        : (decimal)doThatRows.Sum(x => x.KLPhuGia ?? 0);
+                    hasValue = true;
+                }
+
+                if (phanBoRows.Count > 0)
+                {
+                    value += (decimal)phanBoRows.Sum(x => x.KLPhuGia ?? 0);
+                    hasValue = true;
+                }
+
+                if (!hasValue) continue;
+
                 if (bieuMau.StartsWith("BOF", StringComparison.OrdinalIgnoreCase))
                     bofTotal = (bofTotal ?? 0) + value;
                 else if (bieuMau.StartsWith("LF", StringComparison.OrdinalIgnoreCase))
@@ -99,14 +181,21 @@ namespace dataproduct.api.Repositories
         /// đang dùng HeaderKey này như BƯỚC 3 của PhanBoAsync (Header_Mappings/ID_HeaderKey trực tiếp),
         /// đảm bảo nhất quán với chính quyết định phân bổ. Dùng để phát hiện mẻ nấu luyện đã đổi (VD:
         /// phiếu Nấu Luyện vừa được "Đề nghị hiệu chỉnh") sau lần "Làm mới" + "Lưu" gần nhất trên Sổ
-        /// Xuất-Nhập-Tồn, tránh phân bổ dựa trên ChênhLệch đã lỗi thời.
+        /// Xuất-Nhập-Tồn, tránh phân bổ dựa trên ChênhLệch đã lỗi thời. Chỉ tính các mẻ thuộc khu vực
+        /// (BieuMau, Scope) đã được khai báo cho phiếu này — xem GetDeclaredKhuVucAsync.
         /// </summary>
-        private async Task<decimal> ComputeTongThucTeHienTaiAsync(DateTime ngaySX, int ca, int idHeaderKey)
+        private async Task<decimal> ComputeTongThucTeHienTaiAsync(Guid idPhieu, DateTime ngaySX, int ca, int idHeaderKey)
         {
-            var dlnmIds = await _context.DLNM_HRC2s
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, idHeaderKey);
+            if (declaredKhuVuc.Count == 0) return 0;
+
+            var dlnmIds = (await _context.DLNM_HRC2s
                 .Where(x => x.Ngay == ngaySX && x.Ca == ca && x.IsDelete != true)
+                .Select(x => new { x.ID, x.BieuMau, x.Scope })
+                .ToListAsync())
+                .Where(x => declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0)))
                 .Select(x => x.ID)
-                .ToListAsync();
+                .ToList();
 
             if (dlnmIds.Count == 0) return 0;
 
@@ -115,18 +204,34 @@ namespace dataproduct.api.Repositories
                 .Select(hm => hm.ID_PhuLieu)
                 .ToListAsync();
 
+            // Nhận diện mirror GetHRC2GroupedByMaterialAsync: dòng có ID_PhuLieu thật thì quyết định
+            // CHỈ theo Header_Mapping hiện tại (bỏ qua cột ID_HeaderKey trên dòng — snapshot lúc tạo,
+            // không cập nhật khi Header_Mapping đổi sau đó), tránh 1 dòng bị tính trùng vào 2 HeaderKey.
             var plRows = await _context.PhuLieu_HRC2s
                 .Where(pl =>
                     dlnmIds.Contains(pl.ID_MeThoi) &&
                     (pl.IsPhanBo != true) &&
-                    (
-                        (pl.ID_PhuLieu.HasValue && mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)) ||
-                        pl.ID_HeaderKey == idHeaderKey
-                    ))
-                .Select(pl => new { pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual })
+                    (pl.ID_PhuLieu.HasValue
+                        ? mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)
+                        : pl.ID_HeaderKey == idHeaderKey))
+                .Select(pl => new { pl.ID_MeThoi, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual })
                 .ToListAsync();
 
-            return (decimal)plRows.Sum(x => x.IsManual == true ? (x.KLPhuGia_Manual ?? 0) : (x.KLPhuGia ?? 0));
+            // Gom theo mẻ trước khi cộng — mirror sp_GetHRC2GroupedByMaterial (HasManual/ManualValue):
+            // nếu 1 mẻ có dòng Manual, dùng giá trị Manual đó thay cho CẢ mẻ, không cộng thêm các dòng
+            // Auto khác cùng mẻ (tránh cộng trùng khi 1 mẻ có nhiều dòng PhuLieu cùng map vào HeaderKey này).
+            decimal total = 0;
+            foreach (var group in plRows.GroupBy(x => x.ID_MeThoi))
+            {
+                var manualValues = group
+                    .Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue)
+                    .Select(x => x.KLPhuGia_Manual!.Value);
+
+                total += manualValues.Any()
+                    ? (decimal)manualValues.Max()
+                    : (decimal)group.Sum(x => x.KLPhuGia ?? 0);
+            }
+            return total;
         }
 
         /// <summary>
@@ -134,14 +239,22 @@ namespace dataproduct.api.Repositories
         /// Ngày/Ca, thẳng từ PhuLieu_HRC2 (chỉ dòng đo thật IsPhanBo != true) — cùng cách nhận diện như
         /// ComputeTongThucTeHienTaiAsync. Dùng để chặn phân bổ tỷ lệ > 0 cho công đoạn không còn sử dụng
         /// phụ liệu (VD: phiếu Nấu Luyện đã hiệu chỉnh chuyển lượng dùng sang công đoạn khác nhưng tổng không đổi,
-        /// nên BƯỚC 1.5 không phát hiện được).
+        /// nên BƯỚC 1.5 không phát hiện được). Chỉ tính các mẻ thuộc khu vực (BieuMau, Scope) đã được
+        /// khai báo cho phiếu này — xem GetDeclaredKhuVucAsync.
         /// </summary>
-        private async Task<(decimal Bof, decimal Lf, decimal Rh)> ComputeSuDungTheoCongDoanAsync(DateTime ngaySX, int ca, int idHeaderKey)
+        private async Task<(decimal Bof, decimal Lf, decimal Rh)> ComputeSuDungTheoCongDoanAsync(Guid idPhieu, DateTime ngaySX, int ca, int idHeaderKey)
         {
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, idHeaderKey);
+            if (declaredKhuVuc.Count == 0) return (0, 0, 0);
+
             var dlnmRows = await _context.DLNM_HRC2s
                 .Where(x => x.Ngay == ngaySX && x.Ca == ca && x.IsDelete != true)
-                .Select(x => new { x.ID, x.BieuMau })
+                .Select(x => new { x.ID, x.BieuMau, x.Scope })
                 .ToListAsync();
+
+            dlnmRows = dlnmRows
+                .Where(x => declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0)))
+                .ToList();
 
             if (dlnmRows.Count == 0) return (0, 0, 0);
 
@@ -153,22 +266,35 @@ namespace dataproduct.api.Repositories
                 .Select(hm => hm.ID_PhuLieu)
                 .ToListAsync();
 
+            // Nhận diện mirror GetHRC2GroupedByMaterialAsync: dòng có ID_PhuLieu thật thì quyết định
+            // CHỈ theo Header_Mapping hiện tại (bỏ qua cột ID_HeaderKey trên dòng — snapshot lúc tạo,
+            // không cập nhật khi Header_Mapping đổi sau đó), tránh 1 dòng bị tính trùng vào 2 HeaderKey.
             var plRows = await _context.PhuLieu_HRC2s
                 .Where(pl =>
                     meIds.Contains(pl.ID_MeThoi) &&
                     (pl.IsPhanBo != true) &&
-                    (
-                        (pl.ID_PhuLieu.HasValue && mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)) ||
-                        pl.ID_HeaderKey == idHeaderKey
-                    ))
+                    (pl.ID_PhuLieu.HasValue
+                        ? mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)
+                        : pl.ID_HeaderKey == idHeaderKey))
                 .Select(pl => new { pl.ID_MeThoi, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual })
                 .ToListAsync();
 
             decimal bof = 0, lf = 0, rh = 0;
-            foreach (var pl in plRows)
+            // Gom theo mẻ trước khi cộng — mirror sp_GetHRC2GroupedByMaterial (HasManual/ManualValue):
+            // nếu 1 mẻ có dòng Manual, dùng giá trị Manual đó thay cho CẢ mẻ, không cộng thêm các dòng
+            // Auto khác cùng mẻ (tránh cộng trùng khi 1 mẻ có nhiều dòng PhuLieu cùng map vào HeaderKey này).
+            foreach (var group in plRows.GroupBy(x => x.ID_MeThoi))
             {
-                if (!bieuMauByMeId.TryGetValue(pl.ID_MeThoi, out var bieuMau) || bieuMau == null) continue;
-                var value = (decimal)(pl.IsManual == true ? (pl.KLPhuGia_Manual ?? 0) : (pl.KLPhuGia ?? 0));
+                if (!bieuMauByMeId.TryGetValue(group.Key, out var bieuMau) || bieuMau == null) continue;
+
+                var manualValues = group
+                    .Where(x => x.IsManual == true && x.KLPhuGia_Manual.HasValue)
+                    .Select(x => x.KLPhuGia_Manual!.Value);
+
+                var value = manualValues.Any()
+                    ? (decimal)manualValues.Max()
+                    : (decimal)group.Sum(x => x.KLPhuGia ?? 0);
+
                 if (bieuMau.StartsWith("BOF", StringComparison.OrdinalIgnoreCase)) bof += value;
                 else if (bieuMau.StartsWith("LF", StringComparison.OrdinalIgnoreCase)) lf += value;
                 else if (bieuMau.StartsWith("RH", StringComparison.OrdinalIgnoreCase)) rh += value;
@@ -858,7 +984,7 @@ namespace dataproduct.api.Repositories
 
                 // ========== BƯỚC 1.5: Kiểm tra mẻ nấu luyện có bị đổi (VD: do "Đề nghị hiệu chỉnh")
                 // sau lần "Làm mới" + "Lưu" gần nhất chưa — tránh phân bổ dựa trên ChênhLệch lỗi thời. ==========
-                var tongThucTeHienTai = await ComputeTongThucTeHienTaiAsync(entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
+                var tongThucTeHienTai = await ComputeTongThucTeHienTaiAsync(entity.IdPhieu, entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
                 var tongThucTeDiff = Math.Abs((details.TongSDTrenSoSach ?? 0) - tongThucTeHienTai);
                 if (tongThucTeDiff > 0.001m)
                 {
@@ -872,6 +998,17 @@ namespace dataproduct.api.Repositories
                     .Where(x => x.Ngay == entity.NgaySX && x.Ca == entity.Ca && x.IsDelete != true
                              && x.IsSyncSauGui != true)
                     .ToListAsync();
+
+                // Chỉ giữ mẻ thuộc khu vực (BieuMau, Scope) mà user đã khai báo thống kê HeaderKey này
+                // trên Sổ Xuất-Nhập-Tồn (VD: Huỳnh Thạch dùng cả ở LF và RH trong ca, nhưng phiếu này chỉ
+                // khai báo theo dõi ở LF-6 thì RH-1/RH-2 không được tính vào phân bổ của phiếu này).
+                var declaredKhuVucPB = await GetDeclaredKhuVucAsync(entity.IdPhieu, entity.Id_HeaderKey);
+                if (declaredKhuVucPB.Count > 0)
+                {
+                    dlnmInCa = dlnmInCa
+                        .Where(x => declaredKhuVucPB.Contains((x.BieuMau, x.Scope ?? 0)))
+                        .ToList();
+                }
 
                 if (!dlnmInCa.Any())
                 {
@@ -887,16 +1024,18 @@ namespace dataproduct.api.Repositories
                     .Select(hm => hm.ID_PhuLieu)
                     .ToListAsync();
 
-                // Tìm mẻ có PhuLieu_HRC2 (không phải phanBo) cho HeaderKey này
-                // — khớp qua ID_PhuLieu → mapping hoặc ID_HeaderKey trực tiếp
+                // Tìm mẻ có PhuLieu_HRC2 (không phải phanBo) cho HeaderKey này — mirror
+                // GetHRC2GroupedByMaterialAsync: dòng có ID_PhuLieu thật thì quyết định CHỈ theo
+                // Header_Mapping hiện tại (bỏ qua cột ID_HeaderKey trên dòng — snapshot lúc tạo, không
+                // cập nhật khi Header_Mapping đổi sau đó); chỉ dùng ID_HeaderKey trực tiếp cho dòng
+                // thêm tay (không có ID_PhuLieu).
                 var meThoiIdsWithPhuLieu = await _context.PhuLieu_HRC2s
                     .Where(pl =>
                         allDlnmIds.Contains(pl.ID_MeThoi) &&
                         (pl.IsPhanBo != true) &&
-                        (
-                            (pl.ID_PhuLieu.HasValue && mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)) ||
-                            pl.ID_HeaderKey == entity.Id_HeaderKey
-                        ))
+                        (pl.ID_PhuLieu.HasValue
+                            ? mappedPhuLieuIds.Contains(pl.ID_PhuLieu.Value)
+                            : pl.ID_HeaderKey == entity.Id_HeaderKey))
                     .Select(pl => pl.ID_MeThoi)
                     .Distinct()
                     .ToListAsync();
@@ -947,7 +1086,7 @@ namespace dataproduct.api.Repositories
                 if (tyLeBOF != null || tyLeTinhLuyen != null || tyLeRH != null)
                 {
                     const string lamMoiHint = "Số liệu phiếu Nấu Luyện có thể đã thay đổi, vui lòng bấm \"Làm mới\" rồi \"Lưu\" lại Sổ Xuất-Nhập-Tồn trước khi phân bổ.";
-                    var (suDungBof, suDungLf, suDungRh) = await ComputeSuDungTheoCongDoanAsync(entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
+                    var (suDungBof, suDungLf, suDungRh) = await ComputeSuDungTheoCongDoanAsync(entity.IdPhieu, entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
 
                     if (suDungBof == 0 && suDungLf == 0 && suDungRh == 0)
                         throw new Exception($"Phụ liệu này hiện không được sử dụng ở công đoạn nào trong ca, không thể phân bổ. {lamMoiHint}");
@@ -1152,7 +1291,7 @@ namespace dataproduct.api.Repositories
 
                 // Tính KLTK_BOF/LF/RH SAU khi dòng phân bổ đã được lưu (BƯỚC 8/9 ở trên) — phải đọc lại
                 // DB sau SaveChangesAsync để ComputeKLTKAsync gộp đúng cả phần phân bổ vừa ghi.
-                var (klTkBof, klTkLf, klTkRh) = await ComputeKLTKAsync(entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
+                var (klTkBof, klTkLf, klTkRh) = await ComputeKLTKAsync(entity.IdPhieu, entity.NgaySX, entity.Ca, entity.Id_HeaderKey);
                 details.KLTK_BOF = klTkBof;
                 details.KLTK_LF = klTkLf;
                 details.KLTK_RH = klTkRh;
@@ -1339,7 +1478,7 @@ namespace dataproduct.api.Repositories
             else
             {
                 summary.HasPhanBo = false;
-                var (klTkBof, klTkLf, klTkRh) = await ComputeKLTKAsync(ngaySX, ca, idHeaderKey);
+                var (klTkBof, klTkLf, klTkRh) = await ComputeKLTKAsync(idPhieu, ngaySX, ca, idHeaderKey);
                 summary.KLTK_BOF = klTkBof;
                 summary.KLTK_LF = klTkLf;
                 summary.KLTK_RH = klTkRh;

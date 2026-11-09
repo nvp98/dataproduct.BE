@@ -214,9 +214,33 @@ namespace dataproduct.api.Services
 
             if (request.IdPhieu.HasValue && request.IdPhieu.Value != Guid.Empty)
             {
+                // Phiếu đã tạo nhưng chưa có dòng phụ liệu nào (ví dụ do InitializeHRC1_STD_NXTAsync lỗi/miss
+                // prevRecords ở lần tạo trước) → re-init lại từ phiếu ca trước/danh mục mặc định ngay tại đây,
+                // để "Làm mới" tự phục hồi phiếu bị kẹt thay vì phải sửa tay dưới DB.
+                var hasAnyDetail = await _context.STD_XUAT_NHAP_TON_HRC1s
+                    .AnyAsync(x => x.Id_Phieu == request.IdPhieu.Value);
+
+                if (!hasAnyDetail)
+                {
+                    var phieu = await _context.BmPhieus.FirstOrDefaultAsync(x => x.Idphieu == request.IdPhieu.Value);
+                    if (phieu != null)
+                        await _stdNxtRepo.InitializeHRC1_STD_NXTAsync(phieu, fallbackToDefaultWhenPrevMissing: true);
+                }
+
                 var phuLieuIds = (request.PhuLieuIds != null && request.PhuLieuIds.Count > 0)
                     ? request.PhuLieuIds.Where(id => id > 0).Distinct().ToList()
                     : result.Select(x => x.PhuLieuID).Distinct().ToList();
+
+                if (!hasAnyDetail)
+                {
+                    // Danh sách phuLieuIds trên vừa tính từ FE/NM data cũ, chưa chắc khớp các dòng vừa được
+                    // tạo lại ở trên → lấy lại trực tiếp từ DB để GetHRC1FilterInitAsync init đúng TonDauCa.
+                    phuLieuIds = await _context.STD_XUAT_NHAP_TON_HRC1s
+                        .Where(x => x.Id_Phieu == request.IdPhieu.Value)
+                        .Select(x => x.PhuLieuID)
+                        .Distinct()
+                        .ToListAsync();
+                }
 
                 if (phuLieuIds.Count > 0)
                 {
@@ -2290,8 +2314,8 @@ namespace dataproduct.api.Services
 
             ClearRowsFrom(ws, 4);
             string isoText = bieuMau == "LF"
-                ? "BM.14/QT.05.10\nNgày hiệu lực: 01/09/2023\nLần sửa đổi: 00"
-                : "BM.07/QT.05.10\nNgày hiệu lực: 01/07/2024\nLần sửa đổi: 02";
+                ? "BM.14/QT.05.10\nNgày hiệu lực: 25/09/2026\nLần sửa đổi: 01"
+                : "BM.07/QT.05.10\nNgày hiệu lực: 25/09/2026\nLần sửa đổi: 03";
             UpdateHeaderRowMerges(ws, lastCol, isoText);
             RenderInfoRows(ws, rows, lastCol, scope, ngayPhieu, caPhieu, kip, bieuMau);
 
@@ -2737,8 +2761,8 @@ namespace dataproduct.api.Services
             // Mã ISO riêng theo biểu mẫu — mirror isoInfo.code trong BM_config/HRC1_BB_TieuHao_BOF.json
             // (BM.08/QT.05.15) và HRC1_BB_TieuHao_LF.json (BM.14/QT.05.15).
             string bmCode = isLF
-                ? "BM.14/QT.05.10 <br /> Ngày hiệu lực: 01/09/2023 <br /> Lần sửa đổi: 00"
-                : "BM.07/QT.05.10 <br /> Ngày hiệu lực: 01/07/2024 <br /> Lần sửa đổi: 02";
+                ? "BM.14/QT.05.10 <br /> Ngày hiệu lực: 25/09/2026 <br /> Lần sửa đổi: 01"
+                : "BM.07/QT.05.10 <br /> Ngày hiệu lực: 25/09/2026 <br /> Lần sửa đổi: 03";
 
             string thead = PdfThead(headers, bieuMau);
             string tbody = PdfTbody(headers, rows, bieuMau);

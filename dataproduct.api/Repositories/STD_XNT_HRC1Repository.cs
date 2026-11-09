@@ -27,6 +27,44 @@ namespace dataproduct.api.Repositories
         private static string ResolveBieuMauFromScope(int scope) => scope >= 1 && scope <= 5 ? "BOF" : "LF";
 
         /// <summary>
+        /// Quy đổi ToHopSTDNXT_HRC1 (1-10, chỉ số khu vực riêng của Sổ Xuất-Nhập-Tồn) sang (BieuMau,
+        /// Scope) THẬT khớp với Hrc1TieuHao.Scope (số lò/tổ vật lý) — mirror ToHopSTDNXTMap của HRC2.
+        /// </summary>
+        private static readonly Dictionary<int, (string BieuMau, int Scope)> ToHopSTDNXT_HRC1Map = new()
+        {
+            { (int)ToHopSTDNXT_HRC1.LoThoi1, ("BOF", 1) },
+            { (int)ToHopSTDNXT_HRC1.LoThoi2, ("BOF", 2) },
+            { (int)ToHopSTDNXT_HRC1.LoThoi3, ("BOF", 3) },
+            { (int)ToHopSTDNXT_HRC1.LoThoi4, ("BOF", 4) },
+            { (int)ToHopSTDNXT_HRC1.LoThoi5, ("BOF", 5) },
+            { (int)ToHopSTDNXT_HRC1.TinhLuyen1, ("LF", 1) },
+            { (int)ToHopSTDNXT_HRC1.TinhLuyen2, ("LF", 2) },
+            { (int)ToHopSTDNXT_HRC1.TinhLuyen3, ("LF", 3) },
+            { (int)ToHopSTDNXT_HRC1.TinhLuyen4, ("LF", 4) },
+            { (int)ToHopSTDNXT_HRC1.TinhLuyen5, ("LF", 5) },
+        };
+
+        /// <summary>
+        /// Lấy tập (BieuMau, Scope) THẬT mà user đã khai báo thống kê cho PhuLieuID này trong đúng phiếu
+        /// Sổ Xuất-Nhập-Tồn (bảng STD_XUAT_NHAP_TON_HRC1, key Id_Phieu+PhuLieuID) — mirror
+        /// GetDeclaredKhuVucAsync của HRC2. Một phụ liệu có thể thực tế dùng ở nhiều lò/tổ trong ca,
+        /// nhưng nếu user chỉ khai báo theo dõi nó ở 1 số lò/tổ thì các lò/tổ còn lại không được tính.
+        /// </summary>
+        private async Task<HashSet<(string? BieuMau, int Scope)>> GetDeclaredKhuVucAsync(Guid idPhieu, int phuLieuID)
+        {
+            var scopes = await _context.STD_XUAT_NHAP_TON_HRC1s
+                .Where(d => d.Id_Phieu == idPhieu && d.PhuLieuID == phuLieuID)
+                .Select(d => d.Scope)
+                .Distinct()
+                .ToListAsync();
+
+            return scopes
+                .Where(s => ToHopSTDNXT_HRC1Map.ContainsKey(s))
+                .Select(s => ((string?)ToHopSTDNXT_HRC1Map[s].BieuMau, ToHopSTDNXT_HRC1Map[s].Scope))
+                .ToHashSet();
+        }
+
+        /// <summary>
         /// Tính lại "Tổng thực tế" (tongThucTe) HIỆN TẠI của 1 PhuLieuID trong đúng Ngày/Ca, thẳng từ
         /// nguồn Hrc1PhuLieu (chỉ dòng đo thật IsPhanBo=false) — mirror đúng công thức
         /// DLNMHRC1Repository.GetHRC1GroupedByMaterialAsync (dùng khi bấm "Làm mới"), KHÔNG cộng
@@ -34,8 +72,11 @@ namespace dataproduct.api.Repositories
         /// mẻ tiêu hao đã đổi (VD: phiếu Tiêu Hao vừa được "Đề nghị hiệu chỉnh") sau lần "Làm mới" +
         /// "Lưu" gần nhất trên Sổ Xuất-Nhập-Tồn, tránh phân bổ dựa trên ChênhLệch đã lỗi thời.
         /// </summary>
-        private async Task<decimal> ComputeTongThucTeHienTaiAsync(DateOnly ngaySX, int ca, int phuLieuID)
+        private async Task<decimal> ComputeTongThucTeHienTaiAsync(Guid idPhieu, DateOnly ngaySX, int ca, int phuLieuID)
         {
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, phuLieuID);
+            if (declaredKhuVuc.Count == 0) return 0;
+
             var caByte = (byte)ca;
             var raw = await (
                 from pl in _context.Hrc1PhuLieus
@@ -48,10 +89,12 @@ namespace dataproduct.api.Repositories
                       && pl.PhuLieuID == phuLieuID
                       && (tieuHao.IDPhieu == null ||
                           _context.BmPhieus.Any(p => p.Idphieu == tieuHao.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
-                select new { pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual }
+                select new { tieuHao.BieuMau, tieuHao.Scope, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual }
             ).ToListAsync();
 
-            return raw.Sum(x => x.IsManual ? (x.KLPhuGia_Manual ?? 0) : (x.KLPhuGia ?? 0));
+            return raw
+                .Where(x => declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0)))
+                .Sum(x => x.IsManual ? (x.KLPhuGia_Manual ?? 0) : (x.KLPhuGia ?? 0));
         }
 
         /// <summary>
@@ -60,8 +103,11 @@ namespace dataproduct.api.Repositories
         /// tỷ lệ > 0 cho công đoạn không còn sử dụng phụ liệu (VD: phiếu Tiêu Hao đã hiệu chỉnh chuyển lượng dùng
         /// sang công đoạn khác nhưng tổng không đổi, nên BƯỚC 1.5 không phát hiện được).
         /// </summary>
-        private async Task<(decimal Bof, decimal Lf)> ComputeSuDungTheoCongDoanAsync(DateOnly ngaySX, int ca, int phuLieuID)
+        private async Task<(decimal Bof, decimal Lf)> ComputeSuDungTheoCongDoanAsync(Guid idPhieu, DateOnly ngaySX, int ca, int phuLieuID)
         {
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, phuLieuID);
+            if (declaredKhuVuc.Count == 0) return (0, 0);
+
             var caByte = (byte)ca;
             var raw = await (
                 from pl in _context.Hrc1PhuLieus
@@ -74,12 +120,13 @@ namespace dataproduct.api.Repositories
                       && pl.PhuLieuID == phuLieuID
                       && (tieuHao.IDPhieu == null ||
                           _context.BmPhieus.Any(p => p.Idphieu == tieuHao.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
-                select new { tieuHao.BieuMau, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual }
+                select new { tieuHao.BieuMau, tieuHao.Scope, pl.IsManual, pl.KLPhuGia, pl.KLPhuGia_Manual }
             ).ToListAsync();
 
             decimal bof = 0, lf = 0;
             foreach (var x in raw)
             {
+                if (!declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0))) continue;
                 var value = x.IsManual ? (x.KLPhuGia_Manual ?? 0) : (x.KLPhuGia ?? 0);
                 if (string.Equals(x.BieuMau, "BOF", StringComparison.OrdinalIgnoreCase)) bof += value;
                 else if (string.Equals(x.BieuMau, "LF", StringComparison.OrdinalIgnoreCase)) lf += value;
@@ -127,15 +174,20 @@ namespace dataproduct.api.Repositories
         /// BuildThongKeQuery. Trả về NULL cho vế nào không có dòng dữ liệu (khớp hành vi "không xuất hiện
         /// trong kết quả" của search-thongke), khác 0.
         /// </summary>
-        private async Task<(decimal? Bof, decimal? Lf)> ComputeKLTKAsync(DateOnly ngaySX, int ca, int phuLieuID)
+        private async Task<(decimal? Bof, decimal? Lf)> ComputeKLTKAsync(Guid idPhieu, DateOnly ngaySX, int ca, int phuLieuID)
         {
+            var declaredKhuVuc = await GetDeclaredKhuVucAsync(idPhieu, phuLieuID);
+            if (declaredKhuVuc.Count == 0) return (null, null);
+
             var caByte = (byte)ca;
-            var meRows = await _context.Hrc1TieuHaos
+            var meRows = (await _context.Hrc1TieuHaos
                 .Where(x => x.NgaySanXuat == ngaySX && x.Ca == caByte && !x.IsDeleted)
                 .Where(x => x.IDPhieu == null ||
                     _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
-                .Select(x => new { x.ID, x.BieuMau })
-                .ToListAsync();
+                .Select(x => new { x.ID, x.BieuMau, x.Scope })
+                .ToListAsync())
+                .Where(x => declaredKhuVuc.Contains((x.BieuMau, x.Scope ?? 0)))
+                .ToList();
 
             if (meRows.Count == 0) return (null, null);
 
@@ -331,7 +383,7 @@ namespace dataproduct.api.Repositories
             }
         }
 
-        public async Task InitializeHRC1_STD_NXTAsync(BmPhieu phieu)
+        public async Task InitializeHRC1_STD_NXTAsync(BmPhieu phieu, bool fallbackToDefaultWhenPrevMissing = false)
         {
             var ngaySx = phieu.NgaySX?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Now;
             var ca = phieu.Ca.Value;
@@ -353,11 +405,12 @@ namespace dataproduct.api.Repositories
                 .Select(x => x.Idphieu)
                 .FirstOrDefaultAsync();
 
-            if (prevPhieu == default)
+            // Không có phiếu trước đó (hoặc phiếu trước có nhưng không có dữ liệu phụ liệu, ví dụ do tạo lỗi
+            // giữa chừng) → dùng danh sách HRC1_PhuLieuNM mặc định (IsUsedNXT = true), theo ThuTu_Excel_BOF
+            // khai báo trong danh mục (cột ThuTu đơn cũ đã bỏ; nhánh này áp dụng chung cho cả 10 tổ hợp
+            // BOF/LF nên không tách riêng theo BieuMau ở bước init này).
+            async Task LoadDefaultSourceAsync()
             {
-                // Không có phiếu trước đó → dùng danh sách HRC1_PhuLieuNM mặc định (IsUsedNXT = true),
-                // theo ThuTu_Excel_BOF khai báo trong danh mục (cột ThuTu đơn cũ đã bỏ; nhánh này áp dụng
-                // chung cho cả 10 tổ hợp BOF/LF nên không tách riêng theo BieuMau ở bước init này).
                 var defaults = await _context.Hrc1PhuLieuNms
                     .Where(x => x.IsUsedNXT == true)
                     .OrderBy(x => x.ThuTu_Excel_BOF ?? int.MaxValue)
@@ -378,6 +431,11 @@ namespace dataproduct.api.Repositories
                 }
 
                 allPhuLieuIds = defaults.Select(x => x.ID).ToList();
+            }
+
+            if (prevPhieu == default)
+            {
+                await LoadDefaultSourceAsync();
             }
             else
             {
@@ -402,26 +460,38 @@ namespace dataproduct.api.Repositories
                     .ToDictionary(x => x.PhuLieuID, x => (x.TyLeBOF, x.TyLeLF));
 
                 if (!prevRecords.Any())
-                    throw new Exception($"Phiếu ca trước không có dữ liệu phụ liệu (IdPhieu: {prevPhieu})");
+                {
+                    // Phiếu ca trước không có dữ liệu phụ liệu (ví dụ phiếu đó tạo lỗi) → không throw ở đây,
+                    // vì các phiếu sau luôn trỏ lại đúng phiếu trước gần nhất nên sẽ kẹt mãi không tạo được.
+                    // Luồng tự động (tạo/sửa phiếu) chỉ bỏ qua lần init này, giữ nguyên dữ liệu hiện có của
+                    // phiếu (nếu có) — không tự ý áp danh mục mặc định. Chỉ khi người dùng chủ động bấm
+                    // "Làm mới" (fallbackToDefaultWhenPrevMissing = true) mới fallback dùng danh mục mặc định.
+                    if (!fallbackToDefaultWhenPrevMissing)
+                        return;
 
-                // Group theo Scope → dedup theo PhuLieuID trong mỗi Scope, giữ nguyên thứ tự
-                // hiển thị (ThuTu) mà người dùng đã sắp xếp ở ca trước
-                sourceByScope = prevRecords
-                    .GroupBy(x => x.Scope)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g
-                            .OrderBy(x => x.ThuTu ?? int.MaxValue)
-                            .GroupBy(x => x.PhuLieuID)
-                            .Select(hg => hg.First())
-                            .Select((x, idx) => (x.PhuLieuID, x.TenNguyenLieu, x.TyTrong, x.IDSilo, (int?)idx))
-                            .ToList()
-                    );
+                    await LoadDefaultSourceAsync();
+                }
+                else
+                {
+                    // Group theo Scope → dedup theo PhuLieuID trong mỗi Scope, giữ nguyên thứ tự
+                    // hiển thị (ThuTu) mà người dùng đã sắp xếp ở ca trước
+                    sourceByScope = prevRecords
+                        .GroupBy(x => x.Scope)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g
+                                .OrderBy(x => x.ThuTu ?? int.MaxValue)
+                                .GroupBy(x => x.PhuLieuID)
+                                .Select(hg => hg.First())
+                                .Select((x, idx) => (x.PhuLieuID, x.TenNguyenLieu, x.TyTrong, x.IDSilo, (int?)idx))
+                                .ToList()
+                        );
 
-                allPhuLieuIds = prevRecords
-                    .Select(x => x.PhuLieuID)
-                    .Distinct()
-                    .ToList();
+                    allPhuLieuIds = prevRecords
+                        .Select(x => x.PhuLieuID)
+                        .Distinct()
+                        .ToList();
+                }
             }
 
             // -------------------------------------------------------
@@ -783,7 +853,7 @@ namespace dataproduct.api.Repositories
 
                 // ========== BƯỚC 1.5: Kiểm tra mẻ tiêu hao có bị đổi (VD: do "Đề nghị hiệu chỉnh")
                 // sau lần "Làm mới" + "Lưu" gần nhất chưa — tránh phân bổ dựa trên ChênhLệch lỗi thời. ==========
-                var tongThucTeHienTai = await ComputeTongThucTeHienTaiAsync(ngaySXDate, entity.Ca, entity.PhuLieuID);
+                var tongThucTeHienTai = await ComputeTongThucTeHienTaiAsync(entity.IdPhieu, ngaySXDate, entity.Ca, entity.PhuLieuID);
                 var tongThucTeDiff = Math.Abs((totalRow.TongSDTrenSoSach ?? 0) - tongThucTeHienTai);
                 if (tongThucTeDiff > 0.001m)
                 {
@@ -799,6 +869,16 @@ namespace dataproduct.api.Repositories
                     .Where(x => x.IDPhieu == null ||
                         _context.BmPhieus.Any(p => p.Idphieu == x.IDPhieu && p.IsLock != 1 && p.IsDelete != 1))
                     .ToListAsync();
+
+                // Chỉ giữ mẻ thuộc khu vực (BieuMau, Scope) mà user đã khai báo thống kê PhuLieuID này
+                // trên Sổ Xuất-Nhập-Tồn — mirror BƯỚC 2 của STD_XNT_HRC2Repository.PhanBoAsync.
+                var declaredKhuVucPB = await GetDeclaredKhuVucAsync(entity.IdPhieu, entity.PhuLieuID);
+                if (declaredKhuVucPB.Count > 0)
+                {
+                    meTrongCa = meTrongCa
+                        .Where(x => declaredKhuVucPB.Contains((x.BieuMau, x.Scope ?? 0)))
+                        .ToList();
+                }
 
                 if (!meTrongCa.Any())
                 {
@@ -852,7 +932,7 @@ namespace dataproduct.api.Repositories
                 if (tyLeBOF != null || tyLeLF != null)
                 {
                     const string lamMoiHint = "Số liệu phiếu Tiêu Hao có thể đã thay đổi, vui lòng bấm \"Làm mới\" rồi \"Lưu\" lại Sổ Xuất-Nhập-Tồn trước khi phân bổ.";
-                    var (suDungBof, suDungLf) = await ComputeSuDungTheoCongDoanAsync(ngaySXDate, entity.Ca, entity.PhuLieuID);
+                    var (suDungBof, suDungLf) = await ComputeSuDungTheoCongDoanAsync(entity.IdPhieu, ngaySXDate, entity.Ca, entity.PhuLieuID);
 
                     if (suDungBof == 0 && suDungLf == 0)
                         throw new Exception($"Phụ liệu này hiện không được sử dụng ở công đoạn nào trong ca, không thể phân bổ. {lamMoiHint}");
@@ -878,12 +958,33 @@ namespace dataproduct.api.Repositories
                                      d.BieuMau.Equals("BOF", StringComparison.OrdinalIgnoreCase))
                         .OrderBy(id => id)
                         .ToList();
-                    var lfMeIds = meIds
+                    var lfMeIdsRaw = meIds
                         .Where(id => meLookupAll.TryGetValue(id, out var d) &&
                                      d.BieuMau != null &&
                                      d.BieuMau.Equals("LF", StringComparison.OrdinalIgnoreCase))
                         .OrderBy(id => id)
                         .ToList();
+
+                    // Dedupe mẻ tinh luyện trùng nhau TRONG CÙNG ca/ngày (cùng MeThoi, bỏ qua Hrc1TieuHao.IsTrungMeThoi
+                    // vì cờ đó tính toàn cục không giới hạn ca/ngày nên không đáng tin cho mục đích này) — chỉ giữ
+                    // 1 đại diện/nhóm là mẻ có Id nhỏ nhất (được nhận trước) để chia lfAmount; MeThoi null/rỗng không
+                    // bị coi là trùng với nhau. Các mẻ trùng còn lại trong nhóm nhận KLPhuGia=0 (BƯỚC 8).
+                    var lfMeIds = new List<int>();
+                    var lfDuplicateIds = new List<int>();
+                    foreach (var group in lfMeIdsRaw.GroupBy(id => meLookupAll[id].MeThoi))
+                    {
+                        if (string.IsNullOrWhiteSpace(group.Key))
+                        {
+                            lfMeIds.AddRange(group);
+                        }
+                        else
+                        {
+                            // group giữ nguyên thứ tự của lfMeIdsRaw (đã OrderBy Id tăng dần) -> First() = Id nhỏ nhất
+                            lfMeIds.Add(group.First());
+                            lfDuplicateIds.AddRange(group.Skip(1));
+                        }
+                    }
+                    lfMeIds.Sort();
 
                     if (bofMeIds.Count == 0 && tyLeBOF is decimal tBof && tBof != 0)
                         throw new Exception($"Không có mẻ BOF trong ca này nhưng tỷ lệ BOF đang là {tBof}%. Vui lòng điều chỉnh lại tỷ lệ.");
@@ -891,6 +992,7 @@ namespace dataproduct.api.Repositories
                         throw new Exception($"Không có mẻ LF trong ca này nhưng tỷ lệ LF đang là {tLF}%. Vui lòng điều chỉnh lại tỷ lệ.");
 
                     klPhanBoByMe = new Dictionary<int, decimal>();
+                    foreach (var dupId in lfDuplicateIds) klPhanBoByMe[dupId] = 0;
 
                     if (bofMeIds.Any() && tyLeBOF is decimal tyLeBOFValue && tyLeBOFValue > 0)
                     {
@@ -988,7 +1090,7 @@ namespace dataproduct.api.Repositories
 
                 // Tính KLTK_BOF/KLTK_LF SAU khi dòng phân bổ đã được lưu (BƯỚC 8/9 ở trên) — phải đọc lại DB
                 // sau SaveChangesAsync để công thức ComputeKLTKAsync gộp đúng cả phần phân bổ vừa ghi.
-                var (klTkBof, klTkLf) = await ComputeKLTKAsync(ngaySXDate, entity.Ca, entity.PhuLieuID);
+                var (klTkBof, klTkLf) = await ComputeKLTKAsync(entity.IdPhieu, ngaySXDate, entity.Ca, entity.PhuLieuID);
                 totalRow.KLTK_BOF = klTkBof;
                 totalRow.KLTK_LF = klTkLf;
                 await _context.SaveChangesAsync();
@@ -1181,7 +1283,7 @@ namespace dataproduct.api.Repositories
             {
                 totalRow.HasPhanBo = false;
                 var (klTkBof, klTkLf) = await ComputeKLTKAsync(
-                    DateOnly.FromDateTime(ngaySX), ca, phuLieuID);
+                    idPhieu, DateOnly.FromDateTime(ngaySX), ca, phuLieuID);
                 totalRow.KLTK_BOF = klTkBof;
                 totalRow.KLTK_LF = klTkLf;
             }
