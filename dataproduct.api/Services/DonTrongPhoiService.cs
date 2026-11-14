@@ -20,15 +20,43 @@ namespace dataproduct.api.Services
             _repo = repo;
         }
 
-        public Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null)
-            => _repo.GetAllAsync(macPhoi, mac, kichThuoc, isXacNhan, excludeLocked, maVatTu);
+        public Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null, int? idXuong = null)
+            => _repo.GetAllAsync(macPhoi, mac, kichThuoc, isXacNhan, excludeLocked, maVatTu, idXuong);
 
         public Task<DonTrongPhoi?> GetByIdAsync(int id)
             => _repo.GetByIdAsync(id);
 
+        /// <summary>
+        /// Tra đơn trọng theo thứ tự ưu tiên: (Mác + KT, riêng xưởng) → (Mác + KT, dùng chung)
+        /// → (KT, riêng xưởng) → (KT, dùng chung). Không tìm thấy → null (bên gọi phải chặn tính, không ghi 0).
+        /// </summary>
+        public async Task<(DonTrongPhoi Row, string NguonTra)?> TraCuuAsync(string? mac, string kichThuoc, int? idXuong)
+        {
+            var rows = await _repo.GetByKichThuocAsync(kichThuoc.Trim());
+            var macNorm = string.IsNullOrWhiteSpace(mac) ? null : mac.Trim();
+
+            bool KhopMac(DonTrongPhoi x) => macNorm != null && string.Equals(x.Mac?.Trim(), macNorm, StringComparison.OrdinalIgnoreCase);
+            bool MacTrong(DonTrongPhoi x) => string.IsNullOrWhiteSpace(x.Mac);
+
+            var thuTu = new (Func<DonTrongPhoi, bool> Match, string Nguon)[]
+            {
+                (x => KhopMac(x) && idXuong.HasValue && x.IdXuong == idXuong, "Mác + KT (riêng xưởng)"),
+                (x => KhopMac(x) && x.IdXuong == null,                         "Mác + KT (dùng chung)"),
+                (x => MacTrong(x) && idXuong.HasValue && x.IdXuong == idXuong, "KT (riêng xưởng)"),
+                (x => MacTrong(x) && x.IdXuong == null,                        "KT (dùng chung)"),
+            };
+
+            foreach (var (match, nguon) in thuTu)
+            {
+                var row = rows.FirstOrDefault(match);
+                if (row != null) return (row, nguon);
+            }
+            return null;
+        }
+
         public async Task<DonTrongPhoi> CreateAsync(DonTrongPhoi entity)
         {
-            if (await _repo.ExistsAsync(entity.MacPhoi, entity.Mac, entity.KichThuoc))
+            if (await _repo.ExistsAsync(entity.MacPhoi, entity.Mac, entity.KichThuoc, idXuong: entity.IdXuong))
                 throw new InvalidOperationException("Đã tồn tại bản ghi với Mác phôi, Mác thép và Kích thước này.");
 
             await _repo.AddAsync(entity);
@@ -40,7 +68,7 @@ namespace dataproduct.api.Services
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null) return false;
 
-            if (await _repo.ExistsAsync(entity.MacPhoi, entity.Mac, entity.KichThuoc, id))
+            if (await _repo.ExistsAsync(entity.MacPhoi, entity.Mac, entity.KichThuoc, id, entity.IdXuong))
                 throw new InvalidOperationException("Đã tồn tại bản ghi với Mác phôi, Mác thép và Kích thước này.");
 
             existing.MacPhoi    = entity.MacPhoi;
@@ -48,6 +76,8 @@ namespace dataproduct.api.Services
             existing.Mac        = entity.Mac;
             existing.KichThuoc  = entity.KichThuoc;
             existing.IsXacNhan  = entity.IsXacNhan;
+            existing.IdPB       = entity.IdPB;
+            existing.IdXuong    = entity.IdXuong;
             await _repo.UpdateAsync(existing);
             return true;
         }

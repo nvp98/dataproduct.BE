@@ -12,4 +12,7 @@ public partial class DonTrongPhoi
     public string? TenVatTu { get; set; }
     public int? IsSync { get; set; }
     public int? IsLock { get; set; }
+    // NULL = dùng chung (NM.CTD). Có giá trị = riêng theo nhà máy / xưởng (vd Đúc phôi vuông HRC1)
+    public int? IdPB { get; set; }
+    public int? IdXuong { get; set; }
 }

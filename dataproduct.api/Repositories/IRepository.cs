@@ -4,7 +4,9 @@ using dataproduct.api.DTOs.NMLG_Dto;
 using dataproduct.api.Models;
 using dataproduct.api.Models.MasterData;
 using dataproduct.api.ResponseModels;
+using dataproduct.api.Services.Kdl;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Storage;
 using System.Text.Json;
 using static dataproduct.api.DTOs.CTD_Dto.PhoinhapkhoDto;
 
@@ -610,16 +612,54 @@ namespace dataproduct.api.Repositories
 
     public interface IDonTrongPhoiRepository
     {
-        Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null);
+        Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null, int? idXuong = null);
         Task<DonTrongPhoi?> GetByIdAsync(int id);
         Task<DonTrongPhoi?> FindByKeyAsync(string macPhoi, string? mac, string? kichThuoc);
+        Task<List<DonTrongPhoi>> GetByKichThuocAsync(string kichThuoc);
         Task AddAsync(DonTrongPhoi entity);
         Task UpdateAsync(DonTrongPhoi entity);
         Task DeleteAsync(int id);
         Task ReplaceInSoTheoDoiAsync(int oldId, int? newId);
-        Task<bool> ExistsAsync(string macPhoi, string? mac, string? kichThuoc, int? excludeId = null);
+        Task<bool> ExistsAsync(string macPhoi, string? mac, string? kichThuoc, int? excludeId = null, int? idXuong = null);
         Task SyncMaVatTuAsync();
         Task<bool> ToggleLockAsync(int id);
+    }
+
+    // --- HRC1 Đúc phôi vuông ---
+    public interface IDPV_LenhSanXuatRepository
+    {
+        Task<List<DPV_LenhSanXuat>> SearchAsync(string? mac, string? kichThuoc, int? mayDuc, int? idXuong, string? searchKey);
+        Task<List<DPV_LenhSanXuat>> GetAllActiveAsync();
+        Task<DPV_LenhSanXuat?> GetByIdAsync(int id);
+        Task<bool> ExistsToHopAsync(string mac, string kichThuoc, int mayDuc, int? excludeId = null);
+        Task<List<(string Mac, string KichThuoc, int MayDuc)>> GetToHopTuDuLieuMeAsync(DateOnly tuNgay, DateOnly denNgay);
+        Task AddAsync(DPV_LenhSanXuat entity);
+        Task AddRangeAsync(IEnumerable<DPV_LenhSanXuat> entities);
+        Task UpdateAsync(DPV_LenhSanXuat entity);
+    }
+
+    // --- Kho dữ liệu — Động lực (EMS) ---
+    public interface IDongLucRepository
+    {
+        Task<List<TagID_DongLuc>> GetTagsAsync(string? maXuong, byte? tinhTrang, string? searchKey);
+        Task<TagID_DongLuc?> GetTagByIdAsync(int id);
+        Task<bool> ExistsTagAsync(string tagIdEms, int? excludeId = null);
+        Task AddTagAsync(TagID_DongLuc entity);
+        Task UpdateTagAsync(TagID_DongLuc entity);
+
+        Task<(List<DuLieu_DongLuc> Rows, int Total)> SearchDuLieuAsync(DateOnly tuNgay, DateOnly denNgay, byte? caSX, string? maXuong, string? maHeader, int page, int pageSize);
+        Task<List<DuLieu_DongLuc>> GetDuLieuAsync(DateOnly tuNgay, DateOnly denNgay, byte? caSX, string? maXuong, string? maHeader);
+        Task<int> UpsertDuLieuAsync(IReadOnlyCollection<DuLieu_DongLuc> rows);
+
+        Task AddSyncLogAsync(DongLuc_SyncLog log);
+        Task UpdateSyncLogAsync(DongLuc_SyncLog log);
+        Task<DongLuc_SyncLog?> GetSyncLogGanNhatAsync();
+    }
+
+    public interface IDanhMucMasterRepository
+    {
+        Task<List<PhongBan>> GetPhongBanAsync();
+        Task<List<Tbl_Xuong>> GetXuongAsync();
     }
 
     public interface IHrc1PhuLieuNmRepository
@@ -659,5 +699,39 @@ namespace dataproduct.api.Repositories
         // LG_NL_ChiTiet.GiaTri trực tiếp — bỏ qua pivot SCADA, vẫn resolve nhomNVLIds → nvlIds per lò cao
         Task<List<CanBangNLSourceRow>> ExecLgnlChiTietAsync(
             DateTime ngay, int? ca, int? idLoCao, CanBangNLSourceConfig src, List<int> nhomNVLIds);
+    }
+
+    // --- Kho dữ liệu động (KDL) — dùng chung mọi module ---
+    public interface IKdlRepository
+    {
+        Task<List<KDL_Key>> GetKeysAsync(string maModule, bool chiActive = true);
+        Task<KDL_Form?> GetFormAsync(string maForm);
+        Task<List<KDL_Form>> GetFormsAsync(string? maModule);
+
+        Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
+
+        /// <summary>MERGE header theo (MaModule, Me); danhDauXoa = true thì đối tượng trong khoảng ngày
+        /// không còn ở nguồn bị IsDelete = 1. Trả các đối tượng của danh sách (kèm IdDoiTuong).</summary>
+        Task<List<KDL_DoiTuong>> UpsertDoiTuongAsync(string maModule, DateOnly tuNgay, DateOnly denNgay,
+            IReadOnlyCollection<KdlDoiTuongVao> rows, bool danhDauXoa);
+
+        Task<KDL_DoiTuong?> GetDoiTuongByIdAsync(int idDoiTuong);
+        Task<(List<KDL_DoiTuong> Rows, int Total)> SearchDoiTuongAsync(KdlLoc loc, int page, int pageSize);
+        Task<List<KDL_DoiTuong>> GetDoiTuongAsync(KdlLoc loc, int toiDa);
+
+        Task<List<KDL_GiaTri>> GetGiaTriAsync(IReadOnlyCollection<int> idDoiTuongs, DateOnly tuNgay, DateOnly denNgay,
+            IReadOnlyCollection<byte>? nguons = null, IReadOnlyCollection<int>? idKeys = null);
+
+        /// <summary>Xóa giá trị (module × khoảng ngày × nguồn, lọc thêm theo đối tượng / key nếu có) rồi bulk insert rows.
+        /// Gọi trong transaction của BeginTransactionAsync.</summary>
+        Task<int> ThayGiaTriAsync(string maModule, DateOnly tuNgay, DateOnly denNgay, IReadOnlyCollection<byte> nguons,
+            IReadOnlyCollection<int>? idDoiTuongs, IReadOnlyCollection<int>? idKeys, IReadOnlyCollection<KDL_GiaTri> rows);
+
+        /// <summary>Σ giá trị đang hiệu lực (ưu tiên Nguon 4 > 3 > 1/2) theo các chiều nhóm (cột KDL_DoiTuong đã kiểm tra).</summary>
+        Task<List<KdlNhomTongHop>> TongHopAsync(KdlLoc loc, IReadOnlyList<string> cotNhom, IReadOnlyCollection<int> idKeys);
+
+        Task AddSyncLogAsync(KDL_SyncLog log);
+        Task UpdateSyncLogAsync(KDL_SyncLog log);
+        Task<KDL_SyncLog?> GetSyncLogGanNhatAsync(string maModule);
     }
 }

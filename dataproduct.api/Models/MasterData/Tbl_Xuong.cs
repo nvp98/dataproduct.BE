@@ -9,5 +9,8 @@ namespace dataproduct.api.Models.MasterData
         [Key]
         public int ID_Xuong { get; set; }
         public string? TenXuong { get; set; }
+        public int? ID_PhongBan { get; set; }
+        // 1 = đang hoạt động, 0 = ngưng
+        public int? ID_TrangThai { get; set; }
     }
 }

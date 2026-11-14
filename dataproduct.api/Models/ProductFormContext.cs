@@ -81,6 +81,21 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<NhomPhanLoaiMacThep> NhomPhanLoaiMacTheps { get; set; }
     public virtual DbSet<DonTrongPhoi> DonTrongPhois { get; set; }
 
+    // HRC1 — Đúc phôi vuông (BCSX)
+    public virtual DbSet<DPV_LenhSanXuat> DPV_LenhSanXuats { get; set; }
+
+    // Kho dữ liệu — Động lực (EMS)
+    public virtual DbSet<TagID_DongLuc> TagID_DongLucs { get; set; }
+    public virtual DbSet<DuLieu_DongLuc> DuLieu_DongLucs { get; set; }
+    public virtual DbSet<DongLuc_SyncLog> DongLuc_SyncLogs { get; set; }
+
+    // Kho dữ liệu động (KDL) — dùng chung mọi module báo cáo
+    public virtual DbSet<KDL_Key> KDL_Keys { get; set; }
+    public virtual DbSet<KDL_Form> KDL_Forms { get; set; }
+    public virtual DbSet<KDL_DoiTuong> KDL_DoiTuongs { get; set; }
+    public virtual DbSet<KDL_GiaTri> KDL_GiaTris { get; set; }
+    public virtual DbSet<KDL_SyncLog> KDL_SyncLogs { get; set; }
+
     // HRC2 Slab
     public virtual DbSet<BkHrc2Slab> BkHrc2Slabs { get; set; }
     public virtual DbSet<BkHrc2SlabTrangThai> BkHrc2SlabTrangThais { get; set; }
@@ -888,6 +903,116 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.TenVatTu).HasMaxLength(200);
             entity.Property(e => e.IsSync).HasColumnName("isSync");
             entity.Property(e => e.IsLock).HasColumnName("isLock");
+            entity.Property(e => e.IdPB).HasColumnName("IdPB");
+            entity.Property(e => e.IdXuong).HasColumnName("IdXuong");
+        });
+
+        // --- HRC1 Đúc phôi vuông ---
+        modelBuilder.Entity<DPV_LenhSanXuat>(entity =>
+        {
+            entity.ToTable("LenhSanXuat");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Mac).HasMaxLength(100);
+            entity.Property(e => e.KichThuoc).HasMaxLength(100);
+            entity.Property(e => e.MaLenh).HasMaxLength(20);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        // --- Kho dữ liệu — Động lực ---
+        modelBuilder.Entity<TagID_DongLuc>(entity =>
+        {
+            entity.ToTable("TagID_DongLuc");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.TagIDEMS).HasMaxLength(50);
+            entity.Property(e => e.MaHeader).HasMaxLength(50);
+            entity.Property(e => e.YNghia).HasMaxLength(200);
+            entity.Property(e => e.MaXuong).HasMaxLength(20);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<DuLieu_DongLuc>(entity =>
+        {
+            entity.ToTable("DuLieu_DongLuc");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MaHeader).HasMaxLength(50);
+            entity.Property(e => e.TagID).HasMaxLength(50);
+            entity.Property(e => e.GiaTri).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.MaXuong).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<DongLuc_SyncLog>(entity =>
+        {
+            entity.ToTable("DongLuc_SyncLog");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MaXuong).HasMaxLength(20);
+            entity.Property(e => e.NguonChay).HasMaxLength(100);
+        });
+
+        // --- Kho dữ liệu động (migrations/kdl_dong.sql) ---
+        modelBuilder.Entity<KDL_Key>(entity =>
+        {
+            entity.ToTable("KDL_Key");
+            entity.HasKey(e => e.IdKey);
+            entity.Property(e => e.MaModule).HasMaxLength(30);
+            entity.Property(e => e.MaKey).HasMaxLength(50);
+            entity.Property(e => e.TenKey).HasMaxLength(200);
+            entity.Property(e => e.DonVi).HasMaxLength(20);
+            entity.Property(e => e.MaNguon).HasMaxLength(20);
+            entity.Property(e => e.MaGoc).HasMaxLength(1000);
+            entity.Property(e => e.CongThuc).HasMaxLength(1000);
+            entity.Property(e => e.TenXuLy).HasMaxLength(100);
+            entity.Property(e => e.MaKeyTuSo).HasMaxLength(50);
+            entity.Property(e => e.MaKeyMauSo).HasMaxLength(50);
+            entity.Property(e => e.HeSo).HasColumnType("decimal(18,6)");
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<KDL_Form>(entity =>
+        {
+            entity.ToTable("KDL_Form");
+            entity.HasKey(e => e.IdForm);
+            entity.Property(e => e.MaForm).HasMaxLength(50);
+            entity.Property(e => e.TenForm).HasMaxLength(200);
+            entity.Property(e => e.MaModule).HasMaxLength(30);
+            entity.Property(e => e.MaBM).HasMaxLength(50);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<KDL_DoiTuong>(entity =>
+        {
+            entity.ToTable("KDL_DoiTuong");
+            entity.HasKey(e => e.IdDoiTuong);
+            entity.Property(e => e.MaModule).HasMaxLength(30);
+            entity.Property(e => e.Me).HasMaxLength(50);
+            entity.Property(e => e.Kip).HasMaxLength(1).IsFixedLength();
+            entity.Property(e => e.MayDuc).HasMaxLength(30);
+            entity.Property(e => e.Mac).HasMaxLength(50);
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+        });
+
+        // Columnstore, không có PK — EF chỉ đọc; ghi bằng SQL / SqlBulkCopy (KdlRepository)
+        modelBuilder.Entity<KDL_GiaTri>(entity =>
+        {
+            entity.ToTable("KDL_GiaTri");
+            entity.HasNoKey();
+            entity.Property(e => e.GiaTri).HasColumnType("decimal(18,3)");
+            entity.Property(e => e.GiaTriText).HasMaxLength(500);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<KDL_SyncLog>(entity =>
+        {
+            entity.ToTable("KDL_SyncLog");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.MaModule).HasMaxLength(30);
+            entity.Property(e => e.MaNguon).HasMaxLength(20);
+            entity.Property(e => e.NguonChay).HasMaxLength(100);
         });
 
         // --- HRC1 ---

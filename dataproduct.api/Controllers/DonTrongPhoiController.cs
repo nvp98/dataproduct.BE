@@ -20,20 +20,20 @@ namespace dataproduct.api.Controllers
             => Ok(await _service.GetAllAsync(macPhoi, mac, kichThuoc, excludeLocked: excludeLocked, maVatTu: maVatTu));
 
         [HttpGet("search")]
-        public async Task<IActionResult> Search(string? searchKey, string? mac, string? kichThuoc, int? isXacNhan, string? maVatTu, int page = 1, int pageSize = 30)
+        public async Task<IActionResult> Search(string? searchKey, string? mac, string? kichThuoc, int? isXacNhan, string? maVatTu, int? idXuong, int page = 1, int pageSize = 30)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 30;
             if (pageSize > 200) pageSize = 200;
 
-            var rows = await _service.GetAllAsync(searchKey, mac, kichThuoc, isXacNhan, maVatTu: maVatTu);
+            var rows = await _service.GetAllAsync(searchKey, mac, kichThuoc, isXacNhan, maVatTu: maVatTu, idXuong: idXuong);
             var ordered = rows.OrderBy(x => x.MacPhoi).ThenBy(x => x.KichThuoc).ToList();
 
             var totalCount = ordered.Count;
             var data = ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(x => new { x.Id, x.MacPhoi, x.DonTrong, x.Mac, x.KichThuoc, x.IsXacNhan, x.MaVatTu, x.TenVatTu, x.IsSync, x.IsLock });
+                .Select(x => new { x.Id, x.MacPhoi, x.DonTrong, x.Mac, x.KichThuoc, x.IsXacNhan, x.MaVatTu, x.TenVatTu, x.IsSync, x.IsLock, x.IdPB, x.IdXuong });
 
             return Ok(new
             {
@@ -43,6 +43,21 @@ namespace dataproduct.api.Controllers
                 pageSize,
                 totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
             });
+        }
+
+        // Tra đơn trọng: (Mác + KT) trước, sau đó (KT); ưu tiên riêng xưởng rồi dùng chung
+        [HttpGet("tra-cuu")]
+        public async Task<IActionResult> TraCuu(string? mac, string kichThuoc, int? idXuong)
+        {
+            if (string.IsNullOrWhiteSpace(kichThuoc))
+                return BadRequest(new { message = "Thiếu kích thước." });
+
+            var result = await _service.TraCuuAsync(mac, kichThuoc, idXuong);
+            if (result == null)
+                return NotFound(new { message = $"Chưa khai báo đơn trọng cho mác '{mac}', kích thước '{kichThuoc}'." });
+
+            var (row, nguonTra) = result.Value;
+            return Ok(new { row.Id, row.MacPhoi, row.Mac, row.KichThuoc, row.DonTrong, row.IdPB, row.IdXuong, nguonTra });
         }
 
         [HttpGet("{id}")]

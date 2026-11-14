@@ -87,7 +87,19 @@ builder.Services.Scan(scan => scan
     .AddClasses(c => c.Where(t => t.Name.EndsWith("SearchFilterProvider")))
         .AsImplementedInterfaces()
         .WithScopedLifetime()
+    // Kho dữ liệu động: adapter nguồn (IKdlNguon) + handler xử lý riêng (IKdlXuLyRieng)
+    .AddClasses(c => c.Where(t => t.Name.EndsWith("Nguon")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime()
+    .AddClasses(c => c.Where(t => t.Name.EndsWith("XuLy")))
+        .AsImplementedInterfaces()
+        .WithScopedLifetime()
 );
+
+// Tự động kéo dữ liệu Động lực từ EMS (cấu hình "EmsApi"; bỏ qua khi chưa có BaseUrl)
+builder.Services.AddHostedService<dataproduct.api.Services.Background.DongLucSyncWorker>();
+// Tự động đẩy số về Kho dữ liệu động (cấu hình "Kdl"; Kdl:TatDongBo = true để tắt)
+builder.Services.AddHostedService<dataproduct.api.Services.Background.KdlSyncWorker>();
 
 
 

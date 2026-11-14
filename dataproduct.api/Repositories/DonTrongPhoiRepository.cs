@@ -13,7 +13,7 @@ namespace dataproduct.api.Repositories
             _context = context;
         }
 
-        public async Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null)
+        public async Task<IEnumerable<DonTrongPhoi>> GetAllAsync(string? macPhoi, string? mac, string? kichThuoc, int? isXacNhan = null, bool excludeLocked = false, string? maVatTu = null, int? idXuong = null)
         {
             var query = _context.DonTrongPhois.AsQueryable();
 
@@ -34,6 +34,8 @@ namespace dataproduct.api.Repositories
                 query = query.Where(x => x.IsLock != 1);
             if (!string.IsNullOrWhiteSpace(maVatTu))
                 query = query.Where(x => x.MaVatTu != null && x.MaVatTu.Contains(maVatTu));
+            if (idXuong.HasValue)
+                query = query.Where(x => x.IdXuong == idXuong.Value);
 
             return await query.OrderBy(x => x.MacPhoi).ThenBy(x => x.KichThuoc).ToListAsync();
         }
@@ -41,11 +43,18 @@ namespace dataproduct.api.Repositories
         public Task<DonTrongPhoi?> GetByIdAsync(int id)
             => _context.DonTrongPhois.FirstOrDefaultAsync(x => x.Id == id);
 
+        // Import Excel chỉ áp dụng cho đơn trọng dùng chung (IdXuong NULL)
         public Task<DonTrongPhoi?> FindByKeyAsync(string macPhoi, string? mac, string? kichThuoc)
             => _context.DonTrongPhois.FirstOrDefaultAsync(x =>
                 x.MacPhoi == macPhoi &&
                 x.Mac == mac &&
-                x.KichThuoc == kichThuoc);
+                x.KichThuoc == kichThuoc &&
+                x.IdXuong == null);
+
+        public async Task<List<DonTrongPhoi>> GetByKichThuocAsync(string kichThuoc)
+            => await _context.DonTrongPhois
+                .Where(x => x.KichThuoc == kichThuoc && x.IsLock != 1)
+                .ToListAsync();
 
         public async Task AddAsync(DonTrongPhoi entity)
         {
@@ -74,12 +83,13 @@ namespace dataproduct.api.Repositories
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.IdDonTrongPhoi, newId));
         }
 
-        public Task<bool> ExistsAsync(string macPhoi, string? mac, string? kichThuoc, int? excludeId = null)
+        public Task<bool> ExistsAsync(string macPhoi, string? mac, string? kichThuoc, int? excludeId = null, int? idXuong = null)
         {
             var query = _context.DonTrongPhois.Where(x =>
                 x.MacPhoi == macPhoi &&
                 x.Mac == mac &&
-                x.KichThuoc == kichThuoc);
+                x.KichThuoc == kichThuoc &&
+                x.IdXuong == idXuong);
             if (excludeId.HasValue)
                 query = query.Where(x => x.Id != excludeId.Value);
             return query.AnyAsync();
