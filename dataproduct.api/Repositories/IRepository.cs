@@ -494,7 +494,7 @@ namespace dataproduct.api.Repositories
     public interface INapLieuPhanBoRepository
     {
         // SUM(QuyKho) GROUP BY IDCa, IDNVL cho 1 ngày + 1 lò cao (bỏ Kíp) — dùng LG_NL_ChiTiet.QuyKho có sẵn, không cần view
-        Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao, bool apDungQuyKho = true);
+        Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao, bool apDungQuyKho = true, int[]? tinhTrangFilter = null);
 
         // G của CVH: SUM(QuyKho) cho danh sách NVL "than cốc hoàn" đại diện theo lò cao
         Task<List<TongNhanVeDto>> GetNapLieuTheoNvlListAsync(DateTime ngay, IEnumerable<int> idNvlList);

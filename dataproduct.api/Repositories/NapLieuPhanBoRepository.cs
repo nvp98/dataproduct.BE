@@ -18,10 +18,21 @@ namespace dataproduct.api.Repositories
         // sẽ nhân giá trị thật lên theo số dòng chi tiết trong phiếu.
         // apDungQuyKho = false: KhoiLuongNapLieu trả về cũng là giá trị chưa quy khô (giữ để dùng sau này).
         // Luôn trả kèm KhoiLuongNapLieuTruocQuyKho (chưa quy khô) dùng cho tính tỷ lệ nhóm PP1 Than cốc.
-        public async Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao, bool apDungQuyKho = true)
+        public async Task<List<NapLieuTheoNvlDto>> GetNapLieuAsync(DateTime ngay, int idLoCao, bool apDungQuyKho = true, int[]? tinhTrangFilter = null)
         {
-            var raw = await _context.LG_NL_ChiTiet
-                .Where(x => x.Ngay == ngay.Date && x.IDLoCao == idLoCao)
+            var query = tinhTrangFilter != null
+                ? _context.LG_NL_ChiTiet
+                    .Join(_context.BmPhieus,
+                          ct => ct.IDPhieu,
+                          ph => ph.Idphieu,
+                          (ct, ph) => new { ct, ph.TinhTrang })
+                    .Where(x => x.ct.Ngay == ngay.Date && x.ct.IDLoCao == idLoCao
+                             && tinhTrangFilter.Contains(x.TinhTrang ?? -1))
+                    .Select(x => x.ct)
+                : _context.LG_NL_ChiTiet
+                    .Where(x => x.Ngay == ngay.Date && x.IDLoCao == idLoCao);
+
+            var raw = await query
                 .GroupBy(x => new { x.IDCa, x.IDNVL })
                 .Select(g => new
                 {
