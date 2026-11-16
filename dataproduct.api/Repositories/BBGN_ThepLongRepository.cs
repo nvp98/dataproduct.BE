@@ -29,13 +29,21 @@ namespace dataproduct.api.Repositories
             }
 
             var phieus = await phieuQuery
-                .Select(x => new { x.Idphieu, x.TinhTrang })
+                .Select(x => new { x.Idphieu, x.TinhTrang, x.Scope })
                 .ToListAsync();
 
             if (!phieus.Any())
             {
                 return;
             }
+
+            // Tên máy đúc luôn resolve từ Scope của phiếu (quy ước MayDuc.Id = BmPhieu.Scope),
+            // để khớp với giá trị UI đang hiển thị cho mọi mẻ của phiếu — không để trống khi
+            // auto-sync tạo mẻ mới từ GangLong (trước đây bỏ sót, gây mất MayDuc khi xuất file).
+            var scopeIds = phieus.Where(p => p.Scope.HasValue).Select(p => p.Scope!.Value).Distinct().ToList();
+            var tenMayDucById = await _context.MayDucs
+                .Where(m => scopeIds.Contains(m.Id))
+                .ToDictionaryAsync(m => m.Id, m => m.TenMayDuc);
 
             // HashSet nguồn mới (unique MaMeThoi, bỏ null/rỗng)
             var newSet = new HashSet<string>(
@@ -62,6 +70,10 @@ namespace dataproduct.api.Repositories
                         .Where(s => !string.IsNullOrWhiteSpace(s))!,
                     StringComparer.OrdinalIgnoreCase);
 
+                var tenMayDuc = phieu.Scope.HasValue && tenMayDucById.TryGetValue(phieu.Scope.Value, out var ten)
+                    ? ten
+                    : null;
+
                 // Bước 2: Nếu DB chưa có dữ liệu cho phiếu này
                 if (!rowsOfPhieu.Any())
                 {
@@ -71,6 +83,7 @@ namespace dataproduct.api.Repositories
                         {
                             IdPhieu = phieu.Idphieu,
                             Me = meThoi,
+                            MayDuc = tenMayDuc,
                             NgaySX = request.NgaySX.ToDateTime(TimeOnly.MinValue),
                             Ca = request.Ca,
                             BieuMau = maBm,
@@ -89,6 +102,7 @@ namespace dataproduct.api.Repositories
                     {
                         IdPhieu = phieu.Idphieu,
                         Me = meThoi,
+                        MayDuc = tenMayDuc,
                         NgaySX = request.NgaySX.ToDateTime(TimeOnly.MinValue),
                         Ca = request.Ca,
                         BieuMau = maBm,
@@ -122,6 +136,18 @@ namespace dataproduct.api.Repositories
                     if (row.IsGhost == true)
                     {
                         row.IsGhost = false;
+                        _context.BBGN_ThepLongs.Update(row);
+                    }
+                }
+
+                // Bước 4.4: backfill MayDuc cho các mẻ còn tồn tại (dữ liệu cũ null từ trước khi fix,
+                // hoặc lệch so với Scope hiện tại của phiếu) — bỏ qua các dòng đã bị xóa hẳn ở Bước 4.2.
+                var hardDeletedMes = phieu.TinhTrang != 5 ? toRemove : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in rowsOfPhieu.Where(r => r.Me == null || !hardDeletedMes.Contains(r.Me)))
+                {
+                    if (row.MayDuc != tenMayDuc)
+                    {
+                        row.MayDuc = tenMayDuc;
                         _context.BBGN_ThepLongs.Update(row);
                     }
                 }

@@ -67,6 +67,13 @@ namespace dataproduct.api.Services
             var scope = TryParseInt(formData, "scope");
             var kip = GetString(formData, "kip");
 
+            // Tên máy đúc luôn resolve từ Scope của phiếu (quy ước MayDuc.Id = BmPhieu.Scope),
+            // khớp với giá trị UI đang hiển thị cho mọi mẻ — không dùng "mayDuc" rời do FE gửi lên
+            // từng dòng (cột này trên UI không phải ô nhập, luôn hiển thị theo Scope của phiếu).
+            var resolvedTenMayDuc = scope.HasValue
+                ? await _context.MayDucs.Where(m => m.Id == scope.Value).Select(m => m.TenMayDuc).FirstOrDefaultAsync()
+                : null;
+
             // ===== PRELOAD DATA theo IdPhieu =====
             var existingData = await _context.BBGN_ThepLongs
                 .Where(x => x.IdPhieu == idPhieu)
@@ -118,7 +125,7 @@ namespace dataproduct.api.Services
                     // ===== UPDATE =====
                     var oldMe = existing.Me;
                     existing.Me = me;
-                    existing.MayDuc = GetString(row, "mayDuc");
+                    existing.MayDuc = resolvedTenMayDuc ?? GetString(row, "mayDuc");
                     existing.ThungSo = GetString(row, "thungSo");
                     existing.ThoiGian = GetString(row, "thoiGian");
                     existing.KLLFSauThep = klLFSauThep;
@@ -163,7 +170,7 @@ namespace dataproduct.api.Services
                     var entity = new BBGN_ThepLong
                     {
                         Me = me,
-                        MayDuc = GetString(row, "mayDuc"),
+                        MayDuc = resolvedTenMayDuc ?? GetString(row, "mayDuc"),
                         ThungSo = GetString(row, "thungSo"),
                         ThoiGian = GetString(row, "thoiGian"),
                         BieuMau = bieuMau,
