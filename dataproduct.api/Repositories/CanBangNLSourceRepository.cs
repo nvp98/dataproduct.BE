@@ -167,7 +167,7 @@ namespace dataproduct.api.Repositories
 
                 var nvlIds = nvlRows.Select(n => n.ID).ToHashSet();
                 var napLieuRepo = scope.ServiceProvider.GetRequiredService<INapLieuPhanBoRepository>();
-                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao, tinhTrangFilter: [1, 2, 5]);
+                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao, chiLayPhieuChuaKhoa: true);
 
                 var byNvl = napLieu
                     .Where(x => x.Ca == (byte)ca && nvlIds.Contains(x.IdNvl))
@@ -299,7 +299,7 @@ namespace dataproduct.api.Repositories
 
                 // Lấy khối lượng quy khô từ LG_NL_ChiTiet (aggregate DoAm trên từng dòng GiaTri)
                 var napLieuRepo = scope.ServiceProvider.GetRequiredService<INapLieuPhanBoRepository>();
-                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao, tinhTrangFilter: [1, 2, 5]);
+                var napLieu = await napLieuRepo.GetNapLieuAsync(ngay, idLoCao, chiLayPhieuChuaKhoa: true);
                 var quyKhoByNvl = napLieu
                     .Where(x => x.Ca == (byte)ca)
                     .ToDictionary(x => x.IdNvl, x => x.KhoiLuongNapLieu);
