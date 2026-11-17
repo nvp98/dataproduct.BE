@@ -1,7 +1,8 @@
+using dataproduct.api.DTOs;
 using dataproduct.api.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using dataproduct.api.DTOs;
 
 namespace dataproduct.api.Repositories
 {
@@ -141,6 +142,14 @@ namespace dataproduct.api.Repositories
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.BkPhoiThep.AnyAsync(e => e.Id == id);
+        }
+
+        public async Task SyncBkMisByDateAsync(DateOnly ngaySX)
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.sp_Sync_SanLuongPhoi_ByDate @ProductionDate",
+                new SqlParameter("@ProductionDate", ngaySX.ToDateTime(TimeOnly.MinValue))
+            );
         }
     }
 }

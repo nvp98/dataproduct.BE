@@ -82,6 +82,7 @@ namespace dataproduct.api.Repositories
         Task<int?> RevokeStDaChuyenAsync(int id, int soThuHoi);
         Task<int> RevokeStDaChuyenRangeAsync(List<BKPhoiThepStRevoke> items);
         Task DeleteAsync(int id);
+        Task SyncBkMisByDateAsync(DateOnly ngaySX);
     }
     public interface IDLNMHRC2Repository
     {

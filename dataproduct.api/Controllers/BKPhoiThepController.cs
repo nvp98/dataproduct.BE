@@ -79,6 +79,14 @@ namespace dataproduct.api.Controllers
             var count = await _service.RevokeStDaChuyenRangeAsync(items);
             return Ok(new { updated = count });
         }
+
+        [HttpPost("sync-bkmis")]
+        public async Task<IActionResult> SyncBkMis([FromBody] SyncBkMisRequest request)
+        {
+            if (request?.NgaySX == null) return BadRequest();
+            await _service.SyncBkMisByDateAsync(request.NgaySX.Value);
+            return Ok();
+        }
     }
 
     public class UpdateStDaChuyenRequest
@@ -89,5 +97,10 @@ namespace dataproduct.api.Controllers
     public class RevokeStRequest
     {
         public int SoThuHoi { get; set; }
+    }
+
+    public class SyncBkMisRequest
+    {
+        public DateOnly? NgaySX { get; set; }
     }
 }

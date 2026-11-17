@@ -123,5 +123,8 @@ namespace dataproduct.api.Services
         {
             return _repo.RevokeStDaChuyenRangeAsync(items);
         }
+
+        public Task SyncBkMisByDateAsync(DateOnly ngaySX)
+            => _repo.SyncBkMisByDateAsync(ngaySX);
     }
 }
