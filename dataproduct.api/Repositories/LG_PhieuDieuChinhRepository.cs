@@ -214,14 +214,16 @@ namespace dataproduct.api.Repositories
             var now = DateTime.Now;
             var loi = new List<string>();
 
+            // Chỉ xét phiếu của đúng bên đối ứng của dòng đang lưu (không đụng phiếu nhà máy khác): nếu phiếu đó đã gửi/khóa
+            // thì muốn đổi số khác với số của họ phải thu hồi phiếu đó trước.
+            string GoiYThuHoi(Guid idPhieuKia)
+                => phieuBenKiaKhoa.TryGetValue(idPhieuKia, out var soKia)
+                    ? $" Phiếu {TenPhieu(idPhieuKia, soKia)} của bên {(laBenNhan ? "xuất" : "nhận")} đã gửi — cần thu hồi phiếu đó (và phiếu này) để điều chỉnh lại."
+                    : "";
+
             foreach (var item in items)
             {
-                if (item.KhoiLuong is < 0)
-                {
-                    loi.Add($"{MoTaDong(item)}: khối lượng không được âm.");
-                    continue;
-                }
-
+                // Cho phép khối lượng âm (điều chỉnh giảm)
                 // Có khối lượng thì phải chọn loại số; "Sau ẩm" cần độ ẩm (lấy từ BBGN) để tính KL quy khô
                 if (item.KhoiLuong.HasValue)
                 {
@@ -293,7 +295,7 @@ namespace dataproduct.api.Repositories
                 {
                     loi.Add($"{MoTaDong(item)}: bên {(laBenNhan ? "xuất" : "nhận")} đã chọn " +
                             $"{(kiaLoai.LoaiSoDieuChinh == 1 ? "Trước ẩm" : "Sau ẩm")} — phải chọn giống, " +
-                            "hoặc Reset loại số điều chỉnh để chọn lại.");
+                            "hoặc Reset loại số điều chỉnh để chọn lại." + GoiYThuHoi(kiaLoai.IDPhieu));
                     continue;
                 }
 
@@ -311,6 +313,19 @@ namespace dataproduct.api.Repositories
                     continue;
                 }
 
+                // Phiếu bên kia đã gửi/khóa mà dòng này họ để trống (không điều chỉnh): đó là số chốt của họ, bên mình không được
+                // nhập đơn phương — muốn điều chỉnh phải thu hồi phiếu bên kia.
+                if (item.KhoiLuong.HasValue
+                    && doiTac.TryGetValue(item.IdCtBBGN, out var kiaChot)
+                    && phieuBenKiaKhoa.TryGetValue(kiaChot.IDPhieu, out var soKiaChot)
+                    && !(laBenNhan ? kiaChot.KhoiLuongXuat : kiaChot.KhoiLuongNhap).HasValue)
+                {
+                    loi.Add($"{MoTaDong(item)}: phiếu {TenPhieu(kiaChot.IDPhieu, soKiaChot)} của bên " +
+                            $"{(laBenNhan ? "xuất" : "nhận")} đã gửi và không điều chỉnh dòng này — " +
+                            "cần thu hồi phiếu đó nếu muốn điều chỉnh.");
+                    continue;
+                }
+
                 // Đối chiếu với bên kia (nếu bên kia đã nhập khối lượng)
                 if (item.KhoiLuong.HasValue && doiTac.TryGetValue(item.IdCtBBGN, out var kia))
                 {
@@ -321,7 +336,7 @@ namespace dataproduct.api.Repositories
                         var nhap = laBenNhan ? item.KhoiLuong.Value : klDoiTac.Value;
                         var xuat = laBenNhan ? klDoiTac.Value : item.KhoiLuong.Value;
                         loi.Add($"{MoTaDong(item)}: KL nhập ({nhap:0.###}) khác KL xuất ({xuat:0.###}), " +
-                                $"chênh lệch {chenhLech:0.###} — 2 bên phải bằng nhau mới lưu được.");
+                                $"chênh lệch {chenhLech:0.###} — 2 bên phải bằng nhau mới lưu được." + GoiYThuHoi(kia.IDPhieu));
                         continue;
                     }
                 }
@@ -407,11 +422,6 @@ namespace dataproduct.api.Repositories
             return loi;
         }
 
-        // Nối dòng "[Reset ...]" vào ghi chú của bên đang reset. Ghi chú hiện tại chính là lý do người dùng vừa gõ thì thay luôn
-        // (lý do đã nằm trong dòng reset), tránh hiện lặp.
-        private static string NoiGhiChuReset(string? cu, string lyDo, string dong)
-            => string.IsNullOrWhiteSpace(cu) || cu.Trim() == lyDo.Trim() ? dong : $"{cu}\n{dong}";
-
         // Reset Loại số điều chỉnh của CẢ 2 bên cho 1 dòng BBGN (bên nào cũng bấm được, bắt buộc có lý do). KL của 2 bên giữ
         // nguyên, KL quy khô bị xóa (vì phụ thuộc loại số) — 2 bên chọn lại loại số rồi lưu lại. Cần cả 2 phiếu còn sửa được.
         public async Task ResetLoaiSoBBGNAsync(
@@ -468,11 +478,9 @@ namespace dataproduct.api.Repositories
             {
                 kia.LoaiSoDieuChinh = null;
                 if (laBenNhan) kia.KhoiLuongQuyKhoXuat = null; else kia.KhoiLuongQuyKhoNhap = null;
-                var dong = $"[Reset loại số bởi bên {(laBenNhan ? "nhận" : "xuất")} {now:dd/MM/yyyy HH:mm} " +
-                           $"(loại cũ {(loaiCu == 1 ? "Trước ẩm" : "Sau ẩm")}): {lyDo.Trim()}]";
-                // Dòng reset ghi vào ghi chú của chính bên đang reset
-                if (laBenNhan) own.GhiChuNhap = NoiGhiChuReset(own.GhiChuNhap, lyDo, dong);
-                else own.GhiChuXuat = NoiGhiChuReset(own.GhiChuXuat, lyDo, dong);
+                // Reset xong xóa trắng ghi chú của bên đang reset để nhập lại
+                if (laBenNhan) own.GhiChuNhap = null;
+                else own.GhiChuXuat = null;
             }
             await _formContext.SaveChangesAsync();
             await tx.CommitAsync();
@@ -537,10 +545,9 @@ namespace dataproduct.api.Repositories
                 rec.ThoiGianDieuChinhNhan = null;
             }
 
-            var dong = $"[Reset bởi bên {(laBenNhan ? "nhận" : "xuất")} {now:dd/MM/yyyy HH:mm} (KL cũ {klKia:0.###}): {lyDo.Trim()}]";
-            // Dòng reset ghi vào ghi chú của chính bên đang reset
-            if (laBenNhan) dongCuaMinh.GhiChuNhap = NoiGhiChuReset(dongCuaMinh.GhiChuNhap, lyDo, dong);
-            else dongCuaMinh.GhiChuXuat = NoiGhiChuReset(dongCuaMinh.GhiChuXuat, lyDo, dong);
+            // Reset xong xóa trắng ghi chú của bên đang reset để nhập lại
+            if (laBenNhan) dongCuaMinh.GhiChuNhap = null;
+            else dongCuaMinh.GhiChuXuat = null;
             await _formContext.SaveChangesAsync();
             await tx.CommitAsync();
         }
