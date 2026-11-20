@@ -83,6 +83,13 @@ public partial class ProductFormContext : DbContext
 
     // HRC1 — Đúc phôi vuông (BCSX)
     public virtual DbSet<DPV_LenhSanXuat> DPV_LenhSanXuats { get; set; }
+    public virtual DbSet<DinhMucTieuHao> DinhMucTieuHaos { get; set; }
+
+    // Biên bản chốt số liệu Xưởng ĐPV (HRC1_BCSX_DPV) — 4 bảng chi tiết theo PhieuID
+    public virtual DbSet<HRC1_BC_ThepLong> HRC1_BC_ThepLongs { get; set; }
+    public virtual DbSet<HRC1_BC_Dien> HRC1_BC_Diens { get; set; }
+    public virtual DbSet<HRC1_BC_NguyenVatLieu> HRC1_BC_NguyenVatLieus { get; set; }
+    public virtual DbSet<HRC1_BC_ThanhPham> HRC1_BC_ThanhPhams { get; set; }
 
     // Kho dữ liệu — Động lực (EMS)
     public virtual DbSet<TagID_DongLuc> TagID_DongLucs { get; set; }
@@ -921,6 +928,76 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
         });
 
+        modelBuilder.Entity<DinhMucTieuHao>(entity =>
+        {
+            entity.ToTable("DinhMucTieuHao");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.DayChuyen).HasMaxLength(100);
+            entity.Property(e => e.BaoCao).HasMaxLength(100);
+            entity.Property(e => e.ChiTieu).HasMaxLength(200);
+            entity.Property(e => e.DonViTinh).HasMaxLength(50);
+            entity.Property(e => e.MucSanLuong).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.DieuKienSanLuong).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.MucTieuHaoLDG).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.DieuKienTieuHaoLDG).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.MucTyLePhe).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.DieuKienTyLePhe).HasColumnType("decimal(18,4)");
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+        });
+
+        // --- Biên bản chốt số liệu Xưởng ĐPV (HRC1_BCSX_DPV) ---
+        modelBuilder.Entity<HRC1_BC_ThepLong>(entity =>
+        {
+            entity.ToTable("HRC1_BC_ThepLong");
+            CauHinhDongBC(entity);
+            entity.Property(e => e.Mac).HasMaxLength(100);
+            entity.Property(e => e.DonViTinh).HasMaxLength(20);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+            entity.Property(e => e.TonDau).HasPrecision(18, 3);
+            entity.Property(e => e.Nhap).HasPrecision(18, 3);
+            entity.Property(e => e.Xuat).HasPrecision(18, 3);
+            entity.Property(e => e.TonCuoi).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<HRC1_BC_Dien>(entity =>
+        {
+            entity.ToTable("HRC1_BC_Dien");
+            CauHinhDongBC(entity);
+            entity.Property(e => e.NoiDung).HasMaxLength(200);
+            entity.Property(e => e.DonViTinh).HasMaxLength(20);
+            entity.Property(e => e.SoLieu).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<HRC1_BC_NguyenVatLieu>(entity =>
+        {
+            entity.ToTable("HRC1_BC_NguyenVatLieu");
+            CauHinhDongBC(entity);
+            entity.Property(e => e.NoiDung).HasMaxLength(200);
+            entity.Property(e => e.DonViTinh).HasMaxLength(20);
+            entity.Property(e => e.BoPhanLienQuan).HasMaxLength(100);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+            entity.Property(e => e.SoLieu).HasPrecision(18, 3);
+            entity.Property(e => e.SoLieuBoPhan).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<HRC1_BC_ThanhPham>(entity =>
+        {
+            entity.ToTable("HRC1_BC_ThanhPham");
+            CauHinhDongBC(entity);
+            entity.Property(e => e.Me).HasMaxLength(50);
+            entity.Property(e => e.Mac).HasMaxLength(100);
+            entity.Property(e => e.KichThuoc).HasMaxLength(50);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+            foreach (var p in new[] { "Nguoi_Loai1", "Nguoi_Loai2BM", "Nguoi_Loai2TPHH", "Nguoi_Loai3",
+                                      "Nong_Loai1", "Nong_Loai2BM", "Nong_Loai2TPHH", "Nong_Loai3" })
+                entity.Property<decimal?>(p).HasPrecision(18, 3);
+            // Cột tính PERSISTED trong DB — EF không ghi
+            entity.Property(e => e.Tong).HasPrecision(18, 3)
+                .HasComputedColumnSql(
+                    "ISNULL([Nguoi_Loai1],0)+ISNULL([Nguoi_Loai2BM],0)+ISNULL([Nguoi_Loai2TPHH],0)+ISNULL([Nguoi_Loai3],0)" +
+                    "+ISNULL([Nong_Loai1],0)+ISNULL([Nong_Loai2BM],0)+ISNULL([Nong_Loai2TPHH],0)+ISNULL([Nong_Loai3],0)",
+                    stored: true);
+        });
+
         // --- Kho dữ liệu — Động lực ---
         modelBuilder.Entity<TagID_DongLuc>(entity =>
         {
@@ -1350,4 +1427,14 @@ public partial class ProductFormContext : DbContext
     }
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 
+    /// <summary>Cột chung của 4 bảng HRC1_BC_* (Biên bản chốt số liệu Xưởng ĐPV).</summary>
+    private static void CauHinhDongBC<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity)
+        where T : HRC1_BC_DongBase
+    {
+        entity.HasKey(e => e.ID);
+        entity.Property(e => e.Kip).HasMaxLength(1).IsFixedLength().IsUnicode(false);
+        entity.Property(e => e.GhiChu).HasMaxLength(500);
+        entity.Property(e => e.NguoiTao).HasMaxLength(100);
+        entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+    }
 }

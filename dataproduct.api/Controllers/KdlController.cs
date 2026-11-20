@@ -94,6 +94,66 @@ namespace dataproduct.api.Controllers
             return File(kq.Value.Bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
 
+        /// <summary>
+        /// Tổng hợp chi tiết: dòng đối tượng xen dòng Tổng ca / ngày / tháng / năm.
+        /// loaiDuLieu: tatCa (mặc định) | ca | ngay | thang | nam — cấp thấp nhất được hiển thị.
+        /// </summary>
+        [HttpGet("form/{maForm}/tong-hop-chi-tiet")]
+        public async Task<IActionResult> GetTongHopChiTiet(string maForm, [FromQuery] KdlLocQuery q, string? loaiDuLieu)
+        {
+            var kq = await _xem.GetTongHopChiTietAsync(maForm, q.ToLoc(), loaiDuLieu);
+            if (kq == null) return NotFound(new { message = $"Không tìm thấy form {maForm}." });
+            return Ok(new { data = kq.Value.Rows, vuotGioiHan = kq.Value.VuotGioiHan });
+        }
+
+        [HttpGet("form/{maForm}/tong-hop-chi-tiet/export-excel")]
+        public async Task<IActionResult> ExportTongHopChiTiet(string maForm, [FromQuery] KdlLocQuery q, string? loaiDuLieu)
+        {
+            var loc = q.ToLoc();
+            var kq = await _xem.ExportTongHopChiTietExcelAsync(maForm, loc, loaiDuLieu);
+            if (kq == null) return NotFound(new { message = $"Không tìm thấy form {maForm}." });
+
+            var fileName = $"{maForm}_THCT_{loc.TuNgay:yyyyMMdd}_{loc.DenNgay:yyyyMMdd}.xlsx";
+            return File(kq.Value.Bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+
+        /// <summary>
+        /// Tổng hợp theo chiều: mỗi cấp ca / ngày / tháng / năm có dòng "Theo …" từng giá trị chiều + dòng "Tổng …".
+        /// chieu: Mac | LenhSanXuat | MayDuc | KichThuoc. loaiDuLieu: tatCa | ca | ngay | thang | nam.
+        /// </summary>
+        [HttpGet("form/{maForm}/tong-hop-theo-chieu")]
+        public async Task<IActionResult> GetTongHopTheoChieu(string maForm, [FromQuery] KdlLocQuery q, string? chieu, string? loaiDuLieu)
+        {
+            try
+            {
+                var kq = await _xem.GetTongHopTheoChieuAsync(maForm, q.ToLoc(), chieu, loaiDuLieu);
+                if (kq == null) return NotFound(new { message = $"Không tìm thấy form {maForm}." });
+                return Ok(new { data = kq.Value.Rows, vuotGioiHan = kq.Value.VuotGioiHan });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("form/{maForm}/tong-hop-theo-chieu/export-excel")]
+        public async Task<IActionResult> ExportTongHopTheoChieu(string maForm, [FromQuery] KdlLocQuery q, string? chieu, string? loaiDuLieu)
+        {
+            var loc = q.ToLoc();
+            try
+            {
+                var kq = await _xem.ExportTongHopTheoChieuExcelAsync(maForm, loc, chieu, loaiDuLieu);
+                if (kq == null) return NotFound(new { message = $"Không tìm thấy form {maForm}." });
+
+                var fileName = $"{maForm}_TH_{chieu}_{loc.TuNgay:yyyyMMdd}_{loc.DenNgay:yyyyMMdd}.xlsx";
+                return File(kq.Value.Bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         /// <summary>Body: { "MaKey": giá trị | null }. null / "" = xóa nhập tay, quay về số tự động.</summary>
         [HttpPut("form/{maForm}/doi-tuong/{idDoiTuong}/nhap-tay")]
         public async Task<IActionResult> NhapTay(string maForm, int idDoiTuong, [FromBody] Dictionary<string, JsonElement> giaTri)

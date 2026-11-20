@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Biên bản chốt số liệu Xưởng Đúc phôi vuông</title>
+    <!-- BM.14/QT.05.11 — MaBM HRC1_BCSX_DPV. Placeholder do HRC1_BCSXExportService điền; {{MaBM}} {{NgayHieuLuc}} {{LanSuaDoi}} từ bm-config.json -->
+    <style>
+        body { font-family: "Times New Roman", serif; font-size: 12px; margin: 0; padding: 0; color: #000; }
+
+        /* ===== HEADER: logo trái — tiêu đề giữa (ngang đáy logo) — mã BM góc trên phải ===== */
+        table.header { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        table.header td { border: none; padding: 0; }
+        .header-left { width: 24%; vertical-align: top; text-align: left; }
+        .header-left img { height: 92px; }
+        .header-mid { width: 52%; vertical-align: bottom; text-align: center; }
+        .header-right { width: 24%; vertical-align: top; text-align: right; font-size: 11px; line-height: 1.6; padding-top: 6px !important; }
+        .title { font-weight: bold; font-size: 19px; text-transform: uppercase; letter-spacing: 0.2px; }
+        .sub-title { font-size: 12px; margin-top: 3px; }
+
+        /* ===== BẢNG ===== */
+        table.bb { width: 100%; border-collapse: collapse; margin-top: 12px; page-break-inside: auto; table-layout: fixed; }
+        table.bb td { word-wrap: break-word; }
+        table.bb tr { page-break-inside: avoid; }
+        table.bb th, table.bb td { border: 1px solid #555; padding: 5px 4px; text-align: center; vertical-align: middle; }
+        table.bb th { font-weight: bold; padding: 7px 4px; line-height: 1.25; }
+        table.bb td { height: 18px; }
+        table.bb tr.section td { text-align: left; font-weight: bold; padding: 9px 5px; }
+        table.bb tr.section td:first-child { text-align: center; }
+        .text-left { text-align: left !important; padding-left: 5px !important; }
+        .text-right { text-align: right !important; padding-right: 6px !important; }
+        .total td { font-weight: bold; }
+        .nd td { background: #e7e6e6; }
+        .kt { font-size: 10px; }
+
+        /* ===== KÝ ===== */
+        /* Ngày + 3 ô ký luôn đi cùng nhau (không tách trang) */
+        .ky-block { page-break-inside: avoid; margin-top: 10px; }
+        .footer-date { text-align: right; font-style: italic; padding-right: 30px; }
+        table.sign { width: 100%; border-collapse: collapse; margin-top: 8px; text-align: center; page-break-inside: avoid; }
+        table.sign td { border: none; width: 33.3%; vertical-align: top; }
+        .sign-title { font-weight: bold; font-size: 13px; }
+        .sign-img { height: 80px; vertical-align: middle !important; }
+        .sign-img img { max-height: 70px; }
+        .sign-name { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <table class="header">
+        <tr>
+            <td class="header-left"><img src="{{LogoUrl}}" alt="Logo" /></td>
+            <td class="header-mid">
+                <div class="title">Biên bản chốt số liệu xưởng đúc phôi vuông</div>
+                <div class="sub-title">Từ 08 giờ 00 ngày {{TuNgayText}} đến 08 giờ 00 ngày {{DenNgayText}}</div>
+            </td>
+            <td class="header-right">
+                <div><b>{{MaBM}}</b></div>
+                <div><b><i>Ngày hiệu lực:</i> {{NgayHieuLuc}}</b></div>
+                <div><b><i>Lần sửa đổi:</i> {{LanSuaDoi}}</b></div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Cả biên bản là 1 bảng liền trên lưới 18 cột (theo vùng IV). Dòng tiêu đề vùng, header cột và dữ liệu do
+         HRC1_BCSXExportService dựng ({{BangBienBan}}); mỗi vùng ghép ô (colspan) cho đủ 18 cột. -->
+    <table class="bb">
+        <colgroup>
+            <col style="width:3%" />    <!-- 1  STT -->
+            <col style="width:7%" />    <!-- 2  Mẻ -->
+            <col style="width:6%" />    <!-- 3  Mác -->
+            <col style="width:8%" />    <!-- 4  Kích thước -->
+            <col style="width:3.5%" />  <!-- 5  Kíp -->
+            <col style="width:4%" />    <!-- 6  Nguội: số thanh -->
+            <col style="width:6.5%" />  <!-- 7  Nguội: Loại I -->
+            <col style="width:5%" />    <!-- 8  Nguội: Loại II BM -->
+            <col style="width:5%" />    <!-- 9  Nguội: Loại II TPHH -->
+            <col style="width:5%" />    <!-- 10 Nguội: Loại III -->
+            <col style="width:4%" />    <!-- 11 Nóng: số thanh -->
+            <col style="width:6.5%" />  <!-- 12 Nóng: Loại I -->
+            <col style="width:5%" />    <!-- 13 Nóng: Loại II BM -->
+            <col style="width:5%" />    <!-- 14 Nóng: Loại II TPHH -->
+            <col style="width:4%" />    <!-- 15 Nóng: Loại III -->
+            <col style="width:6.5%" />  <!-- 16 Tổng -->
+            <col style="width:3.5%" />  <!-- 17 Đúc -->
+            <col style="width:12.5%" /> <!-- 18 Ghi chú / LSX -->
+        </colgroup>
+        <tbody>
+            {{BangBienBan}}
+        </tbody>
+    </table>
+
+    <div class="ky-block">
+    <table class="sign">
+        <tr>
+            <td colspan="3" class="footer-date">Quảng Ngãi, ngày {{NgayKyText}}</td>
+        </tr>
+        <tr>
+            <td class="sign-title">P.CNLT</td>
+            <td class="sign-title">NM.HRC1</td>
+            <td class="sign-title">P.KH</td>
+        </tr>
+        <tr>
+            <td class="sign-img">{{Sign_CNLT}}</td>
+            <td class="sign-img">{{Sign_HRC1}}</td>
+            <td class="sign-img">{{Sign_KH}}</td>
+        </tr>
+        <tr>
+            <td class="sign-name">{{Name_CNLT}}</td>
+            <td class="sign-name">{{Name_HRC1}}</td>
+            <td class="sign-name">{{Name_KH}}</td>
+        </tr>
+    </table>
+    </div>
+</body>
+</html>

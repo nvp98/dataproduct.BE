@@ -98,5 +98,10 @@
     "MaBM": "BM.30/QT.05.15",
     "NgayHieuLuc": "10/11/2025",
     "LanSuaDoi": "00"
+  },
+  "HRC1_BCSX_DPV": {
+    "MaBM": "BM.14/QT.05.11",
+    "NgayHieuLuc": "01/10/2026",
+    "LanSuaDoi": "03"
   }
 }

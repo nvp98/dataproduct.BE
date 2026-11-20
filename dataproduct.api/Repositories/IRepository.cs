@@ -638,6 +638,14 @@ namespace dataproduct.api.Repositories
         Task UpdateAsync(DPV_LenhSanXuat entity);
     }
 
+    public interface IDinhMucTieuHaoRepository
+    {
+        Task<List<DinhMucTieuHao>> SearchAsync(int? idPB, int? idXuong, string? baoCao, string? chiTieu, DateOnly? ngayApDung);
+        Task<DinhMucTieuHao?> GetByIdAsync(int id);
+        Task AddAsync(DinhMucTieuHao entity);
+        Task UpdateAsync(DinhMucTieuHao entity);
+    }
+
     // --- Kho dữ liệu — Động lực (EMS) ---
     public interface IDongLucRepository
     {
