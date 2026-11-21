@@ -40,12 +40,17 @@ namespace dataproduct.api.Services
         private readonly IHRC1_BCSXRepository _repo;
         private readonly KdlXemService _kdl;
         private readonly ProductDataMasterDbContext _master;
+        private readonly HRC1_GNTongHopNhomService? _tongHopNhom;
+        private readonly HRC1_GNPhanBoService? _phanBo;
 
-        public HRC1_BCSXService(IHRC1_BCSXRepository repo, KdlXemService kdl, ProductDataMasterDbContext master)
+        public HRC1_BCSXService(IHRC1_BCSXRepository repo, KdlXemService kdl, ProductDataMasterDbContext master,
+            HRC1_GNTongHopNhomService? tongHopNhom = null, HRC1_GNPhanBoService? phanBo = null)
         {
             _repo = repo;
             _kdl = kdl;
             _master = master;
+            _tongHopNhom = tongHopNhom;
+            _phanBo = phanBo;
         }
 
         public Task<HRC1_BCSXChiTiet> GetChiTietAsync(Guid idPhieu) => _repo.GetByPhieuAsync(idPhieu);
@@ -55,11 +60,25 @@ namespace dataproduct.api.Services
         /// <summary>
         /// Số liệu gợi ý của ngày <paramref name="ngaySX"/> (kỳ 08h ngày N → 08h ngày N+1) từ CSDL HRC1_DPV:
         /// Thép lỏng (Kíp × Mác × LSX: số mẻ, Xuất = Σ TL_Tong), Điện (Σ Dien theo kíp), Thành phẩm (theo mẻ + dòng ngắn dài).
-        /// NVL không có nguồn → trống. Dòng gợi ý có Nguon = 1.
+        /// III. NVL từ form Giao nhận (HRC1_DPV_GN, chiều Giao): NVL có cờ phân bổ = số phân bổ theo LSX, NVL khác = Σ theo
+        /// (Nhóm 1, Xưởng) mỗi kíp. Dòng gợi ý có Nguon = 1.
         /// </summary>
         public async Task<HRC1_BCSXGoiY> GetGoiYAsync(DateOnly ngaySX)
         {
             var kq = new HRC1_BCSXGoiY();
+
+            // Lịch kíp trực: (TenCa) → (ID_Kip, TenKip)
+            var lichKip = await _master.Tbl_Kip.AsNoTracking()
+                .Where(k => k.NgayLamViec == ngaySX)
+                .ToListAsync();
+            Tbl_Kip? TraKip(byte? ca) => ca == null ? null : lichKip.FirstOrDefault(k => k.TenCa == ca.Value.ToString());
+
+            // II. Điện — Σ DuLieu_DongLuc (EMS) MaHeader DPV_DienTong (tag 5468) theo ca; kíp theo lịch Tbl_Kip
+            await ThemDienAsync(kq, ngaySX, TraKip);
+
+            // III. NVL lấy từ Giao nhận — độc lập với CSDL (có thể có NVL khi CSDL chưa đồng bộ)
+            await ThemNguyenVatLieuAsync(kq, ngaySX, TraKip);
+
             var dongs = await _kdl.GetTatCaDongAsync(MaFormCSDL, new KdlLoc { TuNgay = ngaySX, DenNgay = ngaySX });
             if (dongs == null)
             {
@@ -71,12 +90,6 @@ namespace dataproduct.api.Services
                 kq.CanhBao.Add($"Chưa có dữ liệu CSDL Đúc phôi vuông ngày {ngaySX:dd/MM/yyyy} — hãy Đồng bộ ở màn hình CSDL rồi lấy lại.");
                 return kq;
             }
-
-            // Lịch kíp trực: (TenCa) → (ID_Kip, TenKip)
-            var lichKip = await _master.Tbl_Kip.AsNoTracking()
-                .Where(k => k.NgayLamViec == ngaySX)
-                .ToListAsync();
-            Tbl_Kip? TraKip(byte? ca) => ca == null ? null : lichKip.FirstOrDefault(k => k.TenCa == ca.Value.ToString());
 
             // Thứ tự biên bản: ca 1 trước ca 2, trong ca theo mẻ A→Z
             var theoCa = dongs.OrderBy(d => d.CaSX ?? 9).ThenBy(d => d.Me, StringComparer.OrdinalIgnoreCase).ToList();
@@ -111,18 +124,6 @@ namespace dataproduct.api.Services
                     kq.CanhBao.Add($"Thép lỏng {x.Mac} kíp {x.Kip}: chưa có LSX (điền ở màn hình LSX Đúc phôi vuông rồi Đồng bộ).");
                 kq.ThepLong.Add(x);
             }
-
-            // II. Điện — Σ Dien theo kíp (điện cả ca gắn vào mẻ đầu ca)
-            foreach (var g in theoCa.GroupBy(d => (d.CaSX, Kip: ChuanKip(d.Kip))))
-            {
-                var dien = TongKey(g, "Dien");
-                if (dien == null) continue;
-                var x = new HRC1_BC_Dien { SoLieu = dien };
-                GanKip(x, g.First());
-                kq.Dien.Add(x);
-            }
-            if (kq.Dien.Count == 0)
-                kq.CanhBao.Add("Chưa có số điện (tag DPV_DienTong) cho ngày này.");
 
             // IV. Thành phẩm — 1 dòng / mẻ; mẻ có ngắn dài thêm 1 dòng KT ngắn dài (xếp cuối kíp)
             foreach (var g in theoCa.GroupBy(d => (d.CaSX, Kip: ChuanKip(d.Kip))))
@@ -183,6 +184,99 @@ namespace dataproduct.api.Services
 
             kq.CanhBao = kq.CanhBao.Distinct().ToList();
             return kq;
+        }
+
+        /// <summary>MaHeader động lực dùng cho vùng II Điện (TagID_DongLuc: tag EMS 5468 "Điện tổng" xưởng DPV).</summary>
+        public const string MaHeaderDien = "DPV_DienTong";
+
+        /// <summary>
+        /// II. Điện — Σ DuLieu_DongLuc (kéo từ EMS ở màn hình Động lực) MaHeader <see cref="MaHeaderDien"/> theo ca của ngày SX;
+        /// 1 dòng / ca, kíp theo lịch Tbl_Kip. Ca chưa có số (EMS chưa trả) → cảnh báo.
+        /// </summary>
+        private async Task ThemDienAsync(HRC1_BCSXGoiY kq, DateOnly ngaySX, Func<byte?, Tbl_Kip?> traKip)
+        {
+            var theoCa = await _repo.GetDongLucTheoCaAsync(ngaySX, MaHeaderDien);
+            foreach (byte ca in new byte[] { 1, 2 })
+            {
+                if (!theoCa.TryGetValue(ca, out var soLieu))
+                {
+                    kq.CanhBao.Add($"Chưa có số điện {MaHeaderDien} ca {ca} ngày {ngaySX:dd/MM/yyyy} — Đồng bộ ở màn hình Dữ liệu động lực (EMS chưa có số thì để trống).");
+                    continue;
+                }
+                var k = traKip(ca);
+                kq.Dien.Add(new HRC1_BC_Dien
+                {
+                    NgaySX = ngaySX, CaSX = ca, IdKip = k?.ID_Kip, Kip = ChuanKip(k?.TenKip),
+                    SoLieu = Math.Round(soLieu, 3), Nguon = KdlConst.Nguon.TuDong,
+                });
+            }
+        }
+
+        /// <summary>
+        /// III. NVL xuất cho các nhà máy — từ form Giao nhận Xưởng ĐPV (chiều Giao, Số liệu sau điều chỉnh, kg):
+        /// NVL có cờ "Cấu hình phân bổ" (Mapping NVL) → 1 dòng / (kíp, LSX) = phân bổ cuối (tab Phân bổ BBGN);
+        /// NVL khác → 1 dòng / (kíp, Nhóm 1, Xưởng), LSX trống. Số liệu = Số liệu bộ phận; Bộ phận = xưởng viết tắt.
+        /// Thứ tự: ca → thứ tự Mapping NVL → LSX.
+        /// </summary>
+        private async Task ThemNguyenVatLieuAsync(HRC1_BCSXGoiY kq, DateOnly ngaySX, Func<byte?, Tbl_Kip?> traKip)
+        {
+            if (_tongHopNhom == null || _phanBo == null) return;
+            var th = await _tongHopNhom.GetAsync(ngaySX, ngaySX);
+            var pb = await _phanBo.GetAsync(ngaySX, ngaySX);
+            static string K(string? s) => Kdl.HRC1DPV.HRC1DPVGN_BBGNNguon.ChuanHoa(s);
+
+            var khoiPhanBo = pb.Khoi.Select(k => (K(k.Nhom1), K(k.Xuong))).ToHashSet();
+            var thuTuCot = th.Cot.Select((c, i) => (c, i))
+                .Where(x => x.c.Chieu == Kdl.HRC1DPV.HRC1DPVGN_BBGNNguon.ChieuGiao)
+                .GroupBy(x => (K(x.c.Nhom1), K(x.c.Xuong)))
+                .ToDictionary(g => g.Key, g => g.Min(x => x.i));
+            int ThuTu(string nhom1, string xuong) => thuTuCot.GetValueOrDefault((K(nhom1), K(xuong)), int.MaxValue);
+
+            var dongMoi = new List<(byte Ca, int ThuTu, string Lsx, HRC1_BC_NguyenVatLieu Dong)>();
+            HRC1_BC_NguyenVatLieu Tao(byte ca, string? kip, string nhom1, string xuong, decimal soLieu, string? lsx)
+            {
+                var k = traKip(ca);
+                return new HRC1_BC_NguyenVatLieu
+                {
+                    NgaySX = ngaySX, CaSX = ca, IdKip = k?.ID_Kip, Kip = ChuanKip(kip) ?? ChuanKip(k?.TenKip),
+                    NoiDung = nhom1, DonViTinh = "Kg", SoLieu = soLieu, SoLieuBoPhan = soLieu, BoPhanLienQuan = xuong,
+                    LenhSanXuat = string.IsNullOrWhiteSpace(lsx) ? null : lsx, Nguon = KdlConst.Nguon.TuDong,
+                };
+            }
+
+            // NVL không phân bổ: Σ theo (ca, kíp, Nhóm 1, Xưởng)
+            foreach (var d in th.Dong.Where(d => d.CaSX is 1 or 2))
+                foreach (var c in th.Cot.Where(c => c.Chieu == Kdl.HRC1DPV.HRC1DPVGN_BBGNNguon.ChieuGiao && !khoiPhanBo.Contains((K(c.Nhom1), K(c.Xuong)))))
+                {
+                    var v = d.GiaTri.GetValueOrDefault(c.Ma);
+                    if (v != 0) dongMoi.Add((d.CaSX!.Value, ThuTu(c.Nhom1, c.Xuong), "", Tao(d.CaSX.Value, d.Kip, c.Nhom1, c.Xuong, v, null)));
+                }
+
+            // NVL phân bổ: theo LSX; ca chưa có LSX → 1 dòng tổng không LSX + cảnh báo
+            foreach (var d in pb.Dong)
+                foreach (var k in pb.Khoi)
+                {
+                    var o = d.O[k.Ma];
+                    if (d.LenhSanXuat.Length == 0)
+                    {
+                        if (o.TongCa == 0) continue;
+                        dongMoi.Add((d.CaSX, ThuTu(k.Nhom1, k.Xuong), "", Tao(d.CaSX, d.Kip, k.Nhom1, k.Xuong, o.TongCa, null)));
+                        kq.CanhBao.Add($"{k.Nhom1} ca {d.CaSX}: chưa có LSX để phân bổ ({o.TongCa:N0} kg) — bổ sung LSX ở CSDL rồi Đồng bộ.");
+                        continue;
+                    }
+                    if (o.PhanBoCuoi != 0)
+                        dongMoi.Add((d.CaSX, ThuTu(k.Nhom1, k.Xuong), d.LenhSanXuat, Tao(d.CaSX, d.Kip, k.Nhom1, k.Xuong, o.PhanBoCuoi, d.LenhSanXuat)));
+                    if (d.DauCa && o.Check != 0)
+                        kq.CanhBao.Add($"{k.Nhom1} ca {d.CaSX}: phân bổ lệch tổng {o.Check:N0} kg (tab Phân bổ BBGN).");
+                }
+
+            var chuaMap = th.Tong.GetValueOrDefault("NA");
+            if (chuaMap != 0)
+                kq.CanhBao.Add($"Giao nhận ngày này có {chuaMap:N0} kg (giao + nhận) chưa map Nội dung 1 / BP đối tác — phần chiều Giao chưa map không vào vùng III (bổ sung ở tab Mapping rồi Đồng bộ).");
+
+            kq.NguyenVatLieu.AddRange(dongMoi
+                .OrderBy(x => x.Ca).ThenBy(x => x.ThuTu).ThenBy(x => x.Lsx, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.Dong));
         }
 
         // ── Ghi bảng phụ từ DataJson (hook sau khi lưu phiếu) ──────────────────

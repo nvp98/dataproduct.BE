@@ -26,5 +26,8 @@ namespace dataproduct.api.Repositories
         /// — dùng cho Excel tổng hợp. Kèm số phiếu theo PhieuID.
         /// </summary>
         Task<(HRC1_BCSXChiTiet Data, Dictionary<Guid, string?> SoPhieu)> GetTheoKhoangNgayAsync(string maBM, DateOnly tuNgay, DateOnly denNgay);
+
+        /// <summary>Σ giá trị động lực (DuLieu_DongLuc, kéo từ EMS) của <paramref name="maHeader"/> theo ca trong 1 ngày.</summary>
+        Task<Dictionary<byte, decimal>> GetDongLucTheoCaAsync(DateOnly ngay, string maHeader);
     }
 }

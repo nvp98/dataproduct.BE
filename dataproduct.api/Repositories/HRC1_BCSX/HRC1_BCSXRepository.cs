@@ -15,6 +15,14 @@ namespace dataproduct.api.Repositories
         public async Task<BmPhieu?> GetPhieuByIdAsync(Guid idPhieu)
             => await _context.BmPhieus.FindAsync(idPhieu);
 
+        public async Task<Dictionary<byte, decimal>> GetDongLucTheoCaAsync(DateOnly ngay, string maHeader)
+            => (await _context.DuLieu_DongLucs.AsNoTracking()
+                    .Where(x => x.Ngay == ngay && x.MaHeader == maHeader && x.GiaTri != null)
+                    .GroupBy(x => x.CaSX)
+                    .Select(g => new { Ca = g.Key, Tong = g.Sum(x => x.GiaTri!.Value) })
+                    .ToListAsync())
+               .ToDictionary(x => x.Ca, x => x.Tong);
+
         // Thứ tự hiển thị theo biên bản: kíp ca 1 trước ca 2, trong kíp theo ID (= thứ tự nhập)
         public async Task<HRC1_BCSXChiTiet> GetByPhieuAsync(Guid idPhieu) => new()
         {

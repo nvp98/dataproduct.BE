@@ -98,6 +98,7 @@ namespace dataproduct.api.Services.Kdl
             // 1. Đọc nguồn
             var doiTuongVao = new Dictionary<string, KdlDoiTuongVao>(StringComparer.OrdinalIgnoreCase);
             var giaTriVao = new List<(string Nguon, KdlDongDuLieu Dong)>();
+            var canhBaoNguon = new List<string>();
             foreach (var nguon in nguons)
             {
                 var ctx = new KdlNguonContext
@@ -112,6 +113,7 @@ namespace dataproduct.api.Services.Kdl
                     foreach (var d in kq.DoiTuongs)
                         doiTuongVao[d.Me] = d;
                 giaTriVao.AddRange(kq.GiaTris.Select(g => (nguon.MaNguon, g)));
+                canhBaoNguon.AddRange(kq.CanhBao.Select(c => $"{nguon.MaNguon}: {c}"));
             }
 
             // 2. Map mã gốc → key, gộp (đối tượng, key): số cộng dồn, chuỗi lấy giá trị cuối
@@ -172,7 +174,7 @@ namespace dataproduct.api.Services.Kdl
 
             await tx.CommitAsync(ct);
 
-            var canhBao = new List<string>();
+            var canhBao = new List<string>(canhBaoNguon);
             if (chuaMap.Count > 0) canhBao.Add($"Mã gốc chưa khai báo trong KDL_Key.MaGoc: {string.Join(", ", chuaMap)}");
             if (khongCoDoiTuong > 0) canhBao.Add($"{khongCoDoiTuong} giá trị bỏ qua vì không có đối tượng tương ứng");
             return (soDong, canhBao.Count > 0 ? string.Join(" | ", canhBao) : null);

@@ -22,6 +22,8 @@ namespace dataproduct.api.Services.Kdl
     {
         public List<KdlDoiTuongVao> DoiTuongs { get; } = [];
         public List<KdlDongDuLieu> GiaTris { get; } = [];
+        /// <summary>Cảnh báo của nguồn (vd không tra được mapping) — ghi vào KDL_SyncLog.LoiChiTiet, không làm hỏng lần đồng bộ.</summary>
+        public List<string> CanhBao { get; } = [];
     }
 
     public class KdlNguonContext

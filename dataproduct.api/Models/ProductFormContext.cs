@@ -90,6 +90,9 @@ public partial class ProductFormContext : DbContext
     public virtual DbSet<HRC1_BC_Dien> HRC1_BC_Diens { get; set; }
     public virtual DbSet<HRC1_BC_NguyenVatLieu> HRC1_BC_NguyenVatLieus { get; set; }
     public virtual DbSet<HRC1_BC_ThanhPham> HRC1_BC_ThanhPhams { get; set; }
+    public virtual DbSet<HRC1_BC_XuongChuanHoa> HRC1_BC_XuongChuanHoas { get; set; }
+    public virtual DbSet<HRC1_BC_NVLChuanHoa> HRC1_BC_NVLChuanHoas { get; set; }
+    public virtual DbSet<HRC1_BC_PhanBoDieuChinh> HRC1_BC_PhanBoDieuChinhs { get; set; }
 
     // Kho dữ liệu — Động lực (EMS)
     public virtual DbSet<TagID_DongLuc> TagID_DongLucs { get; set; }
@@ -978,6 +981,43 @@ public partial class ProductFormContext : DbContext
             entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
             entity.Property(e => e.SoLieu).HasPrecision(18, 3);
             entity.Property(e => e.SoLieuBoPhan).HasPrecision(18, 3);
+        });
+        modelBuilder.Entity<HRC1_BC_XuongChuanHoa>(entity =>
+        {
+            entity.ToTable("HRC1_BC_XuongChuanHoa");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.Xuong).HasMaxLength(200);
+            entity.Property(e => e.BoPhan).HasMaxLength(200);
+            entity.Property(e => e.VietTat).HasMaxLength(30);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+            entity.Property(e => e.NgayTao).HasDefaultValueSql("(getdate())");
+        });
+        modelBuilder.Entity<HRC1_BC_PhanBoDieuChinh>(entity =>
+        {
+            entity.ToTable("HRC1_BC_PhanBoDieuChinh");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.Kip).HasMaxLength(1).IsFixedLength().IsUnicode(false);
+            entity.Property(e => e.LenhSanXuat).HasMaxLength(30);
+            entity.Property(e => e.Nhom1).HasMaxLength(100);
+            entity.Property(e => e.XuongVietTat).HasMaxLength(30);
+            entity.Property(e => e.DieuChinh).HasPrecision(18, 3);
+            entity.Property(e => e.LyDo).HasMaxLength(500);
+            entity.Property(e => e.GhiChu).HasMaxLength(500);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+            entity.Property(e => e.NgayTao).HasDefaultValueSql("(getdate())");
+        });
+        modelBuilder.Entity<HRC1_BC_NVLChuanHoa>(entity =>
+        {
+            entity.ToTable("HRC1_BC_NVLChuanHoa");
+            entity.HasKey(e => e.ID);
+            entity.Property(e => e.TenVatTu).HasMaxLength(200);
+            entity.Property(e => e.XuongVietTat).HasMaxLength(30);
+            entity.Property(e => e.Nhom1).HasMaxLength(100);
+            entity.Property(e => e.NguoiTao).HasMaxLength(100);
+            entity.Property(e => e.NguoiCapNhat).HasMaxLength(100);
+            entity.Property(e => e.NgayTao).HasDefaultValueSql("(getdate())");
         });
         modelBuilder.Entity<HRC1_BC_ThanhPham>(entity =>
         {
